@@ -1040,8 +1040,8 @@ func TestIndexBatch(t *testing.T) {
 		externalDocIds[externalID] = struct{}{}
 	}
 	expectedDocIds := map[string]struct{}{
-		"2": struct{}{},
-		"3": struct{}{},
+		"2": {},
+		"3": {},
 	}
 	if !reflect.DeepEqual(externalDocIds, expectedDocIds) {
 		t.Errorf("expected ids: %v, got ids: %v", expectedDocIds, externalDocIds)
@@ -1191,7 +1191,6 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 		t.Errorf("expected 3 stored field, got %d", len(storedDoc.Fields))
 	}
 	for _, field := range storedDoc.Fields {
-
 		if field.Name() == "name" {
 			textField, ok := field.(*document.TextField)
 			if !ok {
@@ -1272,7 +1271,6 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	}
 
 	for _, field := range storedDoc.Fields {
-
 		if field.Name() == "name" {
 			textField, ok := field.(*document.TextField)
 			if !ok {
@@ -1383,16 +1381,15 @@ func TestIndexInsertFields(t *testing.T) {
 			fieldsMap[field] = struct{}{}
 		}
 		expectedFieldsMap := map[string]struct{}{
-			"_id":       struct{}{},
-			"name":      struct{}{},
-			"age":       struct{}{},
-			"unixEpoch": struct{}{},
+			"_id":       {},
+			"name":      {},
+			"age":       {},
+			"unixEpoch": {},
 		}
 		if !reflect.DeepEqual(fieldsMap, expectedFieldsMap) {
 			t.Errorf("expected fields: %v, got %v", expectedFieldsMap, fieldsMap)
 		}
 	}
-
 }
 
 func TestIndexUpdateComposites(t *testing.T) {
@@ -1683,30 +1680,40 @@ func TestDocValueReaderConcurrent(t *testing.T) {
 	// now have 10 goroutines try to visit field values for doc 1
 	// in a random field
 	var wg sync.WaitGroup
+	errCh := make(chan error, 10)
 	for j := 0; j < 10; j++ {
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			r, err := idx.Reader()
 			if err != nil {
-				t.Fatal(err)
+				errCh <- err
+				return
 			}
 			docNumber, err := r.InternalID("1")
 			if err != nil {
-				t.Fatal(err)
+				errCh <- err
+				return
 			}
 			dvr, err := r.DocValueReader([]string{fmt.Sprintf("f%d", rand.Intn(100))})
 			if err != nil {
-				t.Fatal(err)
+				errCh <- err
+				return
 			}
 			err = dvr.VisitDocValues(docNumber, func(field string, term []byte) {})
 			if err != nil {
-				t.Fatal(err)
+				errCh <- err
+				return
 			}
-			wg.Done()
 		}()
 	}
 
 	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Fatal(err)
+	}
 }
 
 func TestConcurrentUpdate(t *testing.T) {
@@ -1740,24 +1747,30 @@ func TestConcurrentUpdate(t *testing.T) {
 
 	// do some concurrent updates
 	var wg sync.WaitGroup
+	errCh := make(chan error, 100)
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func(i int) {
+			defer wg.Done()
 			doc := document.NewDocument("1")
 			doc.AddField(document.NewTextFieldWithIndexingOptions(strconv.Itoa(i), []uint64{}, []byte(strconv.Itoa(i)), index.StoreField))
 			err := idx.Update(doc)
 			if err != nil {
-				t.Errorf("Error updating index: %v", err)
+				errCh <- fmt.Errorf("Error updating index: %v", err)
 			}
-			wg.Done()
 		}(i)
 	}
 	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Error(err)
+	}
 
 	// now load the name field and see what we get
 	r, err := idx.Reader()
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 	defer func() {
 		err := r.Close()
@@ -1768,7 +1781,7 @@ func TestConcurrentUpdate(t *testing.T) {
 
 	docInt, err := r.Document("1")
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	doc := docInt.(*document.Document)
@@ -2023,7 +2036,6 @@ func TestIndexDocValueReaderWithMultipleDocs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 }
 
 func TestIndexDocValueReaderWithMultipleFieldOptions(t *testing.T) {
@@ -2103,7 +2115,6 @@ func TestIndexDocValueReaderWithMultipleFieldOptions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 }
 
 func TestAllFieldWithDifferentTermVectorsEnabled(t *testing.T) {
@@ -2195,7 +2206,7 @@ func TestForceVersion(t *testing.T) {
 		t.Fatalf("wrong segment wrapper version loaded, expected %d got %d", 12, s.segPlugin.Version())
 	}
 	cfg["forceSegmentVersion"] = 10
-	idx, err = NewScorch(Name, cfg, analysisQueue)
+	_, err = NewScorch(Name, cfg, analysisQueue)
 	if err == nil {
 		t.Fatalf("expected an error opening an unsupported vesion, got nil")
 	}
@@ -2204,6 +2215,9 @@ func TestForceVersion(t *testing.T) {
 func TestIndexForceMerge(t *testing.T) {
 	cfg := CreateConfig("TestIndexForceMerge")
 	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
 		err := DestroyTest(cfg)
 		if err != nil {
@@ -2283,7 +2297,8 @@ func TestIndexForceMerge(t *testing.T) {
 			MaxSegmentsPerTier:   1,
 			MaxSegmentSize:       10000,
 			SegmentsPerMergeTask: 10,
-			FloorSegmentSize:     10000})
+			FloorSegmentSize:     10000,
+		})
 		if err != nil {
 			t.Errorf("ForceMerge failed, err: %v", err)
 		}
@@ -2300,7 +2315,8 @@ func TestIndexForceMerge(t *testing.T) {
 		MaxSegmentsPerTier:   1,
 		MaxSegmentSize:       1 << 33,
 		SegmentsPerMergeTask: 10,
-		FloorSegmentSize:     10000})
+		FloorSegmentSize:     10000,
+	})
 	if err != mergeplan.ErrMaxSegmentSizeTooLarge {
 		t.Errorf("ForceMerge expected to fail with ErrMaxSegmentSizeTooLarge")
 	}
@@ -2396,7 +2412,10 @@ func TestCancelIndexForceMerge(t *testing.T) {
 
 	// cancel the force merge operation once the root has some new merge
 	// introductions. ie if the root has lesser file segments than earlier.
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for {
 			nval := atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot)
 			if nval < nfsr {
@@ -2406,12 +2425,14 @@ func TestCancelIndexForceMerge(t *testing.T) {
 			time.Sleep(time.Millisecond * 5)
 		}
 	}()
+	wg.Wait()
 
 	err = si.ForceMerge(ctx, &mergeplan.MergePlanOptions{
 		MaxSegmentsPerTier:   1,
 		MaxSegmentSize:       10000,
 		SegmentsPerMergeTask: 5,
-		FloorSegmentSize:     10000})
+		FloorSegmentSize:     10000,
+	})
 	if err != nil {
 		t.Errorf("ForceMerge failed, err: %v", err)
 	}
@@ -2628,7 +2649,9 @@ func TestReadOnlyIndex(t *testing.T) {
 			if entry.IsDir() {
 				permissionsFunc(fullName)
 			} else {
-				os.Chmod(fullName, 0555)
+				if err := os.Chmod(fullName, 0o555); err != nil {
+					t.Fatal(err)
+				}
 			}
 		}
 	}
@@ -2665,7 +2688,6 @@ func TestReadOnlyIndex(t *testing.T) {
 }
 
 func BenchmarkAggregateFieldStats(b *testing.B) {
-
 	fieldStatsArray := make([]*fieldStats, 1000)
 
 	for i := range fieldStatsArray {

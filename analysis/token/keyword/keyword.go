@@ -35,8 +35,7 @@ func NewKeyWordMarkerFilter(keyWords analysis.TokenMap) *KeyWordMarkerFilter {
 
 func (f *KeyWordMarkerFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
 	for _, token := range input {
-		word := string(token.Term)
-		_, isKeyWord := f.keyWords[word]
+		_, isKeyWord := f.keyWords[string(token.Term)]
 		if isKeyWord {
 			token.KeyWord = true
 		}

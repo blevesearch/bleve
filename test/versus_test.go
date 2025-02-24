@@ -400,7 +400,8 @@ func hitsById(res *bleve.SearchResult) map[string]*search.DocumentMatch {
 
 func (vt *VersusTest) run(indexTypeA, kvStoreA, indexTypeB, kvStoreB string,
 	cb func(versusTest *VersusTest, searchTemplates []string, idxA, idxB bleve.Index),
-	searchTemplates []string) {
+	searchTemplates []string,
+) {
 	if cb == nil {
 		cb = testVersusSearches
 	}

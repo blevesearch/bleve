@@ -23,9 +23,11 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-var reflectStaticSizeDocumentMatch int
-var reflectStaticSizeSearchContext int
-var reflectStaticSizeLocation int
+var (
+	reflectStaticSizeDocumentMatch int
+	reflectStaticSizeSearchContext int
+	reflectStaticSizeLocation      int
+)
 
 func init() {
 	var dm DocumentMatch
@@ -261,7 +263,7 @@ func (dm *DocumentMatch) Size() int {
 		sizeInBytes += size.SizeOfString + len(entry)
 	}
 
-	for k, _ := range dm.Fields {
+	for k := range dm.Fields {
 		sizeInBytes += size.SizeOfString + len(k) +
 			size.SizeOfPtr
 	}

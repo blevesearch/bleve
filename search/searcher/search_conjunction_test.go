@@ -249,29 +249,51 @@ func TestScorchCompositeSearchOptimizations(t *testing.T) {
 	}()
 
 	tests := []compositeSearchOptimizationTest{
-		{fieldTerms: []string{},
-			expectEmpty: "conjunction,disjunction"},
-		{fieldTerms: []string{"name:marty"},
-			expectEmpty: ""},
-		{fieldTerms: []string{"name:marty", "desc:beer"},
-			expectEmpty: ""},
-		{fieldTerms: []string{"name:marty", "name:marty"},
-			expectEmpty: ""},
-		{fieldTerms: []string{"name:marty", "desc:beer", "title:mister", "street:couchbase"},
-			expectEmpty: "conjunction"},
-		{fieldTerms: []string{"name:steve", "desc:beer", "title:mister", "street:couchbase"},
-			expectEmpty: ""},
+		{
+			fieldTerms:  []string{},
+			expectEmpty: "conjunction,disjunction",
+		},
+		{
+			fieldTerms:  []string{"name:marty"},
+			expectEmpty: "",
+		},
+		{
+			fieldTerms:  []string{"name:marty", "desc:beer"},
+			expectEmpty: "",
+		},
+		{
+			fieldTerms:  []string{"name:marty", "name:marty"},
+			expectEmpty: "",
+		},
+		{
+			fieldTerms:  []string{"name:marty", "desc:beer", "title:mister", "street:couchbase"},
+			expectEmpty: "conjunction",
+		},
+		{
+			fieldTerms:  []string{"name:steve", "desc:beer", "title:mister", "street:couchbase"},
+			expectEmpty: "",
+		},
 
-		{fieldTerms: []string{"name:NotARealName"},
-			expectEmpty: "conjunction,disjunction"},
-		{fieldTerms: []string{"name:NotARealName", "name:marty"},
-			expectEmpty: "conjunction"},
-		{fieldTerms: []string{"name:NotARealName", "name:marty", "desc:beer"},
-			expectEmpty: "conjunction"},
-		{fieldTerms: []string{"name:NotARealName", "name:marty", "name:marty"},
-			expectEmpty: "conjunction"},
-		{fieldTerms: []string{"name:NotARealName", "name:marty", "desc:beer", "title:mister", "street:couchbase"},
-			expectEmpty: "conjunction"},
+		{
+			fieldTerms:  []string{"name:NotARealName"},
+			expectEmpty: "conjunction,disjunction",
+		},
+		{
+			fieldTerms:  []string{"name:NotARealName", "name:marty"},
+			expectEmpty: "conjunction",
+		},
+		{
+			fieldTerms:  []string{"name:NotARealName", "name:marty", "desc:beer"},
+			expectEmpty: "conjunction",
+		},
+		{
+			fieldTerms:  []string{"name:NotARealName", "name:marty", "name:marty"},
+			expectEmpty: "conjunction",
+		},
+		{
+			fieldTerms:  []string{"name:NotARealName", "name:marty", "desc:beer", "title:mister", "street:couchbase"},
+			expectEmpty: "conjunction",
+		},
 	}
 
 	// The theme of this unit test is that given one of the above
@@ -281,14 +303,14 @@ func TestScorchCompositeSearchOptimizations(t *testing.T) {
 	// ID's from the search results from any of those combinations
 	// should be the same.
 	searcherOptionsToCompare := []search.SearcherOptions{
-		search.SearcherOptions{},
-		search.SearcherOptions{Explain: true},
-		search.SearcherOptions{IncludeTermVectors: true},
-		search.SearcherOptions{IncludeTermVectors: true, Explain: true},
-		search.SearcherOptions{Score: "none"},
-		search.SearcherOptions{Score: "none", IncludeTermVectors: true},
-		search.SearcherOptions{Score: "none", IncludeTermVectors: true, Explain: true},
-		search.SearcherOptions{Score: "none", Explain: true},
+		{},
+		{Explain: true},
+		{IncludeTermVectors: true},
+		{IncludeTermVectors: true, Explain: true},
+		{Score: "none"},
+		{Score: "none", IncludeTermVectors: true},
+		{Score: "none", IncludeTermVectors: true, Explain: true},
+		{Score: "none", Explain: true},
 	}
 
 	testScorchCompositeSearchOptimizations(t, twoDocIndexReader, tests,
@@ -301,7 +323,8 @@ func TestScorchCompositeSearchOptimizations(t *testing.T) {
 func testScorchCompositeSearchOptimizations(t *testing.T, indexReader index.IndexReader,
 	tests []compositeSearchOptimizationTest,
 	searcherOptionsToCompare []search.SearcherOptions,
-	compositeKind string) {
+	compositeKind string,
+) {
 	for testi := range tests {
 		resultsToCompare := map[string]bool{}
 
@@ -317,13 +340,13 @@ func testScorchCompositeSearchOptimizationsHelper(
 	t *testing.T, indexReader index.IndexReader,
 	tests []compositeSearchOptimizationTest, testi int,
 	searcherOptionsToCompare []search.SearcherOptions,
-	compositeKind string, allowOptimizations bool, resultsToCompare map[string]bool) {
+	compositeKind string, allowOptimizations bool, resultsToCompare map[string]bool,
+) {
 	// Save the global allowed optimization settings to restore later.
 	optimizeConjunction := scorch.OptimizeConjunction
 	optimizeConjunctionUnadorned := scorch.OptimizeConjunctionUnadorned
 	optimizeDisjunctionUnadorned := scorch.OptimizeDisjunctionUnadorned
-	optimizeDisjunctionUnadornedMinChildCardinality :=
-		scorch.OptimizeDisjunctionUnadornedMinChildCardinality
+	optimizeDisjunctionUnadornedMinChildCardinality := scorch.OptimizeDisjunctionUnadornedMinChildCardinality
 
 	scorch.OptimizeConjunction = allowOptimizations
 	scorch.OptimizeConjunctionUnadorned = allowOptimizations
@@ -337,8 +360,7 @@ func testScorchCompositeSearchOptimizationsHelper(
 		scorch.OptimizeConjunction = optimizeConjunction
 		scorch.OptimizeConjunctionUnadorned = optimizeConjunctionUnadorned
 		scorch.OptimizeDisjunctionUnadorned = optimizeDisjunctionUnadorned
-		scorch.OptimizeDisjunctionUnadornedMinChildCardinality =
-			optimizeDisjunctionUnadornedMinChildCardinality
+		scorch.OptimizeDisjunctionUnadornedMinChildCardinality = optimizeDisjunctionUnadornedMinChildCardinality
 	}()
 
 	test := tests[testi]
@@ -393,6 +415,9 @@ func testScorchCompositeSearchOptimizationsHelper(
 			}
 
 			next, err = cs.Next(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
 			i++
 		}
 

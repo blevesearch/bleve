@@ -930,7 +930,6 @@ func TestQuerySyntaxParserInvalid(t *testing.T) {
 }
 
 func BenchmarkLexer(b *testing.B) {
-
 	for n := 0; n < b.N; n++ {
 		var tokenTypes []int
 		var tokens []yySymType
@@ -946,5 +945,4 @@ func BenchmarkLexer(b *testing.B) {
 			rv = l.Lex(&lval)
 		}
 	}
-
 }

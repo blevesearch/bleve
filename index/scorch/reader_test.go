@@ -59,7 +59,6 @@ func TestIndexReader(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount++
 
 	doc = document.NewDocument("2")
 	doc.AddField(document.NewTextFieldWithAnalyzer("name", []uint64{}, []byte("test test test"), testAnalyzer))
@@ -68,7 +67,6 @@ func TestIndexReader(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount++
 
 	indexReader, err := idx.Reader()
 	if err != nil {
@@ -216,7 +214,6 @@ func TestIndexReader(t *testing.T) {
 	if match != nil {
 		t.Errorf("expected nil, got %v", match)
 	}
-
 }
 
 func TestIndexDocIdReader(t *testing.T) {
@@ -568,7 +565,6 @@ func TestIndexDocIdOnlyReader(t *testing.T) {
 	// if !id.Equals(index.IndexInternalID("9")) {
 	// 	t.Errorf("expected to find id '9', got '%s'", id)
 	// }
-
 }
 
 func TestSegmentIndexAndLocalDocNumFromGlobal(t *testing.T) {

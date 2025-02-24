@@ -26,12 +26,15 @@
 package query
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
 
-var debugParser bool
-var debugLexer bool
+var (
+	debugParser bool
+	debugLexer  bool
+)
 
 func parseQuerySyntax(query string) (rq Query, err error) {
 	if query == "" {
@@ -41,7 +44,7 @@ func parseQuerySyntax(query string) (rq Query, err error) {
 	doParse(lex)
 
 	if len(lex.errs) > 0 {
-		return nil, fmt.Errorf(strings.Join(lex.errs, "\n"))
+		return nil, errors.New(strings.Join(lex.errs, "\n"))
 	}
 	return lex.query, nil
 }

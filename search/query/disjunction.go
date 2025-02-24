@@ -56,9 +56,7 @@ func (q *DisjunctionQuery) Boost() float64 {
 }
 
 func (q *DisjunctionQuery) AddQuery(aq ...Query) {
-	for _, aaq := range aq {
-		q.Disjuncts = append(q.Disjuncts, aaq)
-	}
+	q.Disjuncts = append(q.Disjuncts, aq...)
 }
 
 func (q *DisjunctionQuery) SetMin(m float64) {
@@ -66,7 +64,8 @@ func (q *DisjunctionQuery) SetMin(m float64) {
 }
 
 func (q *DisjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping,
-	options search.SearcherOptions) (search.Searcher, error) {
+	options search.SearcherOptions,
+) (search.Searcher, error) {
 	ss := make([]search.Searcher, 0, len(q.Disjuncts))
 	for _, disjunct := range q.Disjuncts {
 		sr, err := disjunct.Searcher(ctx, i, m, options)
