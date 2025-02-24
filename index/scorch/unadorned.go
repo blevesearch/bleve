@@ -96,6 +96,12 @@ func (i *unadornedPostingsIteratorBitmap) ReplaceActual(actual *roaring.Bitmap) 
 	i.actual = actual.Iterator()
 }
 
+// Resets the iterator to the beginning of the postings list.
+// by resetting the actual iterator.
+func (i *unadornedPostingsIteratorBitmap) ResetIterator() {
+	i.actual = i.actualBM.Iterator()
+}
+
 func newUnadornedPostingsIteratorFromBitmap(bm *roaring.Bitmap) segment.PostingsIterator {
 	return &unadornedPostingsIteratorBitmap{
 		actualBM: bm,
