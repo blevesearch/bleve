@@ -658,6 +658,16 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["num_persister_nap_merger_break"] = m["TotPersisterMergerNapBreak"]
 	m["total_compaction_written_bytes"] = m["TotFileMergeWrittenBytes"]
 
+	// the bool stat `index_converging` indicates whether the background routines
+	// which causes the index to reach a steady state are still doing some work.
+	if rootEpoch, ok := m["CurRootEpoch"].(uint64); ok {
+		if lastMergedEpoch, ok := m["LastMergedEpoch"].(uint64); ok {
+			if lastPersistedEpoch, ok := m["LastPersistedEpoch"].(uint64); ok {
+				m["index_converging"] = !(lastMergedEpoch == rootEpoch && lastPersistedEpoch == rootEpoch)
+			}
+		}
+	}
+
 	// calculate the aggregate of all the segment's field stats
 	aggFieldStats := newFieldStats()
 	for _, segmentSnapshot := range indexSnapshot.Segments() {
