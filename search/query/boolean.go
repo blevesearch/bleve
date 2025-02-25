@@ -250,6 +250,7 @@ func (q *BooleanQuery) UnmarshalJSON(data []byte) error {
 		Must    json.RawMessage `json:"must,omitempty"`
 		Should  json.RawMessage `json:"should,omitempty"`
 		MustNot json.RawMessage `json:"must_not,omitempty"`
+		Filter  json.RawMessage `json:"filter,omitempty"`
 		Boost   *Boost          `json:"boost,omitempty"`
 	}{}
 	err := util.UnmarshalJSON(data, &tmp)
@@ -287,6 +288,13 @@ func (q *BooleanQuery) UnmarshalJSON(data []byte) error {
 		_, isDisjunctionQuery := q.MustNot.(*DisjunctionQuery)
 		if !isDisjunctionQuery {
 			return fmt.Errorf("must not clause must be disjunction")
+		}
+	}
+
+	if tmp.Filter != nil {
+		q.Filter, err = ParseQuery(tmp.Filter)
+		if err != nil {
+			return err
 		}
 	}
 
