@@ -5,14 +5,14 @@ go 1.21
 require (
 	github.com/RoaringBitmap/roaring/v2 v2.4.5
 	github.com/bits-and-blooms/bitset v1.12.0
-	github.com/blevesearch/bleve_index_api v1.2.1
+	github.com/blevesearch/bleve_index_api v1.2.2-0.20250207163324-9af4b44c3810
 	github.com/blevesearch/geo v0.1.20
 	github.com/blevesearch/go-faiss v1.0.24
 	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/blevesearch/go-porterstemmer v1.0.3
 	github.com/blevesearch/goleveldb v1.0.1
 	github.com/blevesearch/gtreap v0.1.1
-	github.com/blevesearch/scorch_segment_api/v2 v2.3.3
+	github.com/blevesearch/scorch_segment_api/v2 v2.3.4-0.20250210150338-cf1ed08c650d
 	github.com/blevesearch/segment v0.9.1
 	github.com/blevesearch/snowball v0.6.1
 	github.com/blevesearch/snowballstem v0.9.0
@@ -27,6 +27,7 @@ require (
 	github.com/blevesearch/zapx/v16 v16.2.1
 	github.com/couchbase/moss v0.2.0
 	github.com/golang/protobuf v1.3.2
+	github.com/google/go-cmp v0.6.0
 	github.com/spf13/cobra v1.7.0
 	go.etcd.io/bbolt v1.3.7
 	golang.org/x/text v0.8.0
@@ -43,3 +44,5 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 )
+
+replace github.com/blevesearch/zapx/v16 => ../zapx
