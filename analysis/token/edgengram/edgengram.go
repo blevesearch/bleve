@@ -111,5 +111,8 @@ func EdgeNgramFilterConstructor(config map[string]interface{}, cache *registry.C
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, EdgeNgramFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, EdgeNgramFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

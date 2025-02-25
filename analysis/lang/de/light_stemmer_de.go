@@ -112,5 +112,8 @@ func GermanLightStemmerFilterConstructor(config map[string]interface{}, cache *r
 }
 
 func init() {
-	registry.RegisterTokenFilter(LightStemmerName, GermanLightStemmerFilterConstructor)
+	err := registry.RegisterTokenFilter(LightStemmerName, GermanLightStemmerFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

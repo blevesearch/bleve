@@ -20,12 +20,13 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 )
 
-func RegisterSynonymSource(typ string, constructor SynonymSourceConstructor) {
+func RegisterSynonymSource(typ string, constructor SynonymSourceConstructor) error {
 	_, exists := synonymSources[typ]
 	if exists {
-		panic(fmt.Errorf("attempted to register duplicate synonym source with type '%s'", typ))
+		return fmt.Errorf("attempted to register duplicate synonym source with type '%s'", typ)
 	}
 	synonymSources[typ] = constructor
+	return nil
 }
 
 type SynonymSourceCache struct {

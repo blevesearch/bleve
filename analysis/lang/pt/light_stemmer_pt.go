@@ -191,5 +191,8 @@ func PortugueseLightStemmerFilterConstructor(config map[string]interface{}, cach
 }
 
 func init() {
-	registry.RegisterTokenFilter(LightStemmerName, PortugueseLightStemmerFilterConstructor)
+	err := registry.RegisterTokenFilter(LightStemmerName, PortugueseLightStemmerFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

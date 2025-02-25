@@ -42,5 +42,8 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 }
 
 func init() {
-	registry.RegisterAnalyzer(Name, AnalyzerConstructor)
+	err := registry.RegisterAnalyzer(Name, AnalyzerConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

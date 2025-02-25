@@ -63,5 +63,8 @@ func PossessiveFilterConstructor(config map[string]interface{}, cache *registry.
 }
 
 func init() {
-	registry.RegisterTokenFilter(PossessiveName, PossessiveFilterConstructor)
+	err := registry.RegisterTokenFilter(PossessiveName, PossessiveFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

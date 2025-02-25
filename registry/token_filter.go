@@ -20,12 +20,13 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 )
 
-func RegisterTokenFilter(name string, constructor TokenFilterConstructor) {
+func RegisterTokenFilter(name string, constructor TokenFilterConstructor) error {
 	_, exists := tokenFilters[name]
 	if exists {
-		panic(fmt.Errorf("attempted to register duplicate token filter named '%s'", name))
+		return fmt.Errorf("attempted to register duplicate token filter named '%s'", name)
 	}
 	tokenFilters[name] = constructor
+	return nil
 }
 
 type TokenFilterConstructor func(config map[string]interface{}, cache *Cache) (analysis.TokenFilter, error)

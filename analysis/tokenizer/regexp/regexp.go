@@ -69,7 +69,10 @@ func RegexpTokenizerConstructor(config map[string]interface{}, cache *registry.C
 }
 
 func init() {
-	registry.RegisterTokenizer(Name, RegexpTokenizerConstructor)
+	err := registry.RegisterTokenizer(Name, RegexpTokenizerConstructor)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func detectTokenType(termBytes []byte) analysis.TokenType {

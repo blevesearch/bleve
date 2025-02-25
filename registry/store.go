@@ -17,15 +17,16 @@ package registry
 import (
 	"fmt"
 
-	"github.com/blevesearch/upsidedown_store_api"
+	store "github.com/blevesearch/upsidedown_store_api"
 )
 
-func RegisterKVStore(name string, constructor KVStoreConstructor) {
+func RegisterKVStore(name string, constructor KVStoreConstructor) error {
 	_, exists := stores[name]
 	if exists {
-		panic(fmt.Errorf("attempted to register duplicate store named '%s'", name))
+		return fmt.Errorf("attempted to register duplicate store named '%s'", name)
 	}
 	stores[name] = constructor
+	return nil
 }
 
 // KVStoreConstructor is used to build a KVStore of a specific type when

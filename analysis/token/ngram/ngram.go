@@ -90,7 +90,10 @@ func NgramFilterConstructor(config map[string]interface{}, cache *registry.Cache
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, NgramFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, NgramFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Expects either an int or a flaot64 value

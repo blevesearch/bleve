@@ -1042,7 +1042,10 @@ func (udc *UpsideDownCouch) fieldIndexOrNewRow(name string) (uint16, *FieldRow) 
 }
 
 func init() {
-	registry.RegisterIndexType(Name, NewUpsideDownCouch)
+	err := registry.RegisterIndexType(Name, NewUpsideDownCouch)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func backIndexRowForDoc(kvreader store.KVReader, docID index.IndexInternalID) (*BackIndexRow, error) {

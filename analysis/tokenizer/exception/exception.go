@@ -137,5 +137,8 @@ func ExceptionsTokenizerConstructor(config map[string]interface{}, cache *regist
 }
 
 func init() {
-	registry.RegisterTokenizer(Name, ExceptionsTokenizerConstructor)
+	err := registry.RegisterTokenizer(Name, ExceptionsTokenizerConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

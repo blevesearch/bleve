@@ -58,5 +58,8 @@ func GenericTokenMapConstructor(config map[string]interface{}, cache *registry.C
 }
 
 func init() {
-	registry.RegisterTokenMap(Name, GenericTokenMapConstructor)
+	err := registry.RegisterTokenMap(Name, GenericTokenMapConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

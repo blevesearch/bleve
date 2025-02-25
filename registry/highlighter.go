@@ -20,12 +20,13 @@ import (
 	"github.com/blevesearch/bleve/v2/search/highlight"
 )
 
-func RegisterHighlighter(name string, constructor HighlighterConstructor) {
+func RegisterHighlighter(name string, constructor HighlighterConstructor) error {
 	_, exists := highlighters[name]
 	if exists {
-		panic(fmt.Errorf("attempted to register duplicate highlighter named '%s'", name))
+		return fmt.Errorf("attempted to register duplicate highlighter named '%s'", name)
 	}
 	highlighters[name] = constructor
+	return nil
 }
 
 type HighlighterConstructor func(config map[string]interface{}, cache *Cache) (highlight.Highlighter, error)

@@ -20,12 +20,13 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 )
 
-func RegisterDateTimeParser(name string, constructor DateTimeParserConstructor) {
+func RegisterDateTimeParser(name string, constructor DateTimeParserConstructor) error {
 	_, exists := dateTimeParsers[name]
 	if exists {
-		panic(fmt.Errorf("attempted to register duplicate date time parser named '%s'", name))
+		return fmt.Errorf("attempted to register duplicate date time parser named '%s'", name)
 	}
 	dateTimeParsers[name] = constructor
+	return nil
 }
 
 type DateTimeParserConstructor func(config map[string]interface{}, cache *Cache) (analysis.DateTimeParser, error)

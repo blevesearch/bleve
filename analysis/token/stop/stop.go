@@ -66,5 +66,8 @@ func StopTokensFilterConstructor(config map[string]interface{}, cache *registry.
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, StopTokensFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, StopTokensFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

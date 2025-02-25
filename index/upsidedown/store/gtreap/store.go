@@ -26,7 +26,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/gtreap"
-	"github.com/blevesearch/upsidedown_store_api"
+	store "github.com/blevesearch/upsidedown_store_api"
 )
 
 const Name = "gtreap"
@@ -78,5 +78,8 @@ func (s *Store) Writer() (store.KVWriter, error) {
 }
 
 func init() {
-	registry.RegisterKVStore(Name, New)
+	err := registry.RegisterKVStore(Name, New)
+	if err != nil {
+		panic(err)
+	}
 }

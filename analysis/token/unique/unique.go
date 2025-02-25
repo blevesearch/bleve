@@ -49,5 +49,8 @@ func UniqueTermFilterConstructor(config map[string]interface{}, cache *registry.
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, UniqueTermFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, UniqueTermFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

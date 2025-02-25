@@ -20,12 +20,13 @@ import (
 	"github.com/blevesearch/bleve/v2/search/highlight"
 )
 
-func RegisterFragmentFormatter(name string, constructor FragmentFormatterConstructor) {
+func RegisterFragmentFormatter(name string, constructor FragmentFormatterConstructor) error {
 	_, exists := fragmentFormatters[name]
 	if exists {
-		panic(fmt.Errorf("attempted to register duplicate fragment formatter named '%s'", name))
+		return fmt.Errorf("attempted to register duplicate fragment formatter named '%s'", name)
 	}
 	fragmentFormatters[name] = constructor
+	return nil
 }
 
 type FragmentFormatterConstructor func(config map[string]interface{}, cache *Cache) (highlight.FragmentFormatter, error)

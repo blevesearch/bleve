@@ -63,7 +63,10 @@ func EnglishPluralStemmerFilterConstructor(config map[string]interface{}, cache 
 }
 
 func init() {
-	registry.RegisterTokenFilter(PluralStemmerName, EnglishPluralStemmerFilterConstructor)
+	err := registry.RegisterTokenFilter(PluralStemmerName, EnglishPluralStemmerFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // ----------------------------------------------------------------------------

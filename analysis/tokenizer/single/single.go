@@ -45,5 +45,8 @@ func SingleTokenTokenizerConstructor(config map[string]interface{}, cache *regis
 }
 
 func init() {
-	registry.RegisterTokenizer(Name, SingleTokenTokenizerConstructor)
+	err := registry.RegisterTokenizer(Name, SingleTokenTokenizerConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

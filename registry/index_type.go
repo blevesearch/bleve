@@ -20,12 +20,13 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-func RegisterIndexType(name string, constructor IndexTypeConstructor) {
+func RegisterIndexType(name string, constructor IndexTypeConstructor) error {
 	_, exists := indexTypes[name]
 	if exists {
-		panic(fmt.Errorf("attempted to register duplicate index encoding named '%s'", name))
+		return fmt.Errorf("attempted to register duplicate index encoding named '%s'", name)
 	}
 	indexTypes[name] = constructor
+	return nil
 }
 
 type IndexTypeConstructor func(storeName string, storeConfig map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error)
@@ -38,7 +39,7 @@ func IndexTypeConstructorByName(name string) IndexTypeConstructor {
 func IndexTypesAndInstances() ([]string, []string) {
 	var types []string
 	var instances []string
-	for name := range stores {
+	for name := range indexTypes {
 		types = append(types, name)
 	}
 	return types, instances

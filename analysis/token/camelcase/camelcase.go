@@ -74,5 +74,8 @@ func CamelCaseFilterConstructor(config map[string]interface{}, cache *registry.C
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, CamelCaseFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, CamelCaseFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

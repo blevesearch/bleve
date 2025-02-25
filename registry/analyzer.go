@@ -20,12 +20,13 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 )
 
-func RegisterAnalyzer(name string, constructor AnalyzerConstructor) {
+func RegisterAnalyzer(name string, constructor AnalyzerConstructor) error {
 	_, exists := analyzers[name]
 	if exists {
-		panic(fmt.Errorf("attempted to register duplicate analyzer named '%s'", name))
+		return fmt.Errorf("attempted to register duplicate analyzer named '%s'", name)
 	}
 	analyzers[name] = constructor
+	return nil
 }
 
 type AnalyzerConstructor func(config map[string]interface{}, cache *Cache) (analysis.Analyzer, error)

@@ -772,7 +772,10 @@ func (s *Scorch) unmarkIneligibleForRemoval(filename string) {
 }
 
 func init() {
-	registry.RegisterIndexType(Name, NewScorch)
+	err := registry.RegisterIndexType(Name, NewScorch)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func parseToTimeDuration(i interface{}) (time.Duration, error) {

@@ -29,5 +29,8 @@ func TokenizerConstructor(config map[string]interface{}, cache *registry.Cache) 
 }
 
 func init() {
-	registry.RegisterTokenizer(Name, TokenizerConstructor)
+	err := registry.RegisterTokenizer(Name, TokenizerConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

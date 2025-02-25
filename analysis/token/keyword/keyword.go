@@ -57,5 +57,8 @@ func KeyWordMarkerFilterConstructor(config map[string]interface{}, cache *regist
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, KeyWordMarkerFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, KeyWordMarkerFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }
