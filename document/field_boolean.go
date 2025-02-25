@@ -66,7 +66,7 @@ func (b *BooleanField) Options() index.FieldIndexingOptions {
 	return b.options
 }
 
-func (b *BooleanField) Analyze() {
+func (b *BooleanField) Analyze() error {
 	tokens := make(analysis.TokenStream, 0)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
@@ -78,6 +78,8 @@ func (b *BooleanField) Analyze() {
 
 	b.length = len(tokens)
 	b.frequencies = analysis.TokenFrequency(tokens, b.arrayPositions, b.options)
+
+	return nil
 }
 
 func (b *BooleanField) Value() []byte {

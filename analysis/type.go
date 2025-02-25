@@ -72,8 +72,58 @@ type TokenFilter interface {
 	Filter(TokenStream) TokenStream
 }
 
+// -----------------------------------------------------------------------------
+
+type AnalyzerType int
+
+const (
+	TokensAnalyzer AnalyzerType = iota
+	VectorAnalyzer
+)
+
 type Analyzer interface {
-	Analyze([]byte) TokenStream
+	Type() AnalyzerType
+	Analyze([]byte) (any, error)
+}
+
+// Convenience method to analyze given input using an Analyzer.
+// Performs type assertion to ensure that the output is a token stream.
+func AnalyzeForTokens(analyzer Analyzer, input []byte) (TokenStream, error) {
+	if analyzer.Type() != TokensAnalyzer {
+		return nil, fmt.Errorf("incompatible analyzer type")
+	}
+
+	output, err := analyzer.Analyze(input)
+	if err != nil {
+		return nil, err
+	}
+
+	rv, ok := output.(TokenStream)
+	if !ok {
+		return nil, fmt.Errorf("unexpected output type, expected TokenStream")
+	}
+
+	return rv, nil
+}
+
+// Convenience method to analyze given input using an Analyzer.
+// Performs type assertion to ensure that the output is a vector.
+func AnalyzeForVectors(analyzer Analyzer, input []byte) ([]float32, error) {
+	if analyzer.Type() != VectorAnalyzer {
+		return nil, fmt.Errorf("incompatible analyzer type")
+	}
+
+	output, err := analyzer.Analyze(input)
+	if err != nil {
+		return nil, err
+	}
+
+	rv, ok := output.([]float32)
+	if !ok {
+		return nil, fmt.Errorf("unexpected output type, expected []float32")
+	}
+
+	return rv, nil
 }
 
 type DefaultAnalyzer struct {
@@ -82,7 +132,7 @@ type DefaultAnalyzer struct {
 	TokenFilters []TokenFilter
 }
 
-func (a *DefaultAnalyzer) Analyze(input []byte) TokenStream {
+func (a *DefaultAnalyzer) Analyze(input []byte) (any, error) {
 	if a.CharFilters != nil {
 		for _, cf := range a.CharFilters {
 			input = cf.Filter(input)
@@ -94,8 +144,14 @@ func (a *DefaultAnalyzer) Analyze(input []byte) TokenStream {
 			tokens = tf.Filter(tokens)
 		}
 	}
-	return tokens
+	return tokens, nil
 }
+
+func (a *DefaultAnalyzer) Type() AnalyzerType {
+	return TokensAnalyzer
+}
+
+// -----------------------------------------------------------------------------
 
 var ErrInvalidDateTime = fmt.Errorf("unable to parse datetime with any of the layouts")
 

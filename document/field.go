@@ -29,7 +29,7 @@ type Field interface {
 	// "doc1", then "field" in "doc2".
 	ArrayPositions() []uint64
 	Options() index.FieldIndexingOptions
-	Analyze()
+	Analyze() error
 	Value() []byte
 
 	// NumPlainTextBytes should return the number of plain text bytes

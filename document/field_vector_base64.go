@@ -79,7 +79,8 @@ func (n *VectorBase64Field) AnalyzedTokenFrequencies() index.TokenFrequencies {
 	return n.vectorField.AnalyzedTokenFrequencies()
 }
 
-func (n *VectorBase64Field) Analyze() {
+func (n *VectorBase64Field) Analyze() error {
+	return nil
 }
 
 func (n *VectorBase64Field) Value() []byte {

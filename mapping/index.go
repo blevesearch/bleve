@@ -475,7 +475,7 @@ func (im *IndexMappingImpl) AnalyzeText(analyzerName string, text []byte) (analy
 	if err != nil {
 		return nil, err
 	}
-	return analyzer.Analyze(text), nil
+	return analysis.AnalyzeForTokens(analyzer, text)
 }
 
 // FieldAnalyzer returns the name of the analyzer used on a field.

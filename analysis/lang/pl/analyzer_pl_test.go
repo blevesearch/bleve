@@ -136,7 +136,10 @@ func TestPolishAnalyzer(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, test := range tests {
-		actual := analyzer.Analyze(test.input)
+		actual, err := analysis.AnalyzeForTokens(analyzer, test.input)
+		if err != nil {
+			t.Fatalf("error analyzing input: %v", err)
+		}
 		if len(actual) != len(test.output) {
 			t.Fatalf("expected length: %d, got %d", len(test.output), len(actual))
 		}
