@@ -44,7 +44,10 @@ func ReverseFilterConstructor(config map[string]interface{}, cache *registry.Cac
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, ReverseFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, ReverseFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // reverse(..) will generate a reversed version of the provided

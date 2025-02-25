@@ -64,5 +64,8 @@ func SynonymSourceConstructor(config map[string]interface{}, cache *registry.Cac
 }
 
 func init() {
-	registry.RegisterSynonymSource(analysis.SynonymSourceType, SynonymSourceConstructor)
+	err := registry.RegisterSynonymSource(analysis.SynonymSourceType, SynonymSourceConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

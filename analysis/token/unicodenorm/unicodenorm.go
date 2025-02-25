@@ -75,5 +75,8 @@ func UnicodeNormalizeFilterConstructor(config map[string]interface{}, cache *reg
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, UnicodeNormalizeFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, UnicodeNormalizeFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

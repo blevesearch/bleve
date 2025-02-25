@@ -73,5 +73,8 @@ func LengthFilterConstructor(config map[string]interface{}, cache *registry.Cach
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, LengthFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, LengthFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

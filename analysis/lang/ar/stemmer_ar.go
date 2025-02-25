@@ -114,5 +114,8 @@ func StemmerFilterConstructor(config map[string]interface{}, cache *registry.Cac
 }
 
 func init() {
-	registry.RegisterTokenFilter(StemmerName, StemmerFilterConstructor)
+	err := registry.RegisterTokenFilter(StemmerName, StemmerFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

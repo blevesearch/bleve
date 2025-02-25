@@ -105,5 +105,8 @@ func Constructor(config map[string]interface{}, cache *registry.Cache) (highligh
 }
 
 func init() {
-	registry.RegisterFragmentFormatter(Name, Constructor)
+	err := registry.RegisterFragmentFormatter(Name, Constructor)
+	if err != nil {
+		panic(err)
+	}
 }

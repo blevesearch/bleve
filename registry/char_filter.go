@@ -20,12 +20,13 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 )
 
-func RegisterCharFilter(name string, constructor CharFilterConstructor) {
+func RegisterCharFilter(name string, constructor CharFilterConstructor) error {
 	_, exists := charFilters[name]
 	if exists {
-		panic(fmt.Errorf("attempted to register duplicate char filter named '%s'", name))
+		return fmt.Errorf("attempted to register duplicate char filter named '%s'", name)
 	}
 	charFilters[name] = constructor
+	return nil
 }
 
 type CharFilterConstructor func(config map[string]interface{}, cache *Cache) (analysis.CharFilter, error)

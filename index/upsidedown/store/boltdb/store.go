@@ -177,5 +177,8 @@ func (bs *Store) Compact() error {
 }
 
 func init() {
-	registry.RegisterKVStore(Name, New)
+	err := registry.RegisterKVStore(Name, New)
+	if err != nil {
+		panic(err)
+	}
 }

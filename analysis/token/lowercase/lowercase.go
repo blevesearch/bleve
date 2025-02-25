@@ -47,7 +47,10 @@ func LowerCaseFilterConstructor(config map[string]interface{}, cache *registry.C
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, LowerCaseFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, LowerCaseFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // toLowerDeferredCopy will function exactly like

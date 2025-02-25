@@ -97,5 +97,8 @@ func CJKWidthFilterConstructor(config map[string]interface{}, cache *registry.Ca
 }
 
 func init() {
-	registry.RegisterTokenFilter(WidthName, CJKWidthFilterConstructor)
+	err := registry.RegisterTokenFilter(WidthName, CJKWidthFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

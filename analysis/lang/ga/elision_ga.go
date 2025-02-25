@@ -33,5 +33,8 @@ func ElisionFilterConstructor(config map[string]interface{}, cache *registry.Cac
 }
 
 func init() {
-	registry.RegisterTokenFilter(ElisionName, ElisionFilterConstructor)
+	err := registry.RegisterTokenFilter(ElisionName, ElisionFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

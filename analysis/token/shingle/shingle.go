@@ -165,5 +165,8 @@ func ShingleFilterConstructor(config map[string]interface{}, cache *registry.Cac
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, ShingleFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, ShingleFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

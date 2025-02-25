@@ -46,5 +46,8 @@ func Constructor(config map[string]interface{}, cache *registry.Cache) (highligh
 }
 
 func init() {
-	registry.RegisterHighlighter(Name, Constructor)
+	err := registry.RegisterHighlighter(Name, Constructor)
+	if err != nil {
+		panic(err)
+	}
 }

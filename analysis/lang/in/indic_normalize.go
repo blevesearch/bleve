@@ -44,5 +44,8 @@ func NormalizerFilterConstructor(config map[string]interface{}, cache *registry.
 }
 
 func init() {
-	registry.RegisterTokenFilter(NormalizeName, NormalizerFilterConstructor)
+	err := registry.RegisterTokenFilter(NormalizeName, NormalizerFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

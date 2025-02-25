@@ -33,5 +33,8 @@ func ArticlesTokenMapConstructor(config map[string]interface{}, cache *registry.
 }
 
 func init() {
-	registry.RegisterTokenMap(ArticlesName, ArticlesTokenMapConstructor)
+	err := registry.RegisterTokenMap(ArticlesName, ArticlesTokenMapConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

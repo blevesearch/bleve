@@ -137,5 +137,8 @@ func DictionaryCompoundFilterConstructor(config map[string]interface{}, cache *r
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, DictionaryCompoundFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, DictionaryCompoundFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

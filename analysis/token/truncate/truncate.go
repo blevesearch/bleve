@@ -55,5 +55,8 @@ func TruncateTokenFilterConstructor(config map[string]interface{}, cache *regist
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, TruncateTokenFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, TruncateTokenFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

@@ -20,12 +20,13 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 )
 
-func RegisterTokenMap(name string, constructor TokenMapConstructor) {
+func RegisterTokenMap(name string, constructor TokenMapConstructor) error {
 	_, exists := tokenMaps[name]
 	if exists {
-		panic(fmt.Errorf("attempted to register duplicate token map named '%s'", name))
+		return fmt.Errorf("attempted to register duplicate token map named '%s'", name)
 	}
 	tokenMaps[name] = constructor
+	return nil
 }
 
 type TokenMapConstructor func(config map[string]interface{}, cache *Cache) (analysis.TokenMap, error)

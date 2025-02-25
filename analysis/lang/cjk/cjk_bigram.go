@@ -199,5 +199,8 @@ func CJKBigramFilterConstructor(config map[string]interface{}, cache *registry.C
 }
 
 func init() {
-	registry.RegisterTokenFilter(BigramName, CJKBigramFilterConstructor)
+	err := registry.RegisterTokenFilter(BigramName, CJKBigramFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

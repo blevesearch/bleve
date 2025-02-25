@@ -49,5 +49,8 @@ func PorterStemmerConstructor(config map[string]interface{}, cache *registry.Cac
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, PorterStemmerConstructor)
+	err := registry.RegisterTokenFilter(Name, PorterStemmerConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

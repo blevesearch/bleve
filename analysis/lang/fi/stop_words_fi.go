@@ -117,5 +117,8 @@ func TokenMapConstructor(config map[string]interface{}, cache *registry.Cache) (
 }
 
 func init() {
-	registry.RegisterTokenMap(StopName, TokenMapConstructor)
+	err := registry.RegisterTokenMap(StopName, TokenMapConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

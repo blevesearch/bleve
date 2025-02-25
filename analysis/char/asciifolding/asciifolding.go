@@ -50,7 +50,10 @@ func AsciiFoldingFilterConstructor(config map[string]interface{}, cache *registr
 }
 
 func init() {
-	registry.RegisterCharFilter(Name, AsciiFoldingFilterConstructor)
+	err := registry.RegisterCharFilter(Name, AsciiFoldingFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Converts characters above ASCII to their ASCII equivalents.

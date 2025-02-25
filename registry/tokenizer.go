@@ -20,12 +20,13 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 )
 
-func RegisterTokenizer(name string, constructor TokenizerConstructor) {
+func RegisterTokenizer(name string, constructor TokenizerConstructor) error {
 	_, exists := tokenizers[name]
 	if exists {
-		panic(fmt.Errorf("attempted to register duplicate tokenizer named '%s'", name))
+		return fmt.Errorf("attempted to register duplicate tokenizer named '%s'", name)
 	}
 	tokenizers[name] = constructor
+	return nil
 }
 
 type TokenizerConstructor func(config map[string]interface{}, cache *Cache) (analysis.Tokenizer, error)

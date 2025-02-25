@@ -45,5 +45,8 @@ func RomanianStemmerFilterConstructor(config map[string]interface{}, cache *regi
 }
 
 func init() {
-	registry.RegisterTokenFilter(SnowballStemmerName, RomanianStemmerFilterConstructor)
+	err := registry.RegisterTokenFilter(SnowballStemmerName, RomanianStemmerFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

@@ -115,7 +115,10 @@ func UnicodeTokenizerConstructor(config map[string]interface{}, cache *registry.
 }
 
 func init() {
-	registry.RegisterTokenizer(Name, UnicodeTokenizerConstructor)
+	err := registry.RegisterTokenizer(Name, UnicodeTokenizerConstructor)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func convertType(segmentWordType int) analysis.TokenType {

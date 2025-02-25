@@ -55,5 +55,8 @@ func SnowballStemmerConstructor(config map[string]interface{}, cache *registry.C
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, SnowballStemmerConstructor)
+	err := registry.RegisterTokenFilter(Name, SnowballStemmerConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

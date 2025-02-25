@@ -50,5 +50,8 @@ func CharFilterConstructor(config map[string]interface{}, cache *registry.Cache)
 }
 
 func init() {
-	registry.RegisterCharFilter(Name, CharFilterConstructor)
+	err := registry.RegisterCharFilter(Name, CharFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

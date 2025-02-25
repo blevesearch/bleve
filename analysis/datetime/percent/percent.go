@@ -163,5 +163,8 @@ func DateTimeParserConstructor(config map[string]interface{}, cache *registry.Ca
 }
 
 func init() {
-	registry.RegisterDateTimeParser(Name, DateTimeParserConstructor)
+	err := registry.RegisterDateTimeParser(Name, DateTimeParserConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

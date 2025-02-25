@@ -182,5 +182,8 @@ func SuffixTransformationFilterConstructor(config map[string]interface{}, cache 
 }
 
 func init() {
-	registry.RegisterTokenFilter(SuffixTransformationFilterName, SuffixTransformationFilterConstructor)
+	err := registry.RegisterTokenFilter(SuffixTransformationFilterName, SuffixTransformationFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

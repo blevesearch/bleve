@@ -17,6 +17,7 @@ package simple
 import (
 	"container/heap"
 	"fmt"
+
 	index "github.com/blevesearch/bleve_index_api"
 
 	"github.com/blevesearch/bleve/v2/registry"
@@ -217,5 +218,8 @@ func Constructor(config map[string]interface{}, cache *registry.Cache) (highligh
 }
 
 func init() {
-	registry.RegisterHighlighter(Name, Constructor)
+	err := registry.RegisterHighlighter(Name, Constructor)
+	if err != nil {
+		panic(err)
+	}
 }

@@ -88,5 +88,8 @@ func HierarchyFilterConstructor(config map[string]interface{}, cache *registry.C
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, HierarchyFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, HierarchyFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

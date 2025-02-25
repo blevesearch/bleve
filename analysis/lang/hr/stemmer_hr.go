@@ -149,5 +149,8 @@ func CroatianStemmerFilterConstructor(config map[string]interface{}, cache *regi
 }
 
 func init() {
-	registry.RegisterTokenFilter(StemmerName, CroatianStemmerFilterConstructor)
+	err := registry.RegisterTokenFilter(StemmerName, CroatianStemmerFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

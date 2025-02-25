@@ -33,5 +33,8 @@ func notSpace(r rune) bool {
 }
 
 func init() {
-	registry.RegisterTokenizer(Name, TokenizerConstructor)
+	err := registry.RegisterTokenizer(Name, TokenizerConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

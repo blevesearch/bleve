@@ -75,5 +75,8 @@ func FrenchMinimalStemmerFilterConstructor(config map[string]interface{}, cache 
 }
 
 func init() {
-	registry.RegisterTokenFilter(MinimalStemmerName, FrenchMinimalStemmerFilterConstructor)
+	err := registry.RegisterTokenFilter(MinimalStemmerName, FrenchMinimalStemmerFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }

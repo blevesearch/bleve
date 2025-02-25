@@ -20,12 +20,13 @@ import (
 	"github.com/blevesearch/bleve/v2/search/highlight"
 )
 
-func RegisterFragmenter(name string, constructor FragmenterConstructor) {
+func RegisterFragmenter(name string, constructor FragmenterConstructor) error {
 	_, exists := fragmenters[name]
 	if exists {
-		panic(fmt.Errorf("attempted to register duplicate fragmenter named '%s'", name))
+		return fmt.Errorf("attempted to register duplicate fragmenter named '%s'", name)
 	}
 	fragmenters[name] = constructor
+	return nil
 }
 
 type FragmenterConstructor func(config map[string]interface{}, cache *Cache) (highlight.Fragmenter, error)

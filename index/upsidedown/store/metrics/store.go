@@ -95,7 +95,10 @@ func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, 
 }
 
 func init() {
-	registry.RegisterKVStore(Name, New)
+	err := registry.RegisterKVStore(Name, New)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (s *Store) Close() error {

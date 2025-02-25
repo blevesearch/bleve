@@ -50,5 +50,8 @@ func ApostropheFilterConstructor(config map[string]interface{}, cache *registry.
 }
 
 func init() {
-	registry.RegisterTokenFilter(Name, ApostropheFilterConstructor)
+	err := registry.RegisterTokenFilter(Name, ApostropheFilterConstructor)
+	if err != nil {
+		panic(err)
+	}
 }
