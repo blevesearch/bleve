@@ -24,6 +24,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -383,11 +384,11 @@ type flushable struct {
 
 // number workers which parallely perform an in-memory merge of the segments
 // followed by a flush operation.
-var DefaultNumPersisterWorkers = 8
+var DefaultNumPersisterWorkers = 1
 
 // maximum size of data that a single worker is allowed to perform the in-memory
 // merge operation.
-var DefaultMaxSizeInMemoryMerge = 200 * 1024 * 1024
+var DefaultMaxSizeInMemoryMerge = 0
 
 func legacyFlushBehaviour(maxSizeInMemoryMerge, numPersisterWorkers int) bool {
 	// DefaultMaxSizeInMemoryMerge = 0 is a special value to preserve the leagcy
@@ -434,27 +435,20 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 		// constructs a flushSet where each flushable object contains a set of segments
 		// to be merged and flushed out to disk.
 		for i, snapshot := range snapshot.segment {
-			if totSize >= po.MaxSizeInMemoryMerge {
-				if len(sbs) >= DefaultMinSegmentsForInMemoryMerge {
-					numSegsToFlushOut += len(sbs)
-					val := &flushable{
-						segments: make([]segment.Segment, len(sbs)),
-						drops:    make([]*roaring.Bitmap, len(sbsDrops)),
-						sbIdxs:   make([]int, len(sbsIndexes)),
-						totDocs:  totDocs,
-					}
-					copy(val.segments, sbs)
-					copy(val.drops, sbsDrops)
-					copy(val.sbIdxs, sbsIndexes)
-					flushSet = append(flushSet, val)
-
-					oldSegIdxs = append(oldSegIdxs, sbsIndexes...)
-					sbs = sbs[:0]
-					sbsDrops = sbsDrops[:0]
-					sbsIndexes = sbsIndexes[:0]
-					totSize = 0
-					totDocs = 0
+			if totSize >= po.MaxSizeInMemoryMerge &&
+				len(sbs) >= DefaultMinSegmentsForInMemoryMerge {
+				numSegsToFlushOut += len(sbs)
+				val := &flushable{
+					segments: slices.Clone(sbs),
+					drops:    slices.Clone(sbsDrops),
+					sbIdxs:   slices.Clone(sbsIndexes),
+					totDocs:  totDocs,
 				}
+				flushSet = append(flushSet, val)
+				oldSegIdxs = append(oldSegIdxs, sbsIndexes...)
+
+				sbs, sbsDrops, sbsIndexes = sbs[:0], sbsDrops[:0], sbsIndexes[:0]
+				totSize, totDocs = 0, 0
 			}
 
 			if len(flushSet) >= int(po.NumPersisterWorkers) {
@@ -473,22 +467,13 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 		if len(flushSet) < po.NumPersisterWorkers {
 			numSegsToFlushOut += len(sbs)
 			val := &flushable{
-				segments: make([]segment.Segment, len(sbs)),
-				drops:    make([]*roaring.Bitmap, len(sbsDrops)),
-				sbIdxs:   make([]int, len(sbsIndexes)),
+				segments: slices.Clone(sbs),
+				drops:    slices.Clone(sbsDrops),
+				sbIdxs:   slices.Clone(sbsIndexes),
 				totDocs:  totDocs,
 			}
-			copy(val.segments, sbs)
-			copy(val.drops, sbsDrops)
-			copy(val.sbIdxs, sbsIndexes)
 			flushSet = append(flushSet, val)
-
 			oldSegIdxs = append(oldSegIdxs, sbsIndexes...)
-			sbs = sbs[:0]
-			sbsDrops = sbsDrops[:0]
-			sbsIndexes = sbsIndexes[:0]
-			totSize = 0
-			totDocs = 0
 		}
 	}
 

@@ -468,9 +468,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	if skipped {
 		atomic.AddUint64(&s.stats.TotFileMergeIntroductionsObsoleted, 1)
 	} else {
-		// tbd: should this stat correspond to total number of merged segments introduced?
-		// or is it like number of merge introductions done
-		atomic.AddUint64(&s.stats.TotIntroducedSegmentsMerge, 1)
+		atomic.AddUint64(&s.stats.TotIntroducedSegmentsMerge, uint64(len(nextMerge.new)))
 	}
 
 	atomic.StoreUint64(&s.stats.TotItemsToPersist, docsToPersistCount)

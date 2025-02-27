@@ -334,7 +334,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			}
 		}
 
-		var oldNewDocNums map[uint64][]uint64
 		var seg segment.Segment
 		var filename string
 		if len(segmentsToMerge) > 0 {
@@ -375,10 +374,10 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			totalBytesRead := seg.BytesRead() + prevBytesReadTotal
 			seg.ResetBytesRead(totalBytesRead)
 
-			oldNewDocNums = make(map[uint64][]uint64, len(newDocNums))
 			for i, segNewDocNums := range newDocNums {
-				oldNewDocNums[task.Segments[i].Id()] = segNewDocNums
-				mergedSegHistory[task.Segments[i].Id()].oldNewDocIDs = segNewDocNums
+				if mergedSegHistory[task.Segments[i].Id()] != nil {
+					mergedSegHistory[task.Segments[i].Id()].oldNewDocIDs = segNewDocNums
+				}
 			}
 
 			atomic.AddUint64(&s.stats.TotFileMergeSegments, uint64(len(segmentsToMerge)))
@@ -489,7 +488,7 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 	// we're tracking the merged segments and their doc number per worker
 	// to be able to introduce them all at once, so the first dimension of the
 	// slices here correspond to workerID
-	newDocNumsSet := make([][][]uint64, len(flushableObjs))
+	newDocIDsSet := make([][][]uint64, len(flushableObjs))
 	newMergedSegments := make([]segment.Segment, len(flushableObjs))
 	newMergedSegmentIDs := make([]uint64, len(flushableObjs))
 	numFlushes := len(flushableObjs)
@@ -507,7 +506,7 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 
 			// the newly merged segment is already flushed out to disk, just needs
 			// to be opened using mmap.
-			newDocNums, _, err :=
+			newDocIDs, _, err :=
 				s.segPlugin.Merge(segsBatch, dropsBatch, path, s.closeCh, s)
 			if err != nil {
 				errs[id] = err
@@ -515,7 +514,7 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 				return
 			}
 			newMergedSegmentIDs[id] = newSegmentID
-			newDocNumsSet[id] = newDocNums
+			newDocIDsSet[id] = newDocIDs
 			newMergedSegments[id], err = s.segPlugin.Open(path)
 			if err != nil {
 				errs[id] = err
@@ -559,7 +558,7 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 			// oldSegmentSnapshot.id -> {workerID, oldSegmentSnapshot, docIDs}
 			sm.mergedSegHistory[ss.id] = &mergedSegmentHistory{
 				workerID:     uint64(i),
-				oldNewDocIDs: newDocNumsSet[i][j],
+				oldNewDocIDs: newDocIDsSet[i][j],
 				oldSegment:   ss,
 			}
 		}
