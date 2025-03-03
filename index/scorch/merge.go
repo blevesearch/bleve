@@ -493,7 +493,8 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 	newMergedSegmentIDs := make([]uint64, len(flushableObjs))
 	numFlushes := len(flushableObjs)
 	var numSegments, newMergedCount uint64
-	errs := make([]error, numFlushes)
+	var em sync.Mutex
+	var errs []error
 
 	// deploy the workers to merge and flush the batches of segments parallely
 	for i := 0; i < numFlushes; i++ {
@@ -509,7 +510,9 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 			newDocIDs, _, err :=
 				s.segPlugin.Merge(segsBatch, dropsBatch, path, s.closeCh, s)
 			if err != nil {
-				errs[id] = err
+				em.Lock()
+				errs = append(errs, err)
+				em.Unlock()
 				atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
 				return
 			}
@@ -517,7 +520,9 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 			newDocIDsSet[id] = newDocIDs
 			newMergedSegments[id], err = s.segPlugin.Open(path)
 			if err != nil {
-				errs[id] = err
+				em.Lock()
+				errs = append(errs, err)
+				em.Unlock()
 				atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
 				return
 			}
@@ -525,15 +530,22 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 			atomic.AddUint64(&numSegments, uint64(len(segsBatch)))
 		}(flushableObjs[i].segments, flushableObjs[i].drops, i)
 	}
-
 	wg.Wait()
 
-	if errs[0] != nil {
+	if errs != nil {
 		// close the new merged segments
 		_ = closeNewMergedSegments(newMergedSegments)
-
-		// tbd: need a better way to consolidate errors
-		return nil, nil, errs[0]
+		var errf error
+		for _, err := range errs {
+			if err == segment.ErrClosed {
+				// the index snapshot was closed which will be handled gracefully
+				// by retrying the whole merge+flush operation in a later iteration
+				// so its safe to early exit the same error.
+				return nil, nil, err
+			}
+			errf = fmt.Errorf("%w; %v", errf, err)
+		}
+		return nil, nil, errf
 	}
 
 	atomic.AddUint64(&s.stats.TotMemMergeZapEnd, 1)
