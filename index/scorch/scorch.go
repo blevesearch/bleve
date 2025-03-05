@@ -425,7 +425,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		result := <-resultChan
 		resultSize := result.Size()
 		// check if the document is searchable by the index
-		if result.Searchable() {
+		if result.Indexed() {
 			atomic.AddUint64(&s.stats.TotMutationsFiltered, 1)
 		}
 		atomic.AddUint64(&s.iStats.analysisBytesAdded, uint64(resultSize))
