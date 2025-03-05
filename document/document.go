@@ -34,6 +34,7 @@ type Document struct {
 	Fields           []Field `json:"fields"`
 	CompositeFields  []*CompositeField
 	StoredFieldsSize uint64
+	searchable       bool
 }
 
 func (d *Document) StoredFieldsBytes() uint64 {
@@ -147,4 +148,12 @@ func (d *Document) VisitSynonymFields(visitor index.SynonymFieldVisitor) {
 			visitor(sf)
 		}
 	}
+}
+
+func (d *Document) SetSearchable(searchable bool) {
+	d.searchable = searchable
+}
+
+func (d *Document) Searchable() bool {
+	return d.searchable
 }
