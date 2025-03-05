@@ -15,7 +15,6 @@
 package searcher
 
 import (
-	"bytes"
 	"context"
 	"reflect"
 
@@ -34,44 +33,19 @@ func init() {
 // FilterFunc defines a function which can filter documents
 // returning true means keep the document
 // returning false means do not keep the document
-type FilterFunc func(d *search.DocumentMatch) bool
-
-// ConstraintFunc defines a function which can constrain documents
-// returning true means keep the document
-// returning false means do not keep the document
-// This is similar to FilterFunc, but takes a SearchContext
-type ConstraintFunc func(sctx *search.SearchContext, d *search.DocumentMatch) bool
+type FilterFunc func(sctx *search.SearchContext, d *search.DocumentMatch) bool
 
 // FilteringSearcher wraps any other searcher, but checks any Next/Advance
 // call against the supplied FilterFunc
 type FilteringSearcher struct {
-	child      search.Searcher
-	accept     FilterFunc
-	constraint ConstraintFunc
+	child  search.Searcher
+	accept FilterFunc
 }
 
 func NewFilteringSearcher(ctx context.Context, s search.Searcher, filter FilterFunc) *FilteringSearcher {
 	return &FilteringSearcher{
 		child:  s,
 		accept: filter,
-	}
-}
-func NewConstrainedSearcher(ctx context.Context, baseSearcher search.Searcher, constraint search.Searcher) *FilteringSearcher {
-	constraintFunc := func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
-		// Attempt to advance the constraint searcher to the document identified by
-		// the base searcher's current result (d.IndexInternalID).
-		//
-		// If the constraint searcher successfully finds a document with the same
-		// internal ID, it means the document satisfies the constraint and should be kept.
-		//
-		// If the constraint searcher returns an error, does not find a matching document,
-		// or finds a document with a different internal ID, the document should be discarded.
-		dm, err := constraint.Advance(sctx, d.IndexInternalID)
-		return err == nil && dm != nil && bytes.Equal(dm.IndexInternalID, d.IndexInternalID)
-	}
-	return &FilteringSearcher{
-		child:      baseSearcher,
-		constraint: constraintFunc,
 	}
 }
 
@@ -83,16 +57,12 @@ func (f *FilteringSearcher) Size() int {
 func (f *FilteringSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	next, err := f.child.Next(ctx)
 	for next != nil && err == nil {
-		if f.passesFilter(ctx, next) {
+		if f.accept(ctx, next) {
 			return next, nil
 		}
 		next, err = f.child.Next(ctx)
 	}
 	return nil, err
-}
-
-func (f *FilteringSearcher) passesFilter(ctx *search.SearchContext, d *search.DocumentMatch) bool {
-	return (f.accept == nil || f.accept(d)) && (f.constraint == nil || f.constraint(ctx, d))
 }
 
 func (f *FilteringSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
@@ -103,7 +73,7 @@ func (f *FilteringSearcher) Advance(ctx *search.SearchContext, ID index.IndexInt
 	if adv == nil {
 		return nil, nil
 	}
-	if f.passesFilter(ctx, adv) {
+	if f.accept(ctx, adv) {
 		return adv, nil
 	}
 	return f.Next(ctx)
