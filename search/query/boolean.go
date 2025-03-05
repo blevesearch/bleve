@@ -15,6 +15,7 @@
 package query
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -183,7 +184,7 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 		}
 	}
 
-	var filterSearcher search.Searcher
+	var filterFunc searcher.FilterFunc
 	if q.Filter != nil {
 		// create a new searcher options with disabled scoring, since filter should not affect scoring
 		// and we don't want to pay the cost of scoring if we don't need it, also disable term vectors
@@ -193,13 +194,25 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 			IncludeTermVectors: false,
 			Score:              "none",
 		}
-		filterSearcher, err = q.Filter.Searcher(ctx, i, m, filterOptions)
+		filterSearcher, err := q.Filter.Searcher(ctx, i, m, filterOptions)
 		if err != nil {
 			return nil, err
 		}
+		filterFunc = func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
+			// Attempt to advance the filter searcher to the document identified by
+			// the base searcher's (unfiltered boolean) current result (d.IndexInternalID).
+			//
+			// If the filter searcher successfully finds a document with the same
+			// internal ID, it means the document satisfies the filter and should be kept.
+			//
+			// If the filter searcher returns an error, does not find a matching document,
+			// or finds a document with a different internal ID, the document should be discarded.
+			dm, err := filterSearcher.Advance(sctx, d.IndexInternalID)
+			return err == nil && dm != nil && bytes.Equal(dm.IndexInternalID, d.IndexInternalID)
+		}
 	}
 	// optimization, if only should searcher, just return it instead
-	if mustSearcher == nil && shouldSearcher != nil && mustNotSearcher == nil && filterSearcher == nil {
+	if mustSearcher == nil && shouldSearcher != nil && mustNotSearcher == nil && filterFunc == nil {
 		return shouldSearcher, nil
 	}
 
@@ -208,8 +221,8 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 		return nil, err
 	}
 
-	if filterSearcher != nil {
-		return searcher.NewConstrainedSearcher(ctx, bs, filterSearcher), nil
+	if filterFunc != nil {
+		return searcher.NewFilteringSearcher(ctx, bs, filterFunc), nil
 	}
 	return bs, nil
 }
