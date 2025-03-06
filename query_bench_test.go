@@ -249,8 +249,8 @@ func BenchmarkQueryDateRange(b *testing.B) {
 
 	inclusive := true
 	for i := 0; i < b.N; i++ {
-		start, _ := time.Parse("2006-01-02T12:00:00Z", members[i%(len(members)-2)])
-		end, _ := time.Parse("2006-01-02T12:00:00Z", members[(i+2)%(len(members)-2)])
+		start, _ := time.Parse("2006-01-02T15:04:05Z", members[i%(len(members)-2)])
+		end, _ := time.Parse("2006-01-02T15:04:05Z", members[(i+2)%(len(members)-2)])
 		q := NewDateRangeInclusiveQuery(start, end, &inclusive, &inclusive)
 		q.SetField("date")
 		req := NewSearchRequest(q)

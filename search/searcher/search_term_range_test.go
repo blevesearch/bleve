@@ -25,7 +25,6 @@ import (
 )
 
 func TestTermRangeSearch(t *testing.T) {
-
 	twoDocIndexReader, err := twoDocIndex.Reader()
 	if err != nil {
 		t.Error(err)
@@ -200,7 +199,6 @@ func TestTermRangeSearch(t *testing.T) {
 		}
 
 	}
-
 }
 
 func TestTermRangeSearchTooManyTerms(t *testing.T) {
@@ -229,8 +227,8 @@ func TestTermRangeSearchTooManyTerms(t *testing.T) {
 		}
 	}()
 
-	var want = []string{"1", "3", "4", "5"}
-	var truth = true
+	want := []string{"1", "3", "4", "5"}
+	truth := true
 	searcher, err := NewTermRangeSearcher(nil, scorchReader, []byte("bobert"), []byte("ravi"),
 		&truth, &truth, "name", 1.0, search.SearcherOptions{Score: "none", IncludeTermVectors: false})
 	if err != nil {
@@ -252,6 +250,10 @@ func TestTermRangeSearchTooManyTerms(t *testing.T) {
 		got = append(got, extId)
 		ctx.DocumentMatchPool.Put(next)
 		next, err = searcher.Next(ctx)
+		if err != nil {
+			break
+		}
+
 		i++
 	}
 	if err != nil {

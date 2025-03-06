@@ -4145,16 +4145,12 @@ func TestDecodeGeoHashVersus(t *testing.T) {
 
 func compareLatitude(box []float64, v float64) bool {
 	avg := (box[0] + box[1]) / 2
-	if compareGeo(avg, v) != 0 {
-		return false
-	}
-	return true
+
+	return compareGeo(avg, v) == 0
 }
 
 func compareLogitude(box []float64, v float64) bool {
 	avg := (box[2] + box[3]) / 2
-	if compareGeo(avg, v) != 0 {
-		return false
-	}
-	return true
+
+	return compareGeo(avg, v) == 0
 }

@@ -15,7 +15,6 @@
 package test
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"testing"
@@ -44,11 +43,11 @@ func TestDisjunctionSearchScoreIndexWithCompositeFields(t *testing.T) {
 			"upsidedown: (%+v, %+v), scorch: (%+v, %+v)\n",
 			*upHits[0].Expl, *upHits[1].Expl, *scHits[0].Expl, *scHits[1].Expl)
 	}
-
 }
 
 func disjunctionQueryiOnIndexWithCompositeFields(indexName string,
-	t *testing.T) []*search.DocumentMatch {
+	t *testing.T,
+) []*search.DocumentMatch {
 	tmpIndexPath, err := os.MkdirTemp("", "bleve-testidx")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
@@ -134,8 +133,7 @@ func disjunctionQueryiOnIndexWithCompositeFields(indexName string,
 	}
 
 	if len(res.Hits) != 2 {
-		t.Errorf(fmt.Sprintf("indexType: %s Expected 2 hits, "+
-			"but got: %v", indexName, len(res.Hits)))
+		t.Errorf("indexType: %s Expected 2 hits, but got: %v", indexName, len(res.Hits))
 	}
 
 	return res.Hits
