@@ -366,6 +366,7 @@ func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}
 			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, index.IndexField|index.IncludeTermVectors)
 			doc.AddField(field)
 		}
+		doc.SetIndexed()
 	}
 
 	return nil

@@ -81,6 +81,7 @@ type Stats struct {
 	TotPersistedItems    uint64
 	TotItemsToPersist    uint64
 	TotPersistedSegments uint64
+	TotMutationsFiltered uint64
 
 	TotPersisterSlowMergerPause  uint64
 	TotPersisterSlowMergerResume uint64

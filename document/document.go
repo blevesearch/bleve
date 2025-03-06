@@ -34,6 +34,7 @@ type Document struct {
 	Fields           []Field `json:"fields"`
 	CompositeFields  []*CompositeField
 	StoredFieldsSize uint64
+	indexed          bool
 }
 
 func (d *Document) StoredFieldsBytes() uint64 {
@@ -147,4 +148,12 @@ func (d *Document) VisitSynonymFields(visitor index.SynonymFieldVisitor) {
 			visitor(sf)
 		}
 	}
+}
+
+func (d *Document) SetIndexed() {
+	d.indexed = true
+}
+
+func (d *Document) Indexed() bool {
+	return d.indexed
 }

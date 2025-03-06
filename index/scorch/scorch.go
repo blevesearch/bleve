@@ -424,6 +424,10 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	for itemsDeQueued < numUpdates {
 		result := <-resultChan
 		resultSize := result.Size()
+		// check if the document is searchable by the index
+		if result.Indexed() {
+			atomic.AddUint64(&s.stats.TotMutationsFiltered, 1)
+		}
 		atomic.AddUint64(&s.iStats.analysisBytesAdded, uint64(resultSize))
 		totalAnalysisSize += resultSize
 		analysisResults[itemsDeQueued] = result
@@ -636,6 +640,7 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["term_searchers_finished"] = m["TotTermSearchersFinished"]
 	m["knn_searches"] = m["TotKNNSearches"]
 	m["synonym_searches"] = m["TotSynonymSearches"]
+	m["total_mutations_filtered"] = m["TotMutationsFiltered"]
 
 	m["num_bytes_read_at_query_time"] = m["TotBytesReadAtQueryTime"]
 	m["num_plain_text_bytes_indexed"] = m["TotIndexedPlainTextBytes"]
