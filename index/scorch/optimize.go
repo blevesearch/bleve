@@ -393,5 +393,7 @@ func (i *IndexSnapshot) unadornedTermFieldReader(
 		includeNorm:        false,
 		includeTermVectors: false,
 		recycle:            false,
+		// signal downstream that this is a special unadorned termFieldReader
+		unadorned: true,
 	}
 }
