@@ -381,11 +381,11 @@ type flushable struct {
 
 // number workers which parallely perform an in-memory merge of the segments
 // followed by a flush operation.
-var DefaultNumPersisterWorkers = 8
+var DefaultNumPersisterWorkers = 4
 
 // maximum size of data that a single worker is allowed to perform the in-memory
 // merge operation.
-var DefaultMaxSizeInMemoryMerge = 200 * 1024 * 1024
+var DefaultMaxSizeInMemoryMerge = 400 * 1024 * 1024
 
 func legacyFlushBehaviour(maxSizeInMemoryMerge, numPersisterWorkers int) bool {
 	// DefaultMaxSizeInMemoryMerge = 0 is a special value to preserve the leagcy
