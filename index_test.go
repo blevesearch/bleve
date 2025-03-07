@@ -1352,7 +1352,6 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	done := make(chan struct{})
-	errChan := make(chan error, 1)
 	go func() {
 		for {
 			select {
@@ -1362,19 +1361,13 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 			default:
 				_, err2 := index.DocCount()
 				if err2 != nil {
-					errChan <- err2
+					t.Error(err2)
+					wg.Done()
 					return
 				}
 			}
 		}
 	}()
-
-	// wait for any errors from the goroutine
-	select {
-	case err := <-errChan:
-		t.Fatal(err)
-	default:
-	}
 
 	for i := 0; i < 100; i++ {
 		batch := index.NewBatch()
@@ -1387,6 +1380,7 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+
 	close(done)
 	wg.Wait()
 }
@@ -1450,39 +1444,38 @@ func TestIndexCountMatchSearch(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	errChan := make(chan error, 1)
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(i int) {
 			b := index.NewBatch()
 			for j := 0; j < 200; j++ {
 				id := fmt.Sprintf("%d", (i*200)+j)
+
 				doc := struct {
 					Body string
 				}{
 					Body: "match",
 				}
+
 				err := b.Index(id, doc)
 				if err != nil {
-					errChan <- err
+					t.Error(err)
+					wg.Done()
 					return
 				}
 			}
+
 			err := index.Batch(b)
 			if err != nil {
-				errChan <- err
+				t.Error(err)
+				wg.Done()
+				return
 			}
+
 			wg.Done()
 		}(i)
 	}
 	wg.Wait()
-
-	// wait for any errors from the goroutines
-	select {
-	case err := <-errChan:
-		t.Fatal(err)
-	default:
-	}
 
 	// search for something that should match all documents
 	sr, err := index.Search(NewSearchRequest(NewMatchQuery("match")))
