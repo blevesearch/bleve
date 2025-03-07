@@ -378,7 +378,7 @@ func testScorchCompositeSearchOptimizationsHelper(
 
 		next, err := cs.Next(ctx)
 		i := 0
-		for err == nil && next != nil {
+		for next != nil {
 			docID, err := indexReader.ExternalID(next.IndexInternalID)
 			if err != nil {
 				t.Fatal(err)
@@ -391,8 +391,10 @@ func testScorchCompositeSearchOptimizationsHelper(
 					t.Errorf("missing %s", string(docID))
 				}
 			}
-
 			next, err = cs.Next(ctx)
+			if err != nil {
+				t.Fatalf("error iterating searcher: %v", err)
+			}
 			i++
 		}
 
