@@ -64,17 +64,24 @@ func TestSimplePlan(t *testing.T) {
 		ExpectPlan *MergePlan
 		ExpectErr  error
 	}{
-		{"nil segments",
-			nil, nil, nil, nil},
-		{"empty segments",
-			[]Segment{}, nil, nil, nil},
-		{"1 segment",
+		{
+			"nil segments",
+			nil, nil, nil, nil,
+		},
+		{
+			"empty segments",
+			[]Segment{},
+			nil, nil, nil,
+		},
+		{
+			"1 segment",
 			[]Segment{segs[1]},
 			nil,
 			nil,
 			nil,
 		},
-		{"2 segments",
+		{
+			"2 segments",
 			[]Segment{
 				segs[1],
 				segs[2],
@@ -82,7 +89,7 @@ func TestSimplePlan(t *testing.T) {
 			nil,
 			&MergePlan{
 				Tasks: []*MergeTask{
-					&MergeTask{
+					{
 						Segments: []Segment{
 							segs[2],
 							segs[1],
@@ -92,7 +99,8 @@ func TestSimplePlan(t *testing.T) {
 			},
 			nil,
 		},
-		{"3 segments",
+		{
+			"3 segments",
 			[]Segment{
 				segs[1],
 				segs[2],
@@ -101,7 +109,7 @@ func TestSimplePlan(t *testing.T) {
 			nil,
 			&MergePlan{
 				Tasks: []*MergeTask{
-					&MergeTask{
+					{
 						Segments: []Segment{
 							segs[9],
 							segs[2],
@@ -112,7 +120,8 @@ func TestSimplePlan(t *testing.T) {
 			},
 			nil,
 		},
-		{"many segments",
+		{
+			"many segments",
 			[]Segment{
 				segs[1],
 				segs[2],
@@ -130,7 +139,7 @@ func TestSimplePlan(t *testing.T) {
 			},
 			&MergePlan{
 				Tasks: []*MergeTask{
-					&MergeTask{
+					{
 						Segments: []Segment{
 							segs[6],
 							segs[5],
@@ -144,14 +153,18 @@ func TestSimplePlan(t *testing.T) {
 
 	for testi, test := range tests {
 		plan, err := Plan(test.Segments, test.Options)
+
 		if err != test.ExpectErr {
 			testj, _ := json.Marshal(&test)
-			t.Errorf("testi: %d, test: %s, got err: %v",
-				testi, testj, err)
+
+			t.Errorf("testi: %d, test: %s, got err: %v", testi, testj, err)
 		}
+
 		if !reflect.DeepEqual(plan, test.ExpectPlan) {
 			testj, _ := json.Marshal(&test)
+
 			planj, _ := json.Marshal(&plan)
+
 			t.Errorf("testi: %d, test: %s, got plan: %s",
 				testi, testj, planj)
 		}
@@ -184,7 +197,8 @@ func TestCalcBudget(t *testing.T) {
 		{0, 0, MergePlanOptions{}, 0},
 		{1, 0, MergePlanOptions{}, 1},
 		{9, 0, MergePlanOptions{}, 9},
-		{1, 1,
+		{
+			1, 1,
 			MergePlanOptions{
 				MaxSegmentsPerTier:   1,
 				MaxSegmentSize:       1000,
@@ -194,7 +208,8 @@ func TestCalcBudget(t *testing.T) {
 			},
 			1,
 		},
-		{21, 1,
+		{
+			21, 1,
 			MergePlanOptions{
 				MaxSegmentsPerTier:   1,
 				MaxSegmentSize:       1000,
@@ -204,7 +219,8 @@ func TestCalcBudget(t *testing.T) {
 			},
 			5,
 		},
-		{21, 1,
+		{
+			21, 1,
 			MergePlanOptions{
 				MaxSegmentsPerTier:   2,
 				MaxSegmentSize:       1000,
@@ -214,18 +230,30 @@ func TestCalcBudget(t *testing.T) {
 			},
 			7,
 		},
-		{1000, 2000, DefaultMergePlanOptions,
-			1},
-		{5000, 2000, DefaultMergePlanOptions,
-			3},
-		{10000, 2000, DefaultMergePlanOptions,
-			5},
-		{30000, 2000, DefaultMergePlanOptions,
-			11},
-		{1000000, 2000, DefaultMergePlanOptions,
-			24},
-		{1000000000, 2000, DefaultMergePlanOptions,
-			54},
+		{
+			1000, 2000, DefaultMergePlanOptions,
+			1,
+		},
+		{
+			5000, 2000, DefaultMergePlanOptions,
+			3,
+		},
+		{
+			10000, 2000, DefaultMergePlanOptions,
+			5,
+		},
+		{
+			30000, 2000, DefaultMergePlanOptions,
+			11,
+		},
+		{
+			1000000, 2000, DefaultMergePlanOptions,
+			24,
+		},
+		{
+			1000000000, 2000, DefaultMergePlanOptions,
+			54,
+		},
 	}
 
 	for testi, test := range tests {
@@ -492,7 +520,6 @@ func TestPlanMaxSegmentSizeLimit(t *testing.T) {
 			var totalLiveSize int64
 			for _, segs := range task.Segments {
 				totalLiveSize += segs.LiveSize()
-
 			}
 			if totalLiveSize >= o.MaxSegmentSize {
 				t.Errorf("merged segments size: %d exceeding the MaxSegmentSize"+
@@ -500,7 +527,6 @@ func TestPlanMaxSegmentSizeLimit(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 // ----------------------------------------

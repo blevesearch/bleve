@@ -1040,8 +1040,8 @@ func TestIndexBatch(t *testing.T) {
 		externalDocIds[externalID] = struct{}{}
 	}
 	expectedDocIds := map[string]struct{}{
-		"2": struct{}{},
-		"3": struct{}{},
+		"2": {},
+		"3": {},
 	}
 	if !reflect.DeepEqual(externalDocIds, expectedDocIds) {
 		t.Errorf("expected ids: %v, got ids: %v", expectedDocIds, externalDocIds)
@@ -1191,7 +1191,6 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 		t.Errorf("expected 3 stored field, got %d", len(storedDoc.Fields))
 	}
 	for _, field := range storedDoc.Fields {
-
 		if field.Name() == "name" {
 			textField, ok := field.(*document.TextField)
 			if !ok {
@@ -1272,7 +1271,6 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	}
 
 	for _, field := range storedDoc.Fields {
-
 		if field.Name() == "name" {
 			textField, ok := field.(*document.TextField)
 			if !ok {
@@ -1301,6 +1299,9 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 
 	// now delete the document
 	err = idx.Delete("1")
+	if err != nil {
+		t.Errorf("Error deleting entry from index: %v", err)
+	}
 	expectedCount--
 
 	// expected doc count shouldn't have changed
@@ -1383,16 +1384,15 @@ func TestIndexInsertFields(t *testing.T) {
 			fieldsMap[field] = struct{}{}
 		}
 		expectedFieldsMap := map[string]struct{}{
-			"_id":       struct{}{},
-			"name":      struct{}{},
-			"age":       struct{}{},
-			"unixEpoch": struct{}{},
+			"_id":       {},
+			"name":      {},
+			"age":       {},
+			"unixEpoch": {},
 		}
 		if !reflect.DeepEqual(fieldsMap, expectedFieldsMap) {
 			t.Errorf("expected fields: %v, got %v", expectedFieldsMap, fieldsMap)
 		}
 	}
-
 }
 
 func TestIndexUpdateComposites(t *testing.T) {
@@ -1527,7 +1527,7 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 		}
 	}()
 
-	termFieldReader, err := indexReader.TermFieldReader(nil, []byte("mister"), "_all", true, true, true)
+	termFieldReader, err := indexReader.TermFieldReader(context.TODO(), []byte("mister"), "_all", true, true, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -1538,10 +1538,15 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		if externalID != "1" {
 			t.Errorf("expected to find document id 1")
 		}
+
 		tfd, err = termFieldReader.Next(nil)
+		if err != nil {
+			t.Error(err)
+		}
 	}
 	if err != nil {
 		t.Error(err)
@@ -1688,19 +1693,27 @@ func TestDocValueReaderConcurrent(t *testing.T) {
 		go func() {
 			r, err := idx.Reader()
 			if err != nil {
-				t.Fatal(err)
+				t.Errorf("error getting reader: %v", err)
+				wg.Done()
+				return
 			}
 			docNumber, err := r.InternalID("1")
 			if err != nil {
-				t.Fatal(err)
+				t.Errorf("error getting internal ID: %v", err)
+				wg.Done()
+				return
 			}
 			dvr, err := r.DocValueReader([]string{fmt.Sprintf("f%d", rand.Intn(100))})
 			if err != nil {
-				t.Fatal(err)
+				t.Errorf("error getting doc value reader: %v", err)
+				wg.Done()
+				return
 			}
 			err = dvr.VisitDocValues(docNumber, func(field string, term []byte) {})
 			if err != nil {
-				t.Fatal(err)
+				t.Errorf("error visiting doc values: %v", err)
+				wg.Done()
+				return
 			}
 			wg.Done()
 		}()
@@ -2023,7 +2036,6 @@ func TestIndexDocValueReaderWithMultipleDocs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 }
 
 func TestIndexDocValueReaderWithMultipleFieldOptions(t *testing.T) {
@@ -2103,7 +2115,6 @@ func TestIndexDocValueReaderWithMultipleFieldOptions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 }
 
 func TestAllFieldWithDifferentTermVectorsEnabled(t *testing.T) {
@@ -2195,7 +2206,7 @@ func TestForceVersion(t *testing.T) {
 		t.Fatalf("wrong segment wrapper version loaded, expected %d got %d", 12, s.segPlugin.Version())
 	}
 	cfg["forceSegmentVersion"] = 10
-	idx, err = NewScorch(Name, cfg, analysisQueue)
+	_, err = NewScorch(Name, cfg, analysisQueue)
 	if err == nil {
 		t.Fatalf("expected an error opening an unsupported vesion, got nil")
 	}
@@ -2204,12 +2215,16 @@ func TestForceVersion(t *testing.T) {
 func TestIndexForceMerge(t *testing.T) {
 	cfg := CreateConfig("TestIndexForceMerge")
 	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
 		err := DestroyTest(cfg)
 		if err != nil {
 			t.Log(err)
 		}
 	}()
+
 	tmp := struct {
 		MaxSegmentsPerTier   int   `json:"maxSegmentsPerTier"`
 		SegmentsPerMergeTask int   `json:"segmentsPerMergeTask"`
@@ -2226,10 +2241,12 @@ func TestIndexForceMerge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	err = idx.Open()
 	if err != nil {
 		t.Fatalf("error opening index: %v", err)
 	}
+
 	var expectedCount uint64
 	batch := index.NewBatch()
 	for i := 0; i < 10; i++ {
@@ -2252,17 +2269,21 @@ func TestIndexForceMerge(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
 	docCount, err := indexReader.DocCount()
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
+
 	err = indexReader.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var si *Scorch
 	var ok bool
 	if si, ok = idx.(*Scorch); !ok {
@@ -2275,15 +2296,13 @@ func TestIndexForceMerge(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	for {
-		if atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot) == 1 {
-			break
-		}
+	for atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot) != 1 {
 		err := si.ForceMerge(ctx, &mergeplan.MergePlanOptions{
 			MaxSegmentsPerTier:   1,
 			MaxSegmentSize:       10000,
 			SegmentsPerMergeTask: 10,
-			FloorSegmentSize:     10000})
+			FloorSegmentSize:     10000,
+		})
 		if err != nil {
 			t.Errorf("ForceMerge failed, err: %v", err)
 		}
@@ -2300,7 +2319,8 @@ func TestIndexForceMerge(t *testing.T) {
 		MaxSegmentsPerTier:   1,
 		MaxSegmentSize:       1 << 33,
 		SegmentsPerMergeTask: 10,
-		FloorSegmentSize:     10000})
+		FloorSegmentSize:     10000,
+	})
 	if err != mergeplan.ErrMaxSegmentSizeTooLarge {
 		t.Errorf("ForceMerge expected to fail with ErrMaxSegmentSizeTooLarge")
 	}
@@ -2411,7 +2431,8 @@ func TestCancelIndexForceMerge(t *testing.T) {
 		MaxSegmentsPerTier:   1,
 		MaxSegmentSize:       10000,
 		SegmentsPerMergeTask: 5,
-		FloorSegmentSize:     10000})
+		FloorSegmentSize:     10000,
+	})
 	if err != nil {
 		t.Errorf("ForceMerge failed, err: %v", err)
 	}
@@ -2479,7 +2500,7 @@ func TestIndexSeekBackwardsStats(t *testing.T) {
 	}
 	defer reader.Close()
 
-	tfr, err := reader.TermFieldReader(nil, []byte("cat"), "name", false, false, false)
+	tfr, err := reader.TermFieldReader(context.TODO(), []byte("cat"), "name", false, false, false)
 	if err != nil {
 		t.Fatalf("error getting term field readyer for name/cat: %v", err)
 	}
@@ -2628,7 +2649,9 @@ func TestReadOnlyIndex(t *testing.T) {
 			if entry.IsDir() {
 				permissionsFunc(fullName)
 			} else {
-				os.Chmod(fullName, 0555)
+				if err := os.Chmod(fullName, 0o555); err != nil {
+					t.Fatal(err)
+				}
 			}
 		}
 	}
@@ -2665,7 +2688,6 @@ func TestReadOnlyIndex(t *testing.T) {
 }
 
 func BenchmarkAggregateFieldStats(b *testing.B) {
-
 	fieldStatsArray := make([]*fieldStats, 1000)
 
 	for i := range fieldStatsArray {

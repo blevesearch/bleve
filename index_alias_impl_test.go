@@ -411,7 +411,8 @@ func TestIndexAliasMulti(t *testing.T) {
 				},
 			},
 			MaxScore: 1.0,
-		}}
+		},
+	}
 	ei2Count := uint64(8)
 	ei2 := &stubIndex{
 		err:            nil,
@@ -431,7 +432,8 @@ func TestIndexAliasMulti(t *testing.T) {
 				},
 			},
 			MaxScore: 2.0,
-		}}
+		},
+	}
 
 	alias := NewIndexAlias(ei1, ei2)
 
@@ -710,7 +712,6 @@ func TestMultiSearchSecondPage(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
-
 }
 
 // TestMultiSearchTimeout tests simple timeout cases
@@ -748,7 +749,8 @@ func TestMultiSearchTimeout(t *testing.T) {
 				},
 			},
 			MaxScore: 1.0,
-		}}
+		},
+	}
 	ei2 := &stubIndex{
 		name: "ei2",
 		checkRequest: func(req *SearchRequest) error {
@@ -776,7 +778,8 @@ func TestMultiSearchTimeout(t *testing.T) {
 				},
 			},
 			MaxScore: 2.0,
-		}}
+		},
+	}
 
 	// first run with absurdly long time out, should succeed
 	var cancel context.CancelFunc
@@ -882,7 +885,8 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 				},
 			},
 			MaxScore: 1.0,
-		}}
+		},
+	}
 	ei2 := &stubIndex{
 		name: "ei2",
 		err:  nil,
@@ -902,15 +906,14 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 				},
 			},
 			MaxScore: 2.0,
-		}}
+		},
+	}
 
 	ei3 := &stubIndex{
 		name: "ei3",
 		checkRequest: func(req *SearchRequest) error {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			}
+			<-ctx.Done()
+			return ctx.Err()
 		},
 		err: nil,
 		searchResult: &SearchResult{
@@ -929,7 +932,8 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 				},
 			},
 			MaxScore: 3.0,
-		}}
+		},
+	}
 
 	// ei3 is set to take >50ms, so run search with timeout less than
 	// this, this should return partial results
@@ -1000,7 +1004,8 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 				},
 			},
 			MaxScore: 1.0,
-		}}
+		},
+	}
 	ei2 := &stubIndex{
 		name: "ei2",
 		checkRequest: func(req *SearchRequest) error {
@@ -1028,7 +1033,8 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 				},
 			},
 			MaxScore: 2.0,
-		}}
+		},
+	}
 
 	ei3 := &stubIndex{
 		name: "ei3",
@@ -1057,7 +1063,8 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 				},
 			},
 			MaxScore: 3.0,
-		}}
+		},
+	}
 
 	ei4 := &stubIndex{
 		name: "ei4",
@@ -1078,7 +1085,8 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 				},
 			},
 			MaxScore: 4.0,
-		}}
+		},
+	}
 
 	alias1 := NewIndexAlias(ei1, ei2)
 	alias2 := NewIndexAlias(ei3, ei4)

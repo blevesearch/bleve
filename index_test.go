@@ -241,7 +241,8 @@ func approxSame(actual, expected uint64) bool {
 }
 
 func checkStatsOnIndexedBatch(indexPath string, indexMapping mapping.IndexMapping,
-	expectedVal uint64) error {
+	expectedVal uint64,
+) error {
 	var wg sync.WaitGroup
 	var statValError error
 
@@ -557,7 +558,6 @@ func TestBM25GlobalScoring(t *testing.T) {
 				hit.Score, singlePartHits[i].Score)
 		}
 	}
-
 }
 
 func TestBytesRead(t *testing.T) {
@@ -926,7 +926,8 @@ func TestIndexCreateNewOverExisting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	index, err = New(tmpIndexPath, NewIndexMapping())
+
+	_, err = New(tmpIndexPath, NewIndexMapping())
 	if err != ErrorIndexPathExists {
 		t.Fatalf("expected error index path exists, got %v", err)
 	}
@@ -955,23 +956,23 @@ func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
 	tmpIndexPathMeta := filepath.Join(tmpIndexPath, "index_meta.json")
 
 	// now intentionally change the storage type
-	err = os.WriteFile(tmpIndexPathMeta, []byte(`{"storage":"mystery"}`), 0666)
+	err = os.WriteFile(tmpIndexPathMeta, []byte(`{"storage":"mystery"}`), 0o666)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	index, err = Open(tmpIndexPath)
+	_, err = Open(tmpIndexPath)
 	if err == nil {
 		t.Fatalf("expected error for unknown storage type, got %v", err)
 	}
 
 	// now intentionally corrupt the metadata
-	err = os.WriteFile(tmpIndexPathMeta, []byte("corrupted"), 0666)
+	err = os.WriteFile(tmpIndexPathMeta, []byte("corrupted"), 0o666)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	index, err = Open(tmpIndexPath)
+	_, err = Open(tmpIndexPath)
 	if err != ErrorIndexMetaCorrupt {
 		t.Fatalf("expected error index metadata corrupted, got %v", err)
 	}
@@ -982,14 +983,13 @@ func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	index, err = Open(tmpIndexPath)
+	_, err = Open(tmpIndexPath)
 	if err != ErrorIndexMetaMissing {
 		t.Fatalf("expected error index metadata missing, got %v", err)
 	}
 }
 
 func TestInMemIndex(t *testing.T) {
-
 	index, err := NewMemOnly(NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
@@ -1332,7 +1332,6 @@ func TestBatchString(t *testing.T) {
 	if !strings.Contains(batchStr, "DELETE INTERNAL - 'd'") {
 		t.Errorf("expected to contain DELETE INTERNAL - 'd', did not")
 	}
-
 }
 
 func TestIndexMetadataRaceBug198(t *testing.T) {
@@ -1362,7 +1361,9 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 			default:
 				_, err2 := index.DocCount()
 				if err2 != nil {
-					t.Fatal(err2)
+					t.Error(err2)
+					wg.Done()
+					return
 				}
 			}
 		}
@@ -1379,6 +1380,7 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+
 	close(done)
 	wg.Wait()
 }
@@ -1448,20 +1450,28 @@ func TestIndexCountMatchSearch(t *testing.T) {
 			b := index.NewBatch()
 			for j := 0; j < 200; j++ {
 				id := fmt.Sprintf("%d", (i*200)+j)
+
 				doc := struct {
 					Body string
 				}{
 					Body: "match",
 				}
+
 				err := b.Index(id, doc)
 				if err != nil {
-					t.Fatal(err)
+					t.Error(err)
+					wg.Done()
+					return
 				}
 			}
+
 			err := index.Batch(b)
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
+				wg.Done()
+				return
 			}
+
 			wg.Done()
 		}(i)
 	}
@@ -2276,7 +2286,6 @@ func TestOpenReadonlyMultiple(t *testing.T) {
 	index, err = OpenUsing(tmpIndexPath, map[string]interface{}{
 		"read_only": true,
 	})
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2285,7 +2294,6 @@ func TestOpenReadonlyMultiple(t *testing.T) {
 	index2, err := OpenUsing(tmpIndexPath, map[string]interface{}{
 		"read_only": true,
 	})
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2375,9 +2383,11 @@ func TestIndexAdvancedCountMatchSearch(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
+	errChan := make(chan error, 10)
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(i int) {
+			defer wg.Done()
 			b := index.NewBatch()
 			for j := 0; j < 200; j++ {
 				id := fmt.Sprintf("%d", (i*200)+j)
@@ -2388,17 +2398,25 @@ func TestIndexAdvancedCountMatchSearch(t *testing.T) {
 
 				err := b.IndexAdvanced(doc)
 				if err != nil {
-					t.Fatal(err)
+					errChan <- err
+					return
 				}
 			}
 			err := index.Batch(b)
 			if err != nil {
-				t.Fatal(err)
+				errChan <- err
+				return
 			}
-			wg.Done()
 		}(i)
 	}
 	wg.Wait()
+
+	close(errChan)
+	for err := range errChan {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	// search for something that should match all documents
 	sr, err := index.Search(NewSearchRequest(NewMatchQuery("match")))
@@ -2502,7 +2520,9 @@ func TestSearchQueryCallback(t *testing.T) {
 		return expErr
 	}
 
-	ctx := context.WithValue(context.Background(), SearchQueryStartCallbackKey,
+	ctx := context.WithValue(
+		context.Background(),
+		SearchQueryStartCallbackKey,
 		SearchQueryStartCallbackFn(f))
 	_, err = index.SearchInContext(ctx, req)
 	if err != expErr {
@@ -2656,7 +2676,6 @@ func TestBatchMerge(t *testing.T) {
 			t.Errorf("field %s is missing", ef)
 		}
 	}
-
 }
 
 func TestBug1096(t *testing.T) {

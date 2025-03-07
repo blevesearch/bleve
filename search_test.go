@@ -87,23 +87,32 @@ func TestSortedFacetedQuery(t *testing.T) {
 		}
 	}()
 
-	index.Index("1", map[string]interface{}{
+	if err := index.Index("1", map[string]interface{}{
 		"country": "india",
 		"content": "k",
-	})
-	index.Index("2", map[string]interface{}{
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := index.Index("2", map[string]interface{}{
 		"country": "india",
 		"content": "l",
-	})
-	index.Index("3", map[string]interface{}{
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := index.Index("3", map[string]interface{}{
 		"country": "india",
 		"content": "k",
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	d, err := index.DocCount()
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if d != 3 {
 		t.Errorf("expected 3, got %d", d)
 	}
@@ -156,18 +165,26 @@ func TestMatchAllScorer(t *testing.T) {
 		}
 	}()
 
-	index.Index("1", map[string]interface{}{
+	if err := index.Index("1", map[string]interface{}{
 		"country": "india",
 		"content": "k",
-	})
-	index.Index("2", map[string]interface{}{
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := index.Index("2", map[string]interface{}{
 		"country": "india",
 		"content": "l",
-	})
-	index.Index("3", map[string]interface{}{
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := index.Index("3", map[string]interface{}{
 		"country": "india",
 		"content": "k",
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	d, err := index.DocCount()
 	if err != nil {
@@ -196,7 +213,6 @@ func TestMatchAllScorer(t *testing.T) {
 }
 
 func TestSearchResultString(t *testing.T) {
-
 	tests := []struct {
 		result *SearchResult
 		str    string
@@ -309,7 +325,6 @@ func TestSearchResultMerge(t *testing.T) {
 }
 
 func TestUnmarshalingSearchResult(t *testing.T) {
-
 	searchResponse := []byte(`{
     "status":{
       "total":1,
@@ -356,11 +371,11 @@ func TestUnmarshalingSearchResult(t *testing.T) {
 }
 
 func TestFacetNumericDateRangeRequests(t *testing.T) {
-	var drMissingErr = fmt.Errorf("date range query must specify either start, end or both for range name 'testName'")
-	var nrMissingErr = fmt.Errorf("numeric range query must specify either min, max or both for range name 'testName'")
-	var drNrErr = fmt.Errorf("facet can only contain numeric ranges or date ranges, not both")
-	var drNameDupErr = fmt.Errorf("date ranges contains duplicate name 'testName'")
-	var nrNameDupErr = fmt.Errorf("numeric ranges contains duplicate name 'testName'")
+	drMissingErr := fmt.Errorf("date range query must specify either start, end or both for range name 'testName'")
+	nrMissingErr := fmt.Errorf("numeric range query must specify either min, max or both for range name 'testName'")
+	drNrErr := fmt.Errorf("facet can only contain numeric ranges or date ranges, not both")
+	drNameDupErr := fmt.Errorf("date ranges contains duplicate name 'testName'")
+	nrNameDupErr := fmt.Errorf("numeric ranges contains duplicate name 'testName'")
 	value := float64(5)
 
 	tests := []struct {
@@ -494,7 +509,6 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 			t.Errorf("expected %#v, got %#v", test.result, result)
 		}
 	}
-
 }
 
 func TestSearchResultFacetsMerge(t *testing.T) {
@@ -1094,7 +1108,7 @@ func testBooleanMustNotSearcher(t *testing.T, indexName string) {
 	rhs := NewBooleanQuery()
 	rhs.AddMustNot(hasRole)
 
-	var compareLeftRightAndConjunction = func(idx Index, left, right query.Query) error {
+	compareLeftRightAndConjunction := func(idx Index, left, right query.Query) error {
 		// left
 		lr := NewSearchRequestOptions(left, 100, 0, false)
 		lres, err := idx.Search(lr)
@@ -2098,7 +2112,7 @@ func TestAnalyzerInheritance(t *testing.T) {
 	}
 
 	for i := range tests {
-		t.Run(fmt.Sprintf("%s", tests[i].name), func(t *testing.T) {
+		t.Run(tests[i].name, func(t *testing.T) {
 			idxMapping := NewIndexMapping()
 			if err := idxMapping.UnmarshalJSON([]byte(tests[i].mappingStr)); err != nil {
 				t.Fatal(err)
@@ -2495,9 +2509,9 @@ func TestCustomDateTimeParserLayoutValidation(t *testing.T) {
 			time.StampMilli,
 			time.StampMicro,
 			time.StampNano,
-			"2006-01-02 15:04:05", //time.DateTime
-			"2006-01-02",          //time.DateOnly
-			"15:04:05",            //time.TimeOnly
+			"2006-01-02 15:04:05", // time.DateTime
+			"2006-01-02",          // time.DateOnly
+			"15:04:05",            // time.TimeOnly
 
 			// Corrected layouts to the incorrect ones below.
 			"2006-01-02 03:04:05 -0700",
@@ -2590,7 +2604,6 @@ func TestDateRangeStringQuery(t *testing.T) {
 			"2006/01/02 3:04PM",
 		},
 	})
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2601,7 +2614,6 @@ func TestDateRangeStringQuery(t *testing.T) {
 			"02/01/2006 3:04PM",
 		},
 	})
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2873,6 +2885,7 @@ func TestDateRangeStringQuery(t *testing.T) {
 		}
 	}
 }
+
 func TestDateRangeFacetQueriesWithCustomDateTimeParser(t *testing.T) {
 	idxMapping := NewIndexMapping()
 
@@ -2883,7 +2896,6 @@ func TestDateRangeFacetQueriesWithCustomDateTimeParser(t *testing.T) {
 			"2006/01/02 3:04PM",
 		},
 	})
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2894,7 +2906,6 @@ func TestDateRangeFacetQueriesWithCustomDateTimeParser(t *testing.T) {
 			"02/01/2006 3:04PM",
 		},
 	})
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4019,118 +4030,118 @@ func TestSynonymSearchQueries(t *testing.T) {
 					He remains persistent even in the face of challenges.`,
 		},
 		"doc2": {
-			"text": `The tranquil surroundings of the retreat provide a perfect escape from the hustle and bustle of city life. 
-					Guests enjoy the peaceful atmosphere, which is perfect for relaxation and rejuvenation. 
-					The calm environment offers the ideal place to meditate and connect with nature. 
+			"text": `The tranquil surroundings of the retreat provide a perfect escape from the hustle and bustle of city life.
+					Guests enjoy the peaceful atmosphere, which is perfect for relaxation and rejuvenation.
+					The calm environment offers the ideal place to meditate and connect with nature.
 					Even the most stressed individuals find themselves feeling relaxed and at ease.`,
 		},
 		"doc3": {
-			"text": `The house was burned down, leaving only a charred shell behind. 
-					The intense heat of the flames caused the walls to warp and the roof to cave in. 
-					The seared remains of the furniture told the story of the blaze. 
+			"text": `The house was burned down, leaving only a charred shell behind.
+					The intense heat of the flames caused the walls to warp and the roof to cave in.
+					The seared remains of the furniture told the story of the blaze.
 					The incinerated remains left little more than ashes to remember what once was.`,
 		},
 		"doc4": {
-			"text": `The faithful dog followed its owner everywhere, always loyal and steadfast. 
-					It was devoted to protecting its family, and its reliable nature meant it could always be trusted. 
-					In the face of danger, the dog remained calm, knowing its role was to stay vigilant. 
+			"text": `The faithful dog followed its owner everywhere, always loyal and steadfast.
+					It was devoted to protecting its family, and its reliable nature meant it could always be trusted.
+					In the face of danger, the dog remained calm, knowing its role was to stay vigilant.
 					Its trustworthy companionship provided comfort and security.`,
 		},
 		"doc5": {
-			"text": `The lively market is bustling with activity from morning to night. 
-					The dynamic energy of the crowd fills the air as vendors sell their wares. 
-					Shoppers wander from stall to stall, captivated by the vibrant colors and energetic atmosphere. 
+			"text": `The lively market is bustling with activity from morning to night.
+					The dynamic energy of the crowd fills the air as vendors sell their wares.
+					Shoppers wander from stall to stall, captivated by the vibrant colors and energetic atmosphere.
 					This place is alive with movement and life.`,
 		},
 		"doc6": {
-			"text": `In moments of crisis, bravery shines through. 
-					It takes valor to step forward when others are afraid to act. 
-					Heroes are defined by their guts and nerve, taking risks to protect others. 
+			"text": `In moments of crisis, bravery shines through.
+					It takes valor to step forward when others are afraid to act.
+					Heroes are defined by their guts and nerve, taking risks to protect others.
 					Boldness in the face of danger is what sets them apart.`,
 		},
 		"doc7": {
-			"text": `Innovation is the driving force behind progress in every industry. 
-					The company fosters an environment of invention, encouraging creativity at every level. 
-					The focus on novelty and improvement means that ideas are always evolving. 
+			"text": `Innovation is the driving force behind progress in every industry.
+					The company fosters an environment of invention, encouraging creativity at every level.
+					The focus on novelty and improvement means that ideas are always evolving.
 					The development of new solutions is at the core of the company's mission.`,
 		},
 		"doc8": {
-			"text": `The blazing sunset cast a radiant glow over the horizon, painting the sky with hues of red and orange. 
-					The intense heat of the day gave way to a fiery display of color. 
-					As the sun set, the glowing light illuminated the landscape, creating a breathtaking scene. 
+			"text": `The blazing sunset cast a radiant glow over the horizon, painting the sky with hues of red and orange.
+					The intense heat of the day gave way to a fiery display of color.
+					As the sun set, the glowing light illuminated the landscape, creating a breathtaking scene.
 					The fiery sky was a sight to behold.`,
 		},
 		"doc9": {
-			"text": `The fertile soil of the valley makes it perfect for farming. 
-					The productive land yields abundant crops year after year. 
-					Farmers rely on the rich, fruitful ground to sustain their livelihoods. 
+			"text": `The fertile soil of the valley makes it perfect for farming.
+					The productive land yields abundant crops year after year.
+					Farmers rely on the rich, fruitful ground to sustain their livelihoods.
 					The area is known for its plentiful harvests, supporting both local communities and export markets.`,
 		},
 		"doc10": {
-			"text": `The arid desert is a vast, dry expanse with little water or vegetation. 
-					The barren landscape stretches as far as the eye can see, offering little respite from the scorching sun. 
-					The desolate environment is unforgiving to those who venture too far without preparation. 
+			"text": `The arid desert is a vast, dry expanse with little water or vegetation.
+					The barren landscape stretches as far as the eye can see, offering little respite from the scorching sun.
+					The desolate environment is unforgiving to those who venture too far without preparation.
 					The parched earth cracks under the heat, creating a harsh, unyielding terrain.`,
 		},
 		"doc11": {
-			"text": `The fox is known for its cunning and intelligence. 
-					As a predator, it relies on its sharp instincts to outwit its prey. 
-					Its vulpine nature makes it both mysterious and fascinating. 
+			"text": `The fox is known for its cunning and intelligence.
+					As a predator, it relies on its sharp instincts to outwit its prey.
+					Its vulpine nature makes it both mysterious and fascinating.
 					The fox's ability to hunt with precision and stealth is what makes it such a formidable hunter.`,
 		},
 		"doc12": {
-			"text": `The dog is often considered man's best friend due to its loyal nature. 
-					As a companion, the hound provides both protection and affection. 
-					The puppy quickly becomes a member of the family, always by your side. 
+			"text": `The dog is often considered man's best friend due to its loyal nature.
+					As a companion, the hound provides both protection and affection.
+					The puppy quickly becomes a member of the family, always by your side.
 					Its playful energy and unshakable loyalty make it a beloved pet.`,
 		},
 		"doc13": {
-			"text": `He worked tirelessly through the night, always persistent in his efforts. 
-					His industrious approach to problem-solving kept the project moving forward. 
-					No matter how difficult the task, he remained focused, always giving his best. 
+			"text": `He worked tirelessly through the night, always persistent in his efforts.
+					His industrious approach to problem-solving kept the project moving forward.
+					No matter how difficult the task, he remained focused, always giving his best.
 					His dedication paid off when the project was completed ahead of schedule.`,
 		},
 		"doc14": {
-			"text": `The river flowed calmly through the valley, its peaceful current offering a sense of tranquility. 
-					Fishermen relaxed by the banks, enjoying the calm waters that reflected the sky above. 
-					The tranquil nature of the river made it a perfect spot for meditation. 
+			"text": `The river flowed calmly through the valley, its peaceful current offering a sense of tranquility.
+					Fishermen relaxed by the banks, enjoying the calm waters that reflected the sky above.
+					The tranquil nature of the river made it a perfect spot for meditation.
 					As the day ended, the river's quiet flow brought a sense of peace.`,
 		},
 		"doc15": {
-			"text": `After the fire, all that was left was the charred remains of what once was. 
-					The seared walls of the house told a tragic story. 
-					The intensity of the blaze had burned everything in its path, leaving only the smoldering wreckage behind. 
+			"text": `After the fire, all that was left was the charred remains of what once was.
+					The seared walls of the house told a tragic story.
+					The intensity of the blaze had burned everything in its path, leaving only the smoldering wreckage behind.
 					The incinerated objects could not be salvaged, and the damage was beyond repair.`,
 		},
 		"doc16": {
-			"text": `The devoted employee always went above and beyond to complete his tasks. 
-					His steadfast commitment to the company made him a valuable team member. 
-					He was reliable, never failing to meet deadlines. 
+			"text": `The devoted employee always went above and beyond to complete his tasks.
+					His steadfast commitment to the company made him a valuable team member.
+					He was reliable, never failing to meet deadlines.
 					His trustworthiness earned him the respect of his colleagues, and was considered an
 					ingenious expert in his field.`,
 		},
 		"doc17": {
-			"text": `The city is vibrant, full of life and energy. 
-					The dynamic pace of the streets reflects the diverse culture of its inhabitants. 
-					People from all walks of life contribute to the energetic atmosphere. 
+			"text": `The city is vibrant, full of life and energy.
+					The dynamic pace of the streets reflects the diverse culture of its inhabitants.
+					People from all walks of life contribute to the energetic atmosphere.
 					The city's lively spirit can be felt in every corner, from the bustling markets to the lively festivals.`,
 		},
 		"doc18": {
-			"text": `In a moment of uncertainty, he made a bold decision that would change his life forever. 
-					It took courage and nerve to take the leap, but his bravery paid off. 
-					The guts to face the unknown allowed him to achieve something remarkable. 
+			"text": `In a moment of uncertainty, he made a bold decision that would change his life forever.
+					It took courage and nerve to take the leap, but his bravery paid off.
+					The guts to face the unknown allowed him to achieve something remarkable.
 					Being an bright scholar, the skill he demonstrated inspired those around him.`,
 		},
 		"doc19": {
-			"text": `Innovation is often born from necessity, and the lightbulb is a prime example. 
-					Thomas Edison's invention changed the world, offering a new way to see the night. 
-					The creativity involved in developing such a groundbreaking product sparked a wave of 
+			"text": `Innovation is often born from necessity, and the lightbulb is a prime example.
+					Thomas Edison's invention changed the world, offering a new way to see the night.
+					The creativity involved in developing such a groundbreaking product sparked a wave of
 					novelty in the scientific community. This improvement in technology continues to shape the modern world.
 					He was a clever academic and a smart researcher.`,
 		},
 		"doc20": {
-			"text": `The fiery volcano erupted with a force that shook the earth. Its radiant lava flowed down the sides, 
-					illuminating the night sky. The intense heat from the eruption could be felt miles away, as the 
+			"text": `The fiery volcano erupted with a force that shook the earth. Its radiant lava flowed down the sides,
+					illuminating the night sky. The intense heat from the eruption could be felt miles away, as the
 					glowing lava burned everything in its path. The fiery display was both terrifying and mesmerizing.`,
 		},
 	}
@@ -4211,7 +4222,7 @@ func TestSynonymSearchQueries(t *testing.T) {
 		return batches
 	}
 	// Create batches of 5 documents
-	var batchSize = 5
+	batchSize := 5
 	docBatches := createDocBatches(combinedDocIDs, batchSize)
 	if len(docBatches) == 0 {
 		t.Fatal("expected batches")
@@ -4389,11 +4400,16 @@ func TestSynonymSearchQueries(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			cleanupTmpIndexPath(t, indexesPath[i])
 		}
 	}()
 	alias := NewIndexAlias(indexes...)
-	alias.SetIndexMapping(imap)
+
+	if err := alias.SetIndexMapping(imap); err != nil {
+		t.Fatal(err)
+	}
+
 	err = runTestQueries(alias)
 	if err != nil {
 		t.Fatal(err)
@@ -4425,7 +4441,11 @@ func TestSynonymSearchQueries(t *testing.T) {
 		aliases[numAliases-1].Add(indexes[numIndexes-1])
 	}
 	alias = NewIndexAlias()
-	alias.SetIndexMapping(imap)
+
+	if err := alias.SetIndexMapping(imap); err != nil {
+		t.Fatal(err)
+	}
+
 	for i := 0; i < numAliases; i++ {
 		alias.Add(aliases[i])
 	}
@@ -4491,7 +4511,9 @@ func TestGeoDistanceInSort(t *testing.T) {
 	}
 
 	for _, doc := range docs {
-		idx.Index(doc.id, map[string]interface{}{"geo": doc.point})
+		if err := idx.Index(doc.id, map[string]interface{}{"geo": doc.point}); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	q := NewGeoDistanceQuery(qp[0], qp[1], "1000000m")

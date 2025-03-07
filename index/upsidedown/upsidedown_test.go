@@ -15,6 +15,7 @@
 package upsidedown
 
 import (
+	"context"
 	"log"
 	"reflect"
 	"regexp"
@@ -970,6 +971,10 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 
 	// now delete the document
 	err = idx.Delete("1")
+	if err != nil {
+		t.Errorf("Error deleting entry from index: %v", err)
+	}
+
 	expectedCount--
 
 	// expected doc count shouldn't have changed
@@ -1047,7 +1052,6 @@ func TestIndexInsertFields(t *testing.T) {
 			t.Errorf("expected fields: %v, got %v", expectedFields, fields)
 		}
 	}
-
 }
 
 func TestIndexUpdateComposites(t *testing.T) {
@@ -1192,7 +1196,6 @@ func TestIndexFieldsMisc(t *testing.T) {
 	if fieldName3 != "" {
 		t.Errorf("expected field named '', got '%s'", fieldName3)
 	}
-
 }
 
 func TestIndexTermReaderCompositeFields(t *testing.T) {
@@ -1239,7 +1242,7 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 		}
 	}()
 
-	termFieldReader, err := indexReader.TermFieldReader(nil, []byte("mister"), "_all", true, true, true)
+	termFieldReader, err := indexReader.TermFieldReader(context.TODO(), []byte("mister"), "_all", true, true, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -1322,7 +1325,6 @@ func TestIndexDocValueReader(t *testing.T) {
 }
 
 func BenchmarkBatch(b *testing.B) {
-
 	cache := registry.NewCache()
 	analyzer, err := cache.AnalyzerNamed(standard.Name)
 	if err != nil {
@@ -1501,7 +1503,6 @@ func TestIndexBatchPersistedCallbackWithErrorUpsideDown(t *testing.T) {
 	if !callbackExecuted {
 		t.Fatal("expected callback to fire, it did not")
 	}
-
 }
 
 // fieldTerms contains the terms used by a document, keyed by field

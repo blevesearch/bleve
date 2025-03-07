@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/index/scorch"
@@ -400,7 +401,8 @@ func hitsById(res *bleve.SearchResult) map[string]*search.DocumentMatch {
 
 func (vt *VersusTest) run(indexTypeA, kvStoreA, indexTypeB, kvStoreB string,
 	cb func(versusTest *VersusTest, searchTemplates []string, idxA, idxB bleve.Index),
-	searchTemplates []string) {
+	searchTemplates []string,
+) {
 	if cb == nil {
 		cb = testVersusSearches
 	}
@@ -441,8 +443,6 @@ func (vt *VersusTest) run(indexTypeA, kvStoreA, indexTypeB, kvStoreB string,
 		vt.t.Fatalf("new using err: %v", err)
 	}
 	defer func() { _ = idxB.Close() }()
-
-	rand.Seed(0)
 
 	if vt.Bodies == nil {
 		vt.Bodies = vt.genBodies()
@@ -505,9 +505,11 @@ func (vt *VersusTest) genBodies() (rv [][]string) {
 }
 
 func (vt *VersusTest) genBody() (rv []string) {
-	m := rand.Intn(vt.MaxWordsPerDoc)
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	m := rng.Intn(vt.MaxWordsPerDoc)
 	for j := 0; j < m; j++ {
-		rv = append(rv, vt.genWord(rand.Intn(vt.NumWords)))
+		rv = append(rv, vt.genWord(rng.Intn(vt.NumWords)))
 	}
 	return rv
 }
