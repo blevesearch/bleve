@@ -24,19 +24,19 @@ import (
 )
 
 func TestMetricsStore(t *testing.T) {
-	s, err := New(nil, map[string]interface{}{})
+	_, err := New(nil, map[string]interface{}{})
 	if err == nil {
 		t.Errorf("expected err when bad config")
 	}
 
-	s, err = New(nil, map[string]interface{}{
+	_, err = New(nil, map[string]interface{}{
 		"kvStoreName_actual": "some-invalid-kvstore-name",
 	})
 	if err == nil {
 		t.Errorf("expected err when unknown kvStoreName_actual")
 	}
 
-	s, err = New(nil, map[string]interface{}{
+	s, err := New(nil, map[string]interface{}{
 		"kvStoreName_actual": gtreap.Name,
 		"path":               "",
 	})

@@ -930,7 +930,6 @@ func TestQuerySyntaxParserInvalid(t *testing.T) {
 }
 
 func BenchmarkLexer(b *testing.B) {
-
 	for n := 0; n < b.N; n++ {
 		var tokenTypes []int
 		var tokens []yySymType
@@ -938,13 +937,18 @@ func BenchmarkLexer(b *testing.B) {
 		l := newQueryStringLex(r)
 		var lval yySymType
 		rv := l.Lex(&lval)
+
 		for rv > 0 {
 			tokenTypes = append(tokenTypes, rv)
 			tokens = append(tokens, lval)
+
+			// use the slice to silence the compiler warning
+			_ = tokenTypes
+			_ = tokens
+
 			lval.s = ""
 			lval.n = 0
 			rv = l.Lex(&lval)
 		}
 	}
-
 }
