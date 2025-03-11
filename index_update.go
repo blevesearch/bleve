@@ -156,7 +156,6 @@ func compareMappings(ori, upd *mapping.IndexMappingImpl) error {
 // Ensures updated document mapping does not contain new
 // field mappings or document mappings
 func checkUpdatedMapping(ori, upd *mapping.DocumentMapping) error {
-
 	// Check to verify both original and updated are not nil
 	// and are enabled before proceeding
 	if ori == nil {
@@ -183,7 +182,6 @@ func checkUpdatedMapping(ori, upd *mapping.DocumentMapping) error {
 	// in updated
 	for _, updFMapping := range upd.Fields {
 		var oriFMapping *mapping.FieldMapping
-
 		for _, fMapping := range ori.Fields {
 			if updFMapping.Name == fMapping.Name {
 				oriFMapping = fMapping
@@ -202,7 +200,6 @@ func checkUpdatedMapping(ori, upd *mapping.DocumentMapping) error {
 // for a single field or multiple document fields' data getting written to a single zapx field
 func addPathInfo(paths map[string]*pathInfo, name string, mp *mapping.DocumentMapping,
 	im *mapping.IndexMappingImpl, parent *pathInfo, rootName string) {
-
 	// Early exit if mapping has been disabled
 	// Comparisions later on will be done with a nil object
 	if !mp.Enabled {
@@ -278,7 +275,6 @@ func compareCustomComponents(oriPaths, updPaths map[string]*pathInfo, ori, upd *
 // Standard analysers not in custom analysis are not compared
 // Analysers in custom analysis but not in use are not compared
 func compareAnalysers(oriPaths, updPaths map[string]*pathInfo, ori, upd *mapping.IndexMappingImpl) error {
-
 	oriAnalyzers := make(map[string]interface{})
 	updAnalyzers := make(map[string]interface{})
 	oriCustomAnalysers := ori.CustomAnalysis.Analyzers
@@ -330,7 +326,6 @@ func compareAnalysers(oriPaths, updPaths map[string]*pathInfo, ori, upd *mapping
 // Compares all date time parsers currently in use
 // Date time parsers in custom analysis but not in use are not compared
 func compareDateTimeParsers(oriPaths, updPaths map[string]*pathInfo, ori, upd *mapping.IndexMappingImpl) error {
-
 	oriDateTimeParsers := make(map[string]analysis.DateTimeParser)
 	updDateTimeParsers := make(map[string]analysis.DateTimeParser)
 
@@ -383,7 +378,6 @@ func compareDateTimeParsers(oriPaths, updPaths map[string]*pathInfo, ori, upd *m
 // Compares all synonym sources
 // Synonym sources currently not in use are also compared
 func compareSynonymSources(oriPaths, updPaths map[string]*pathInfo, ori, upd *mapping.IndexMappingImpl) error {
-
 	oriSynonymSources := make(map[string]analysis.SynonymSource)
 	updSynonymSources := make(map[string]analysis.SynonymSource)
 
@@ -422,7 +416,6 @@ func compareSynonymSources(oriPaths, updPaths map[string]*pathInfo, ori, upd *ma
 
 // Compare all of the fields at a particular document path and add its field information
 func addFieldInfo(fInfo map[string]*index.UpdateFieldInfo, ori, upd *pathInfo) error {
-
 	var info *index.UpdateFieldInfo
 	var updated bool
 	var err error
@@ -500,7 +493,6 @@ func addFieldInfo(fInfo map[string]*index.UpdateFieldInfo, ori, upd *pathInfo) e
 // update is impossible
 // third argument is an error explaining exactly why the change is not possible
 func compareFieldMapping(original, updated *mapping.FieldMapping) (*index.UpdateFieldInfo, bool, error) {
-
 	rv := &index.UpdateFieldInfo{}
 
 	if updated == nil {
@@ -593,7 +585,6 @@ func compareFieldMapping(original, updated *mapping.FieldMapping) (*index.Update
 // In such a situation, any conflicting changes found will abort the update process
 func validateFieldInfo(newInfo *index.UpdateFieldInfo, updated bool, fInfo map[string]*index.UpdateFieldInfo,
 	ori *pathInfo, oriFMapInfo *fieldMapInfo) error {
-
 	var name string
 	if oriFMapInfo.parent.parentPath == "" {
 		if oriFMapInfo.fieldMapping.Name == "" {
