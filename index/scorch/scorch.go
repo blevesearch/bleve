@@ -947,12 +947,7 @@ func (s *Scorch) FireIndexEvent() {
 // will be merged before persisting. The index mapping is also overwritted both
 // in bolt as well as the index snapshot
 func (s *Scorch) UpdateFields(fieldInfo map[string]*index.UpdateFieldInfo, mappingBytes []byte) error {
-	// Switch from pointer to value so we can marshal into a json for storage
-	updatedFields := make(map[string]index.UpdateFieldInfo)
-	for field, info := range fieldInfo {
-		updatedFields[field] = *info
-	}
-	err := s.updateBolt(updatedFields, mappingBytes)
+	err := s.updateBolt(fieldInfo, mappingBytes)
 	if err != nil {
 		return err
 	}
@@ -964,7 +959,7 @@ func (s *Scorch) UpdateFields(fieldInfo map[string]*index.UpdateFieldInfo, mappi
 }
 
 // Merge and update deleted field info and rewrite index mapping
-func (s *Scorch) updateBolt(fieldInfo map[string]index.UpdateFieldInfo, mappingBytes []byte) error {
+func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mappingBytes []byte) error {
 	return s.rootBolt.Update(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(boltSnapshotsBucket)
 		if snapshots == nil {
@@ -995,7 +990,7 @@ func (s *Scorch) updateBolt(fieldInfo map[string]index.UpdateFieldInfo, mappingB
 					if segmentBucket == nil {
 						return fmt.Errorf("segment key, but bucket missing %x", kk)
 					}
-					var updatedFields map[string]index.UpdateFieldInfo
+					var updatedFields map[string]*index.UpdateFieldInfo
 					updatedFieldBytes := segmentBucket.Get(boltUpdatedFieldsKey)
 					if updatedFieldBytes != nil {
 						err := json.Unmarshal(updatedFieldBytes, &updatedFields)
@@ -1004,7 +999,7 @@ func (s *Scorch) updateBolt(fieldInfo map[string]index.UpdateFieldInfo, mappingB
 						}
 						for field, info := range fieldInfo {
 							if val, ok := updatedFields[field]; ok {
-								updatedFields[field] = index.UpdateFieldInfo{
+								updatedFields[field] = &index.UpdateFieldInfo{
 									Deleted:   info.Deleted || val.Deleted,
 									Store:     info.Store || val.Store,
 									DocValues: info.DocValues || val.DocValues,
