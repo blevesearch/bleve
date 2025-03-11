@@ -85,6 +85,9 @@ func (q *GeoBoundingBoxQuery) Searcher(ctx context.Context, i index.IndexReader,
 }
 
 func (q *GeoBoundingBoxQuery) Validate() error {
+	if q.TopLeft[1] < q.BottomRight[1] {
+		return fmt.Errorf("geo bounding box top left should be higher than bottom right")
+	}
 	return nil
 }
 
