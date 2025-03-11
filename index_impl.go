@@ -179,7 +179,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		if rck == "updated_mapping" {
 			if val, ok := rcv.(string); ok {
 				if len(val) == 0 {
-					return nil, fmt.Errorf(("updated_mapping is empty"))
+					return nil, fmt.Errorf("updated_mapping is empty")
 				}
 				umBytes = []byte(val)
 
