@@ -80,9 +80,9 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.Update
 	// Go through each mapping present in the updated
 	// and consolidate according to the document paths
 	for name, updDMapping := range upd.TypeMapping {
-		addPathInfo(updPaths, "", updDMapping, ori, nil, name)
+		addPathInfo(updPaths, "", updDMapping, upd, nil, name)
 	}
-	addPathInfo(updPaths, "", upd.DefaultMapping, ori, nil, "")
+	addPathInfo(updPaths, "", upd.DefaultMapping, upd, nil, "")
 
 	// Compare all components of custom analysis currently in use
 	err = compareCustomComponents(oriPaths, updPaths, ori, upd)
