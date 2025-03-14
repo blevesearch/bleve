@@ -81,6 +81,8 @@ type IndexSnapshot struct {
 
 	m2        sync.Mutex                                 // Protects the fields that follow.
 	fieldTFRs map[string][]*IndexSnapshotTermFieldReader // keyed by field, recycled TFR's
+
+	updatedFields map[string]*index.UpdateFieldInfo
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
@@ -469,6 +471,12 @@ func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		// Keeping that TODO for now until we have a cleaner way.
 		rvd.StoredFieldsSize += uint64(len(val))
 
+		// Skip fields that are supposed to have deleted store values
+		if info, ok := is.updatedFields[name]; ok &&
+			(info.Deleted || info.Store) {
+			return true
+		}
+
 		// copy value, array positions to preserve them beyond the scope of this callback
 		value := append([]byte(nil), val...)
 		arrayPos := append([]uint64(nil), pos...)
@@ -608,10 +616,21 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 				segBytesRead := s.segment.BytesRead()
 				rv.incrementBytesRead(segBytesRead)
 			}
-			dict, err := s.segment.Dictionary(field)
+
+			var dict segment.TermDictionary
+			var err error
+
+			// Skip fields that are supposed to have no indexing
+			if info, ok := is.updatedFields[field]; ok &&
+				(info.Index || info.Deleted) {
+				dict, err = s.segment.Dictionary("")
+			} else {
+				dict, err = s.segment.Dictionary(field)
+			}
 			if err != nil {
 				return nil, err
 			}
+
 			if dictStats, ok := dict.(segment.DiskStatsReporter); ok {
 				bytesRead := dictStats.BytesRead()
 				rv.incrementBytesRead(bytesRead)
@@ -756,6 +775,18 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 		}
 	}
 
+	// Filter out fields that are supposed to have no doc values
+	idx := 0
+	for _, field := range vFields {
+		if info, ok := is.updatedFields[field]; ok &&
+			(info.DocValues || info.Deleted) {
+			continue
+		}
+		vFields[idx] = field
+		idx++
+	}
+	vFields = vFields[:idx]
+
 	var errCh chan error
 
 	// cFields represents the fields that we'll need from the
@@ -779,7 +810,7 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	}
 
 	if ssvOk && ssv != nil && len(vFields) > 0 {
-		dvs, err = ssv.VisitDocValues(localDocNum, fields, visitor, dvs)
+		dvs, err = ssv.VisitDocValues(localDocNum, vFields, visitor, dvs)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1137,4 +1168,31 @@ func (is *IndexSnapshot) ThesaurusKeysRegexp(name string,
 
 func (is *IndexSnapshot) UpdateSynonymSearchCount(delta uint64) {
 	atomic.AddUint64(&is.parent.stats.TotSynonymSearches, delta)
+}
+
+// Update current snapshot updated field data as well as pass it on to all segments and segment bases
+func (is *IndexSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
+	is.MergeUpdateFieldsInfo(updatedFields)
+
+	for _, segmentSnapshot := range is.segment {
+		segmentSnapshot.UpdateFieldsInfo(is.updatedFields)
+	}
+}
+
+// Merge given updated field information with existing updated field information
+func (is *IndexSnapshot) MergeUpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
+	if is.updatedFields == nil {
+		is.updatedFields = updatedFields
+	} else {
+		for fieldName, info := range updatedFields {
+			if val, ok := is.updatedFields[fieldName]; ok {
+				val.Deleted = val.Deleted || info.Deleted
+				val.Index = val.Index || info.Index
+				val.DocValues = val.DocValues || info.DocValues
+				val.Store = val.Store || info.Store
+			} else {
+				is.updatedFields[fieldName] = info
+			}
+		}
+	}
 }
