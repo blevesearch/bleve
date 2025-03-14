@@ -28,6 +28,7 @@ type pathInfo struct {
 	fieldMapInfo []*fieldMapInfo
 	dynamic      bool
 	path         string
+	analyser     string
 	parentPath   string
 }
 
@@ -121,7 +122,7 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.Update
 	return fieldInfo, nil
 }
 
-// Ensures non of the top level index mapping fields have changed
+// Ensures none of the top level index mapping fields have changed
 func compareMappings(ori, upd *mapping.IndexMappingImpl) error {
 	if ori.TypeField != upd.TypeField &&
 		(len(ori.TypeMapping) != 0 || len(upd.TypeMapping) != 0) {
@@ -137,11 +138,19 @@ func compareMappings(ori, upd *mapping.IndexMappingImpl) error {
 	}
 
 	if ori.StoreDynamic != upd.StoreDynamic {
-		return fmt.Errorf(("store dynamic cannot be changed"))
+		return fmt.Errorf("store dynamic cannot be changed")
 	}
 
 	if ori.DocValuesDynamic != upd.DocValuesDynamic {
-		return fmt.Errorf(("docvalues dynamic cannot be changed"))
+		return fmt.Errorf("docvalues dynamic cannot be changed")
+	}
+
+	if ori.DefaultAnalyzer != upd.DefaultAnalyzer && upd.IndexDynamic {
+		return fmt.Errorf("default analyser cannot be changed if index dynamic is true")
+	}
+
+	if ori.DefaultDateTimeParser != upd.DefaultDateTimeParser && upd.IndexDynamic {
+		return fmt.Errorf("default datetime parser cannot be changed if index dynamic is true")
 	}
 
 	return nil
@@ -210,6 +219,7 @@ func addPathInfo(paths map[string]*pathInfo, name string, mp *mapping.DocumentMa
 			fieldMapInfo: make([]*fieldMapInfo, 0),
 		}
 		pInfo.dynamic = mp.Dynamic && im.IndexDynamic
+		pInfo.analyser = im.AnalyzerNameForPath(name)
 	}
 
 	pInfo.dynamic = (pInfo.dynamic || mp.Dynamic) && im.IndexDynamic
@@ -400,6 +410,9 @@ func addFieldInfo(fInfo map[string]*index.UpdateFieldInfo, ori, upd *pathInfo) e
 			}
 		}
 	} else {
+		if upd.dynamic && ori.analyser != upd.analyser {
+			return fmt.Errorf("analyser has been changed for a dynamic mapping")
+		}
 		for _, oriFMapInfo := range ori.fieldMapInfo {
 			var updFMap *mapping.FieldMapping
 			var updAnalyser string
@@ -424,7 +437,7 @@ func addFieldInfo(fInfo map[string]*index.UpdateFieldInfo, ori, upd *pathInfo) e
 				return fmt.Errorf("analyser has been changed for a text field")
 			}
 			if updDatetimeParser != "" && oriFMapInfo.datetimeParser != updDatetimeParser {
-				return fmt.Errorf("datetime parser has been changed for a text field")
+				return fmt.Errorf("datetime parser has been changed for a date time field")
 			}
 			info, err = compareFieldMapping(oriFMapInfo.fieldMapping, updFMap)
 			if err != nil {
