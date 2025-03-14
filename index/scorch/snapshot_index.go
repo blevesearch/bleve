@@ -776,15 +776,16 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	}
 
 	// Filter out fields that are supposed to have no doc values
-	var filteredFields []string
+	idx := 0
 	for _, field := range vFields {
 		if info, ok := is.updatedFields[field]; ok &&
 			(info.DocValues || info.Deleted) {
 			continue
-		} else {
-			filteredFields = append(filteredFields, field)
 		}
+		vFields[idx] = field
+		idx++
 	}
+	vFields = vFields[:idx]
 
 	var errCh chan error
 
@@ -793,7 +794,7 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	// if the caller happens to know we're on the same segmentIndex
 	// from a previous invocation
 	if cFields == nil {
-		cFields = subtractStrings(fields, filteredFields)
+		cFields = subtractStrings(fields, vFields)
 
 		if !ss.cachedDocs.hasFields(cFields) {
 			errCh = make(chan error, 1)
@@ -808,8 +809,8 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 		}
 	}
 
-	if ssvOk && ssv != nil && len(filteredFields) > 0 {
-		dvs, err = ssv.VisitDocValues(localDocNum, filteredFields, visitor, dvs)
+	if ssvOk && ssv != nil && len(vFields) > 0 {
+		dvs, err = ssv.VisitDocValues(localDocNum, vFields, visitor, dvs)
 		if err != nil {
 			return nil, nil, err
 		}

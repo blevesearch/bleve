@@ -42,15 +42,13 @@ func TestCompareFieldMapping(t *testing.T) {
 		original       *mapping.FieldMapping
 		updated        *mapping.FieldMapping
 		indexFieldInfo *index.UpdateFieldInfo
-		changed        bool
 		err            bool
 	}{
-		{ // both nil => no op
+		{ // both nil => error
 			original:       nil,
 			updated:        nil,
 			indexFieldInfo: nil,
-			changed:        false,
-			err:            false,
+			err:            true,
 		},
 		{ // updated nil => delete all
 			original: &mapping.FieldMapping{},
@@ -58,8 +56,7 @@ func TestCompareFieldMapping(t *testing.T) {
 			indexFieldInfo: &index.UpdateFieldInfo{
 				Deleted: true,
 			},
-			changed: true,
-			err:     false,
+			err: false,
 		},
 		{ // type changed => not updatable
 			original: &mapping.FieldMapping{
@@ -69,10 +66,9 @@ func TestCompareFieldMapping(t *testing.T) {
 				Type: "datetime",
 			},
 			indexFieldInfo: nil,
-			changed:        false,
 			err:            true,
 		},
-		{ // synonym source changed for text => not updatable
+		{ // synonym source changed for text => updatable
 			original: &mapping.FieldMapping{
 				Type:          "text",
 				SynonymSource: "a",
@@ -81,9 +77,8 @@ func TestCompareFieldMapping(t *testing.T) {
 				Type:          "text",
 				SynonymSource: "b",
 			},
-			indexFieldInfo: nil,
-			changed:        false,
-			err:            true,
+			indexFieldInfo: &index.UpdateFieldInfo{},
+			err:            false,
 		},
 		{ // analyser changed for text => not updatable
 			original: &mapping.FieldMapping{
@@ -95,7 +90,6 @@ func TestCompareFieldMapping(t *testing.T) {
 				Analyzer: "b",
 			},
 			indexFieldInfo: nil,
-			changed:        false,
 			err:            true,
 		},
 		{ // dims changed for vector => not updatable
@@ -112,7 +106,6 @@ func TestCompareFieldMapping(t *testing.T) {
 				VectorIndexOptimizedFor: "memory-efficient",
 			},
 			indexFieldInfo: nil,
-			changed:        false,
 			err:            true,
 		},
 		{ // similarity changed for vectorbase64 => not updatable
@@ -129,7 +122,6 @@ func TestCompareFieldMapping(t *testing.T) {
 				VectorIndexOptimizedFor: "memory-efficient",
 			},
 			indexFieldInfo: nil,
-			changed:        false,
 			err:            true,
 		},
 		{ // vectorindexoptimizedfor chagned for vector => not updatable
@@ -146,7 +138,6 @@ func TestCompareFieldMapping(t *testing.T) {
 				VectorIndexOptimizedFor: "latency",
 			},
 			indexFieldInfo: nil,
-			changed:        false,
 			err:            true,
 		},
 		{ // includeinall changed => not updatable
@@ -159,7 +150,6 @@ func TestCompareFieldMapping(t *testing.T) {
 				IncludeInAll: false,
 			},
 			indexFieldInfo: nil,
-			changed:        false,
 			err:            true,
 		},
 		{ //includetermvectors changed => not updatable
@@ -172,7 +162,6 @@ func TestCompareFieldMapping(t *testing.T) {
 				IncludeTermVectors: true,
 			},
 			indexFieldInfo: nil,
-			changed:        false,
 			err:            true,
 		},
 		{ // store changed after all checks => updatable with store delete
@@ -185,7 +174,6 @@ func TestCompareFieldMapping(t *testing.T) {
 				SkipFreqNorm: false,
 			},
 			indexFieldInfo: nil,
-			changed:        false,
 			err:            true,
 		},
 		{ // index changed after all checks => updatable with index and docvalues delete
@@ -201,8 +189,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				Index:     true,
 				DocValues: true,
 			},
-			changed: true,
-			err:     false,
+			err: false,
 		},
 		{ // docvalues changed after all checks => docvalues delete
 			original: &mapping.FieldMapping{
@@ -216,8 +203,7 @@ func TestCompareFieldMapping(t *testing.T) {
 			indexFieldInfo: &index.UpdateFieldInfo{
 				DocValues: true,
 			},
-			changed: true,
-			err:     false,
+			err: false,
 		},
 		{ // no relavent changes => continue but no op
 			original: &mapping.FieldMapping{
@@ -253,19 +239,15 @@ func TestCompareFieldMapping(t *testing.T) {
 				SynonymSource:           "b",
 			},
 			indexFieldInfo: &index.UpdateFieldInfo{},
-			changed:        false,
 			err:            false,
 		},
 	}
 
 	for i, test := range tests {
-		rv, changed, err := compareFieldMapping(test.original, test.updated)
+		rv, err := compareFieldMapping(test.original, test.updated)
 
 		if err == nil && test.err || err != nil && !test.err {
 			t.Errorf("Unexpected error value for test %d, expecting %t, got %v\n", i, test.err, err)
-		}
-		if changed != test.changed {
-			t.Errorf("Unexpected changed value for test %d, expecting %t, got %t, err %v\n", i, test.changed, changed, err)
 		}
 		if rv == nil && test.indexFieldInfo != nil || rv != nil && test.indexFieldInfo == nil || !reflect.DeepEqual(rv, test.indexFieldInfo) {
 			t.Errorf("Unexpected index field info value for test %d, expecting %+v, got %+v, err %v", i, test.indexFieldInfo, rv, err)
@@ -332,14 +314,14 @@ func TestCompareMappings(t *testing.T) {
 			},
 			err: false,
 		},
-		{ // changed default field => error
+		{ // changed default field => false
 			original: &mapping.IndexMappingImpl{
 				DefaultField: "a",
 			},
 			updated: &mapping.IndexMappingImpl{
 				DefaultField: "b",
 			},
-			err: true,
+			err: false,
 		},
 		{ // changed index dynamic => error
 			original: &mapping.IndexMappingImpl{
@@ -555,6 +537,9 @@ func TestCompareDatetimeParsers(t *testing.T) {
 			"2006/01/02 3:04PM",
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = upd.AddCustomDateTimeParser("customDT", map[string]interface{}{
 		"type": sanitized.Name,
@@ -563,6 +548,9 @@ func TestCompareDatetimeParsers(t *testing.T) {
 			"2006/01/02 3:04PM",
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	oriPaths := map[string]*pathInfo{
 		"a": {
@@ -647,7 +635,7 @@ func TestCompareDatetimeParsers(t *testing.T) {
 	// Test case has identical datetime parsers for all fields
 	err = compareDateTimeParsers(oriPaths, updPaths, ori, upd)
 	if err != nil {
-		t.Errorf("Expected error to be nil, got %v", err)
+		t.Fatalf("Expected error to be nil, got %v", err)
 	}
 
 	ori2 := mapping.NewIndexMapping()
@@ -671,6 +659,9 @@ func TestCompareDatetimeParsers(t *testing.T) {
 			"2006/01/02 3:04PM",
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = upd2.AddCustomDateTimeParser("customDT", map[string]interface{}{
 		"type": sanitized.Name,
@@ -679,6 +670,9 @@ func TestCompareDatetimeParsers(t *testing.T) {
 			"2006/01/02",
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// test case has different custom datetime parser for field "b"
 	err = compareDateTimeParsers(oriPaths, updPaths, ori2, upd2)
@@ -731,62 +725,8 @@ func TestCompareSynonymSources(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	oriPaths := map[string]*pathInfo{
-		"a": {
-			fieldMapInfo: []*fieldMapInfo{
-				{
-					fieldMapping: &mapping.FieldMapping{
-						Type: "text",
-					},
-				},
-			},
-			dynamic:    false,
-			path:       "a",
-			parentPath: "",
-		},
-		"b": {
-			fieldMapInfo: []*fieldMapInfo{
-				{
-					fieldMapping: &mapping.FieldMapping{
-						Type: "text",
-					},
-				},
-			},
-			dynamic:    false,
-			path:       "b",
-			parentPath: "",
-		},
-	}
-
-	updPaths := map[string]*pathInfo{
-		"a": {
-			fieldMapInfo: []*fieldMapInfo{
-				{
-					fieldMapping: &mapping.FieldMapping{
-						Type: "text",
-					},
-				},
-			},
-			dynamic:    false,
-			path:       "a",
-			parentPath: "",
-		},
-		"b": {
-			fieldMapInfo: []*fieldMapInfo{
-				{
-					fieldMapping: &mapping.FieldMapping{
-						Type: "text",
-					},
-				},
-			},
-			dynamic:    false,
-			path:       "b",
-			parentPath: "",
-		},
-	}
-
-	// Test case has identical synonym sources for all fields
-	err = compareSynonymSources(oriPaths, updPaths, ori, upd)
+	// Test case has identical synonym sources
+	err = compareSynonymSources(ori, upd)
 	if err != nil {
 		t.Errorf("Expected error to be nil, got %v", err)
 	}
@@ -833,8 +773,8 @@ func TestCompareSynonymSources(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// test case has different synonym source for field "b"
-	err = compareSynonymSources(oriPaths, updPaths, ori2, upd2)
+	// test case has different synonym sources
+	err = compareSynonymSources(ori2, upd2)
 	if err == nil {
 		t.Errorf("Expected error, got nil")
 	}
@@ -2475,10 +2415,10 @@ func TestIndexUpdateText(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res1.Hits) != 3 {
-		t.Fatalf("Expected 3 hits, got %d\n", len(res1.Hits))
+		t.Errorf("Expected 3 hits, got %d\n", len(res1.Hits))
 	}
 	if len(res1.Hits[0].Fields) != 1 {
-		t.Fatalf("Expected 1 field, got %d\n", len(res1.Hits[0].Fields))
+		t.Errorf("Expected 1 field, got %d\n", len(res1.Hits[0].Fields))
 	}
 	q2 := NewSearchRequest(NewQueryStringQuery("b:*"))
 	q2.Fields = append(q2.Fields, "b")
@@ -2487,7 +2427,7 @@ func TestIndexUpdateText(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res2.Hits) != 0 {
-		t.Fatalf("Expected 0 hits, got %d\n", len(res2.Hits))
+		t.Errorf("Expected 0 hits, got %d\n", len(res2.Hits))
 	}
 	q3 := NewSearchRequest(NewQueryStringQuery("c:*"))
 	q3.Fields = append(q3.Fields, "c")
@@ -2496,10 +2436,10 @@ func TestIndexUpdateText(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res3.Hits) != 3 {
-		t.Fatalf("Expected 3 hits, got %d\n", len(res3.Hits))
+		t.Errorf("Expected 3 hits, got %d\n", len(res3.Hits))
 	}
 	if len(res3.Hits[0].Fields) != 0 {
-		t.Fatalf("Expected 0 fields, got %d\n", len(res3.Hits[0].Fields))
+		t.Errorf("Expected 0 fields, got %d\n", len(res3.Hits[0].Fields))
 	}
 	q4 := NewSearchRequest(NewQueryStringQuery("d:*"))
 	q4.Fields = append(q4.Fields, "d")
@@ -2508,7 +2448,7 @@ func TestIndexUpdateText(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res4.Hits) != 0 {
-		t.Fatalf("Expected 0 hits, got %d\n", len(res4.Hits))
+		t.Errorf("Expected 0 hits, got %d\n", len(res4.Hits))
 	}
 }
 
@@ -2646,7 +2586,7 @@ func TestIndexUpdateSynonym(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res1.Hits) != 1 {
-		t.Fatalf("Expected 1 hit, got %d\n", len(res1.Hits))
+		t.Errorf("Expected 1 hit, got %d\n", len(res1.Hits))
 	}
 
 	q2 := NewSearchRequest(NewQueryStringQuery("b:devoted"))
@@ -2655,7 +2595,7 @@ func TestIndexUpdateSynonym(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res2.Hits) != 0 {
-		t.Fatalf("Expected 0 hits, got %d\n", len(res2.Hits))
+		t.Errorf("Expected 0 hits, got %d\n", len(res2.Hits))
 	}
 
 	q3 := NewSearchRequest(NewQueryStringQuery("c:unruffled"))
@@ -2664,7 +2604,7 @@ func TestIndexUpdateSynonym(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res3.Hits) != 0 {
-		t.Fatalf("Expected 0 hits, got %d\n", len(res3.Hits))
+		t.Errorf("Expected 0 hits, got %d\n", len(res3.Hits))
 	}
 }
 
@@ -2877,10 +2817,10 @@ func TestIndexUpdateMerge(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res1.Hits) != 10 {
-		t.Fatalf("Expected 10 hits, got %d\n", len(res1.Hits))
+		t.Errorf("Expected 10 hits, got %d\n", len(res1.Hits))
 	}
 	if len(res1.Hits[0].Fields) != 1 {
-		t.Fatalf("Expected 1 field, got %d\n", len(res1.Hits[0].Fields))
+		t.Errorf("Expected 1 field, got %d\n", len(res1.Hits[0].Fields))
 	}
 	q2 := NewSearchRequest(NewQueryStringQuery("b:*"))
 	q2.Fields = append(q2.Fields, "b")
@@ -2889,7 +2829,7 @@ func TestIndexUpdateMerge(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res2.Hits) != 0 {
-		t.Fatalf("Expected 0 hits, got %d\n", len(res2.Hits))
+		t.Errorf("Expected 0 hits, got %d\n", len(res2.Hits))
 	}
 	q3 := NewSearchRequest(NewQueryStringQuery("c:*"))
 	q3.Fields = append(q3.Fields, "c")
@@ -2898,10 +2838,10 @@ func TestIndexUpdateMerge(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res3.Hits) != 10 {
-		t.Fatalf("Expected 10 hits, got %d\n", len(res3.Hits))
+		t.Errorf("Expected 10 hits, got %d\n", len(res3.Hits))
 	}
 	if len(res3.Hits[0].Fields) != 0 {
-		t.Fatalf("Expected 0 fields, got %d\n", len(res3.Hits[0].Fields))
+		t.Errorf("Expected 0 fields, got %d\n", len(res3.Hits[0].Fields))
 	}
 	q4 := NewSearchRequest(NewQueryStringQuery("d:*"))
 	q4.Fields = append(q4.Fields, "d")
@@ -2910,7 +2850,7 @@ func TestIndexUpdateMerge(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res4.Hits) != 0 {
-		t.Fatalf("Expected 0 hits, got %d\n", len(res4.Hits))
+		t.Errorf("Expected 0 hits, got %d\n", len(res4.Hits))
 	}
 }
 
