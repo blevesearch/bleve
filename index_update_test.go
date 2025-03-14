@@ -788,6 +788,85 @@ func TestDeletedFields(t *testing.T) {
 		err       bool
 	}{
 		{
+			// changed default analyzer with index dynamic
+			// => error
+			original: &mapping.IndexMappingImpl{
+				TypeMapping:      map[string]*mapping.DocumentMapping{},
+				DefaultMapping:   &mapping.DocumentMapping{},
+				DefaultAnalyzer:  standard.Name,
+				IndexDynamic:     true,
+				StoreDynamic:     false,
+				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
+			},
+			updated: &mapping.IndexMappingImpl{
+				TypeMapping:      map[string]*mapping.DocumentMapping{},
+				DefaultMapping:   &mapping.DocumentMapping{},
+				DefaultAnalyzer:  simple.Name,
+				IndexDynamic:     true,
+				StoreDynamic:     false,
+				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
+			},
+			fieldInfo: nil,
+			err:       true,
+		},
+		{
+			// changed default analyzer within a mapping with index dynamic
+			// => error
+			original: &mapping.IndexMappingImpl{
+				TypeMapping: map[string]*mapping.DocumentMapping{},
+				DefaultMapping: &mapping.DocumentMapping{
+					Enabled:         true,
+					Dynamic:         true,
+					DefaultAnalyzer: standard.Name,
+				},
+				DefaultAnalyzer:  "",
+				IndexDynamic:     true,
+				StoreDynamic:     false,
+				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
+			},
+			updated: &mapping.IndexMappingImpl{
+				TypeMapping: map[string]*mapping.DocumentMapping{},
+				DefaultMapping: &mapping.DocumentMapping{
+					Enabled:         true,
+					Dynamic:         true,
+					DefaultAnalyzer: simple.Name,
+				},
+				IndexDynamic:     true,
+				StoreDynamic:     false,
+				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
+			},
+			fieldInfo: nil,
+			err:       true,
+		},
+		{
+			// changed default datetime parser with index dynamic
+			// => error
+			original: &mapping.IndexMappingImpl{
+				TypeMapping:           map[string]*mapping.DocumentMapping{},
+				DefaultMapping:        &mapping.DocumentMapping{},
+				DefaultDateTimeParser: percent.Name,
+				IndexDynamic:          true,
+				StoreDynamic:          false,
+				DocValuesDynamic:      false,
+				CustomAnalysis:        NewIndexMapping().CustomAnalysis,
+			},
+			updated: &mapping.IndexMappingImpl{
+				TypeMapping:           map[string]*mapping.DocumentMapping{},
+				DefaultMapping:        &mapping.DocumentMapping{},
+				DefaultDateTimeParser: sanitized.Name,
+				IndexDynamic:          true,
+				StoreDynamic:          false,
+				DocValuesDynamic:      false,
+				CustomAnalysis:        NewIndexMapping().CustomAnalysis,
+			},
+			fieldInfo: nil,
+			err:       true,
+		},
+		{
 			// no change between original and updated having type and default mapping
 			// => empty fieldInfo with no error
 			original: &mapping.IndexMappingImpl{
