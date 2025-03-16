@@ -23,8 +23,10 @@ import (
 	"github.com/blevesearch/bleve/v2/size"
 )
 
-var reflectStaticSizeNumericFacetBuilder int
-var reflectStaticSizenumericRange int
+var (
+	reflectStaticSizeNumericFacetBuilder int
+	reflectStaticSizenumericRange        int
+)
 
 func init() {
 	var nfb NumericFacetBuilder
@@ -61,12 +63,12 @@ func (fb *NumericFacetBuilder) Size() int {
 	sizeInBytes := reflectStaticSizeNumericFacetBuilder + size.SizeOfPtr +
 		len(fb.field)
 
-	for k, _ := range fb.termsCount {
+	for k := range fb.termsCount {
 		sizeInBytes += size.SizeOfString + len(k) +
 			size.SizeOfInt
 	}
 
-	for k, _ := range fb.ranges {
+	for k := range fb.ranges {
 		sizeInBytes += size.SizeOfString + len(k) +
 			size.SizeOfPtr + reflectStaticSizenumericRange
 	}
