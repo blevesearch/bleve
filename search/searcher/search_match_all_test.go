@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -22,7 +23,6 @@ import (
 )
 
 func TestMatchAllSearch(t *testing.T) {
-
 	twoDocIndexReader, err := twoDocIndex.Reader()
 	if err != nil {
 		t.Error(err)
@@ -36,12 +36,12 @@ func TestMatchAllSearch(t *testing.T) {
 
 	explainTrue := search.SearcherOptions{Explain: true}
 
-	allSearcher, err := NewMatchAllSearcher(nil, twoDocIndexReader, 1.0, explainTrue)
+	allSearcher, err := NewMatchAllSearcher(context.TODO(), twoDocIndexReader, 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	allSearcher2, err := NewMatchAllSearcher(nil, twoDocIndexReader, 1.2, explainTrue)
+	allSearcher2, err := NewMatchAllSearcher(context.TODO(), twoDocIndexReader, 1.2, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}

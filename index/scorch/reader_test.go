@@ -15,6 +15,7 @@
 package scorch
 
 import (
+	"context"
 	"encoding/binary"
 	"reflect"
 	"testing"
@@ -82,7 +83,7 @@ func TestIndexReader(t *testing.T) {
 	}()
 
 	// first look for a term that doesn't exist
-	reader, err := indexReader.TermFieldReader(nil, []byte("nope"), "name", true, true, true)
+	reader, err := indexReader.TermFieldReader(context.TODO(), []byte("nope"), "name", true, true, true)
 	if err != nil {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
@@ -95,7 +96,7 @@ func TestIndexReader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reader, err = indexReader.TermFieldReader(nil, []byte("test"), "name", true, true, true)
+	reader, err = indexReader.TermFieldReader(context.TODO(), []byte("test"), "name", true, true, true)
 	if err != nil {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
@@ -145,7 +146,7 @@ func TestIndexReader(t *testing.T) {
 			},
 		},
 	}
-	tfr, err := indexReader.TermFieldReader(nil, []byte("rice"), "desc", true, true, true)
+	tfr, err := indexReader.TermFieldReader(context.TODO(), []byte("rice"), "desc", true, true, true)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -163,7 +164,7 @@ func TestIndexReader(t *testing.T) {
 	}
 
 	// now test usage of advance
-	reader, err = indexReader.TermFieldReader(nil, []byte("test"), "name", true, true, true)
+	reader, err = indexReader.TermFieldReader(context.TODO(), []byte("test"), "name", true, true, true)
 	if err != nil {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
@@ -194,7 +195,7 @@ func TestIndexReader(t *testing.T) {
 	}
 
 	// now test creating a reader for a field that doesn't exist
-	reader, err = indexReader.TermFieldReader(nil, []byte("water"), "doesnotexist", true, true, true)
+	reader, err = indexReader.TermFieldReader(context.TODO(), []byte("water"), "doesnotexist", true, true, true)
 	if err != nil {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
@@ -216,7 +217,6 @@ func TestIndexReader(t *testing.T) {
 	if match != nil {
 		t.Errorf("expected nil, got %v", match)
 	}
-
 }
 
 func TestIndexDocIdReader(t *testing.T) {
@@ -568,7 +568,6 @@ func TestIndexDocIdOnlyReader(t *testing.T) {
 	// if !id.Equals(index.IndexInternalID("9")) {
 	// 	t.Errorf("expected to find id '9', got '%s'", id)
 	// }
-
 }
 
 func TestSegmentIndexAndLocalDocNumFromGlobal(t *testing.T) {

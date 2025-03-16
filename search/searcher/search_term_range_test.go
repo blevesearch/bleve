@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"os"
 	"reflect"
 	"sort"
@@ -172,7 +173,7 @@ func TestTermRangeSearch(t *testing.T) {
 
 	for _, test := range tests {
 
-		searcher, err := NewTermRangeSearcher(nil, twoDocIndexReader, test.min, test.max,
+		searcher, err := NewTermRangeSearcher(context.TODO(), twoDocIndexReader, test.min, test.max,
 			&test.inclusiveMin, &test.inclusiveMax, test.field, 1.0, search.SearcherOptions{Explain: true})
 		if err != nil {
 			t.Fatal(err)
@@ -229,7 +230,7 @@ func TestTermRangeSearchTooManyTerms(t *testing.T) {
 
 	want := []string{"1", "3", "4", "5"}
 	truth := true
-	searcher, err := NewTermRangeSearcher(nil, scorchReader, []byte("bobert"), []byte("ravi"),
+	searcher, err := NewTermRangeSearcher(context.TODO(), scorchReader, []byte("bobert"), []byte("ravi"),
 		&truth, &truth, "name", 1.0, search.SearcherOptions{Score: "none", IncludeTermVectors: false})
 	if err != nil {
 		t.Fatal(err)

@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -75,7 +76,7 @@ func searcherMaker(t *testing.T, ir index.IndexReader, re, field string) search.
 		t.Fatal(err)
 	}
 
-	regexpSearcher, err := NewRegexpSearcher(nil, ir, pattern, field, 1.0,
+	regexpSearcher, err := NewRegexpSearcher(context.TODO(), ir, pattern, field, 1.0,
 		search.SearcherOptions{Explain: true})
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +86,7 @@ func searcherMaker(t *testing.T, ir index.IndexReader, re, field string) search.
 }
 
 func searcherStringMaker(t *testing.T, ir index.IndexReader, re, field string) search.Searcher {
-	regexpSearcher, err := NewRegexpStringSearcher(nil, ir, re, field, 1.0,
+	regexpSearcher, err := NewRegexpStringSearcher(context.TODO(), ir, re, field, 1.0,
 		search.SearcherOptions{Explain: true})
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +97,8 @@ func searcherStringMaker(t *testing.T, ir index.IndexReader, re, field string) s
 
 func testRegexpSearch(t *testing.T, twoDocIndex index.Index,
 	internalIDMaker func(int) index.IndexInternalID,
-	searcherMaker func(t *testing.T, ir index.IndexReader, re, field string) search.Searcher) {
+	searcherMaker func(t *testing.T, ir index.IndexReader, re, field string) search.Searcher,
+) {
 	twoDocIndexReader, err := twoDocIndex.Reader()
 	if err != nil {
 		t.Error(err)
