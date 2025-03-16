@@ -26,7 +26,6 @@ import (
 )
 
 func TestTop10Scores(t *testing.T) {
-
 	// a stub search with more than 10 matches
 	// the top-10 scores are > 10
 	// everything else is less than 10
@@ -135,7 +134,6 @@ func TestTop10Scores(t *testing.T) {
 }
 
 func TestTop10ScoresSkip10(t *testing.T) {
-
 	// a stub search with more than 10 matches
 	// the top-10 scores are > 10
 	// everything else is less than 10
@@ -232,7 +230,6 @@ func TestTop10ScoresSkip10(t *testing.T) {
 }
 
 func TestTop10ScoresSkip10Only9Hits(t *testing.T) {
-
 	// a stub search with only 10 matches
 	searcher := &stubSearcher{
 		matches: []*search.DocumentMatch{
@@ -294,7 +291,6 @@ func TestTop10ScoresSkip10Only9Hits(t *testing.T) {
 }
 
 func TestPaginationSameScores(t *testing.T) {
-
 	// a stub search with more than 10 matches
 	// all documents have the same score
 	searcher := &stubSearcher{
@@ -551,14 +547,11 @@ func TestStreamResults(t *testing.T) {
 		return nil
 	}
 
-	var handlerMaker search.MakeDocumentMatchHandler
-	handlerMaker = func(ctx *search.SearchContext) (search.DocumentMatchHandler,
-		bool, error) {
+	var handlerMaker search.MakeDocumentMatchHandler = func(ctx *search.SearchContext) (search.DocumentMatchHandler, bool, error) {
 		return docMatchHandler, false, nil
 	}
 
-	ctx := context.WithValue(context.Background(), search.MakeDocumentMatchHandlerKey,
-		handlerMaker)
+	ctx := context.WithValue(context.Background(), search.MakeDocumentMatchHandlerKey, handlerMaker)
 
 	collector := NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
 	err := collector.Collect(ctx, searcher, &stubReader{})
@@ -674,9 +667,7 @@ func TestCollectorChaining(t *testing.T) {
 		return nil
 	}
 
-	var handlerMaker search.MakeDocumentMatchHandler
-	handlerMaker = func(ctx *search.SearchContext) (search.DocumentMatchHandler,
-		bool, error) {
+	var handlerMaker search.MakeDocumentMatchHandler = func(ctx *search.SearchContext) (search.DocumentMatchHandler, bool, error) {
 		topNHandler, _, _ = MakeTopNDocumentMatchHandler(ctx)
 		return docMatchHandler, false, nil
 	}

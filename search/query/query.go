@@ -382,9 +382,7 @@ func ParseQuery(input []byte) (Query, error) {
 // reference queries from the input tree or new queries.
 func expandQuery(m mapping.IndexMapping, query Query) (Query, error) {
 	var expand func(query Query) (Query, error)
-	var expandSlice func(queries []Query) ([]Query, error)
-
-	expandSlice = func(queries []Query) ([]Query, error) {
+	var expandSlice func(queries []Query) ([]Query, error) = func(queries []Query) ([]Query, error) {
 		expanded := []Query{}
 		for _, q := range queries {
 			exp, err := expand(q)
@@ -518,8 +516,8 @@ const (
 // associated with the field. The synonyms are then added to the provided map.
 // The map is returned and may be nil if no synonyms were found.
 func ExtractSynonyms(ctx context.Context, m mapping.SynonymMapping, r index.ThesaurusReader,
-	query Query, rv search.FieldTermSynonymMap) (search.FieldTermSynonymMap, error) {
-
+	query Query, rv search.FieldTermSynonymMap,
+) (search.FieldTermSynonymMap, error) {
 	if r == nil || m == nil || query == nil {
 		return rv, nil
 	}
@@ -683,7 +681,8 @@ func ExtractSynonyms(ctx context.Context, m mapping.SynonymMapping, r index.Thes
 // addFuzzySynonymsForTerm finds all terms that match the given term with the
 // given fuzziness and adds their synonyms to the provided map.
 func addSynonymsForTermWithMatchType(ctx context.Context, matchType int, src, field, term string, fuzziness, prefix int,
-	r index.ThesaurusReader, rv search.FieldTermSynonymMap) (search.FieldTermSynonymMap, error) {
+	r index.ThesaurusReader, rv search.FieldTermSynonymMap,
+) (search.FieldTermSynonymMap, error) {
 	// Determine the terms based on the match type (fuzzy, prefix, or regexp)
 	var thesKeys index.ThesaurusKeys
 	var err error
@@ -751,8 +750,8 @@ func addSynonymsForTermWithMatchType(ctx context.Context, matchType int, src, fi
 }
 
 func addSynonymsForTerm(ctx context.Context, src, field, term string,
-	r index.ThesaurusReader, rv search.FieldTermSynonymMap) (search.FieldTermSynonymMap, error) {
-
+	r index.ThesaurusReader, rv search.FieldTermSynonymMap,
+) (search.FieldTermSynonymMap, error) {
 	termReader, err := r.ThesaurusTermReader(ctx, src, []byte(term))
 	if err != nil {
 		return nil, err
