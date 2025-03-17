@@ -73,8 +73,8 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 	var reader *bytes.Reader
 
 	var bufPool *s2.GeoBufferPool
-	if ctx.Value(search.GeoBufferPoolCallbackKey) != nil {
-		bufPool = ctx.Value(search.GeoBufferPoolCallbackKey).(search.GeoBufferPoolCallbackFunc)()
+	if bufPoolCallback, ok := ctx.Value(search.GeoBufferPoolCallbackKey).(search.GeoBufferPoolCallbackFunc); ok {
+		bufPool = bufPoolCallback()
 	}
 
 	return func(d *search.DocumentMatch) bool {
