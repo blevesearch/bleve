@@ -379,7 +379,7 @@ func TestExtractGeoShapeCoordinates(t *testing.T) {
 					{"lon":77.58894681930542,"lat":12.976498523818783}
 				]
 			]`),
-			typ:      "polygon",
+			typ:      PolygonType,
 			expectOK: false,
 		},
 		{ // Invalid construct causes panic (within extract3DCoordinates), fix MB-65807
@@ -390,7 +390,7 @@ func TestExtractGeoShapeCoordinates(t *testing.T) {
 					[77.58894681930542,12.976498523818783]
 				]
 			}`),
-			typ:      "polygon",
+			typ:      PolygonType,
 			expectOK: false,
 		},
 		{
@@ -442,6 +442,7 @@ func TestExtractGeoShapeCoordinates(t *testing.T) {
 		if err := json.Unmarshal(tests[i].x, &x); err != nil {
 			t.Fatalf("[%d] JSON err: %v", i+1, err)
 		}
+
 		_, typ, ok := ExtractGeoShapeCoordinates(x, tests[i].typ)
 		if ok != tests[i].expectOK {
 			t.Errorf("[%d] expected ok %t, got %t", i+1, tests[i].expectOK, ok)
