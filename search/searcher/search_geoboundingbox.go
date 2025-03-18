@@ -26,13 +26,16 @@ import (
 
 type filterFunc func(key []byte) bool
 
-var GeoBitsShift1 = geo.GeoBits << 1
-var GeoBitsShift1Minus1 = GeoBitsShift1 - 1
+var (
+	GeoBitsShift1       = geo.GeoBits << 1
+	GeoBitsShift1Minus1 = GeoBitsShift1 - 1
+)
 
 func NewGeoBoundingBoxSearcher(ctx context.Context, indexReader index.IndexReader, minLon, minLat,
 	maxLon, maxLat float64, field string, boost float64,
 	options search.SearcherOptions, checkBoundaries bool) (
-	search.Searcher, error) {
+	search.Searcher, error,
+) {
 	if tp, ok := indexReader.(index.SpatialIndexPlugin); ok {
 		sp, err := tp.GetSpatialAnalyzerPlugin("s2")
 		if err == nil {
@@ -65,7 +68,7 @@ func NewGeoBoundingBoxSearcher(ctx context.Context, indexReader index.IndexReade
 	}
 
 	// do math to produce list of terms needed for this search
-	onBoundaryTerms, notOnBoundaryTerms, err := ComputeGeoRange(nil, 0, GeoBitsShift1Minus1,
+	onBoundaryTerms, notOnBoundaryTerms, err := ComputeGeoRange(context.TODO(), 0, GeoBitsShift1Minus1,
 		minLon, minLat, maxLon, maxLat, checkBoundaries, indexReader, field)
 	if err != nil {
 		return nil, err
@@ -122,16 +125,18 @@ func NewGeoBoundingBoxSearcher(ctx context.Context, indexReader index.IndexReade
 	return NewMatchNoneSearcher(indexReader)
 }
 
-var geoMaxShift = document.GeoPrecisionStep * 4
-var geoDetailLevel = ((geo.GeoBits << 1) - geoMaxShift) / 2
+var (
+	geoMaxShift    = document.GeoPrecisionStep * 4
+	geoDetailLevel = ((geo.GeoBits << 1) - geoMaxShift) / 2
+)
 
 type closeFunc func() error
 
 func ComputeGeoRange(ctx context.Context, term uint64, shift uint,
 	sminLon, sminLat, smaxLon, smaxLat float64, checkBoundaries bool,
 	indexReader index.IndexReader, field string) (
-	onBoundary [][]byte, notOnBoundary [][]byte, err error) {
-
+	onBoundary [][]byte, notOnBoundary [][]byte, err error,
+) {
 	isIndexed, closeF, err := buildIsIndexedFunc(ctx, indexReader, field)
 	if closeF != nil {
 		defer func() {
@@ -192,7 +197,6 @@ func buildIsIndexedFunc(ctx context.Context, indexReader index.IndexReader, fiel
 			_ = reader.Close()
 			return true
 		}
-
 	} else {
 		isIndexed = func([]byte) bool {
 			return true
@@ -202,7 +206,8 @@ func buildIsIndexedFunc(ctx context.Context, indexReader index.IndexReader, fiel
 }
 
 func buildRectFilter(ctx context.Context, dvReader index.DocValueReader, field string,
-	minLon, minLat, maxLon, maxLat float64) FilterFunc {
+	minLon, minLat, maxLon, maxLat float64,
+) FilterFunc {
 	return func(d *search.DocumentMatch) bool {
 		// check geo matches against all numeric type terms indexed
 		var lons, lats []float64
@@ -253,8 +258,7 @@ func (grc *geoRangeCompute) makePrefixCoded(in int64, shift uint) (rv numeric.Pr
 		grc.preallocBytes = make([]byte, grc.preallocBytesLen)
 	}
 
-	rv, grc.preallocBytes, _ =
-		numeric.NewPrefixCodedInt64Prealloc(in, shift, grc.preallocBytes)
+	rv, grc.preallocBytes, _ = numeric.NewPrefixCodedInt64Prealloc(in, shift, grc.preallocBytes)
 
 	return rv
 }

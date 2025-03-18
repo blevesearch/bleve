@@ -146,7 +146,7 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 	// FIXME do something better
 	// for now, if we need to seek backwards, then restart from the beginning
 	if i.currPosting != nil && bytes.Compare(i.currID, ID) >= 0 {
-		i2, err := i.snapshot.TermFieldReader(nil, i.term, i.field,
+		i2, err := i.snapshot.TermFieldReader(context.TODO(), i.term, i.field,
 			i.includeFreq, i.includeNorm, i.includeTermVectors)
 		if err != nil {
 			return nil, err

@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -27,7 +28,6 @@ import (
 )
 
 func TestSimpleGeoPolygons(t *testing.T) {
-
 	tests := []struct {
 		polygon []geo.Point
 		field   string
@@ -63,16 +63,22 @@ func TestSimpleGeoPolygons(t *testing.T) {
 }
 
 func TestRealGeoPolygons(t *testing.T) {
-
 	tests := []struct {
 		polygon []geo.Point
 		field   string
 		want    []string
 	}{
-		{[]geo.Point{{Lon: -80.881, Lat: 35.282}, {Lon: -80.858, Lat: 35.281},
-			{Lon: -80.864, Lat: 35.270}}, "loc", []string{"k", "l"}},
-		{[]geo.Point{{Lon: -82.467, Lat: 36.356}, {Lon: -78.127, Lat: 36.321}, {Lon: -80.555, Lat: 32.932},
-			{Lon: -84.807, Lat: 33.111}}, "loc", []string{"k", "l", "m"}},
+		{[]geo.Point{
+			{Lon: -80.881, Lat: 35.282},
+			{Lon: -80.858, Lat: 35.281},
+			{Lon: -80.864, Lat: 35.270},
+		}, "loc", []string{"k", "l"}},
+		{[]geo.Point{
+			{Lon: -82.467, Lat: 36.356},
+			{Lon: -78.127, Lat: 36.321},
+			{Lon: -80.555, Lat: 32.932},
+			{Lon: -84.807, Lat: 33.111},
+		}, "loc", []string{"k", "l", "m"}},
 		// same polygon vertices
 		{[]geo.Point{{Lon: -82.467, Lat: 36.356}, {Lon: -82.467, Lat: 36.356}, {Lon: -82.467, Lat: 36.356}, {Lon: -82.467, Lat: 36.356}}, "loc", nil},
 		// non-overlaping polygon
@@ -81,11 +87,20 @@ func TestRealGeoPolygons(t *testing.T) {
 		{[]geo.Point{{Lon: -71.65, Lat: 42.446}, {Lon: -71.649, Lat: 42.428}, {Lon: -71.640, Lat: 42.445}, {Lon: -71.649, Lat: 42.435}}, "loc", nil},
 		// V like concave polygon with a document 'p' residing inside the bottom corner
 		{[]geo.Point{{Lon: -80.304, Lat: 40.740}, {Lon: -80.038, Lat: 40.239}, {Lon: -79.562, Lat: 40.786}, {Lon: -80.018, Lat: 40.328}}, "loc", []string{"p"}},
-		{[]geo.Point{{Lon: -111.918, Lat: 33.515}, {Lon: -111.938, Lat: 33.494}, {Lon: -111.944, Lat: 33.481}, {Lon: -111.886, Lat: 33.517},
-			{Lon: -111.919, Lat: 33.468}, {Lon: -111.929, Lat: 33.508}}, "loc", []string{"q"}},
+		{[]geo.Point{
+			{Lon: -111.918, Lat: 33.515},
+			{Lon: -111.938, Lat: 33.494},
+			{Lon: -111.944, Lat: 33.481},
+			{Lon: -111.886, Lat: 33.517},
+			{Lon: -111.919, Lat: 33.468},
+			{Lon: -111.929, Lat: 33.508},
+		}, "loc", []string{"q"}},
 		// real points near cb bangalore
-		{[]geo.Point{{Lat: 12.974872, Lon: 77.607749}, {Lat: 12.971725, Lon: 77.610110},
-			{Lat: 12.972530, Lon: 77.606912}, {Lat: 12.975112, Lon: 77.603780},
+		{[]geo.Point{
+			{Lat: 12.974872, Lon: 77.607749},
+			{Lat: 12.971725, Lon: 77.610110},
+			{Lat: 12.972530, Lon: 77.606912},
+			{Lat: 12.975112, Lon: 77.603780},
 		}, "loc", []string{"amoeba", "communiti"}},
 	}
 
@@ -113,13 +128,14 @@ func TestRealGeoPolygons(t *testing.T) {
 }
 
 func TestGeoRectanglePolygon(t *testing.T) {
-
 	tests := []struct {
 		polygon []geo.Point
 		field   string
 		want    []string
 	}{
-		{[]geo.Point{{Lon: 0, Lat: 0}, {Lon: 0, Lat: 50}, {Lon: 50, Lat: 50}, {Lon: 50, Lat: 0}, {Lon: 0, Lat: 0}}, "loc",
+		{
+			[]geo.Point{{Lon: 0, Lat: 0}, {Lon: 0, Lat: 50}, {Lon: 50, Lat: 50}, {Lon: 50, Lat: 0}, {Lon: 0, Lat: 0}},
+			"loc",
 			[]string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"},
 		},
 	}
@@ -149,7 +165,7 @@ func TestGeoRectanglePolygon(t *testing.T) {
 
 func testGeoPolygonSearch(i index.IndexReader, polygon []geo.Point, field string) ([]string, error) {
 	var rv []string
-	gbs, err := NewGeoBoundedPolygonSearcher(nil, i, polygon, field, 1.0, search.SearcherOptions{})
+	gbs, err := NewGeoBoundedPolygonSearcher(context.TODO(), i, polygon, field, 1.0, search.SearcherOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +301,6 @@ type geoPoint struct {
 
 // Test points inside a complex self intersecting polygon
 func TestComplexGeoPolygons(t *testing.T) {
-
 	tests := []struct {
 		polygon []geo.Point
 		points  []geoPoint
@@ -299,11 +314,26 @@ func TestComplexGeoPolygons(t *testing.T) {
 			     \/
 		*/
 		// a, b, c - inside and d - on vertices.
-		{[]geo.Point{{Lon: 6.0, Lat: 2.0}, {Lon: 3.0, Lat: 4.0}, {Lon: 9.0, Lat: 6.0},
-			{Lon: 3.0, Lat: 8.0}, {Lon: 6.0, Lat: 10.0}, {Lon: 6.0, Lat: 2.0}},
-			[]geoPoint{{title: "a", lon: 3, lat: 4}, {title: "b", lon: 7, lat: 6}, {title: "c", lon: 4, lat: 8.1},
-				{title: "d", lon: 6, lat: 10.0}, {title: "e", lon: 5, lat: 6}, {title: "f", lon: 7, lat: 5}},
-			"loc", []string{"a", "b", "c", "d"}},
+		{
+			[]geo.Point{
+				{Lon: 6.0, Lat: 2.0},
+				{Lon: 3.0, Lat: 4.0},
+				{Lon: 9.0, Lat: 6.0},
+				{Lon: 3.0, Lat: 8.0},
+				{Lon: 6.0, Lat: 10.0},
+				{Lon: 6.0, Lat: 2.0},
+			},
+			[]geoPoint{
+				{title: "a", lon: 3, lat: 4},
+				{title: "b", lon: 7, lat: 6},
+				{title: "c", lon: 4, lat: 8.1},
+				{title: "d", lon: 6, lat: 10.0},
+				{title: "e", lon: 5, lat: 6},
+				{title: "f", lon: 7, lat: 5},
+			},
+			"loc",
+			[]string{"a", "b", "c", "d"},
+		},
 		/*
 			____
 			\  /
@@ -311,11 +341,25 @@ func TestComplexGeoPolygons(t *testing.T) {
 			 /\
 			/__\
 		*/
-		{[]geo.Point{{Lon: 7.0, Lat: 2.0}, {Lon: 1.0, Lat: 8.0}, {Lon: 1.0, Lat: 2.0},
-			{Lon: 7.0, Lat: 8.0}, {Lon: 7.0, Lat: 2.0}},
-			[]geoPoint{{title: "a", lon: 6, lat: 5}, {title: "b", lon: 5, lat: 5}, {title: "c", lon: 3, lat: 5.0},
-				{title: "d", lon: 2, lat: 4.0}, {title: "e", lon: 5, lat: 3}, {title: "f", lon: 4, lat: 4}},
-			"loc", []string{"a", "b", "c", "d"}},
+		{
+			[]geo.Point{
+				{Lon: 7.0, Lat: 2.0},
+				{Lon: 1.0, Lat: 8.0},
+				{Lon: 1.0, Lat: 2.0},
+				{Lon: 7.0, Lat: 8.0},
+				{Lon: 7.0, Lat: 2.0},
+			},
+			[]geoPoint{
+				{title: "a", lon: 6, lat: 5},
+				{title: "b", lon: 5, lat: 5},
+				{title: "c", lon: 3, lat: 5.0},
+				{title: "d", lon: 2, lat: 4.0},
+				{title: "e", lon: 5, lat: 3},
+				{title: "f", lon: 4, lat: 4},
+			},
+			"loc",
+			[]string{"a", "b", "c", "d"},
+		},
 	}
 
 	for _, test := range tests {

@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -28,7 +29,6 @@ import (
 )
 
 func TestGeoBoundingBox(t *testing.T) {
-
 	tests := []struct {
 		minLon float64
 		minLat float64
@@ -73,7 +73,7 @@ func TestGeoBoundingBox(t *testing.T) {
 
 func testGeoBoundingBoxSearch(i index.IndexReader, minLon, minLat, maxLon, maxLat float64, field string) ([]string, error) {
 	var rv []string
-	gbs, err := NewGeoBoundingBoxSearcher(nil, i, minLon, minLat, maxLon, maxLat, field, 1.0, search.SearcherOptions{}, true)
+	gbs, err := NewGeoBoundingBoxSearcher(context.TODO(), i, minLon, minLat, maxLon, maxLat, field, 1.0, search.SearcherOptions{}, true)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,6 @@ func testGeoBoundingBoxSearch(i index.IndexReader, minLon, minLat, maxLon, maxLa
 }
 
 func setupGeo(t *testing.T) index.Index {
-
 	analysisQueue := index.NewAnalysisQueue(1)
 	i, err := upsidedown.NewUpsideDownCouch(
 		gtreap.Name,
@@ -184,7 +183,7 @@ func TestComputeGeoRange(t *testing.T) {
 	}
 
 	for testi, test := range tests {
-		onBoundaryRes, offBoundaryRes, err := ComputeGeoRange(nil, 0, GeoBitsShift1Minus1,
+		onBoundaryRes, offBoundaryRes, err := ComputeGeoRange(context.TODO(), 0, GeoBitsShift1Minus1,
 			-1.0*test.degs, -1.0*test.degs, test.degs, test.degs, true, nil, "")
 		if (err != nil) != (test.err != "") {
 			t.Errorf("test: %+v, err: %v", test, err)
@@ -238,14 +237,14 @@ func BenchmarkComputeGeoRange100(b *testing.B) {
 // --------------------------------------------------------------------
 
 func benchmarkComputeGeoRange(b *testing.B,
-	minLon, minLat, maxLon, maxLat float64, onBoundary, offBoundary int) {
+	minLon, minLat, maxLon, maxLat float64, onBoundary, offBoundary int,
+) {
 	checkBoundaries := true
 
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		onBoundaryRes, offBoundaryRes, err :=
-			ComputeGeoRange(nil, 0, GeoBitsShift1Minus1, minLon, minLat, maxLon, maxLat, checkBoundaries, nil, "")
+		onBoundaryRes, offBoundaryRes, err := ComputeGeoRange(context.TODO(), 0, GeoBitsShift1Minus1, minLon, minLat, maxLon, maxLat, checkBoundaries, nil, "")
 		if err != nil {
 			b.Fatalf("expected no err")
 		}
@@ -261,7 +260,8 @@ func benchmarkComputeGeoRange(b *testing.B,
 func origComputeGeoRange(term uint64, shift uint,
 	sminLon, sminLat, smaxLon, smaxLat float64,
 	checkBoundaries bool) (
-	onBoundary [][]byte, notOnBoundary [][]byte) {
+	onBoundary [][]byte, notOnBoundary [][]byte,
+) {
 	split := term | uint64(0x1)<<shift
 	var upperMax uint64
 	if shift < 63 {
@@ -283,7 +283,8 @@ func origComputeGeoRange(term uint64, shift uint,
 func origRelateAndRecurse(start, end uint64, res uint,
 	sminLon, sminLat, smaxLon, smaxLat float64,
 	checkBoundaries bool) (
-	onBoundary [][]byte, notOnBoundary [][]byte) {
+	onBoundary [][]byte, notOnBoundary [][]byte,
+) {
 	minLon := geo.MortonUnhashLon(start)
 	minLat := geo.MortonUnhashLat(start)
 	maxLon := geo.MortonUnhashLon(end)

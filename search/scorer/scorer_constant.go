@@ -103,7 +103,7 @@ func (s *ConstantScorer) Score(ctx *search.SearchContext, id index.IndexInternal
 		if s.options.Explain {
 			scoreExplanation = &search.Explanation{
 				Value:   score,
-				Message: fmt.Sprintf("ConstantScore()"),
+				Message: "ConstantScore()",
 			}
 		}
 

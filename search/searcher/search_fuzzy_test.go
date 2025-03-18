@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -36,22 +37,22 @@ func TestFuzzySearch(t *testing.T) {
 
 	explainTrue := search.SearcherOptions{Explain: true}
 
-	fuzzySearcherbeet, err := NewFuzzySearcher(nil, twoDocIndexReader, "beet", 0, 1, "desc", 1.0, explainTrue)
+	fuzzySearcherbeet, err := NewFuzzySearcher(context.TODO(), twoDocIndexReader, "beet", 0, 1, "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fuzzySearcherdouches, err := NewFuzzySearcher(nil, twoDocIndexReader, "douches", 0, 2, "desc", 1.0, explainTrue)
+	fuzzySearcherdouches, err := NewFuzzySearcher(context.TODO(), twoDocIndexReader, "douches", 0, 2, "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fuzzySearcheraplee, err := NewFuzzySearcher(nil, twoDocIndexReader, "aplee", 0, 2, "desc", 1.0, explainTrue)
+	fuzzySearcheraplee, err := NewFuzzySearcher(context.TODO(), twoDocIndexReader, "aplee", 0, 2, "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fuzzySearcherprefix, err := NewFuzzySearcher(nil, twoDocIndexReader, "water", 3, 2, "desc", 1.0, explainTrue)
+	fuzzySearcherprefix, err := NewFuzzySearcher(context.TODO(), twoDocIndexReader, "water", 3, 2, "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,12 +144,12 @@ func TestFuzzySearch(t *testing.T) {
 
 func TestFuzzySearchLimitErrors(t *testing.T) {
 	explainTrue := search.SearcherOptions{Explain: true}
-	_, err := NewFuzzySearcher(nil, nil, "water", 3, 3, "desc", 1.0, explainTrue)
+	_, err := NewFuzzySearcher(context.TODO(), nil, "water", 3, 3, "desc", 1.0, explainTrue)
 	if err == nil {
 		t.Fatal("`fuzziness exceeds max (2)` error expected")
 	}
 
-	_, err = NewFuzzySearcher(nil, nil, "water", 3, -1, "desc", 1.0, explainTrue)
+	_, err = NewFuzzySearcher(context.TODO(), nil, "water", 3, -1, "desc", 1.0, explainTrue)
 	if err == nil {
 		t.Fatal("`invalid fuzziness, negative` error expected")
 	}

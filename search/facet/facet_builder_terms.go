@@ -50,7 +50,7 @@ func (fb *TermsFacetBuilder) Size() int {
 	sizeInBytes := reflectStaticSizeTermsFacetBuilder + size.SizeOfPtr +
 		len(fb.field)
 
-	for k, _ := range fb.termsCount {
+	for k := range fb.termsCount {
 		sizeInBytes += size.SizeOfString + len(k) +
 			size.SizeOfInt
 	}

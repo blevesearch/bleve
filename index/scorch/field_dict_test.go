@@ -51,14 +51,12 @@ func TestIndexFieldDict(t *testing.T) {
 		}
 	}()
 
-	var expectedCount uint64
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount++
 
 	doc = document.NewDocument("2")
 	doc.AddField(document.NewTextFieldWithAnalyzer("name", []uint64{}, []byte("test test test"), testAnalyzer))
@@ -68,7 +66,6 @@ func TestIndexFieldDict(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount++
 
 	indexReader, err := idx.Reader()
 	if err != nil {

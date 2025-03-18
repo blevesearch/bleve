@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/document"
@@ -61,7 +62,7 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 
 	explainOff := search.SearcherOptions{Explain: false}
 
-	searcher, err := NewDocIDSearcher(nil, indexReader, searched, 1.0, explainOff)
+	searcher, err := NewDocIDSearcher(context.TODO(), indexReader, searched, 1.0, explainOff)
 	if err != nil {
 		t.Fatal(err)
 	}

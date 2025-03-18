@@ -15,6 +15,7 @@
 package scorch
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -59,7 +60,6 @@ func TestBuilder(t *testing.T) {
 	}
 
 	checkIndex(t, tmpDir, []byte("hello"), "name", 10)
-
 }
 
 func checkIndex(t *testing.T, path string, term []byte, field string, expectCount int) {
@@ -101,7 +101,7 @@ func checkIndex(t *testing.T, path string, term []byte, field string, expectCoun
 	}
 
 	// run a search for hello
-	tfr, err := r.TermFieldReader(nil, term, field, false, false, false)
+	tfr, err := r.TermFieldReader(context.TODO(), term, field, false, false, false)
 	if err != nil {
 		t.Errorf("error accessing term field reader: %v", err)
 	} else {

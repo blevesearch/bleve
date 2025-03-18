@@ -24,7 +24,6 @@ import (
 )
 
 func TestPhraseSearch(t *testing.T) {
-
 	twoDocIndexReader, err := twoDocIndex.Reader()
 	if err != nil {
 		t.Error(err)
@@ -37,7 +36,7 @@ func TestPhraseSearch(t *testing.T) {
 	}()
 
 	soptions := search.SearcherOptions{Explain: true, IncludeTermVectors: true}
-	phraseSearcher, err := NewPhraseSearcher(nil, twoDocIndexReader, []string{"angst", "beer"}, 0, false, "desc", 1.0, soptions)
+	phraseSearcher, err := NewPhraseSearcher(context.TODO(), twoDocIndexReader, []string{"angst", "beer"}, 0, false, "desc", 1.0, soptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,8 +55,8 @@ func TestPhraseSearch(t *testing.T) {
 					Score:           1.0807601687084403,
 				},
 			},
-			locations:  map[string]map[string][]search.Location{"desc": map[string][]search.Location{"beer": []search.Location{search.Location{Pos: 2, Start: 6, End: 10}}, "angst": []search.Location{search.Location{Pos: 1, Start: 0, End: 5}}}},
-			fieldterms: [][2]string{[2]string{"desc", "beer"}, [2]string{"desc", "angst"}},
+			locations:  map[string]map[string][]search.Location{"desc": {"beer": {{Pos: 2, Start: 6, End: 10}}, "angst": {{Pos: 1, Start: 0, End: 5}}}},
+			fieldterms: [][2]string{{"desc", "beer"}, {"desc", "angst"}},
 		},
 	}
 
@@ -112,7 +111,6 @@ func TestPhraseSearch(t *testing.T) {
 }
 
 func TestMultiPhraseSearch(t *testing.T) {
-
 	soptions := search.SearcherOptions{Explain: true, IncludeTermVectors: true}
 
 	tests := []struct {
@@ -120,7 +118,7 @@ func TestMultiPhraseSearch(t *testing.T) {
 		docids [][]byte
 	}{
 		{
-			phrase: [][]string{[]string{"angst", "what"}, []string{"beer"}},
+			phrase: [][]string{{"angst", "what"}, {"beer"}},
 			docids: [][]byte{[]byte("2")},
 		},
 	}
@@ -131,7 +129,7 @@ func TestMultiPhraseSearch(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		searcher, err := NewMultiPhraseSearcher(nil, reader, test.phrase, 0, false, "desc", 1.0, soptions)
+		searcher, err := NewMultiPhraseSearcher(context.TODO(), reader, test.phrase, 0, false, "desc", 1.0, soptions)
 		if err != nil {
 			t.Error(err)
 		}
@@ -165,7 +163,6 @@ func TestMultiPhraseSearch(t *testing.T) {
 }
 
 func TestFuzzyMultiPhraseSearch(t *testing.T) {
-
 	soptions := search.SearcherOptions{Explain: true, IncludeTermVectors: true}
 
 	tests := []struct {
@@ -175,27 +172,27 @@ func TestFuzzyMultiPhraseSearch(t *testing.T) {
 		prefix    int
 	}{
 		{
-			mphrase:   [][]string{[]string{"pale", "anger"}, []string{"best"}, []string{"colon", "porch"}},
+			mphrase:   [][]string{{"pale", "anger"}, {"best"}, {"colon", "porch"}},
 			docids:    [][]byte{[]byte("2"), []byte("3")},
 			fuzziness: 2,
 		},
 		{
-			mphrase:   [][]string{[]string{"pale", "anger"}, []string{}, []string{"colon", "porch", "could"}},
+			mphrase:   [][]string{{"pale", "anger"}, {}, {"colon", "porch", "could"}},
 			docids:    nil,
 			fuzziness: 1,
 		},
 		{
-			mphrase:   [][]string{[]string{"app"}, []string{"best"}, []string{"volume"}},
+			mphrase:   [][]string{{"app"}, {"best"}, {"volume"}},
 			docids:    [][]byte{[]byte("3")},
 			fuzziness: 2,
 		},
 		{
-			mphrase:   [][]string{[]string{"anger", "pale", "bar"}, []string{"beard"}, []string{}, []string{}},
+			mphrase:   [][]string{{"anger", "pale", "bar"}, {"beard"}, {}, {}},
 			docids:    [][]byte{[]byte("1"), []byte("2"), []byte("3"), []byte("4")},
 			fuzziness: 2,
 		},
 		{
-			mphrase:   [][]string{[]string{"anger", "pale", "bar"}, []string{}, []string{"beard"}, []string{}},
+			mphrase:   [][]string{{"anger", "pale", "bar"}, {}, {"beard"}, {}},
 			docids:    [][]byte{[]byte("1"), []byte("4")},
 			fuzziness: 2,
 		},
@@ -248,7 +245,7 @@ func TestFindPhrasePaths(t *testing.T) {
 	}{
 		// simplest matching case
 		{
-			phrase: [][]string{[]string{"cat"}, []string{"dog"}},
+			phrase: [][]string{{"cat"}, {"dog"}},
 			tlm: search.TermLocationMap{
 				"cat": search.Locations{
 					&search.Location{
@@ -262,7 +259,7 @@ func TestFindPhrasePaths(t *testing.T) {
 				},
 			},
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 1}},
 					phrasePart{"dog", &search.Location{Pos: 2}},
 				},
@@ -270,7 +267,7 @@ func TestFindPhrasePaths(t *testing.T) {
 		},
 		// second term missing, no match
 		{
-			phrase: [][]string{[]string{"cat"}, []string{"dog"}},
+			phrase: [][]string{{"cat"}, {"dog"}},
 			tlm: search.TermLocationMap{
 				"cat": search.Locations{
 					&search.Location{
@@ -282,7 +279,7 @@ func TestFindPhrasePaths(t *testing.T) {
 		},
 		// second term exists but in wrong position
 		{
-			phrase: [][]string{[]string{"cat"}, []string{"dog"}},
+			phrase: [][]string{{"cat"}, {"dog"}},
 			tlm: search.TermLocationMap{
 				"cat": search.Locations{
 					&search.Location{
@@ -299,7 +296,7 @@ func TestFindPhrasePaths(t *testing.T) {
 		},
 		// matches multiple times
 		{
-			phrase: [][]string{[]string{"cat"}, []string{"dog"}},
+			phrase: [][]string{{"cat"}, {"dog"}},
 			tlm: search.TermLocationMap{
 				"cat": search.Locations{
 					&search.Location{
@@ -319,11 +316,11 @@ func TestFindPhrasePaths(t *testing.T) {
 				},
 			},
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 1}},
 					phrasePart{"dog", &search.Location{Pos: 2}},
 				},
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 8}},
 					phrasePart{"dog", &search.Location{Pos: 9}},
 				},
@@ -331,7 +328,7 @@ func TestFindPhrasePaths(t *testing.T) {
 		},
 		// match over gaps
 		{
-			phrase: [][]string{[]string{"cat"}, []string{""}, []string{"dog"}},
+			phrase: [][]string{{"cat"}, {""}, {"dog"}},
 			tlm: search.TermLocationMap{
 				"cat": search.Locations{
 					&search.Location{
@@ -345,7 +342,7 @@ func TestFindPhrasePaths(t *testing.T) {
 				},
 			},
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 1}},
 					phrasePart{"dog", &search.Location{Pos: 3}},
 				},
@@ -353,7 +350,7 @@ func TestFindPhrasePaths(t *testing.T) {
 		},
 		// match with leading ""
 		{
-			phrase: [][]string{[]string{""}, []string{"cat"}, []string{"dog"}},
+			phrase: [][]string{{""}, {"cat"}, {"dog"}},
 			tlm: search.TermLocationMap{
 				"cat": search.Locations{
 					&search.Location{
@@ -367,7 +364,7 @@ func TestFindPhrasePaths(t *testing.T) {
 				},
 			},
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 2}},
 					phrasePart{"dog", &search.Location{Pos: 3}},
 				},
@@ -375,7 +372,7 @@ func TestFindPhrasePaths(t *testing.T) {
 		},
 		// match with trailing ""
 		{
-			phrase: [][]string{[]string{"cat"}, []string{"dog"}, []string{""}},
+			phrase: [][]string{{"cat"}, {"dog"}, {""}},
 			tlm: search.TermLocationMap{
 				"cat": search.Locations{
 					&search.Location{
@@ -389,7 +386,7 @@ func TestFindPhrasePaths(t *testing.T) {
 				},
 			},
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 2}},
 					phrasePart{"dog", &search.Location{Pos: 3}},
 				},
@@ -442,15 +439,15 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 	}{
 		// no match
 		{
-			phrase: [][]string{[]string{"one"}, []string{"five"}},
+			phrase: [][]string{{"one"}, {"five"}},
 			slop:   2,
 		},
 		// should match
 		{
-			phrase: [][]string{[]string{"one"}, []string{"five"}},
+			phrase: [][]string{{"one"}, {"five"}},
 			slop:   3,
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"one", &search.Location{Pos: 1}},
 					phrasePart{"five", &search.Location{Pos: 5}},
 				},
@@ -458,10 +455,10 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		},
 		// slop 0 finds exact match
 		{
-			phrase: [][]string{[]string{"four"}, []string{"five"}},
+			phrase: [][]string{{"four"}, {"five"}},
 			slop:   0,
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"four", &search.Location{Pos: 4}},
 					phrasePart{"five", &search.Location{Pos: 5}},
 				},
@@ -469,15 +466,15 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		},
 		// slop 0 does not find exact match (reversed)
 		{
-			phrase: [][]string{[]string{"two"}, []string{"one"}},
+			phrase: [][]string{{"two"}, {"one"}},
 			slop:   0,
 		},
 		// slop 1 finds exact match
 		{
-			phrase: [][]string{[]string{"one"}, []string{"two"}},
+			phrase: [][]string{{"one"}, {"two"}},
 			slop:   1,
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"one", &search.Location{Pos: 1}},
 					phrasePart{"two", &search.Location{Pos: 2}},
 				},
@@ -485,15 +482,15 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		},
 		// slop 1 *still* does not find exact match (reversed) requires at least 2
 		{
-			phrase: [][]string{[]string{"two"}, []string{"one"}},
+			phrase: [][]string{{"two"}, {"one"}},
 			slop:   1,
 		},
 		// slop 2 does finds exact match reversed
 		{
-			phrase: [][]string{[]string{"two"}, []string{"one"}},
+			phrase: [][]string{{"two"}, {"one"}},
 			slop:   2,
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"two", &search.Location{Pos: 2}},
 					phrasePart{"one", &search.Location{Pos: 1}},
 				},
@@ -501,15 +498,15 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		},
 		// slop 2 not enough for this
 		{
-			phrase: [][]string{[]string{"three"}, []string{"one"}},
+			phrase: [][]string{{"three"}, {"one"}},
 			slop:   2,
 		},
 		// slop should be cumulative
 		{
-			phrase: [][]string{[]string{"one"}, []string{"three"}, []string{"five"}},
+			phrase: [][]string{{"one"}, {"three"}, {"five"}},
 			slop:   2,
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"one", &search.Location{Pos: 1}},
 					phrasePart{"three", &search.Location{Pos: 3}},
 					phrasePart{"five", &search.Location{Pos: 5}},
@@ -518,15 +515,15 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		},
 		// should require 6
 		{
-			phrase: [][]string{[]string{"five"}, []string{"three"}, []string{"one"}},
+			phrase: [][]string{{"five"}, {"three"}, {"one"}},
 			slop:   5,
 		},
 		// so lets try 6
 		{
-			phrase: [][]string{[]string{"five"}, []string{"three"}, []string{"one"}},
+			phrase: [][]string{{"five"}, {"three"}, {"one"}},
 			slop:   6,
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"five", &search.Location{Pos: 5}},
 					phrasePart{"three", &search.Location{Pos: 3}},
 					phrasePart{"one", &search.Location{Pos: 1}},
@@ -539,17 +536,17 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		// hence, 3 initial terms of ark, bat, cat
 		{
 			phrase: [][]string{
-				[]string{"ark"}, []string{"bat"}, []string{"cat"}, []string{"dog"},
+				{"ark"}, {"bat"}, {"cat"}, {"dog"},
 			},
 			slop: 1,
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"ark", &search.Location{Pos: 1}},
 					phrasePart{"bat", &search.Location{Pos: 2}},
 					phrasePart{"cat", &search.Location{Pos: 3}},
 					phrasePart{"dog", &search.Location{Pos: 4}},
 				},
-				phrasePath{
+				{
 					phrasePart{"ark", &search.Location{Pos: 1}},
 					phrasePart{"bat", &search.Location{Pos: 2}},
 					phrasePart{"cat", &search.Location{Pos: 3}},
@@ -575,11 +572,11 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		// test that we don't see multiple hits from the same location
 		{
 			phrase: [][]string{
-				[]string{"cat"}, []string{"dog"}, []string{"dog"},
+				{"cat"}, {"dog"}, {"dog"},
 			},
 			slop: 1,
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 1}},
 					phrasePart{"dog", &search.Location{Pos: 2}},
 					phrasePart{"dog", &search.Location{Pos: 3}},
@@ -598,23 +595,23 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		// test that we don't see multiple hits from the same location
 		{
 			phrase: [][]string{
-				[]string{"cat"}, []string{"dog"},
+				{"cat"}, {"dog"},
 			},
 			slop: 10,
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 1}},
 					phrasePart{"dog", &search.Location{Pos: 2}},
 				},
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 1}},
 					phrasePart{"dog", &search.Location{Pos: 4}},
 				},
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 3}},
 					phrasePart{"dog", &search.Location{Pos: 2}},
 				},
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 3}},
 					phrasePart{"dog", &search.Location{Pos: 4}},
 				},
@@ -676,10 +673,10 @@ func TestFindPhrasePathsSloppyPalyndrome(t *testing.T) {
 	}{
 		// search non palyndrone, exact match
 		{
-			phrase: [][]string{[]string{"two"}, []string{"three"}},
+			phrase: [][]string{{"two"}, {"three"}},
 			slop:   0,
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"two", &search.Location{Pos: 2}},
 					phrasePart{"three", &search.Location{Pos: 3}},
 				},
@@ -687,14 +684,14 @@ func TestFindPhrasePathsSloppyPalyndrome(t *testing.T) {
 		},
 		// same with slop 2 (not required) (find it twice)
 		{
-			phrase: [][]string{[]string{"two"}, []string{"three"}},
+			phrase: [][]string{{"two"}, {"three"}},
 			slop:   2,
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"two", &search.Location{Pos: 2}},
 					phrasePart{"three", &search.Location{Pos: 3}},
 				},
-				phrasePath{
+				{
 					phrasePart{"two", &search.Location{Pos: 4}},
 					phrasePart{"three", &search.Location{Pos: 3}},
 				},
@@ -702,14 +699,14 @@ func TestFindPhrasePathsSloppyPalyndrome(t *testing.T) {
 		},
 		// palyndrone reversed
 		{
-			phrase: [][]string{[]string{"three"}, []string{"two"}},
+			phrase: [][]string{{"three"}, {"two"}},
 			slop:   2,
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"three", &search.Location{Pos: 3}},
 					phrasePart{"two", &search.Location{Pos: 2}},
 				},
-				phrasePath{
+				{
 					phrasePart{"three", &search.Location{Pos: 3}},
 					phrasePart{"two", &search.Location{Pos: 4}},
 				},
@@ -726,7 +723,6 @@ func TestFindPhrasePathsSloppyPalyndrome(t *testing.T) {
 }
 
 func TestFindMultiPhrasePaths(t *testing.T) {
-
 	tlm := search.TermLocationMap{
 		"cat": search.Locations{
 			&search.Location{
@@ -751,9 +747,9 @@ func TestFindMultiPhrasePaths(t *testing.T) {
 	}{
 		// simplest, one of two possible terms matches
 		{
-			phrase: [][]string{[]string{"cat", "rat"}, []string{"dog"}},
+			phrase: [][]string{{"cat", "rat"}, {"dog"}},
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 1}},
 					phrasePart{"dog", &search.Location{Pos: 2}},
 				},
@@ -761,21 +757,21 @@ func TestFindMultiPhrasePaths(t *testing.T) {
 		},
 		// two possible terms, neither work
 		{
-			phrase: [][]string{[]string{"cat", "rat"}, []string{"chicken"}},
+			phrase: [][]string{{"cat", "rat"}, {"chicken"}},
 		},
 		// two possible terms, one works, but out of position with next
 		{
-			phrase: [][]string{[]string{"cat", "rat"}, []string{"frog"}},
+			phrase: [][]string{{"cat", "rat"}, {"frog"}},
 		},
 		// matches multiple times, with different pairing
 		{
-			phrase: [][]string{[]string{"cat", "dog"}, []string{"dog", "frog"}},
+			phrase: [][]string{{"cat", "dog"}, {"dog", "frog"}},
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 1}},
 					phrasePart{"dog", &search.Location{Pos: 2}},
 				},
-				phrasePath{
+				{
 					phrasePart{"dog", &search.Location{Pos: 2}},
 					phrasePart{"frog", &search.Location{Pos: 3}},
 				},
@@ -783,9 +779,9 @@ func TestFindMultiPhrasePaths(t *testing.T) {
 		},
 		// multi-match over a gap
 		{
-			phrase: [][]string{[]string{"cat", "rat"}, []string{""}, []string{"frog"}},
+			phrase: [][]string{{"cat", "rat"}, {""}, {"frog"}},
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 1}},
 					phrasePart{"frog", &search.Location{Pos: 3}},
 				},
@@ -793,9 +789,9 @@ func TestFindMultiPhrasePaths(t *testing.T) {
 		},
 		// multi-match over a gap (same as before, but with empty term list)
 		{
-			phrase: [][]string{[]string{"cat", "rat"}, []string{}, []string{"frog"}},
+			phrase: [][]string{{"cat", "rat"}, {}, {"frog"}},
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 1}},
 					phrasePart{"frog", &search.Location{Pos: 3}},
 				},
@@ -803,9 +799,9 @@ func TestFindMultiPhrasePaths(t *testing.T) {
 		},
 		// multi-match over a gap (same once again, but nil term list)
 		{
-			phrase: [][]string{[]string{"cat", "rat"}, nil, []string{"frog"}},
+			phrase: [][]string{{"cat", "rat"}, nil, {"frog"}},
 			paths: []phrasePath{
-				phrasePath{
+				{
 					phrasePart{"cat", &search.Location{Pos: 1}},
 					phrasePart{"frog", &search.Location{Pos: 3}},
 				},

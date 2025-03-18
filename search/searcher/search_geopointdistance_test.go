@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -24,7 +25,6 @@ import (
 )
 
 func TestGeoPointDistanceSearcher(t *testing.T) {
-
 	tests := []struct {
 		centerLon float64
 		centerLat float64
@@ -66,7 +66,7 @@ func TestGeoPointDistanceSearcher(t *testing.T) {
 
 func testGeoPointDistanceSearch(i index.IndexReader, centerLon, centerLat, dist float64, field string) ([]string, error) {
 	var rv []string
-	gds, err := NewGeoPointDistanceSearcher(nil, i, centerLon, centerLat, dist, field, 1.0, search.SearcherOptions{})
+	gds, err := NewGeoPointDistanceSearcher(context.TODO(), i, centerLon, centerLat, dist, field, 1.0, search.SearcherOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -110,9 +110,10 @@ func TestGeoPointDistanceCompare(t *testing.T) {
 	for testi, test := range tests {
 		// compares the results from ComputeGeoRange with original, non-optimized version
 		compare := func(desc string,
-			minLon, minLat, maxLon, maxLat float64, checkBoundaries bool) {
+			minLon, minLat, maxLon, maxLat float64, checkBoundaries bool,
+		) {
 			// do math to produce list of terms needed for this search
-			onBoundaryRes, offBoundaryRes, err := ComputeGeoRange(nil, 0, GeoBitsShift1Minus1,
+			onBoundaryRes, offBoundaryRes, err := ComputeGeoRange(context.TODO(), 0, GeoBitsShift1Minus1,
 				minLon, minLat, maxLon, maxLat, checkBoundaries, nil, "")
 			if err != nil {
 				t.Fatal(err)
@@ -136,8 +137,7 @@ func TestGeoPointDistanceCompare(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		topLeftLon, topLeftLat, bottomRightLon, bottomRightLat, err :=
-			geo.RectFromPointDistance(test.centerLon, test.centerLat, dist)
+		topLeftLon, topLeftLat, bottomRightLon, bottomRightLat, err := geo.RectFromPointDistance(test.centerLon, test.centerLat, dist)
 		if err != nil {
 			t.Fatal(err)
 		}

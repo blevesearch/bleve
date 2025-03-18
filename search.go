@@ -31,8 +31,10 @@ import (
 	"github.com/blevesearch/bleve/v2/util"
 )
 
-var reflectStaticSizeSearchResult int
-var reflectStaticSizeSearchStatus int
+var (
+	reflectStaticSizeSearchResult int
+	reflectStaticSizeSearchStatus int
+)
 
 func init() {
 	var sr SearchResult
@@ -497,7 +499,7 @@ func (sr *SearchResult) String() string {
 		rv = "No matches"
 	}
 	if len(sr.Facets) > 0 {
-		rv += fmt.Sprintf("Facets:\n")
+		rv += "Facets:\n"
 		for fn, f := range sr.Facets {
 			rv += fmt.Sprintf("%s(%d)\n", fn, f.Total)
 			for _, t := range f.Terms.Terms() {
