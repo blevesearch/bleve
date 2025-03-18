@@ -643,7 +643,8 @@ func (tfr *TermFrequencyRow) parseV(value []byte, includeTermVectors bool) error
 		}
 		currOffset += bytesRead
 
-		arrayPositionsLen, bytesRead := binary.Uvarint(value[currOffset:])
+		var arrayPositionsLen uint64
+		arrayPositionsLen, bytesRead = binary.Uvarint(value[currOffset:])
 		if bytesRead <= 0 {
 			return fmt.Errorf("invalid term frequency value, vector contains no arrayPositionLen")
 		}
