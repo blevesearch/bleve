@@ -15,12 +15,12 @@
 package geo
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 )
 
 func TestExtractGeoPoint(t *testing.T) {
-
 	tests := []struct {
 		in      interface{}
 		lon     float64
@@ -350,6 +350,106 @@ func TestExtractGeoShape(t *testing.T) {
 		}
 		if !reflect.DeepEqual(test.result, result) {
 			t.Errorf("expected result %+v, got %+v for %v", test.result, result, test.in)
+		}
+	}
+}
+
+func TestExtractGeoShapeCoordinates(t *testing.T) {
+	tests := []struct {
+		x        []byte
+		typ      string
+		expectOK bool
+	}{
+		{
+			x: []byte(`[
+				[
+					[77.58894681930542,12.976498523818783],
+					[77.58677959442139,12.974533005048169],
+					[77.58894681930542,12.976498523818783]
+				]
+			]`),
+			typ:      PolygonType,
+			expectOK: true,
+		},
+		{ // Invalid construct, but handled
+			x: []byte(`[
+				[
+					{"lon":77.58894681930542,"lat":12.976498523818783},
+					{"lon":77.58677959442139,"lat":12.974533005048169},
+					{"lon":77.58894681930542,"lat":12.976498523818783}
+				]
+			]`),
+			typ:      PolygonType,
+			expectOK: false,
+		},
+		{ // Invalid construct causes panic (within extract3DCoordinates), fix MB-65807
+			x: []byte(`{
+				"coordinates": [
+					[77.58894681930542,12.976498523818783],
+					[77.58677959442139,12.974533005048169],
+					[77.58894681930542,12.976498523818783]
+				]
+			}`),
+			typ:      PolygonType,
+			expectOK: false,
+		},
+		{
+			x: []byte(`[
+				[
+					[
+						[-0.163421630859375,51.531600743186644],
+						[-0.15277862548828125,51.52455221546295],
+						[-0.15895843505859375,51.53693981046689],
+						[-0.163421630859375,51.531600743186644]
+					]
+				],
+				[
+					[
+						[-0.1902008056640625,51.5091698216777],
+						[-0.1599884033203125,51.51322956905176],
+						[-0.1902008056640625,51.5091698216777]
+					]
+				]
+			]`),
+			typ:      MultiPolygonType,
+			expectOK: true,
+		},
+		{ // Invalid construct causes panic (within extract3DCoordinates), fix MB-65807
+			x: []byte(`[
+				{
+					"coordinates": [
+						[-0.163421630859375,51.531600743186644],
+						[-0.15277862548828125,51.52455221546295],
+						[-0.15895843505859375,51.53693981046689],
+						[-0.163421630859375,51.531600743186644]
+					]
+				},
+				{
+					"coordinates": [
+						[-0.1902008056640625,51.5091698216777],
+						[-0.1599884033203125,51.51322956905176],
+						[-0.1902008056640625,51.5091698216777]
+					]
+				}
+			]`),
+			typ:      MultiPolygonType,
+			expectOK: false,
+		},
+	}
+
+	for i := range tests {
+		var x interface{}
+		if err := json.Unmarshal(tests[i].x, &x); err != nil {
+			t.Fatalf("[%d] JSON err: %v", i+1, err)
+		}
+
+		_, typ, ok := ExtractGeoShapeCoordinates(x, tests[i].typ)
+		if ok != tests[i].expectOK {
+			t.Errorf("[%d] expected ok %t, got %t", i+1, tests[i].expectOK, ok)
+		}
+
+		if ok && typ != tests[i].typ {
+			t.Errorf("[%d] expected type %s, got %s", i+1, tests[i].typ, typ)
 		}
 	}
 }
