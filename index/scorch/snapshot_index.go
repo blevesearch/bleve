@@ -134,8 +134,8 @@ func (i *IndexSnapshot) updateSize() {
 
 func (is *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 	makeItr func(i segment.TermDictionary) segment.DictionaryIterator,
-	randomLookup bool) (*IndexSnapshotFieldDict, error) {
-
+	randomLookup bool,
+) (*IndexSnapshotFieldDict, error) {
 	results := make(chan *asynchSegmentResult)
 	var totalBytesRead uint64
 	var fieldCardinality int64
@@ -230,7 +230,8 @@ func calculateExclusiveEndFromInclusiveEnd(inclusiveEnd []byte) []byte {
 }
 
 func (is *IndexSnapshot) FieldDictRange(field string, startTerm []byte,
-	endTerm []byte) (index.FieldDict, error) {
+	endTerm []byte,
+) (index.FieldDict, error) {
 	return is.newIndexSnapshotFieldDict(field, func(is segment.TermDictionary) segment.DictionaryIterator {
 		endTermExclusive := calculateExclusiveEndFromInclusiveEnd(endTerm)
 		return is.AutomatonIterator(nil, startTerm, endTermExclusive)
@@ -256,7 +257,8 @@ func calculateExclusiveEndFromPrefix(in []byte) []byte {
 }
 
 func (is *IndexSnapshot) FieldDictPrefix(field string,
-	termPrefix []byte) (index.FieldDict, error) {
+	termPrefix []byte,
+) (index.FieldDict, error) {
 	termPrefixEnd := calculateExclusiveEndFromPrefix(termPrefix)
 	return is.newIndexSnapshotFieldDict(field, func(is segment.TermDictionary) segment.DictionaryIterator {
 		return is.AutomatonIterator(nil, termPrefix, termPrefixEnd)
@@ -264,18 +266,21 @@ func (is *IndexSnapshot) FieldDictPrefix(field string,
 }
 
 func (is *IndexSnapshot) FieldDictRegexp(field string,
-	termRegex string) (index.FieldDict, error) {
+	termRegex string,
+) (index.FieldDict, error) {
 	fd, _, err := is.FieldDictRegexpAutomaton(field, termRegex)
 	return fd, err
 }
 
 func (is *IndexSnapshot) FieldDictRegexpAutomaton(field string,
-	termRegex string) (index.FieldDict, index.RegexAutomaton, error) {
+	termRegex string,
+) (index.FieldDict, index.RegexAutomaton, error) {
 	return is.fieldDictRegexp(field, termRegex)
 }
 
 func (is *IndexSnapshot) fieldDictRegexp(field string,
-	termRegex string) (index.FieldDict, index.RegexAutomaton, error) {
+	termRegex string,
+) (index.FieldDict, index.RegexAutomaton, error) {
 	// TODO: potential optimization where the literal prefix represents the,
 	//       entire regexp, allowing us to use PrefixIterator(prefixTerm)?
 
@@ -294,7 +299,8 @@ func (is *IndexSnapshot) fieldDictRegexp(field string,
 }
 
 func (is *IndexSnapshot) getLevAutomaton(term string,
-	fuzziness uint8) (vellum.Automaton, error) {
+	fuzziness uint8,
+) (vellum.Automaton, error) {
 	if fuzziness == 1 {
 		return lb1.BuildDfa(term, fuzziness)
 	} else if fuzziness == 2 {
@@ -304,18 +310,21 @@ func (is *IndexSnapshot) getLevAutomaton(term string,
 }
 
 func (is *IndexSnapshot) FieldDictFuzzy(field string,
-	term string, fuzziness int, prefix string) (index.FieldDict, error) {
+	term string, fuzziness int, prefix string,
+) (index.FieldDict, error) {
 	fd, _, err := is.FieldDictFuzzyAutomaton(field, term, fuzziness, prefix)
 	return fd, err
 }
 
 func (is *IndexSnapshot) FieldDictFuzzyAutomaton(field string,
-	term string, fuzziness int, prefix string) (index.FieldDict, index.FuzzyAutomaton, error) {
+	term string, fuzziness int, prefix string,
+) (index.FieldDict, index.FuzzyAutomaton, error) {
 	return is.fieldDictFuzzy(field, term, fuzziness, prefix)
 }
 
 func (is *IndexSnapshot) fieldDictFuzzy(field string,
-	term string, fuzziness int, prefix string) (index.FieldDict, index.FuzzyAutomaton, error) {
+	term string, fuzziness int, prefix string,
+) (index.FieldDict, index.FuzzyAutomaton, error) {
 	a, err := is.getLevAutomaton(term, uint8(fuzziness))
 	if err != nil {
 		return nil, nil, err
@@ -431,7 +440,7 @@ func (is *IndexSnapshot) DocCount() (uint64, error) {
 
 func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	// FIXME could be done more efficiently directly, but reusing for simplicity
-	tfr, err := is.TermFieldReader(nil, []byte(id), "_id", false, false, false)
+	tfr, err := is.TermFieldReader(context.TODO(), []byte(id), "_id", false, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -557,7 +566,7 @@ func (is *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
 
 func (is *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err error) {
 	// FIXME could be done more efficiently directly, but reusing for simplicity
-	tfr, err := is.TermFieldReader(nil, []byte(id), "_id", false, false, false)
+	tfr, err := is.TermFieldReader(context.TODO(), []byte(id), "_id", false, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -576,7 +585,8 @@ func (is *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err er
 }
 
 func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field string, includeFreq,
-	includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
+	includeNorm, includeTermVectors bool,
+) (index.TermFieldReader, error) {
 	rv := is.allocTermFieldReaderDicts(field)
 
 	rv.ctx = ctx
@@ -743,7 +753,8 @@ func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
 func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	segmentIndex int, localDocNum uint64, fields []string, cFields []string,
 	visitor index.DocValueVisitor, dvs segment.DocVisitState) (
-	cFieldsOut []string, dvsOut segment.DocVisitState, err error) {
+	cFieldsOut []string, dvsOut segment.DocVisitState, err error,
+) {
 	ss := is.segment[segmentIndex]
 
 	var vFields []string // fields that are visitable via the segment
@@ -800,7 +811,8 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 }
 
 func (is *IndexSnapshot) DocValueReader(fields []string) (
-	index.DocValueReader, error) {
+	index.DocValueReader, error,
+) {
 	return &DocValueReader{i: is, fields: fields, currSegmentIndex: -1}, nil
 }
 
@@ -821,7 +833,8 @@ func (dvr *DocValueReader) BytesRead() uint64 {
 }
 
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
-	visitor index.DocValueVisitor) (err error) {
+	visitor index.DocValueVisitor,
+) (err error) {
 	docNum, err := docInternalToNumber(id)
 	if err != nil {
 		return err
@@ -929,7 +942,7 @@ func (is *IndexSnapshot) CopyTo(d index.Directory) error {
 		return fmt.Errorf("invalid root.bolt file found")
 	}
 
-	copyBolt, err := bolt.Open(rootFile.Name(), 0600, nil)
+	copyBolt, err := bolt.Open(rootFile.Name(), 0o600, nil)
 	if err != nil {
 		return err
 	}
@@ -966,7 +979,8 @@ func (is *IndexSnapshot) UpdateIOStats(val uint64) {
 }
 
 func (is *IndexSnapshot) GetSpatialAnalyzerPlugin(typ string) (
-	index.SpatialAnalyzerPlugin, error) {
+	index.SpatialAnalyzerPlugin, error,
+) {
 	var rv index.SpatialAnalyzerPlugin
 	is.m.Lock()
 	rv = is.parent.spatialPlugin
@@ -1041,8 +1055,8 @@ func (is *IndexSnapshot) ThesaurusTermReader(ctx context.Context, thesaurusName 
 }
 
 func (is *IndexSnapshot) newIndexSnapshotThesaurusKeys(name string,
-	makeItr func(i segment.Thesaurus) segment.ThesaurusIterator) (*IndexSnapshotThesaurusKeys, error) {
-
+	makeItr func(i segment.Thesaurus) segment.ThesaurusIterator,
+) (*IndexSnapshotThesaurusKeys, error) {
 	results := make(chan *asynchSegmentResult, len(is.segment))
 	var wg sync.WaitGroup
 	wg.Add(len(is.segment))
@@ -1101,7 +1115,8 @@ func (is *IndexSnapshot) ThesaurusKeys(name string) (index.ThesaurusKeys, error)
 }
 
 func (is *IndexSnapshot) ThesaurusKeysFuzzy(name string,
-	term string, fuzziness int, prefix string) (index.ThesaurusKeys, error) {
+	term string, fuzziness int, prefix string,
+) (index.ThesaurusKeys, error) {
 	a, err := is.getLevAutomaton(term, uint8(fuzziness))
 	if err != nil {
 		return nil, err
@@ -1117,7 +1132,8 @@ func (is *IndexSnapshot) ThesaurusKeysFuzzy(name string,
 }
 
 func (is *IndexSnapshot) ThesaurusKeysPrefix(name string,
-	termPrefix []byte) (index.ThesaurusKeys, error) {
+	termPrefix []byte,
+) (index.ThesaurusKeys, error) {
 	termPrefixEnd := calculateExclusiveEndFromPrefix(termPrefix)
 	return is.newIndexSnapshotThesaurusKeys(name, func(is segment.Thesaurus) segment.ThesaurusIterator {
 		return is.AutomatonIterator(nil, termPrefix, termPrefixEnd)
@@ -1125,7 +1141,8 @@ func (is *IndexSnapshot) ThesaurusKeysPrefix(name string,
 }
 
 func (is *IndexSnapshot) ThesaurusKeysRegexp(name string,
-	termRegex string) (index.ThesaurusKeys, error) {
+	termRegex string,
+) (index.ThesaurusKeys, error) {
 	a, prefixBeg, prefixEnd, err := parseRegexp(termRegex)
 	if err != nil {
 		return nil, err

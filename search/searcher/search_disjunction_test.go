@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -22,7 +23,6 @@ import (
 )
 
 func TestDisjunctionSearch(t *testing.T) {
-
 	twoDocIndexReader, err := twoDocIndex.Reader()
 	if err != nil {
 		t.Error(err)
@@ -36,37 +36,37 @@ func TestDisjunctionSearch(t *testing.T) {
 
 	explainTrue := search.SearcherOptions{Explain: true}
 
-	martyTermSearcher, err := NewTermSearcher(nil, twoDocIndexReader, "marty", "name", 1.0, explainTrue)
+	martyTermSearcher, err := NewTermSearcher(context.TODO(), twoDocIndexReader, "marty", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dustinTermSearcher, err := NewTermSearcher(nil, twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
+	dustinTermSearcher, err := NewTermSearcher(context.TODO(), twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyOrDustinSearcher, err := NewDisjunctionSearcher(nil, twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher}, 0, explainTrue)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	martyTermSearcher2, err := NewTermSearcher(nil, twoDocIndexReader, "marty", "name", 1.0, explainTrue)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dustinTermSearcher2, err := NewTermSearcher(nil, twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
-	if err != nil {
-		t.Fatal(err)
-	}
-	martyOrDustinSearcher2, err := NewDisjunctionSearcher(nil, twoDocIndexReader, []search.Searcher{martyTermSearcher2, dustinTermSearcher2}, 0, explainTrue)
+	martyOrDustinSearcher, err := NewDisjunctionSearcher(context.TODO(), twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	raviTermSearcher, err := NewTermSearcher(nil, twoDocIndexReader, "ravi", "name", 1.0, explainTrue)
+	martyTermSearcher2, err := NewTermSearcher(context.TODO(), twoDocIndexReader, "marty", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	nestedRaviOrMartyOrDustinSearcher, err := NewDisjunctionSearcher(nil, twoDocIndexReader, []search.Searcher{raviTermSearcher, martyOrDustinSearcher2}, 0, explainTrue)
+	dustinTermSearcher2, err := NewTermSearcher(context.TODO(), twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	martyOrDustinSearcher2, err := NewDisjunctionSearcher(context.TODO(), twoDocIndexReader, []search.Searcher{martyTermSearcher2, dustinTermSearcher2}, 0, explainTrue)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	raviTermSearcher, err := NewTermSearcher(context.TODO(), twoDocIndexReader, "ravi", "name", 1.0, explainTrue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nestedRaviOrMartyOrDustinSearcher, err := NewDisjunctionSearcher(context.TODO(), twoDocIndexReader, []search.Searcher{raviTermSearcher, martyOrDustinSearcher2}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +145,6 @@ func TestDisjunctionSearch(t *testing.T) {
 }
 
 func TestDisjunctionAdvance(t *testing.T) {
-
 	twoDocIndexReader, err := twoDocIndex.Reader()
 	if err != nil {
 		t.Error(err)
@@ -159,15 +158,15 @@ func TestDisjunctionAdvance(t *testing.T) {
 
 	explainTrue := search.SearcherOptions{Explain: true}
 
-	martyTermSearcher, err := NewTermSearcher(nil, twoDocIndexReader, "marty", "name", 1.0, explainTrue)
+	martyTermSearcher, err := NewTermSearcher(context.TODO(), twoDocIndexReader, "marty", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dustinTermSearcher, err := NewTermSearcher(nil, twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
+	dustinTermSearcher, err := NewTermSearcher(context.TODO(), twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyOrDustinSearcher, err := NewDisjunctionSearcher(nil, twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher}, 0, explainTrue)
+	martyOrDustinSearcher, err := NewDisjunctionSearcher(context.TODO(), twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +184,6 @@ func TestDisjunctionAdvance(t *testing.T) {
 }
 
 func TestDisjunctionSearchTooMany(t *testing.T) {
-
 	// set to max to a low non-zero value
 	DisjunctionMaxClauseCount = 2
 	defer func() {
@@ -206,19 +204,19 @@ func TestDisjunctionSearchTooMany(t *testing.T) {
 
 	explainTrue := search.SearcherOptions{Explain: true}
 
-	martyTermSearcher, err := NewTermSearcher(nil, twoDocIndexReader, "marty", "name", 1.0, explainTrue)
+	martyTermSearcher, err := NewTermSearcher(context.TODO(), twoDocIndexReader, "marty", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dustinTermSearcher, err := NewTermSearcher(nil, twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
+	dustinTermSearcher, err := NewTermSearcher(context.TODO(), twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	steveTermSearcher, err := NewTermSearcher(nil, twoDocIndexReader, "steve", "name", 1.0, explainTrue)
+	steveTermSearcher, err := NewTermSearcher(context.TODO(), twoDocIndexReader, "steve", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewDisjunctionSearcher(nil, twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher, steveTermSearcher}, 0, explainTrue)
+	_, err = NewDisjunctionSearcher(context.TODO(), twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher, steveTermSearcher}, 0, explainTrue)
 	if err == nil {
 		t.Fatal(err)
 	}

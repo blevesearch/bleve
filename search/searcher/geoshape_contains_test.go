@@ -91,21 +91,18 @@ func TestPointPolygonContains(t *testing.T) {
 	i := setupIndex(t)
 
 	for _, test := range tests {
-		indexReader, closeFn, err := testCaseSetup(t, test.DocShapeName, "polygon",
-			[][][][]float64{test.DocShapeVertices}, i)
+		indexReader, closeFn, err := testCaseSetup(t, test.DocShapeName, "polygon", [][][][]float64{test.DocShapeVertices}, i)
 		if err != nil {
 			t.Error(err.Error())
 		}
 
 		t.Run(test.Desc, func(t *testing.T) {
-			got, err := runGeoShapePointRelationQuery(test.QueryType,
-				false, indexReader, [][]float64{test.QueryShape}, "geometry")
+			got, err := runGeoShapePointRelationQuery(test.QueryType, false, indexReader, [][]float64{test.QueryShape}, "geometry")
 			if err != nil {
 				t.Error(err.Error())
 			}
 			if !reflect.DeepEqual(got, test.Expected) {
-				t.Errorf("expected %v, got %v for point: %+v",
-					test.Expected, got, test.QueryShape)
+				t.Errorf("expected %v, got %v for point: %+v", test.Expected, got, test.QueryShape)
 			}
 		})
 

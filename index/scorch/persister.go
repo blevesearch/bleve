@@ -240,7 +240,8 @@ OUTER:
 }
 
 func notifyMergeWatchers(lastPersistedEpoch uint64,
-	persistWatchers []*epochWatcher) []*epochWatcher {
+	persistWatchers []*epochWatcher,
+) []*epochWatcher {
 	var watchersNext []*epochWatcher
 	for _, w := range persistWatchers {
 		if w.epoch < lastPersistedEpoch {
@@ -254,8 +255,8 @@ func notifyMergeWatchers(lastPersistedEpoch uint64,
 
 func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64,
 	lastMergedEpoch uint64, persistWatchers []*epochWatcher,
-	po *persisterOptions) (uint64, []*epochWatcher) {
-
+	po *persisterOptions,
+) (uint64, []*epochWatcher) {
 	// First, let the watchers proceed if they lag behind
 	persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
 
@@ -339,7 +340,8 @@ func (s *Scorch) parsePersisterOptions() (*persisterOptions, error) {
 }
 
 func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot,
-	po *persisterOptions) error {
+	po *persisterOptions,
+) error {
 	// Perform in-memory segment merging only when the memory pressure is
 	// below the configured threshold, else the persister performs the
 	// direct persistence of segments.
@@ -365,7 +367,8 @@ var DefaultMinSegmentsForInMemoryMerge = 2
 // persistSnapshotMaybeMerge examines the snapshot and might merge and
 // persist the in-memory zap segments if there are enough of them
 func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
-	bool, error) {
+	bool, error,
+) {
 	// collect the in-memory zap segments (SegmentBase instances)
 	var sbs []segment.Segment
 	var sbsDrops []*roaring.Bitmap
@@ -468,7 +471,8 @@ func copyToDirectory(srcPath string, d index.Directory) (int64, error) {
 }
 
 func persistToDirectory(seg segment.UnpersistedSegment, d index.Directory,
-	path string) error {
+	path string,
+) error {
 	if d == nil {
 		return seg.Persist(path)
 	}
@@ -491,7 +495,8 @@ func persistToDirectory(seg segment.UnpersistedSegment, d index.Directory,
 
 func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 	segPlugin SegmentPlugin, d index.Directory) (
-	[]string, map[uint64]string, error) {
+	[]string, map[uint64]string, error,
+) {
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(boltSnapshotsBucket)
 	if err != nil {
 		return nil, nil, err
@@ -713,16 +718,18 @@ func zapFileName(epoch uint64) string {
 
 // bolt snapshot code
 
-var boltSnapshotsBucket = []byte{'s'}
-var boltPathKey = []byte{'p'}
-var boltDeletedKey = []byte{'d'}
-var boltInternalKey = []byte{'i'}
-var boltMetaDataKey = []byte{'m'}
-var boltMetaDataSegmentTypeKey = []byte("type")
-var boltMetaDataSegmentVersionKey = []byte("version")
-var boltMetaDataTimeStamp = []byte("timeStamp")
-var boltStatsKey = []byte("stats")
-var TotBytesWrittenKey = []byte("TotBytesWritten")
+var (
+	boltSnapshotsBucket           = []byte{'s'}
+	boltPathKey                   = []byte{'p'}
+	boltDeletedKey                = []byte{'d'}
+	boltInternalKey               = []byte{'i'}
+	boltMetaDataKey               = []byte{'m'}
+	boltMetaDataSegmentTypeKey    = []byte("type")
+	boltMetaDataSegmentVersionKey = []byte("version")
+	boltMetaDataTimeStamp         = []byte("timeStamp")
+	boltStatsKey                  = []byte("stats")
+	TotBytesWrittenKey            = []byte("TotBytesWritten")
+)
 
 func (s *Scorch) loadFromBolt() error {
 	return s.rootBolt.View(func(tx *bolt.Tx) error {
@@ -800,7 +807,6 @@ func (s *Scorch) LoadSnapshot(epoch uint64) (rv *IndexSnapshot, err error) {
 }
 
 func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
-
 	rv := &IndexSnapshot{
 		parent:   s,
 		internal: make(map[string][]byte),
@@ -947,7 +953,8 @@ var RollbackSamplingInterval = 0 * time.Minute
 var RollbackRetentionFactor = float64(0.5)
 
 func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
-	snapshots []*snapshotMetaData) (int, map[uint64]time.Time) {
+	snapshots []*snapshotMetaData,
+) (int, map[uint64]time.Time) {
 	if interval == 0 {
 		return len(snapshots), map[uint64]time.Time{}
 	}
@@ -994,8 +1001,8 @@ func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
 // by a time duration of RollbackSamplingInterval.
 func getProtectedSnapshots(rollbackSamplingInterval time.Duration,
 	numSnapshotsToKeep int,
-	persistedSnapshots []*snapshotMetaData) map[uint64]time.Time {
-
+	persistedSnapshots []*snapshotMetaData,
+) map[uint64]time.Time {
 	lastPoint, protectedEpochs := getTimeSeriesSnapshots(numSnapshotsToKeep,
 		rollbackSamplingInterval, persistedSnapshots)
 	if len(protectedEpochs) < numSnapshotsToKeep {
@@ -1162,7 +1169,8 @@ func (s *Scorch) removeOldZapFiles() error {
 // Hence we try to retain atleast retentionFactor portion worth of old snapshots
 // in such a scenario using the following function
 func getBoundaryCheckPoint(retentionFactor float64,
-	checkPoints []*snapshotMetaData, timeStamp time.Time) time.Time {
+	checkPoints []*snapshotMetaData, timeStamp time.Time,
+) time.Time {
 	if checkPoints != nil {
 		boundary := checkPoints[int(math.Floor(float64(len(checkPoints))*
 			retentionFactor))]

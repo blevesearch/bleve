@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -26,11 +27,10 @@ import (
 )
 
 func TestTermSearcher(t *testing.T) {
-
-	var queryTerm = "beer"
-	var queryField = "desc"
-	var queryBoost = 3.0
-	var queryExplain = search.SearcherOptions{Explain: true}
+	queryTerm := "beer"
+	queryField := "desc"
+	queryBoost := 3.0
+	queryExplain := search.SearcherOptions{Explain: true}
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	i, err := upsidedown.NewUpsideDownCouch(
@@ -118,7 +118,7 @@ func TestTermSearcher(t *testing.T) {
 		}
 	}()
 
-	searcher, err := NewTermSearcher(nil, indexReader, queryTerm, queryField, queryBoost, queryExplain)
+	searcher, err := NewTermSearcher(context.TODO(), indexReader, queryTerm, queryField, queryBoost, queryExplain)
 	if err != nil {
 		t.Fatal(err)
 	}

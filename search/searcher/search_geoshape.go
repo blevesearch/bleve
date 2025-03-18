@@ -27,7 +27,8 @@ import (
 
 func NewGeoShapeSearcher(ctx context.Context, indexReader index.IndexReader, shape index.GeoJSON,
 	relation string, field string, boost float64,
-	options search.SearcherOptions) (search.Searcher, error) {
+	options search.SearcherOptions,
+) (search.Searcher, error) {
 	var err error
 	var spatialPlugin index.SpatialAnalyzerPlugin
 
@@ -54,9 +55,7 @@ func NewGeoShapeSearcher(ctx context.Context, indexReader index.IndexReader, sha
 		return nil, err
 	}
 
-	return NewFilteringSearcher(ctx, mSearcher,
-		buildRelationFilterOnShapes(ctx, dvReader, field, relation, shape)), nil
-
+	return NewFilteringSearcher(ctx, mSearcher, buildRelationFilterOnShapes(ctx, dvReader, field, relation, shape)), nil
 }
 
 // Using the same term splitter slice used in the doc values in zap.
@@ -65,7 +64,8 @@ func NewGeoShapeSearcher(ctx context.Context, indexReader index.IndexReader, sha
 var termSeparatorSplitSlice = []byte{0xff}
 
 func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueReader, field string,
-	relation string, shape index.GeoJSON) FilterFunc {
+	relation string, shape index.GeoJSON,
+) FilterFunc {
 	// this is for accumulating the shape's actual complete value
 	// spread across multiple docvalue visitor callbacks.
 	var dvShapeValue []byte
@@ -73,8 +73,8 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 	var reader *bytes.Reader
 
 	var bufPool *s2.GeoBufferPool
-	if ctx != nil {
-		bufPool = ctx.Value(search.GeoBufferPoolCallbackKey).(search.GeoBufferPoolCallbackFunc)()
+	if bufPoolCallback, ok := ctx.Value(search.GeoBufferPoolCallbackKey).(search.GeoBufferPoolCallbackFunc); ok {
+		bufPool = bufPoolCallback()
 	}
 
 	return func(d *search.DocumentMatch) bool {
@@ -82,7 +82,6 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 
 		err := dvReader.VisitDocValues(d.IndexInternalID,
 			func(field string, term []byte) {
-
 				// only consider the values which are GlueBytes prefixed or
 				// if it had already started reading the shape bytes from previous callbacks.
 				if startReading || len(term) > geo.GlueBytesOffset {
@@ -110,11 +109,11 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 
 					// apply the filter once the entire docvalue is finished reading.
 					if finishReading {
-						v, err := geojson.FilterGeoShapesOnRelation(shape,
-							dvShapeValue, relation, &reader, bufPool)
+						v, err := geojson.FilterGeoShapesOnRelation(shape, dvShapeValue, relation, &reader, bufPool)
 						if err == nil && v {
 							found = true
 						}
+
 						dvShapeValue = dvShapeValue[:0]
 						startReading = false
 						finishReading = false

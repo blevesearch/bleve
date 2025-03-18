@@ -67,8 +67,7 @@ var bulkCmd = &cobra.Command{
 					break
 				}
 
-				var doc interface{}
-				doc = b
+				var doc interface{} = b
 				var err error
 				if parseJSON {
 					err = json.Unmarshal(b, &doc)

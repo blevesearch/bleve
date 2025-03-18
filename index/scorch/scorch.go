@@ -110,7 +110,8 @@ type internalStats struct {
 
 func NewScorch(storeName string,
 	config map[string]interface{},
-	analysisQueue *index.AnalysisQueue) (index.Index, error) {
+	analysisQueue *index.AnalysisQueue,
+) (index.Index, error) {
 	rv := &Scorch{
 		version:              Version,
 		config:               config,
@@ -137,7 +138,9 @@ func NewScorch(storeName string,
 
 	typ, ok := config["spatialPlugin"].(string)
 	if ok {
-		rv.loadSpatialAnalyzerPlugin(typ)
+		if err := rv.loadSpatialAnalyzerPlugin(typ); err != nil {
+			return nil, err
+		}
 	}
 
 	rv.root = &IndexSnapshot{parent: rv, refs: 1, creator: "NewScorch"}
@@ -230,7 +233,7 @@ func (s *Scorch) openBolt() error {
 		s.unsafeBatch = true
 	}
 
-	var rootBoltOpt = *bolt.DefaultOptions
+	rootBoltOpt := *bolt.DefaultOptions
 	if s.readOnly {
 		rootBoltOpt.ReadOnly = true
 		rootBoltOpt.OpenFile = func(path string, flag int, mode os.FileMode) (*os.File, error) {
@@ -244,7 +247,7 @@ func (s *Scorch) openBolt() error {
 		}
 	} else {
 		if s.path != "" {
-			err := os.MkdirAll(s.path, 0700)
+			err := os.MkdirAll(s.path, 0o700)
 			if err != nil {
 				return err
 			}
@@ -263,7 +266,7 @@ func (s *Scorch) openBolt() error {
 	rootBoltPath := s.path + string(os.PathSeparator) + "root.bolt"
 	var err error
 	if s.path != "" {
-		s.rootBolt, err = bolt.Open(rootBoltPath, 0600, &rootBoltOpt)
+		s.rootBolt, err = bolt.Open(rootBoltPath, 0o600, &rootBoltOpt)
 		if err != nil {
 			return err
 		}
@@ -325,7 +328,9 @@ func (s *Scorch) openBolt() error {
 
 	typ, ok := s.config["spatialPlugin"].(string)
 	if ok {
-		s.loadSpatialAnalyzerPlugin(typ)
+		if err := s.loadSpatialAnalyzerPlugin(typ); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -481,8 +486,8 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 }
 
 func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
-	internalOps map[string][]byte, persistedCallback index.BatchCallback, stats *fieldStats) error {
-
+	internalOps map[string][]byte, persistedCallback index.BatchCallback, stats *fieldStats,
+) error {
 	// new introduction
 	introduction := &segmentIntroduction{
 		id:                atomic.AddUint64(&s.nextSegmentID, 1),
@@ -576,7 +581,8 @@ func (s *Scorch) BytesReadQueryTime() uint64 {
 }
 
 func (s *Scorch) diskFileStats(rootSegmentPaths map[string]struct{}) (uint64,
-	uint64, uint64) {
+	uint64, uint64,
+) {
 	var numFilesOnDisk, numBytesUsedDisk, numBytesOnDiskByRoot uint64
 	if s.path != "" {
 		files, err := os.ReadDir(s.path)
@@ -832,7 +838,6 @@ func (fs *fieldStats) Store(statName, fieldName string, value uint64) {
 
 // Combine the given stats map with the existing map
 func (fs *fieldStats) Aggregate(stats segment.FieldStats) {
-
 	statMap := stats.Fetch()
 	if statMap == nil {
 		return

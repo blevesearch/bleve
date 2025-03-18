@@ -24,8 +24,10 @@ import (
 	"github.com/blevesearch/bleve/v2/size"
 )
 
-var reflectStaticSizeDateTimeFacetBuilder int
-var reflectStaticSizedateTimeRange int
+var (
+	reflectStaticSizeDateTimeFacetBuilder int
+	reflectStaticSizedateTimeRange        int
+)
 
 func init() {
 	var dtfb DateTimeFacetBuilder
@@ -62,12 +64,12 @@ func (fb *DateTimeFacetBuilder) Size() int {
 	sizeInBytes := reflectStaticSizeDateTimeFacetBuilder + size.SizeOfPtr +
 		len(fb.field)
 
-	for k, _ := range fb.termsCount {
+	for k := range fb.termsCount {
 		sizeInBytes += size.SizeOfString + len(k) +
 			size.SizeOfInt
 	}
 
-	for k, _ := range fb.ranges {
+	for k := range fb.ranges {
 		sizeInBytes += size.SizeOfString + len(k) +
 			size.SizeOfPtr + reflectStaticSizedateTimeRange
 	}
