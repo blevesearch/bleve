@@ -28,8 +28,10 @@ import (
 	"github.com/blevesearch/bleve/v2/util"
 )
 
-var HighTerm = strings.Repeat(string(utf8.MaxRune), 3)
-var LowTerm = string([]byte{0x00})
+var (
+	HighTerm = strings.Repeat(string(utf8.MaxRune), 3)
+	LowTerm  = string([]byte{0x00})
+)
 
 type SearchSort interface {
 	UpdateVisitor(field string, term []byte)
@@ -47,10 +49,15 @@ type SearchSort interface {
 
 func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 	descending, ok := input["desc"].(bool)
+	if !ok {
+		descending = false
+	}
+
 	by, ok := input["by"].(string)
 	if !ok {
 		return nil, fmt.Errorf("search sort must specify by")
 	}
+
 	switch by {
 	case "id":
 		return &SortDocID{
@@ -612,7 +619,8 @@ var maxDistance = string(numeric.MustNewPrefixCodedInt64(math.MaxInt64, 0))
 // NewSortGeoDistance creates SearchSort instance for sorting documents by
 // their distance from the specified point.
 func NewSortGeoDistance(field, unit string, lon, lat float64, desc bool) (
-	*SortGeoDistance, error) {
+	*SortGeoDistance, error,
+) {
 	rv := &SortGeoDistance{
 		Field: field,
 		Desc:  desc,
