@@ -69,12 +69,9 @@ func (q *RegexpQuery) Searcher(ctx context.Context, i index.IndexReader, m mappi
 	// known to interfere with LiteralPrefix() the way ^ does
 	// and removing $ introduces possible ambiguities with escaped \$, \\$, etc
 	actualRegexp := q.Regexp
-	if strings.HasPrefix(actualRegexp, "^") {
-		actualRegexp = actualRegexp[1:] // remove leading ^
-	}
+	actualRegexp = strings.TrimPrefix(actualRegexp, "^") // remove leading ^ if it exists
 
-	return searcher.NewRegexpStringSearcher(ctx, i, actualRegexp, field,
-		q.BoostVal.Value(), options)
+	return searcher.NewRegexpStringSearcher(ctx, i, actualRegexp, field, q.BoostVal.Value(), options)
 }
 
 func (q *RegexpQuery) Validate() error {
