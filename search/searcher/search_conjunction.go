@@ -47,12 +47,11 @@ type ConjunctionSearcher struct {
 
 func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, options search.SearcherOptions) (
-	search.Searcher, error) {
+	search.Searcher, error,
+) {
 	// build the sorted downstream searchers
 	searchers := make(OrderedSearcherList, len(qsearchers))
-	for i, searcher := range qsearchers {
-		searchers[i] = searcher
-	}
+	copy(searchers, qsearchers)
 	sort.Sort(searchers)
 
 	// attempt the "unadorned" conjunction optimization only when we
