@@ -26,8 +26,10 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-var reflectStaticSizeTermFrequencyRow int
-var reflectStaticSizeTermVector int
+var (
+	reflectStaticSizeTermFrequencyRow int
+	reflectStaticSizeTermVector       int
+)
 
 func init() {
 	var tfr TermFrequencyRow
@@ -322,7 +324,6 @@ func NewDictionaryRowKV(key, value []byte) (*DictionaryRow, error) {
 		return nil, err
 	}
 	return rv, nil
-
 }
 
 func NewDictionaryRowK(key []byte) (*DictionaryRow, error) {
@@ -642,7 +643,7 @@ func (tfr *TermFrequencyRow) parseV(value []byte, includeTermVectors bool) error
 		}
 		currOffset += bytesRead
 
-		var arrayPositionsLen uint64 = 0
+		var arrayPositionsLen uint64
 		arrayPositionsLen, bytesRead = binary.Uvarint(value[currOffset:])
 		if bytesRead <= 0 {
 			return fmt.Errorf("invalid term frequency value, vector contains no arrayPositionLen")
@@ -682,7 +683,6 @@ func NewTermFrequencyRowKV(key, value []byte) (*TermFrequencyRow, error) {
 		return nil, err
 	}
 	return rv, nil
-
 }
 
 type BackIndexRow struct {
@@ -1029,7 +1029,7 @@ func visitBackIndexRow(data []byte, callback backIndexFieldTermVisitor) error {
 				return io.ErrUnexpectedEOF
 			}
 			// don't track unrecognized data
-			//m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			// m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
 			iNdEx += skippy
 		}
 	}
@@ -1109,7 +1109,7 @@ func visitBackIndexRowFieldTerms(data []byte, callback backIndexFieldTermVisitor
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			//m.Terms = append(m.Terms, string(data[iNdEx:postIndex]))
+			// m.Terms = append(m.Terms, string(data[iNdEx:postIndex]))
 			callback(theField, data[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
@@ -1132,7 +1132,7 @@ func visitBackIndexRowFieldTerms(data []byte, callback backIndexFieldTermVisitor
 			if (iNdEx + skippy) > l {
 				return io.ErrUnexpectedEOF
 			}
-			//m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			// m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
 			iNdEx += skippy
 		}
 	}
