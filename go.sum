@@ -2,8 +2,8 @@ github.com/RoaringBitmap/roaring/v2 v2.4.5 h1:uGrrMreGjvAtTBobc0g5IrW1D5ldxDQYe2
 github.com/RoaringBitmap/roaring/v2 v2.4.5/go.mod h1:FiJcsfkGje/nZBZgCu0ZxCPOKD/hVXDS2dXi7/eUFE0=
 github.com/bits-and-blooms/bitset v1.12.0 h1:U/q1fAF7xXRhFCrhROzIfffYnu+dlS38vCZtmFVPHmA=
 github.com/bits-and-blooms/bitset v1.12.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
-github.com/blevesearch/bleve_index_api v1.2.3 h1:aJJPhTb30zc68qg2HbvCZLAF1Eh5Hhm296mDAUFaUeg=
-github.com/blevesearch/bleve_index_api v1.2.3/go.mod h1:rKQDl4u51uwafZxFrPD1R7xFOwKnzZW7s/LSeK4lgo0=
+github.com/blevesearch/bleve_index_api v1.2.4 h1:XRk+wWtbNZSxKvW2bNg4fUpoc3XQDD63krBzB45fJDY=
+github.com/blevesearch/bleve_index_api v1.2.4/go.mod h1:rKQDl4u51uwafZxFrPD1R7xFOwKnzZW7s/LSeK4lgo0=
 github.com/blevesearch/geo v0.1.20 h1:paaSpu2Ewh/tn5DKn/FB5SzvH0EWupxHEIwbCk/QPqM=
 github.com/blevesearch/geo v0.1.20/go.mod h1:DVG2QjwHNMFmjo+ZgzrIq2sfCh6rIHzy9d9d0B59I6w=
 github.com/blevesearch/go-faiss v1.0.24 h1:K79IvKjoKHdi7FdiXEsAhxpMuns0x4fM0BO93bW5jLI=
@@ -19,8 +19,8 @@ github.com/blevesearch/gtreap v0.1.1/go.mod h1:QaQyDRAT51sotthUWAH4Sj08awFSSWzgY
 github.com/blevesearch/mmap-go v1.0.2/go.mod h1:ol2qBqYaOUsGdm7aRMRrYGgPvnwLe6Y+7LMvAB5IbSA=
 github.com/blevesearch/mmap-go v1.0.4 h1:OVhDhT5B/M1HNPpYPBKIEJaD0F3Si+CrEKULGCDPWmc=
 github.com/blevesearch/mmap-go v1.0.4/go.mod h1:EWmEAOmdAS9z/pi/+Toxu99DnsbhG1TIxUoRmJw/pSs=
-github.com/blevesearch/scorch_segment_api/v2 v2.3.5 h1:t6NVTdS8xp1xHMJoe5WjxdZWLKhsIIb6kB0U49rhAno=
-github.com/blevesearch/scorch_segment_api/v2 v2.3.5/go.mod h1:7gG1vsL3lu2L+7RuEtZ7PJhxGYE+AV9zjxTSHuXFMdM=
+github.com/blevesearch/scorch_segment_api/v2 v2.3.6 h1:W9tnVyNqaowWrg8BgndTI4BXmwM+Pr6R/5+Xof7nJMk=
+github.com/blevesearch/scorch_segment_api/v2 v2.3.6/go.mod h1:JNx97hWfRl223SpaO9aq0C6WZI9SNdBovMp7X9K7XqU=
 github.com/blevesearch/segment v0.9.1 h1:+dThDy+Lvgj5JMxhmOVlgFfkUtZV2kw49xax4+jTfSU=
 github.com/blevesearch/segment v0.9.1/go.mod h1:zN21iLm7+GnBHWTao9I+Au/7MBiL8pPFtJBJTsk6kQw=
 github.com/blevesearch/snowball v0.6.1 h1:cDYjn/NCH+wwt2UdehaLpr2e4BwLIjN4V/TdLsL+B5A=
