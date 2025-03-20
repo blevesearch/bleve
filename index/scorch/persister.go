@@ -740,7 +740,7 @@ var (
 	boltMetaDataSegmentVersionKey = []byte("version")
 	boltMetaDataTimeStamp         = []byte("timeStamp")
 	boltStatsKey                  = []byte("stats")
-  boltUpdatedFieldsKey          = []byte("fields")
+	boltUpdatedFieldsKey          = []byte("fields")
 	TotBytesWrittenKey            = []byte("TotBytesWritten")
 )
 
