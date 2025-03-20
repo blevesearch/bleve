@@ -1,6 +1,8 @@
 module github.com/blevesearch/bleve/v2
 
-go 1.21
+go 1.23
+
+toolchain go1.23.5
 
 require (
 	github.com/RoaringBitmap/roaring/v2 v2.4.5
@@ -27,8 +29,8 @@ require (
 	github.com/blevesearch/zapx/v16 v16.2.2-0.20250305220028-89edb0ef9aa9
 	github.com/couchbase/moss v0.2.0
 	github.com/golang/protobuf v1.3.2
-	github.com/spf13/cobra v1.7.0
-	go.etcd.io/bbolt v1.3.7
+	github.com/spf13/cobra v1.8.1
+	go.etcd.io/bbolt v1.4.0
 	golang.org/x/text v0.8.0
 )
 
@@ -40,6 +42,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v0.0.0-20171115153421-f7279a603ede // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/sys v0.13.0 // indirect
+	github.com/spf13/pflag v1.0.6 // indirect
+	golang.org/x/sys v0.29.0 // indirect
 )
