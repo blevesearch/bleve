@@ -85,6 +85,11 @@ type IndexSnapshot struct {
 	m3               sync.RWMutex // bm25 metrics specific - not to interfere with TFR creation
 	fieldCardinality map[string]int
 
+	// Stores information about zapx fields that have been
+	// fully deleted (indicated by UpdateFieldInfo.Deleted) or
+	// partially deleted index, store or docvalues (indicated by
+	// UpdateFieldInfo.Index or .Store or .DocValues).
+	// Used to short circuit queries trying to read stale data
 	updatedFields map[string]*index.UpdateFieldInfo
 }
 
@@ -511,7 +516,8 @@ func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		// Keeping that TODO for now until we have a cleaner way.
 		rvd.StoredFieldsSize += uint64(len(val))
 
-		// Skip fields that are supposed to have deleted store values
+		// Skip fields that have been completely deleted or had their
+		// store data deleted
 		if info, ok := is.updatedFields[name]; ok &&
 			(info.Deleted || info.Store) {
 			return true
@@ -646,7 +652,8 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 			var dict segment.TermDictionary
 			var err error
 
-			// Skip fields that are supposed to have no indexing
+			// Skip fields that have been completely deleted or had their
+			// index data deleted
 			if info, ok := is.updatedFields[field]; ok &&
 				(info.Index || info.Deleted) {
 				dict, err = s.segment.Dictionary("")
@@ -802,7 +809,8 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 		}
 	}
 
-	// Filter out fields that are supposed to have no doc values
+	// Filter out fields that have been completely deleted or had their
+	// docvalues data deleted
 	idx := 0
 	for _, field := range vFields {
 		if info, ok := is.updatedFields[field]; ok &&
