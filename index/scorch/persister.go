@@ -87,7 +87,7 @@ type persisterOptions struct {
 
 	// MaxSizeInMemoryMerge is the maximum size of data that a single persister
 	// worker is allowed to work on
-	MaxSizeInMemoryMerge int
+	MaxSizeInMemoryMergePerWorker int
 }
 
 type notificationChan chan struct{}
@@ -330,11 +330,11 @@ OUTER:
 
 func (s *Scorch) parsePersisterOptions() (*persisterOptions, error) {
 	po := persisterOptions{
-		PersisterNapTimeMSec:         DefaultPersisterNapTimeMSec,
-		PersisterNapUnderNumFiles:    DefaultPersisterNapUnderNumFiles,
-		MemoryPressurePauseThreshold: DefaultMemoryPressurePauseThreshold,
-		NumPersisterWorkers:          DefaultNumPersisterWorkers,
-		MaxSizeInMemoryMerge:         DefaultMaxSizeInMemoryMerge,
+		PersisterNapTimeMSec:          DefaultPersisterNapTimeMSec,
+		PersisterNapUnderNumFiles:     DefaultPersisterNapUnderNumFiles,
+		MemoryPressurePauseThreshold:  DefaultMemoryPressurePauseThreshold,
+		NumPersisterWorkers:           DefaultNumPersisterWorkers,
+		MaxSizeInMemoryMergePerWorker: DefaultMaxSizeInMemoryMergePerWorker,
 	}
 	if v, ok := s.config["scorchPersisterOptions"]; ok {
 		b, err := util.MarshalJSON(v)
@@ -388,12 +388,12 @@ var DefaultNumPersisterWorkers = 1
 
 // maximum size of data that a single worker is allowed to perform the in-memory
 // merge operation.
-var DefaultMaxSizeInMemoryMerge = 0
+var DefaultMaxSizeInMemoryMergePerWorker = 0
 
-func legacyFlushBehaviour(maxSizeInMemoryMerge, numPersisterWorkers int) bool {
-	// DefaultMaxSizeInMemoryMerge = 0 is a special value to preserve the leagcy
+func legacyFlushBehaviour(maxSizeInMemoryMergePerWorker, numPersisterWorkers int) bool {
+	// DefaultMaxSizeInMemoryMergePerWorker = 0 is a special value to preserve the leagcy
 	// one-shot in-memory merge + flush behaviour.
-	return maxSizeInMemoryMerge == 0 && numPersisterWorkers == 1
+	return maxSizeInMemoryMergePerWorker == 0 && numPersisterWorkers == 1
 }
 
 // persistSnapshotMaybeMerge examines the snapshot and might merge and
@@ -412,7 +412,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	var totDocs uint64
 
 	// legacy behaviour of merge + flush of all in-memory segments in one-shot
-	if legacyFlushBehaviour(po.MaxSizeInMemoryMerge, po.NumPersisterWorkers) {
+	if legacyFlushBehaviour(po.MaxSizeInMemoryMergePerWorker, po.NumPersisterWorkers) {
 		val := &flushable{
 			segments: make([]segment.Segment, 0),
 			drops:    make([]*roaring.Bitmap, 0),
@@ -435,7 +435,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 		// constructs a flushSet where each flushable object contains a set of segments
 		// to be merged and flushed out to disk.
 		for i, snapshot := range snapshot.segment {
-			if totSize >= po.MaxSizeInMemoryMerge &&
+			if totSize >= po.MaxSizeInMemoryMergePerWorker &&
 				len(sbs) >= DefaultMinSegmentsForInMemoryMerge {
 				numSegsToFlushOut += len(sbs)
 				val := &flushable{
