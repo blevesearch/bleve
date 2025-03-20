@@ -624,6 +624,18 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 				return nil, nil, err
 			}
 		}
+
+		// store updated field info
+		if segmentSnapshot.updatedFields != nil {
+			b, err := json.Marshal(segmentSnapshot.updatedFields)
+			if err != nil {
+				return nil, nil, err
+			}
+			err = snapshotSegmentBucket.Put(boltUpdatedFieldsKey, b)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
 	}
 
 	return filenames, newSegmentPaths, nil
@@ -728,6 +740,7 @@ var (
 	boltMetaDataSegmentVersionKey = []byte("version")
 	boltMetaDataTimeStamp         = []byte("timeStamp")
 	boltStatsKey                  = []byte("stats")
+	boltUpdatedFieldsKey          = []byte("fields")
 	TotBytesWrittenKey            = []byte("TotBytesWritten")
 )
 
@@ -852,7 +865,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 			segmentBucket := snapshot.Bucket(k)
 			if segmentBucket == nil {
 				_ = rv.DecRef()
-				return nil, fmt.Errorf("segment key, but bucket missing % x", k)
+				return nil, fmt.Errorf("segment key, but bucket missing %x", k)
 			}
 			segmentSnapshot, err := s.loadSegment(segmentBucket)
 			if err != nil {
@@ -866,6 +879,10 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 			}
 			rv.segment = append(rv.segment, segmentSnapshot)
 			rv.offsets = append(rv.offsets, running)
+			// Merge all segment level updated field info for use during queries
+			if segmentSnapshot.updatedFields != nil {
+				rv.MergeUpdateFieldsInfo(segmentSnapshot.updatedFields)
+			}
 			running += segmentSnapshot.segment.Count()
 		}
 	}
@@ -878,13 +895,13 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		return nil, fmt.Errorf("segment path missing")
 	}
 	segmentPath := s.path + string(os.PathSeparator) + string(pathBytes)
-	segment, err := s.segPlugin.Open(segmentPath)
+	seg, err := s.segPlugin.Open(segmentPath)
 	if err != nil {
 		return nil, fmt.Errorf("error opening bolt segment: %v", err)
 	}
 
 	rv := &SegmentSnapshot{
-		segment:    segment,
+		segment:    seg,
 		cachedDocs: &cachedDocs{cache: nil},
 		cachedMeta: &cachedMeta{meta: nil},
 	}
@@ -894,7 +911,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		r := bytes.NewReader(deletedBytes)
 		_, err := deletedBitmap.ReadFrom(r)
 		if err != nil {
-			_ = segment.Close()
+			_ = seg.Close()
 			return nil, fmt.Errorf("error reading deleted bytes: %v", err)
 		}
 		if !deletedBitmap.IsEmpty() {
@@ -908,10 +925,23 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		err := json.Unmarshal(statBytes, &statsMap)
 		stats := &fieldStats{statMap: statsMap}
 		if err != nil {
-			_ = segment.Close()
+			_ = seg.Close()
 			return nil, fmt.Errorf("error reading stat bytes: %v", err)
 		}
 		rv.stats = stats
+	}
+	updatedFieldBytes := segmentBucket.Get(boltUpdatedFieldsKey)
+	if updatedFieldBytes != nil {
+		var updatedFields map[string]*index.UpdateFieldInfo
+
+		err := json.Unmarshal(updatedFieldBytes, &updatedFields)
+		if err != nil {
+			_ = seg.Close()
+			return nil, fmt.Errorf("error reading updated field bytes: %v", err)
+		}
+		rv.updatedFields = updatedFields
+		// Set the value within the segment base for use during merge
+		rv.UpdateFieldsInfo(rv.updatedFields)
 	}
 
 	return rv, nil

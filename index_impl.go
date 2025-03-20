@@ -57,8 +57,6 @@ type indexImpl struct {
 
 const storePath = "store"
 
-var mappingInternalKey = []byte("_mapping")
-
 const SearchQueryStartCallbackKey = "_search_query_start_callback_key"
 const SearchQueryEndCallbackKey = "_search_query_end_callback_key"
 
@@ -129,7 +127,7 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	if err != nil {
 		return nil, err
 	}
-	err = rv.i.SetInternal(mappingInternalKey, mappingBytes)
+	err = rv.i.SetInternal(scorch.MappingInternalKey, mappingBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -159,6 +157,9 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		rv.meta.IndexType = upsidedown.Name
 	}
 
+	var um *mapping.IndexMappingImpl
+	var umBytes []byte
+
 	storeConfig := rv.meta.Config
 	if storeConfig == nil {
 		storeConfig = map[string]interface{}{}
@@ -169,6 +170,21 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	storeConfig["error_if_exists"] = false
 	for rck, rcv := range runtimeConfig {
 		storeConfig[rck] = rcv
+		if rck == "updated_mapping" {
+			if val, ok := rcv.(string); ok {
+				if len(val) == 0 {
+					return nil, fmt.Errorf("updated_mapping is empty")
+				}
+				umBytes = []byte(val)
+
+				err = util.UnmarshalJSON(umBytes, &um)
+				if err != nil {
+					return nil, fmt.Errorf("error parsing updated_mapping into JSON: %v\nmapping contents:\n%v", err, rck)
+				}
+			} else {
+				return nil, fmt.Errorf("updated_mapping not of type string")
+			}
+		}
 	}
 
 	// open the index
@@ -202,7 +218,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		}
 	}()
 
-	mappingBytes, err := indexReader.GetInternal(mappingInternalKey)
+	mappingBytes, err := indexReader.GetInternal(scorch.MappingInternalKey)
 	if err != nil {
 		return nil, err
 	}
@@ -224,6 +240,31 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		// note even if the mapping is invalid
 		// we still return an open usable index
 		return rv, err
+	}
+
+	// Validate and update the index with the new mapping
+	// return usable index with error as to why update failed for any error
+	if um != nil {
+		ui, ok := rv.i.(index.UpdateIndex)
+		if !ok {
+			return rv, fmt.Errorf("updated mapping present for unupdatable index")
+		}
+
+		err = um.Validate()
+		if err != nil {
+			return rv, err
+		}
+
+		fieldInfo, err := DeletedFields(im, um)
+		if err != nil {
+			return rv, err
+		}
+
+		err = ui.UpdateFields(fieldInfo, umBytes)
+		if err != nil {
+			return rv, err
+		}
+		im = um
 	}
 
 	rv.m = im
