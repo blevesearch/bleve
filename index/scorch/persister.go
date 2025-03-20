@@ -24,6 +24,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -79,6 +80,14 @@ type persisterOptions struct {
 	// for the number of paused application threads. The default value would
 	// be a very high number to always favour the merging of memory segments.
 	MemoryPressurePauseThreshold uint64
+
+	// NumPersisterWorkers decides the number of parallel workers that will
+	// perform the in-memory merge of segments followed by a flush operation.
+	NumPersisterWorkers int
+
+	// MaxSizeInMemoryMerge is the maximum size of data that a single persister
+	// worker is allowed to work on
+	MaxSizeInMemoryMergePerWorker int
 }
 
 type notificationChan chan struct{}
@@ -321,9 +330,11 @@ OUTER:
 
 func (s *Scorch) parsePersisterOptions() (*persisterOptions, error) {
 	po := persisterOptions{
-		PersisterNapTimeMSec:         DefaultPersisterNapTimeMSec,
-		PersisterNapUnderNumFiles:    DefaultPersisterNapUnderNumFiles,
-		MemoryPressurePauseThreshold: DefaultMemoryPressurePauseThreshold,
+		PersisterNapTimeMSec:          DefaultPersisterNapTimeMSec,
+		PersisterNapUnderNumFiles:     DefaultPersisterNapUnderNumFiles,
+		MemoryPressurePauseThreshold:  DefaultMemoryPressurePauseThreshold,
+		NumPersisterWorkers:           DefaultNumPersisterWorkers,
+		MaxSizeInMemoryMergePerWorker: DefaultMaxSizeInMemoryMergePerWorker,
 	}
 	if v, ok := s.config["scorchPersisterOptions"]; ok {
 		b, err := util.MarshalJSON(v)
@@ -346,7 +357,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot,
 	// below the configured threshold, else the persister performs the
 	// direct persistence of segments.
 	if s.NumEventsBlocking() < po.MemoryPressurePauseThreshold {
-		persisted, err := s.persistSnapshotMaybeMerge(snapshot)
+		persisted, err := s.persistSnapshotMaybeMerge(snapshot, po)
 		if err != nil {
 			return err
 		}
@@ -355,7 +366,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot,
 		}
 	}
 
-	return s.persistSnapshotDirect(snapshot)
+	return s.persistSnapshotDirect(snapshot, nil)
 }
 
 // DefaultMinSegmentsForInMemoryMerge represents the default number of
@@ -364,33 +375,118 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot,
 // those segments
 var DefaultMinSegmentsForInMemoryMerge = 2
 
+type flushable struct {
+	segments []segment.Segment
+	drops    []*roaring.Bitmap
+	sbIdxs   []int
+	totDocs  uint64
+}
+
+// number workers which parallely perform an in-memory merge of the segments
+// followed by a flush operation.
+var DefaultNumPersisterWorkers = 1
+
+// maximum size of data that a single worker is allowed to perform the in-memory
+// merge operation.
+var DefaultMaxSizeInMemoryMergePerWorker = 0
+
+func legacyFlushBehaviour(maxSizeInMemoryMergePerWorker, numPersisterWorkers int) bool {
+	// DefaultMaxSizeInMemoryMergePerWorker = 0 is a special value to preserve the leagcy
+	// one-shot in-memory merge + flush behaviour.
+	return maxSizeInMemoryMergePerWorker == 0 && numPersisterWorkers == 1
+}
+
 // persistSnapshotMaybeMerge examines the snapshot and might merge and
 // persist the in-memory zap segments if there are enough of them
-func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
-	bool, error,
-) {
+func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persisterOptions) (
+	bool, error) {
 	// collect the in-memory zap segments (SegmentBase instances)
 	var sbs []segment.Segment
 	var sbsDrops []*roaring.Bitmap
 	var sbsIndexes []int
+	var oldSegIdxs []int
 
-	for i, segmentSnapshot := range snapshot.segment {
-		if _, ok := segmentSnapshot.segment.(segment.PersistedSegment); !ok {
-			sbs = append(sbs, segmentSnapshot.segment)
-			sbsDrops = append(sbsDrops, segmentSnapshot.deleted)
-			sbsIndexes = append(sbsIndexes, i)
+	flushSet := make([]*flushable, 0)
+	var totSize int
+	var numSegsToFlushOut int
+	var totDocs uint64
+
+	// legacy behaviour of merge + flush of all in-memory segments in one-shot
+	if legacyFlushBehaviour(po.MaxSizeInMemoryMergePerWorker, po.NumPersisterWorkers) {
+		val := &flushable{
+			segments: make([]segment.Segment, 0),
+			drops:    make([]*roaring.Bitmap, 0),
+			sbIdxs:   make([]int, 0),
+			totDocs:  totDocs,
+		}
+		for i, snapshot := range snapshot.segment {
+			if _, ok := snapshot.segment.(segment.PersistedSegment); !ok {
+				val.segments = append(val.segments, snapshot.segment)
+				val.drops = append(val.drops, snapshot.deleted)
+				val.sbIdxs = append(val.sbIdxs, i)
+				oldSegIdxs = append(oldSegIdxs, i)
+				val.totDocs += snapshot.segment.Count()
+				numSegsToFlushOut++
+			}
+		}
+
+		flushSet = append(flushSet, val)
+	} else {
+		// constructs a flushSet where each flushable object contains a set of segments
+		// to be merged and flushed out to disk.
+		for i, snapshot := range snapshot.segment {
+			if totSize >= po.MaxSizeInMemoryMergePerWorker &&
+				len(sbs) >= DefaultMinSegmentsForInMemoryMerge {
+				numSegsToFlushOut += len(sbs)
+				val := &flushable{
+					segments: slices.Clone(sbs),
+					drops:    slices.Clone(sbsDrops),
+					sbIdxs:   slices.Clone(sbsIndexes),
+					totDocs:  totDocs,
+				}
+				flushSet = append(flushSet, val)
+				oldSegIdxs = append(oldSegIdxs, sbsIndexes...)
+
+				sbs, sbsDrops, sbsIndexes = sbs[:0], sbsDrops[:0], sbsIndexes[:0]
+				totSize, totDocs = 0, 0
+			}
+
+			if len(flushSet) >= int(po.NumPersisterWorkers) {
+				break
+			}
+
+			if _, ok := snapshot.segment.(segment.PersistedSegment); !ok {
+				sbs = append(sbs, snapshot.segment)
+				sbsDrops = append(sbsDrops, snapshot.deleted)
+				sbsIndexes = append(sbsIndexes, i)
+				totDocs += snapshot.segment.Count()
+				totSize += snapshot.segment.Size()
+			}
+		}
+		// if there were too few segments just merge them all as part of a single worker
+		if len(flushSet) < po.NumPersisterWorkers {
+			numSegsToFlushOut += len(sbs)
+			val := &flushable{
+				segments: slices.Clone(sbs),
+				drops:    slices.Clone(sbsDrops),
+				sbIdxs:   slices.Clone(sbsIndexes),
+				totDocs:  totDocs,
+			}
+			flushSet = append(flushSet, val)
+			oldSegIdxs = append(oldSegIdxs, sbsIndexes...)
 		}
 	}
 
-	if len(sbs) < DefaultMinSegmentsForInMemoryMerge {
+	if numSegsToFlushOut < DefaultMinSegmentsForInMemoryMerge {
 		return false, nil
 	}
 
-	newSnapshot, newSegmentID, err := s.mergeSegmentBases(
-		snapshot, sbs, sbsDrops, sbsIndexes)
+	// drains out (after merging in memory) the segments in the flushSet parallely
+	newSnapshot, newSegmentIDs, err := s.mergeSegmentBasesParallel(snapshot, flushSet)
 	if err != nil {
 		return false, err
 	}
+
 	if newSnapshot == nil {
 		return false, nil
 	}
@@ -400,8 +496,13 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	}()
 
 	mergedSegmentIDs := map[uint64]struct{}{}
-	for _, idx := range sbsIndexes {
+	for _, idx := range oldSegIdxs {
 		mergedSegmentIDs[snapshot.segment[idx].id] = struct{}{}
+	}
+
+	newMergedSegmentIDs := make(map[uint64]struct{}, len(newSegmentIDs))
+	for _, id := range newSegmentIDs {
+		newMergedSegmentIDs[id] = struct{}{}
 	}
 
 	// construct a snapshot that's logically equivalent to the input
@@ -414,18 +515,25 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 		creator:  "persistSnapshotMaybeMerge",
 	}
 
+	// to track which segments haven't participated in the in-memory merge
+	// they won't be flushed out to the disk yet, but in the next cycle will be
+	// merged in-memory and then flushed out - this is to keep the number of
+	// on-disk files in limit.
+	exclude := make(map[uint64]struct{})
+
 	// copy to the equiv the segments that weren't replaced
 	for _, segment := range snapshot.segment {
 		if _, wasMerged := mergedSegmentIDs[segment.id]; !wasMerged {
 			equiv.segment = append(equiv.segment, segment)
+			exclude[segment.id] = struct{}{}
 		}
 	}
 
 	// append to the equiv the new segment
 	for _, segment := range newSnapshot.segment {
-		if segment.id == newSegmentID {
+		if _, ok := newMergedSegmentIDs[segment.id]; ok {
 			equiv.segment = append(equiv.segment, &SegmentSnapshot{
-				id:      newSegmentID,
+				id:      segment.id,
 				segment: segment.segment,
 				deleted: nil, // nil since merging handled deletions
 				stats:   nil,
@@ -434,7 +542,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 		}
 	}
 
-	err = s.persistSnapshotDirect(equiv)
+	err = s.persistSnapshotDirect(equiv, exclude)
 	if err != nil {
 		return false, err
 	}
@@ -494,9 +602,8 @@ func persistToDirectory(seg segment.UnpersistedSegment, d index.Directory,
 }
 
 func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
-	segPlugin SegmentPlugin, d index.Directory) (
-	[]string, map[uint64]string, error,
-) {
+	segPlugin SegmentPlugin, exclude map[uint64]struct{}, d index.Directory) (
+	[]string, map[uint64]string, error) {
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(boltSnapshotsBucket)
 	if err != nil {
 		return nil, nil, err
@@ -584,19 +691,22 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			}
 			filenames = append(filenames, filename)
 		case segment.UnpersistedSegment:
-			// need to persist this to disk
-			filename := zapFileName(segmentSnapshot.id)
-			path := filepath.Join(path, filename)
-			err := persistToDirectory(seg, d, path)
-			if err != nil {
-				return nil, nil, fmt.Errorf("segment: %s persist err: %v", path, err)
+			// need to persist this to disk if its not part of exclude list (which
+			// restricts which in-memory segment to be persisted to disk)
+			if _, ok := exclude[segmentSnapshot.id]; !ok {
+				filename := zapFileName(segmentSnapshot.id)
+				path := filepath.Join(path, filename)
+				err := persistToDirectory(seg, d, path)
+				if err != nil {
+					return nil, nil, fmt.Errorf("segment: %s persist err: %v", path, err)
+				}
+				newSegmentPaths[segmentSnapshot.id] = path
+				err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
+				if err != nil {
+					return nil, nil, err
+				}
+				filenames = append(filenames, filename)
 			}
-			newSegmentPaths[segmentSnapshot.id] = path
-			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
-			if err != nil {
-				return nil, nil, err
-			}
-			filenames = append(filenames, filename)
 		default:
 			return nil, nil, fmt.Errorf("unknown segment type: %T", seg)
 		}
@@ -629,7 +739,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 	return filenames, newSegmentPaths, nil
 }
 
-func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
+func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot, exclude map[uint64]struct{}) (err error) {
 	// start a write transaction
 	tx, err := s.rootBolt.Begin(true)
 	if err != nil {
@@ -642,7 +752,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 		}
 	}()
 
-	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin, nil)
+	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin, exclude, nil)
 	if err != nil {
 		return err
 	}
