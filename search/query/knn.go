@@ -35,9 +35,11 @@ type KNNQuery struct {
 	BoostVal    *Boost    `json:"boost,omitempty"`
 
 	// see KNNRequest.Params for description
-	Params        json.RawMessage `json:"params"`
-	FilterQuery   Query           `json:"filter,omitempty"`
-	filterResults []index.IndexInternalID
+	Params      json.RawMessage `json:"params"`
+	FilterQuery Query           `json:"filter,omitempty"`
+	// elegibleSelector is used to filter out documents that are
+	// eligible for the KNN search from a pre-filter query.
+	elegibleSelector index.EligibleDocumentSelector
 }
 
 func NewKNNQuery(vector []float32) *KNNQuery {
@@ -69,12 +71,8 @@ func (q *KNNQuery) SetParams(params json.RawMessage) {
 	q.Params = params
 }
 
-func (q *KNNQuery) SetFilterQuery(f Query) {
-	q.FilterQuery = f
-}
-
-func (q *KNNQuery) SetFilterResults(results []index.IndexInternalID) {
-	q.filterResults = results
+func (q *KNNQuery) SetEligibleSelector(eligibleSelector index.EligibleDocumentSelector) {
+	q.elegibleSelector = eligibleSelector
 }
 
 func (q *KNNQuery) Searcher(ctx context.Context, i index.IndexReader,
@@ -94,5 +92,5 @@ func (q *KNNQuery) Searcher(ctx context.Context, i index.IndexReader,
 
 	return searcher.NewKNNSearcher(ctx, i, m, options, q.VectorField,
 		q.Vector, q.K, q.BoostVal.Value(), similarityMetric, q.Params,
-		q.filterResults)
+		q.elegibleSelector)
 }
