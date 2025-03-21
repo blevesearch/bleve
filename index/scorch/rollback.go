@@ -19,6 +19,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/blevesearch/bleve/v2/util"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -61,7 +62,7 @@ func RollbackPoints(path string) ([]*RollbackPoint, error) {
 		_ = rootBolt.Close()
 	}()
 
-	snapshots := tx.Bucket(boltSnapshotsBucket)
+	snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 	if snapshots == nil {
 		return nil, nil
 	}
@@ -87,7 +88,7 @@ func RollbackPoints(path string) ([]*RollbackPoint, error) {
 		meta := map[string][]byte{}
 		c2 := snapshot.Cursor()
 		for j, _ := c2.First(); j != nil; j, _ = c2.Next() {
-			if j[0] == boltInternalKey[0] {
+			if j[0] == util.BoltInternalKey[0] {
 				internalBucket := snapshot.Bucket(j)
 				if internalBucket == nil {
 					err = fmt.Errorf("internal bucket missing")
@@ -151,7 +152,7 @@ func Rollback(path string, to *RollbackPoint) error {
 	var found bool
 	var eligibleEpochs []uint64
 	err = rootBolt.View(func(tx *bolt.Tx) error {
-		snapshots := tx.Bucket(boltSnapshotsBucket)
+		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
 		}
@@ -193,7 +194,7 @@ func Rollback(path string, to *RollbackPoint) error {
 		}
 	}()
 
-	snapshots := tx.Bucket(boltSnapshotsBucket)
+	snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 	if snapshots == nil {
 		return nil
 	}

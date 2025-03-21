@@ -133,7 +133,7 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	if err != nil {
 		return nil, err
 	}
-	err = rv.i.SetInternal(scorch.MappingInternalKey, mappingBytes)
+	err = rv.i.SetInternal(util.MappingInternalKey, mappingBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -203,15 +203,32 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	if err != nil {
 		return nil, err
 	}
-	err = rv.i.Open()
-	if err != nil {
-		return nil, err
-	}
-	defer func(rv *indexImpl) {
-		if !rv.open {
-			rv.i.Close()
+
+	var ui index.UpdateIndex
+	if um != nil {
+		var ok bool
+		ui, ok = rv.i.(index.UpdateIndex)
+		if !ok {
+			return nil, fmt.Errorf("updated mapping present for unupdatable index")
 		}
-	}(rv)
+
+		// Load the meta data from bolt so that we can read the current index
+		// mapping to compare with
+		err = ui.OpenMeta()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err = rv.i.Open()
+		if err != nil {
+			return nil, err
+		}
+		defer func(rv *indexImpl) {
+			if !rv.open {
+				rv.i.Close()
+			}
+		}(rv)
+	}
 
 	// now load the mapping
 	indexReader, err := rv.i.Reader()
@@ -224,7 +241,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		}
 	}()
 
-	mappingBytes, err := indexReader.GetInternal(scorch.MappingInternalKey)
+	mappingBytes, err := indexReader.GetInternal(util.MappingInternalKey)
 	if err != nil {
 		return nil, err
 	}
@@ -235,43 +252,47 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		return nil, fmt.Errorf("error parsing mapping JSON: %v\nmapping contents:\n%s", err, string(mappingBytes))
 	}
 
-	// mark the index as open
-	rv.mutex.Lock()
-	defer rv.mutex.Unlock()
-	rv.open = true
-
 	// validate the mapping
 	err = im.Validate()
 	if err != nil {
-		// note even if the mapping is invalid
-		// we still return an open usable index
-		return rv, err
+		// no longer return usable index on error because there
+		// is a chance the index is not open at this stage
+		return nil, err
 	}
 
 	// Validate and update the index with the new mapping
-	// return usable index with error as to why update failed for any error
-	if um != nil {
-		ui, ok := rv.i.(index.UpdateIndex)
-		if !ok {
-			return rv, fmt.Errorf("updated mapping present for unupdatable index")
-		}
-
+	if um != nil && ui != nil {
 		err = um.Validate()
 		if err != nil {
-			return rv, err
+			return nil, err
 		}
 
 		fieldInfo, err := DeletedFields(im, um)
 		if err != nil {
-			return rv, err
+			return nil, err
 		}
 
 		err = ui.UpdateFields(fieldInfo, umBytes)
 		if err != nil {
-			return rv, err
+			return nil, err
 		}
 		im = um
+
+		err = rv.i.Open()
+		if err != nil {
+			return nil, err
+		}
+		defer func(rv *indexImpl) {
+			if !rv.open {
+				rv.i.Close()
+			}
+		}(rv)
 	}
+
+	// mark the index as open
+	rv.mutex.Lock()
+	defer rv.mutex.Unlock()
+	rv.open = true
 
 	rv.m = im
 	indexStats.Register(rv)

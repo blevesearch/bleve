@@ -2768,7 +2768,7 @@ func TestIndexUpdateMerge(t *testing.T) {
 	}
 
 	numDocsPerBatch := 1000
-	numBatches := 3
+	numBatches := 10
 
 	var batch *Batch
 	doc := make(map[string]interface{})

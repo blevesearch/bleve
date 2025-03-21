@@ -810,17 +810,21 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	}
 
 	// Filter out fields that have been completely deleted or had their
-	// docvalues data deleted
-	idx := 0
-	for _, field := range vFields {
-		if info, ok := is.updatedFields[field]; ok &&
-			(info.DocValues || info.Deleted) {
-			continue
+	// docvalues data deleted from both visitable fields and required fields
+	filterUpdatedFields := func(fields []string) []string {
+		filteredFields := make([]string, 0)
+		for _, field := range fields {
+			if info, ok := is.updatedFields[field]; ok &&
+				(info.DocValues || info.Deleted) {
+				continue
+			}
+			filteredFields = append(filteredFields, field)
 		}
-		vFields[idx] = field
-		idx++
+		return filteredFields
 	}
-	vFields = vFields[:idx]
+
+	fieldsFiltered := filterUpdatedFields(fields)
+	vFieldsFiltered := filterUpdatedFields(vFields)
 
 	var errCh chan error
 
@@ -829,7 +833,7 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	// if the caller happens to know we're on the same segmentIndex
 	// from a previous invocation
 	if cFields == nil {
-		cFields = subtractStrings(fields, vFields)
+		cFields = subtractStrings(fieldsFiltered, vFieldsFiltered)
 
 		if !ss.cachedDocs.hasFields(cFields) {
 			errCh = make(chan error, 1)
@@ -844,8 +848,8 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 		}
 	}
 
-	if ssvOk && ssv != nil && len(vFields) > 0 {
-		dvs, err = ssv.VisitDocValues(localDocNum, vFields, visitor, dvs)
+	if ssvOk && ssv != nil && len(vFieldsFiltered) > 0 {
+		dvs, err = ssv.VisitDocValues(localDocNum, fieldsFiltered, visitor, dvs)
 		if err != nil {
 			return nil, nil, err
 		}
