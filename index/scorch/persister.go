@@ -497,7 +497,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 	segPlugin SegmentPlugin, d index.Directory) (
 	[]string, map[uint64]string, error,
 ) {
-	snapshotsBucket, err := tx.CreateBucketIfNotExists(boltSnapshotsBucket)
+	snapshotsBucket, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -508,17 +508,17 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 	}
 
 	// persist meta values
-	metaBucket, err := snapshotBucket.CreateBucketIfNotExists(boltMetaDataKey)
+	metaBucket, err := snapshotBucket.CreateBucketIfNotExists(util.BoltMetaDataKey)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = metaBucket.Put(boltMetaDataSegmentTypeKey, []byte(segPlugin.Type()))
+	err = metaBucket.Put(util.BoltMetaDataSegmentTypeKey, []byte(segPlugin.Type()))
 	if err != nil {
 		return nil, nil, err
 	}
 	buf := make([]byte, binary.MaxVarintLen32)
 	binary.BigEndian.PutUint32(buf, segPlugin.Version())
-	err = metaBucket.Put(boltMetaDataSegmentVersionKey, buf)
+	err = metaBucket.Put(util.BoltMetaDataSegmentVersionKey, buf)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -532,13 +532,13 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 	if err != nil {
 		return nil, nil, err
 	}
-	err = metaBucket.Put(boltMetaDataTimeStamp, timeStampBinary)
+	err = metaBucket.Put(util.BoltMetaDataTimeStamp, timeStampBinary)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// persist internal values
-	internalBucket, err := snapshotBucket.CreateBucketIfNotExists(boltInternalKey)
+	internalBucket, err := snapshotBucket.CreateBucketIfNotExists(util.BoltInternalKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -554,7 +554,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 		val := make([]byte, 8)
 		bytesWritten := atomic.LoadUint64(&snapshot.parent.stats.TotBytesWrittenAtIndexTime)
 		binary.LittleEndian.PutUint64(val, bytesWritten)
-		err = internalBucket.Put(TotBytesWrittenKey, val)
+		err = internalBucket.Put(util.TotBytesWrittenKey, val)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -578,7 +578,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 				return nil, nil, fmt.Errorf("segment: %s copy err: %v", segPath, err)
 			}
 			filename := filepath.Base(segPath)
-			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
+			err = snapshotSegmentBucket.Put(util.BoltPathKey, []byte(filename))
 			if err != nil {
 				return nil, nil, err
 			}
@@ -592,7 +592,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 				return nil, nil, fmt.Errorf("segment: %s persist err: %v", path, err)
 			}
 			newSegmentPaths[segmentSnapshot.id] = path
-			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
+			err = snapshotSegmentBucket.Put(util.BoltPathKey, []byte(filename))
 			if err != nil {
 				return nil, nil, err
 			}
@@ -607,7 +607,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			if err != nil {
 				return nil, nil, fmt.Errorf("error persisting roaring bytes: %v", err)
 			}
-			err = snapshotSegmentBucket.Put(boltDeletedKey, roaringBuf.Bytes())
+			err = snapshotSegmentBucket.Put(util.BoltDeletedKey, roaringBuf.Bytes())
 			if err != nil {
 				return nil, nil, err
 			}
@@ -619,7 +619,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			if err != nil {
 				return nil, nil, err
 			}
-			err = snapshotSegmentBucket.Put(boltStatsKey, b)
+			err = snapshotSegmentBucket.Put(util.BoltStatsKey, b)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -631,7 +631,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			if err != nil {
 				return nil, nil, err
 			}
-			err = snapshotSegmentBucket.Put(boltUpdatedFieldsKey, b)
+			err = snapshotSegmentBucket.Put(util.BoltUpdatedFieldsKey, b)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -730,23 +730,9 @@ func zapFileName(epoch uint64) string {
 
 // bolt snapshot code
 
-var (
-	boltSnapshotsBucket           = []byte{'s'}
-	boltPathKey                   = []byte{'p'}
-	boltDeletedKey                = []byte{'d'}
-	boltInternalKey               = []byte{'i'}
-	boltMetaDataKey               = []byte{'m'}
-	boltMetaDataSegmentTypeKey    = []byte("type")
-	boltMetaDataSegmentVersionKey = []byte("version")
-	boltMetaDataTimeStamp         = []byte("timeStamp")
-	boltStatsKey                  = []byte("stats")
-	boltUpdatedFieldsKey          = []byte("fields")
-	TotBytesWrittenKey            = []byte("TotBytesWritten")
-)
-
 func (s *Scorch) loadFromBolt() error {
 	return s.rootBolt.View(func(tx *bolt.Tx) error {
-		snapshots := tx.Bucket(boltSnapshotsBucket)
+		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
 		}
@@ -801,7 +787,7 @@ func (s *Scorch) loadFromBolt() error {
 // NOTE: this is currently ONLY intended to be used by the command-line tool
 func (s *Scorch) LoadSnapshot(epoch uint64) (rv *IndexSnapshot, err error) {
 	err = s.rootBolt.View(func(tx *bolt.Tx) error {
-		snapshots := tx.Bucket(boltSnapshotsBucket)
+		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
 		}
@@ -829,14 +815,14 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 	// first we look for the meta-data bucket, this will tell us
 	// which segment type/version was used for this snapshot
 	// all operations for this scorch will use this type/version
-	metaBucket := snapshot.Bucket(boltMetaDataKey)
+	metaBucket := snapshot.Bucket(util.BoltMetaDataKey)
 	if metaBucket == nil {
 		_ = rv.DecRef()
 		return nil, fmt.Errorf("meta-data bucket missing")
 	}
-	segmentType := string(metaBucket.Get(boltMetaDataSegmentTypeKey))
+	segmentType := string(metaBucket.Get(util.BoltMetaDataSegmentTypeKey))
 	segmentVersion := binary.BigEndian.Uint32(
-		metaBucket.Get(boltMetaDataSegmentVersionKey))
+		metaBucket.Get(util.BoltMetaDataSegmentVersionKey))
 	err := s.loadSegmentPlugin(segmentType, segmentVersion)
 	if err != nil {
 		_ = rv.DecRef()
@@ -846,7 +832,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 	var running uint64
 	c := snapshot.Cursor()
 	for k, _ := c.First(); k != nil; k, _ = c.Next() {
-		if k[0] == boltInternalKey[0] {
+		if k[0] == util.BoltInternalKey[0] {
 			internalBucket := snapshot.Bucket(k)
 			if internalBucket == nil {
 				_ = rv.DecRef()
@@ -861,7 +847,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 				_ = rv.DecRef()
 				return nil, err
 			}
-		} else if k[0] != boltMetaDataKey[0] {
+		} else if k[0] != util.BoltMetaDataKey[0] {
 			segmentBucket := snapshot.Bucket(k)
 			if segmentBucket == nil {
 				_ = rv.DecRef()
@@ -890,7 +876,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 }
 
 func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, error) {
-	pathBytes := segmentBucket.Get(boltPathKey)
+	pathBytes := segmentBucket.Get(util.BoltPathKey)
 	if pathBytes == nil {
 		return nil, fmt.Errorf("segment path missing")
 	}
@@ -905,7 +891,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		cachedDocs: &cachedDocs{cache: nil},
 		cachedMeta: &cachedMeta{meta: nil},
 	}
-	deletedBytes := segmentBucket.Get(boltDeletedKey)
+	deletedBytes := segmentBucket.Get(util.BoltDeletedKey)
 	if deletedBytes != nil {
 		deletedBitmap := roaring.NewBitmap()
 		r := bytes.NewReader(deletedBytes)
@@ -918,7 +904,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 			rv.deleted = deletedBitmap
 		}
 	}
-	statBytes := segmentBucket.Get(boltStatsKey)
+	statBytes := segmentBucket.Get(util.BoltStatsKey)
 	if statBytes != nil {
 		var statsMap map[string]map[string]uint64
 
@@ -930,7 +916,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		}
 		rv.stats = stats
 	}
-	updatedFieldBytes := segmentBucket.Get(boltUpdatedFieldsKey)
+	updatedFieldBytes := segmentBucket.Get(util.BoltUpdatedFieldsKey)
 	if updatedFieldBytes != nil {
 		var updatedFields map[string]*index.UpdateFieldInfo
 
@@ -1118,7 +1104,7 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 		}
 	}()
 
-	snapshots := tx.Bucket(boltSnapshotsBucket)
+	snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 	if snapshots == nil {
 		return 0, nil
 	}
@@ -1223,7 +1209,7 @@ func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 	expirationDuration := time.Duration(s.numSnapshotsToKeep) * s.rollbackSamplingInterval
 
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
-		snapshots := tx.Bucket(boltSnapshotsBucket)
+		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
 		}
@@ -1246,11 +1232,11 @@ func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 			if snapshot == nil {
 				continue
 			}
-			metaBucket := snapshot.Bucket(boltMetaDataKey)
+			metaBucket := snapshot.Bucket(util.BoltMetaDataKey)
 			if metaBucket == nil {
 				continue
 			}
-			timeStampBytes := metaBucket.Get(boltMetaDataTimeStamp)
+			timeStampBytes := metaBucket.Get(util.BoltMetaDataTimeStamp)
 			var timeStamp time.Time
 			err = timeStamp.UnmarshalText(timeStampBytes)
 			if err != nil {
@@ -1288,7 +1274,7 @@ func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 func (s *Scorch) RootBoltSnapshotEpochs() ([]uint64, error) {
 	var rv []uint64
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
-		snapshots := tx.Bucket(boltSnapshotsBucket)
+		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
 		}
@@ -1309,7 +1295,7 @@ func (s *Scorch) RootBoltSnapshotEpochs() ([]uint64, error) {
 func (s *Scorch) loadZapFileNames() (map[string]struct{}, error) {
 	rv := map[string]struct{}{}
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
-		snapshots := tx.Bucket(boltSnapshotsBucket)
+		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
 		}
@@ -1321,14 +1307,14 @@ func (s *Scorch) loadZapFileNames() (map[string]struct{}, error) {
 			}
 			segc := snapshot.Cursor()
 			for segk, _ := segc.First(); segk != nil; segk, _ = segc.Next() {
-				if segk[0] == boltInternalKey[0] {
+				if segk[0] == util.BoltInternalKey[0] {
 					continue
 				}
 				segmentBucket := snapshot.Bucket(segk)
 				if segmentBucket == nil {
 					continue
 				}
-				pathBytes := segmentBucket.Get(boltPathKey)
+				pathBytes := segmentBucket.Get(util.BoltPathKey)
 				if pathBytes == nil {
 					continue
 				}
