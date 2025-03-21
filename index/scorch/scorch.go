@@ -25,6 +25,7 @@ import (
 
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	bolt "go.etcd.io/bbolt"
@@ -35,8 +36,6 @@ const Name = "scorch"
 const Version uint8 = 2
 
 var ErrClosed = fmt.Errorf("scorch closed")
-
-var MappingInternalKey = []byte("_mapping")
 
 type Scorch struct {
 	nextSegmentID uint64
@@ -76,6 +75,7 @@ type Scorch struct {
 	merges                   chan *segmentMerge
 	introducerNotifier       chan *epochWatcher
 	persisterNotifier        chan *epochWatcher
+	loadedBolt               bool
 	rootBolt                 *bolt.DB
 	asyncTasks               sync.WaitGroup
 
@@ -124,6 +124,7 @@ func NewScorch(storeName string,
 		forceMergeRequestCh:  make(chan *mergerCtrl, 1),
 		segPlugin:            defaultSegmentPlugin,
 		copyScheduled:        map[string]int{},
+		loadedBolt:           false,
 	}
 
 	forcedSegmentType, forcedSegmentVersion, err := configForceSegmentTypeVersion(config)
@@ -219,9 +220,11 @@ func (s *Scorch) fireAsyncError(err error) {
 }
 
 func (s *Scorch) Open() error {
-	err := s.openBolt()
-	if err != nil {
-		return err
+	if !s.loadedBolt {
+		err := s.openBolt()
+		if err != nil {
+			return err
+		}
 	}
 
 	s.asyncTasks.Add(1)
@@ -958,10 +961,19 @@ func (s *Scorch) UpdateFields(fieldInfo map[string]*index.UpdateFieldInfo, mappi
 	return nil
 }
 
+func (s *Scorch) OpenMeta() error {
+	err := s.openBolt()
+	if err != nil {
+		return err
+	}
+	s.loadedBolt = true
+	return nil
+}
+
 // Merge and update deleted field info and rewrite index mapping
 func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mappingBytes []byte) error {
 	return s.rootBolt.Update(func(tx *bolt.Tx) error {
-		snapshots := tx.Bucket(boltSnapshotsBucket)
+		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
 		}
@@ -976,22 +988,22 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 			snapshot := snapshots.Bucket(k)
 			cc := snapshot.Cursor()
 			for kk, _ := cc.First(); kk != nil; kk, _ = cc.Next() {
-				if kk[0] == boltInternalKey[0] {
+				if kk[0] == util.BoltInternalKey[0] {
 					internalBucket := snapshot.Bucket(kk)
 					if internalBucket == nil {
 						return fmt.Errorf("segment key, but bucket missing %x", kk)
 					}
-					err = internalBucket.Put(MappingInternalKey, mappingBytes)
+					err = internalBucket.Put(util.MappingInternalKey, mappingBytes)
 					if err != nil {
 						return err
 					}
-				} else if kk[0] != boltMetaDataKey[0] {
+				} else if kk[0] != util.BoltMetaDataKey[0] {
 					segmentBucket := snapshot.Bucket(kk)
 					if segmentBucket == nil {
 						return fmt.Errorf("segment key, but bucket missing %x", kk)
 					}
 					var updatedFields map[string]*index.UpdateFieldInfo
-					updatedFieldBytes := segmentBucket.Get(boltUpdatedFieldsKey)
+					updatedFieldBytes := segmentBucket.Get(util.BoltUpdatedFieldsKey)
 					if updatedFieldBytes != nil {
 						err := json.Unmarshal(updatedFieldBytes, &updatedFields)
 						if err != nil {
@@ -1016,7 +1028,7 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 					if err != nil {
 						return err
 					}
-					err = segmentBucket.Put(boltUpdatedFieldsKey, b)
+					err = segmentBucket.Put(util.BoltUpdatedFieldsKey, b)
 					if err != nil {
 						return err
 					}
