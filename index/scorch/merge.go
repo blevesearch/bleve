@@ -226,12 +226,14 @@ func (s *Scorch) parseMergePlannerOptions() (*mergeplan.MergePlanOptions,
 		}
 	}
 
-	po, err := s.parsePersisterOptions()
-	if err != nil {
-		return nil, err
-	}
+	if mergePlannerOptions.FloorSegmentFileSize == 0 {
+		po, err := s.parsePersisterOptions()
+		if err != nil {
+			return nil, err
+		}
 
-	mergePlannerOptions.FloorSegmentFileSize = int64(po.MaxSizeInMemoryMergePerWorker)
+		mergePlannerOptions.FloorSegmentFileSize = int64(po.MaxSizeInMemoryMergePerWorker)
+	}
 
 	return &mergePlannerOptions, nil
 }
