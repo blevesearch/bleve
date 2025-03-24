@@ -160,6 +160,17 @@ func NewScorch(storeName string,
 	if ok {
 		rv.onAsyncError = RegistryAsyncErrorCallbacks[aecbName]
 	}
+	// validate any custom persistor/merger planner options
+	// to prevent an async error in the background routines.
+	_, err = rv.parsePersisterOptions()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = rv.parseMergePlannerOptions()
+	if err != nil {
+		return nil, err
+	}
 
 	return rv, nil
 }
