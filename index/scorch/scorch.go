@@ -728,6 +728,25 @@ func analyze(d index.Document, fn customAnalyzerPluginInitFunc) {
 				d.VisitComposite(func(cf index.CompositeField) {
 					cf.Compose(field.Name(), field.AnalyzedLength(), field.AnalyzedTokenFrequencies())
 				})
+				if f, ok := field.(index.GeoShapeField); ok {
+					d.VisitComposite(func(cf index.CompositeField) {
+						if cf.Name() == "_all" {
+							shape := f.EncodedShape()
+							cf.Compose(field.Name(), 1, index.TokenFrequencies{
+								string(shape): &index.TokenFreq{
+									Term: shape,
+									Locations: []*index.TokenLocation{
+										{
+											Start:    0,
+											End:      len(shape),
+											Position: 1,
+										},
+									},
+								},
+							})
+						}
+					})
+				}
 			}
 		}
 	})
