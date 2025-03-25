@@ -728,21 +728,20 @@ func analyze(d index.Document, fn customAnalyzerPluginInitFunc) {
 				d.VisitComposite(func(cf index.CompositeField) {
 					cf.Compose(field.Name(), field.AnalyzedLength(), field.AnalyzedTokenFrequencies())
 				})
-				// Since the encoded geoShape is only necessary within the doc
-				// values of the geoShapeField, it has been removed from its terms
-				// However, '_all' field uses its term dictionary as its docValues
-				// so it is necessary to add back the geoShape back into the '_all'
-				// field's term dictionary
+				// Since the encoded geoShape is only necessary within the doc values
+				// of the geoShapeField, it has been removed from the field's term dictionary.
+				// However, '_all' field uses its term dictionary as its docValues, so it
+				// becomes necessary to add the geoShape into the '_all' field's term dictionary
 				if f, ok := field.(index.GeoShapeField); ok {
 					d.VisitComposite(func(cf index.CompositeField) {
-						shape := f.EncodedShape()
+						geoshape := f.EncodedShape()
 						cf.Compose(field.Name(), 1, index.TokenFrequencies{
-							string(shape): &index.TokenFreq{
-								Term: shape,
+							string(geoshape): &index.TokenFreq{
+								Term: geoshape,
 								Locations: []*index.TokenLocation{
 									{
 										Start:    0,
-										End:      len(shape),
+										End:      len(geoshape),
 										Position: 1,
 									},
 								},
