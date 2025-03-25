@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
@@ -2703,6 +2704,109 @@ func BenchmarkAggregateFieldStats(b *testing.B) {
 
 		for _, fs := range fieldStatsArray {
 			aggFieldStats.Aggregate(fs)
+		}
+	}
+}
+
+func TestPersistorMergerOptions(t *testing.T) {
+	type test struct {
+		config    string
+		expectErr bool
+	}
+	tests := []test{
+		{
+			// valid config and no error expected
+			config: `{
+				"scorchPersisterOptions": {
+					"persisterNapTimeMSec": 1110,
+					"memoryPressurePauseThreshold" : 333
+				}
+			}`,
+			expectErr: false,
+		},
+		{
+			// valid json with invalid config values
+			// and error expected
+			config: `{
+				"scorchPersisterOptions": {
+					"persisterNapTimeMSec": "1110",
+					"memoryPressurePauseThreshold" : [333]
+				}
+			}`,
+			expectErr: true,
+		},
+		{
+			// valid json with invalid config values
+			// and error expected
+			config: `{
+				"scorchPersisterOptions": {
+					"persisterNapTimeMSec": 1110.2,
+					"memoryPressurePauseThreshold" : 333
+				}
+			}`,
+			expectErr: true,
+		},
+		{
+			// invalid setting for scorchMergePlanOptions
+			config: `{
+				"scorchPersisterOptions": {
+					"persisterNapTimeMSec": 1110,
+					"memoryPressurePauseThreshold" : 333
+				},
+				"scorchMergePlanOptions": [{
+					"maxSegmentSize": 10000,
+					"maxSegmentsPerTier": 10,
+					"segmentsPerMergeTask": 10
+				}]
+			}`,
+			expectErr: true,
+		},
+		{
+			// valid setting
+			config: `{
+				"scorchPersisterOptions": {
+					"persisterNapTimeMSec": 1110,
+					"memoryPressurePauseThreshold" : 333
+				},
+				"scorchMergePlanOptions": {
+					"maxSegmentSize": 10000,
+					"maxSegmentsPerTier": 10,
+					"segmentsPerMergeTask": 10
+				}
+			}`,
+			expectErr: false,
+		},
+		{
+			config: `{
+				"scorchPersisterOptions": {
+					"persisterNapTimeMSec": 1110,
+					"memoryPressurePauseThreshold" : 333
+				},
+				"scorchMergePlanOptions": {
+					"maxSegmentSize": 5.6,
+					"maxSegmentsPerTier": 10,
+					"segmentsPerMergeTask": 10
+				}
+			}`,
+			expectErr: true,
+		},
+	}
+	for i, test := range tests {
+		cfg := map[string]interface{}{}
+		err := json.Unmarshal([]byte(test.config), &cfg)
+		if err != nil {
+			t.Fatalf("test %d: error unmarshalling config: %v", i, err)
+		}
+		analysisQueue := index.NewAnalysisQueue(1)
+		_, err = NewScorch(Name, cfg, analysisQueue)
+		if test.expectErr {
+			if err == nil {
+				t.Errorf("test %d: expected error, got nil", i)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("test %d: unexpected error: %v", i, err)
+			}
 		}
 	}
 }
