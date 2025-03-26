@@ -236,14 +236,19 @@ func extract2DCoordinates(thing interface{}) [][]float64 {
 
 func extract3DCoordinates(thing interface{}) (c [][][]float64) {
 	coords := reflect.ValueOf(thing)
-	for i := 0; i < coords.Len(); i++ {
-		vals := coords.Index(i)
+	if !coords.IsValid() {
+		return nil
+	}
 
-		edges := vals.Interface()
-		if es, ok := edges.([]interface{}); ok {
-			loop := extract2DCoordinates(es)
-			if len(loop) > 0 {
-				c = append(c, loop)
+	if coords.Kind() == reflect.Slice {
+		for i := 0; i < coords.Len(); i++ {
+			vals := coords.Index(i)
+			edges := vals.Interface()
+			if es, ok := edges.([]interface{}); ok {
+				loop := extract2DCoordinates(es)
+				if len(loop) > 0 {
+					c = append(c, loop)
+				}
 			}
 		}
 	}
