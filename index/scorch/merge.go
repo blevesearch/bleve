@@ -209,6 +209,17 @@ func (s *Scorch) ForceMerge(ctx context.Context,
 func (s *Scorch) parseMergePlannerOptions() (*mergeplan.MergePlanOptions,
 	error) {
 	mergePlannerOptions := mergeplan.DefaultMergePlanOptions
+
+	po, err := s.parsePersisterOptions()
+	if err != nil {
+		return nil, err
+	}
+	// by default use the MaxSizeInMemoryMergePerWorker from the persister option
+	// as the FloorSegmentFileSize for the merge planner which would be the
+	// first tier size in the planning. If the value is 0, then we don't use the
+	// file size in the planning.
+	mergePlannerOptions.FloorSegmentFileSize = int64(po.MaxSizeInMemoryMergePerWorker)
+
 	if v, ok := s.config["scorchMergePlanOptions"]; ok {
 		b, err := util.MarshalJSON(v)
 		if err != nil {
