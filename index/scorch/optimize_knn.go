@@ -23,7 +23,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 	segment_api "github.com/blevesearch/scorch_segment_api/v2"
@@ -65,27 +64,6 @@ func (o *OptimizeVR) Finish() error {
 	var errorsM sync.Mutex
 	var errors []error
 
-	var snapshotGlobalDocNums map[int]*roaring.Bitmap
-	var eligibleDocIDsMap map[string]map[int]*roaring.Bitmap
-	fields := make([]string, len(o.vrs))
-	for field := range o.vrs {
-		fields = append(fields, field)
-	}
-
-	if o.requiresFiltering {
-		snapshotGlobalDocNums = o.snapshot.globalDocNums()
-		eligibleDocIDsMap = make(map[string]map[int]*roaring.Bitmap)
-		for _, field := range fields {
-			vrs := o.vrs[field]
-			eligibleDocIDsMap[field] = make(map[int]*roaring.Bitmap)
-			for index, vr := range vrs {
-				if vr.eligibleDocIDs != nil && len(vr.eligibleDocIDs) > 0 {
-					eligibleDocIDsMap[field][index] = vr.getEligibleDocIDs()
-				}
-			}
-		}
-	}
-
 	defer o.invokeSearcherEndCallback()
 
 	wg := sync.WaitGroup{}
@@ -100,8 +78,7 @@ func (o *OptimizeVR) Finish() error {
 					<-semaphore // Release the semaphore slot
 					wg.Done()
 				}()
-				for _, field := range fields {
-					vrs := o.vrs[field]
+				for field, vrs := range o.vrs {
 					vecIndex, err := segment.InterpretVectorIndex(field,
 						o.requiresFiltering, origSeg.deleted)
 					if err != nil {
@@ -114,34 +91,19 @@ func (o *OptimizeVR) Finish() error {
 					// update the vector index size as a meta value in the segment snapshot
 					vectorIndexSize := vecIndex.Size()
 					origSeg.cachedMeta.updateMeta(field, vectorIndexSize)
-					for vrIdx, vr := range vrs {
+					for _, vr := range vrs {
 						var pl segment_api.VecPostingsList
 						var err error
 
 						// for each VR, populate postings list and iterators
 						// by passing the obtained vector index and getting similar vectors.
 
-						// Only applies to filtered kNN.
-						if vr.eligibleDocIDs != nil && len(vr.eligibleDocIDs) > 0 {
-							eligibleVectorInternalIDs := eligibleDocIDsMap[field][vrIdx]
-							eligibleVectorInternalIDsClone := eligibleVectorInternalIDs.Clone()
-							if snapshotGlobalDocNums != nil {
-								// Only the eligible documents belonging to this segment
-								// will get filtered out.
-								// There is no way to determine which doc belongs to which segment
-								eligibleVectorInternalIDsClone.And(snapshotGlobalDocNums[index])
-							}
-
-							eligibleLocalDocNums := make([]uint64, 0)
-							// get the (segment-)local document numbers
-							for _, docNum := range eligibleVectorInternalIDsClone.ToArray() {
-								localDocNum := o.snapshot.localDocNumFromGlobal(index,
-									uint64(docNum))
-								eligibleLocalDocNums = append(eligibleLocalDocNums, localDocNum)
-							}
-
+						// check if the vector reader is configured to use a pre-filter
+						// to filter out ineligible documents before performing
+						// kNN search.
+						if vr.eligibleSelector != nil {
 							pl, err = vecIndex.SearchWithFilter(vr.vector, vr.k,
-								eligibleLocalDocNums, vr.searchParams)
+								vr.eligibleSelector.SegmentEligibleDocs(index), vr.searchParams)
 						} else {
 							pl, err = vecIndex.Search(vr.vector, vr.k, vr.searchParams)
 						}
@@ -195,7 +157,7 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 	}
 	o.ctx = ctx
 	if !o.requiresFiltering {
-		o.requiresFiltering = len(s.eligibleDocIDs) > 0
+		o.requiresFiltering = s.eligibleSelector != nil
 	}
 
 	if o.snapshot != s.snapshot {
