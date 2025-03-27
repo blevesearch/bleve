@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build vectors
+// +build vectors
+
 package collector
 
 import (
@@ -19,7 +22,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -28,7 +30,7 @@ type EligibleCollector struct {
 	size             int
 	total            uint64
 	took             time.Duration
-	eligibleSelector *eligibleDocumentSelector
+	eligibleSelector index.EligibleDocumentSelector
 }
 
 func NewEligibleCollector(size int) *EligibleCollector {
@@ -38,20 +40,23 @@ func NewEligibleCollector(size int) *EligibleCollector {
 func newEligibleCollector(size int) *EligibleCollector {
 	// No sort order & skip always 0 since this is only to filter eligible docs.
 	ec := &EligibleCollector{
-		size:             size,
-		eligibleSelector: NewEligibleDocumentSelector(),
+		size: size,
 	}
 	return ec
 }
 
 func makeEligibleDocumentMatchHandler(ctx *search.SearchContext, reader index.IndexReader) (search.DocumentMatchHandler, error) {
 	if ec, ok := ctx.Collector.(*EligibleCollector); ok {
-		if is, ok := reader.(*scorch.IndexSnapshot); ok {
+		if vr, ok := reader.(index.VectorIndexReader); ok {
+			// create a new eligible document selector to add eligible document matches
+			ec.eligibleSelector = vr.NewEligibleDocumentSelector()
+			// return a document match handler that adds eligible document matches
+			// to the eligible document selector
 			return func(d *search.DocumentMatch) error {
 				if d == nil {
 					return nil
 				}
-				err := ec.eligibleSelector.AddEligibleDocumentMatch(d, is)
+				err := ec.eligibleSelector.AddEligibleDocumentMatch(d.IndexInternalID)
 				if err != nil {
 					return err
 				}
@@ -60,7 +65,7 @@ func makeEligibleDocumentMatchHandler(ctx *search.SearchContext, reader index.In
 				return nil
 			}, nil
 		}
-		return nil, fmt.Errorf("reader is not an index snapshot")
+		return nil, fmt.Errorf("reader is not a VectorIndexReader")
 	}
 
 	return nil, fmt.Errorf("eligiblity collector not available")
@@ -163,32 +168,5 @@ func (ec *EligibleCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilde
 
 func (ec *EligibleCollector) FacetResults() search.FacetResults {
 	// facet unsupported for pre-filtering in KNN search
-	return nil
-}
-
-type eligibleDocumentSelector struct {
-	// segment ID -> segment local doc nums
-	eligibleDocNums map[int][]uint64
-}
-
-func NewEligibleDocumentSelector() *eligibleDocumentSelector {
-	return &eligibleDocumentSelector{
-		eligibleDocNums: map[int][]uint64{},
-	}
-}
-
-func (eds *eligibleDocumentSelector) SegmentEligibleDocs(segmentID int) []uint64 {
-	return eds.eligibleDocNums[segmentID]
-}
-
-func (eds *eligibleDocumentSelector) AddEligibleDocumentMatch(d *search.DocumentMatch,
-	is *scorch.IndexSnapshot) error {
-	// Get the segment number and the local doc number for this document.
-	segIdx, docNum, err := is.SegmentIndexAndLocalDocNum(d.IndexInternalID)
-	if err != nil {
-		return err
-	}
-	// Add the local doc number to the list of eligible doc numbers for this segment.
-	eds.eligibleDocNums[segIdx] = append(eds.eligibleDocNums[segIdx], docNum)
 	return nil
 }

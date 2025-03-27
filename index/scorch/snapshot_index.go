@@ -540,7 +540,7 @@ func (is *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
 	return string(v), nil
 }
 
-func (is *IndexSnapshot) SegmentIndexAndLocalDocNum(id index.IndexInternalID) (int, uint64, error) {
+func (is *IndexSnapshot) segmentIndexAndLocalDocNum(id index.IndexInternalID) (int, uint64, error) {
 	docNum, err := docInternalToNumber(id)
 	if err != nil {
 		return 0, 0, err
