@@ -14,7 +14,7 @@ require (
 	github.com/blevesearch/go-porterstemmer v1.0.3
 	github.com/blevesearch/goleveldb v1.0.1
 	github.com/blevesearch/gtreap v0.1.1
-	github.com/blevesearch/scorch_segment_api/v2 v2.3.5
+	github.com/blevesearch/scorch_segment_api/v2 v2.3.6
 	github.com/blevesearch/segment v0.9.1
 	github.com/blevesearch/snowball v0.6.1
 	github.com/blevesearch/snowballstem v0.9.0
@@ -26,7 +26,7 @@ require (
 	github.com/blevesearch/zapx/v13 v13.4.1
 	github.com/blevesearch/zapx/v14 v14.4.1
 	github.com/blevesearch/zapx/v15 v15.4.1
-	github.com/blevesearch/zapx/v16 v16.2.2-0.20250305220028-89edb0ef9aa9
+	github.com/blevesearch/zapx/v16 v16.2.2-0.20250324225331-76a4d38c3165
 	github.com/couchbase/moss v0.2.0
 	github.com/golang/protobuf v1.3.2
 	github.com/spf13/cobra v1.8.1

@@ -87,13 +87,6 @@ func (n *GeoShapeField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 func (n *GeoShapeField) Analyze() {
 	// compute the bytes representation for the coordinates
 	tokens := make(analysis.TokenStream, 0)
-	tokens = append(tokens, &analysis.Token{
-		Start:    0,
-		End:      len(n.encodedValue),
-		Term:     n.encodedValue,
-		Position: 1,
-		Type:     analysis.AlphaNumeric,
-	})
 
 	rti := geo.GetSpatialAnalyzerPlugin("s2")
 	terms := rti.GetIndexTokens(n.shape)
@@ -124,6 +117,10 @@ func (n *GeoShapeField) GoString() string {
 
 func (n *GeoShapeField) NumPlainTextBytes() uint64 {
 	return n.numPlainTextBytes
+}
+
+func (n *GeoShapeField) EncodedShape() []byte {
+	return n.encodedValue
 }
 
 func NewGeoShapeField(name string, arrayPositions []uint64,
