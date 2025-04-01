@@ -43,7 +43,7 @@ message := struct{
 	Body string
 }{
 	Id:   "example",
-	From: "marty.schoch@gmail.com",
+	From: "xyz@couchbase.com",
 	Body: "bleve indexing is easy",
 }
 
