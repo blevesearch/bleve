@@ -137,9 +137,13 @@ sudo cp build/c_api/libfaiss_c.dylib /usr/local/lib
 
 ### Sanity check
 
-Once the supporting library is built and made available, a sanity run is recommended to make sure all unit tests and especially those accessing the vectors' code pass. Here's how I do on mac -
+Once the supporting library is built and made available, a sanity run is recommended to make sure all unit tests and especially those accessing the vectors' code pass. Here's how ..
 
 ```
 export DYLD_LIBRARY_PATH=/usr/local/lib
 go test -v ./... --tags=vectors
+```
+-or-
+```
+go test -ldflags "-r /usr/local/lib" ./... -tags=vectors
 ```

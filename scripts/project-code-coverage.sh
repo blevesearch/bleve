@@ -33,7 +33,7 @@ else
     exit 1
 fi
 
-cat acc.out integration-acc.out | go run docs/merge-coverprofile.go > merged.out
+cat acc.out integration-acc.out | go run scripts/merge-coverprofile.go > merged.out
 
 if [ -n "$COVERALLS" ]
 then
