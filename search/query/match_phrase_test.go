@@ -44,7 +44,7 @@ func TestTokenStreamToPhrase(t *testing.T) {
 					Position: 2,
 				},
 			},
-			result: [][]string{[]string{"one"}, []string{"two"}},
+			result: [][]string{{"one"}, {"two"}},
 		},
 		// token stream containing a gap (usually from stop words)
 		{
@@ -58,7 +58,7 @@ func TestTokenStreamToPhrase(t *testing.T) {
 					Position: 3,
 				},
 			},
-			result: [][]string{[]string{"wag"}, nil, []string{"dog"}},
+			result: [][]string{{"wag"}, nil, {"dog"}},
 		},
 		// token stream containing multiple tokens at the same position
 		{
@@ -88,7 +88,7 @@ func TestTokenStreamToPhrase(t *testing.T) {
 					Position: 2,
 				},
 			},
-			result: [][]string{[]string{"nia", "onia", "donia"}, []string{"imo", "nimo", "ónimo"}},
+			result: [][]string{{"nia", "onia", "donia"}, {"imo", "nimo", "ónimo"}},
 		},
 	}
 

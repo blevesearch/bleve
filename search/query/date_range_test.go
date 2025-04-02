@@ -23,7 +23,7 @@ import (
 func TestBleveQueryTime(t *testing.T) {
 	testTimes := []time.Time{
 		time.Now(),
-		time.Time{},
+		{},
 	}
 
 	for i, testTime := range testTimes {
