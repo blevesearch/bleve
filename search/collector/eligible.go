@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build vectors
+// +build vectors
+
 package collector
 
 import (
@@ -24,12 +27,10 @@ import (
 )
 
 type EligibleCollector struct {
-	size    int
-	total   uint64
-	took    time.Duration
-	results search.DocumentMatchCollection
-
-	ids []index.IndexInternalID
+	size             int
+	total            uint64
+	took             time.Duration
+	eligibleSelector index.EligibleDocumentSelector
 }
 
 func NewEligibleCollector(size int) *EligibleCollector {
@@ -38,28 +39,33 @@ func NewEligibleCollector(size int) *EligibleCollector {
 
 func newEligibleCollector(size int) *EligibleCollector {
 	// No sort order & skip always 0 since this is only to filter eligible docs.
-	ec := &EligibleCollector{size: size,
-		ids: make([]index.IndexInternalID, 0, size),
+	ec := &EligibleCollector{
+		size: size,
 	}
 	return ec
 }
 
-func makeEligibleDocumentMatchHandler(ctx *search.SearchContext) (search.DocumentMatchHandler, error) {
+func makeEligibleDocumentMatchHandler(ctx *search.SearchContext, reader index.IndexReader) (search.DocumentMatchHandler, error) {
 	if ec, ok := ctx.Collector.(*EligibleCollector); ok {
-		return func(d *search.DocumentMatch) error {
-			if d == nil {
+		if vr, ok := reader.(index.VectorIndexReader); ok {
+			// create a new eligible document selector to add eligible document matches
+			ec.eligibleSelector = vr.NewEligibleDocumentSelector()
+			// return a document match handler that adds eligible document matches
+			// to the eligible document selector
+			return func(d *search.DocumentMatch) error {
+				if d == nil {
+					return nil
+				}
+				err := ec.eligibleSelector.AddEligibleDocumentMatch(d.IndexInternalID)
+				if err != nil {
+					return err
+				}
+				// recycle the DocumentMatch
+				ctx.DocumentMatchPool.Put(d)
 				return nil
-			}
-
-			copyOfID := make([]byte, len(d.IndexInternalID))
-			copy(copyOfID, d.IndexInternalID)
-			ec.ids = append(ec.ids, copyOfID)
-
-			// recycle the DocumentMatch
-			ctx.DocumentMatchPool.Put(d)
-
-			return nil
-		}, nil
+			}, nil
+		}
+		return nil, fmt.Errorf("reader is not a VectorIndexReader")
 	}
 
 	return nil, fmt.Errorf("eligiblity collector not available")
@@ -80,7 +86,7 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 		IndexReader:       reader,
 	}
 
-	dmHandler, err := makeEligibleDocumentMatchHandler(searchContext)
+	dmHandler, err := makeEligibleDocumentMatchHandler(searchContext, reader)
 	if err != nil {
 		return err
 	}
@@ -126,12 +132,21 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 	return nil
 }
 
+// The eligible collector does not return any document matches and hence
+// this method is a dummy method returning nil, to conform to the
+// search.Collector interface.
 func (ec *EligibleCollector) Results() search.DocumentMatchCollection {
 	return nil
 }
 
-func (ec *EligibleCollector) IDs() []index.IndexInternalID {
-	return ec.ids
+// EligibleSelector returns the eligible document selector, which can be used
+// to retrieve the list of eligible documents from this collector.
+// If the collector has no results, it returns nil.
+func (ec *EligibleCollector) EligibleSelector() index.EligibleDocumentSelector {
+	if ec.total == 0 {
+		return nil
+	}
+	return ec.eligibleSelector
 }
 
 func (ec *EligibleCollector) Total() uint64 {

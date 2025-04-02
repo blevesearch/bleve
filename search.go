@@ -602,3 +602,8 @@ func isMatchNoneQuery(q query.Query) bool {
 	_, ok := q.(*query.MatchNoneQuery)
 	return ok
 }
+
+func isMatchAllQuery(q query.Query) bool {
+	_, ok := q.(*query.MatchAllQuery)
+	return ok
+}
