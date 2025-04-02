@@ -1371,8 +1371,7 @@ func TestKNNOperator(t *testing.T) {
 
 	// Conjunction
 	searchRequest.AddKNNOperator(knnOperatorAnd)
-	requiresFiltering := make(map[int]bool)
-	conjunction, _, _, err := createKNNQuery(searchRequest, nil, requiresFiltering)
+	conjunction, _, _, err := createKNNQuery(searchRequest, nil)
 	if err != nil {
 		t.Fatalf("unexpected error for AND knn operator")
 	}
@@ -1388,7 +1387,7 @@ func TestKNNOperator(t *testing.T) {
 
 	// Disjunction
 	searchRequest.AddKNNOperator(knnOperatorOr)
-	disjunction, _, _, err := createKNNQuery(searchRequest, nil, requiresFiltering)
+	disjunction, _, _, err := createKNNQuery(searchRequest, nil)
 	if err != nil {
 		t.Fatalf("unexpected error for OR knn operator")
 	}
@@ -1404,7 +1403,7 @@ func TestKNNOperator(t *testing.T) {
 
 	// Incorrect operator.
 	searchRequest.AddKNNOperator("bs_op")
-	searchRequest.Query, _, _, err = createKNNQuery(searchRequest, nil, requiresFiltering)
+	searchRequest.Query, _, _, err = createKNNQuery(searchRequest, nil)
 	if err == nil {
 		t.Fatalf("expected error for incorrect knn operator")
 	}

@@ -250,8 +250,7 @@ var (
 	knnOperatorOr  = knnOperator("or")
 )
 
-func createKNNQuery(req *SearchRequest, eligibleDocsMap map[int][]index.IndexInternalID,
-	requiresFiltering map[int]bool) (
+func createKNNQuery(req *SearchRequest, knnFilterResults map[int]index.EligibleDocumentSelector) (
 	query.Query, []int64, int64, error) {
 	if requestHasKNN(req) {
 		// first perform validation
@@ -265,21 +264,16 @@ func createKNNQuery(req *SearchRequest, eligibleDocsMap map[int][]index.IndexInt
 		for i, knn := range req.KNN {
 			// If it's a filtered kNN but has no eligible filter hits, then
 			// do not run the kNN query.
-			if requiresFiltering[i] && len(eligibleDocsMap[i]) <= 0 {
+			if selector, exists := knnFilterResults[i]; exists && selector == nil {
 				continue
 			}
-
 			knnQuery := query.NewKNNQuery(knn.Vector)
 			knnQuery.SetFieldVal(knn.Field)
 			knnQuery.SetK(knn.K)
 			knnQuery.SetBoost(knn.Boost.Value())
 			knnQuery.SetParams(knn.Params)
-			if len(eligibleDocsMap[i]) > 0 {
-				knnQuery.SetFilterQuery(knn.FilterQuery)
-				filterResults, exists := eligibleDocsMap[i]
-				if exists {
-					knnQuery.SetFilterResults(filterResults)
-				}
+			if selector, exists := knnFilterResults[i]; exists {
+				knnQuery.SetEligibleSelector(selector)
 			}
 			subQueries = append(subQueries, knnQuery)
 			kArray = append(kArray, knn.K)
@@ -293,12 +287,6 @@ func createKNNQuery(req *SearchRequest, eligibleDocsMap map[int][]index.IndexInt
 }
 
 func validateKNN(req *SearchRequest) error {
-	if req.KNN != nil &&
-		req.KNNOperator != "" &&
-		req.KNNOperator != knnOperatorOr &&
-		req.KNNOperator != knnOperatorAnd {
-		return fmt.Errorf("unknown knn operator: %s", req.KNNOperator)
-	}
 	for _, q := range req.KNN {
 		if q == nil {
 			return fmt.Errorf("knn query cannot be nil")
@@ -359,19 +347,22 @@ func addSortAndFieldsToKNNHits(req *SearchRequest, knnHits []*search.DocumentMat
 }
 
 func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, reader index.IndexReader, preSearch bool) ([]*search.DocumentMatch, error) {
-	// maps the index of the KNN query in the req to the pre-filter hits aka
-	// eligible docs' internal IDs .
-	filterHitsMap := make(map[int][]index.IndexInternalID)
-	// Indicates if this query requires filtering downstream
-	// No filtering required if it's a match all query/no filters applied.
-	requiresFiltering := make(map[int]bool)
-
+	// Maps the index of a KNN query in the request to its pre-filter result:
+	// - If the KNN query is **not filtered**, the value will be `nil`.
+	// - If the KNN query **is filtered**, the value will be an eligible document selector
+	//   that can be used to retrieve eligible documents.
+	// - If there is an **empty entry** for a KNN query, it means no documents match
+	//   the filter query, and the KNN query can be skipped.
+	knnFilterResults := make(map[int]index.EligibleDocumentSelector)
 	for idx, knnReq := range req.KNN {
-		// TODO Can use goroutines for this filter query stuff - do it if perf results
-		// show this to be significantly slow otherwise.
 		filterQ := knnReq.FilterQuery
-		if filterQ == nil {
-			requiresFiltering[idx] = false
+		if filterQ == nil || isMatchAllQuery(filterQ) {
+			// When there is no filter query or the filter query is match_all,
+			// all documents are eligible, and can be treated as unfiltered query.
+			continue
+		} else if isMatchNoneQuery(filterQ) {
+			// If the filter query is match_none, then no documents match the filter query.
+			knnFilterResults[idx] = nil
 			continue
 		}
 
@@ -404,17 +395,11 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 		if err != nil {
 			return nil, err
 		}
-		filterHits := filterColl.IDs()
-		if len(filterHits) > 0 {
-			filterHitsMap[idx] = filterHits
-		}
-		// set requiresFiltering regardless of whether there're filtered hits or
-		// not to later decide whether to consider the knnQuery or not
-		requiresFiltering[idx] = true
+		knnFilterResults[idx] = filterColl.EligibleSelector()
 	}
 
 	// Add the filter hits when creating the kNN query
-	KNNQuery, kArray, sumOfK, err := createKNNQuery(req, filterHitsMap, requiresFiltering)
+	KNNQuery, kArray, sumOfK, err := createKNNQuery(req, knnFilterResults)
 	if err != nil {
 		return nil, err
 	}
