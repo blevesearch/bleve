@@ -59,11 +59,21 @@ const storePath = "store"
 
 var mappingInternalKey = []byte("_mapping")
 
-const SearchQueryStartCallbackKey = "_search_query_start_callback_key"
-const SearchQueryEndCallbackKey = "_search_query_end_callback_key"
+type ContextKey string
 
-type SearchQueryStartCallbackFn func(size uint64) error
-type SearchQueryEndCallbackFn func(size uint64) error
+func (k ContextKey) String() string {
+	return string(k)
+}
+
+const (
+	SearchQueryStartCallbackKey ContextKey = "_search_query_start_callback_key"
+	SearchQueryEndCallbackKey   ContextKey = "_search_query_end_callback_key"
+)
+
+type (
+	SearchQueryStartCallbackFn func(size uint64) error
+	SearchQueryEndCallbackFn   func(size uint64) error
+)
 
 func indexStorePath(path string) string {
 	return path + string(os.PathSeparator) + storePath
@@ -412,10 +422,12 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 	return i.SearchInContext(context.Background(), req)
 }
 
-var documentMatchEmptySize int
-var searchContextEmptySize int
-var facetResultEmptySize int
-var documentEmptySize int
+var (
+	documentMatchEmptySize int
+	searchContextEmptySize int
+	facetResultEmptySize   int
+	documentEmptySize      int
+)
 
 func init() {
 	var dm search.DocumentMatch
@@ -435,8 +447,8 @@ func init() {
 // needed to execute a search request.
 func memNeededForSearch(req *SearchRequest,
 	searcher search.Searcher,
-	topnCollector *collector.TopNCollector) uint64 {
-
+	topnCollector *collector.TopNCollector,
+) uint64 {
 	backingSize := req.Size + req.From + 1
 	if req.Size+req.From > collector.PreAllocSizeSkipCap {
 		backingSize = collector.PreAllocSizeSkipCap + 1
@@ -605,7 +617,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 					}
 					skipSynonymCollector = true
 				}
-			case search.BM25PreSearchDataKey:
+			case search.BM25PreSearchDataKey.String():
 				if v != nil {
 					bm25Data, ok = v.(*search.BM25Stats)
 					if !ok {
@@ -667,8 +679,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		totalSearchCost += bytesRead
 	}
 
-	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey,
-		search.SearchIOStatsCallbackFunc(sendBytesRead))
+	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey, search.SearchIOStatsCallbackFunc(sendBytesRead))
 
 	var bufPool *s2.GeoBufferPool
 	getBufferPool := func() *s2.GeoBufferPool {
@@ -679,8 +690,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		return bufPool
 	}
 
-	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey,
-		search.GeoBufferPoolCallbackFunc(getBufferPool))
+	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey, search.GeoBufferPoolCallbackFunc(getBufferPool))
 
 	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
@@ -847,7 +857,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 	indexName string, r index.IndexReader,
-	highlighter highlight.Highlighter) (error, uint64) {
+	highlighter highlight.Highlighter,
+) (error, uint64) {
 	var totalStoredFieldsBytes uint64
 	if len(req.Fields) > 0 || highlighter != nil {
 		doc, err := r.Document(hit.ID)
@@ -1238,7 +1249,8 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 }
 
 func (f FileSystemDirectory) GetWriter(filePath string) (io.WriteCloser,
-	error) {
+	error,
+) {
 	dir, file := filepath.Split(filePath)
 	if dir != "" {
 		err := os.MkdirAll(filepath.Join(string(f), dir), os.ModePerm)
@@ -1248,7 +1260,7 @@ func (f FileSystemDirectory) GetWriter(filePath string) (io.WriteCloser,
 	}
 
 	return os.OpenFile(filepath.Join(string(f), dir, file),
-		os.O_RDWR|os.O_CREATE, 0600)
+		os.O_RDWR|os.O_CREATE, 0o600)
 }
 
 func (i *indexImpl) FireIndexEvent() {
