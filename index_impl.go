@@ -59,6 +59,7 @@ const storePath = "store"
 
 var mappingInternalKey = []byte("_mapping")
 
+// ContextKey is used to identify the context key in the context.Context
 type ContextKey string
 
 func (k ContextKey) String() string {
