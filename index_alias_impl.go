@@ -634,7 +634,7 @@ func preSearchRequired(ctx context.Context, req *SearchRequest, m mapping.IndexM
 func preSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, indexes ...Index) (*SearchResult, error) {
 	// create a dummy request with a match none query
 	// since we only care about the preSearchData in PreSearch
-	var dummyQuery = req.Query
+	dummyQuery := req.Query
 	if !flags.bm25 && !flags.synonyms {
 		// create a dummy request with a match none query
 		// since we only care about the preSearchData in PreSearch
@@ -724,7 +724,7 @@ func constructBM25PreSearchData(rv map[string]map[string]interface{}, sr *Search
 	bmStats := sr.BM25Stats
 	if bmStats != nil {
 		for _, index := range indexes {
-			rv[index.Name()][search.BM25PreSearchDataKey] = &search.BM25Stats{
+			rv[index.Name()][search.BM25PreSearchDataKey.String()] = &search.BM25Stats{
 				DocCount:         bmStats.DocCount,
 				FieldCardinality: bmStats.FieldCardinality,
 			}
@@ -734,7 +734,8 @@ func constructBM25PreSearchData(rv map[string]map[string]interface{}, sr *Search
 }
 
 func constructPreSearchData(req *SearchRequest, flags *preSearchFlags,
-	preSearchResult *SearchResult, indexes []Index) (map[string]map[string]interface{}, error) {
+	preSearchResult *SearchResult, indexes []Index,
+) (map[string]map[string]interface{}, error) {
 	if flags == nil || preSearchResult == nil {
 		return nil, fmt.Errorf("invalid input, flags: %v, preSearchResult: %v", flags, preSearchResult)
 	}
@@ -762,7 +763,7 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, flags *preSear
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
 	// run search on each index in separate go routine
 	var waitGroup sync.WaitGroup
-	var searchChildIndex = func(in Index, childReq *SearchRequest) {
+	searchChildIndex := func(in Index, childReq *SearchRequest) {
 		rv := asyncSearchResult{Name: in.Name()}
 		rv.Result, rv.Err = in.SearchInContext(ctx, childReq)
 		asyncResults <- &rv
@@ -865,9 +866,9 @@ func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]
 		}
 	}
 
-	if bm25Data, ok := req.PreSearchData[search.BM25PreSearchDataKey].(*search.BM25Stats); ok {
+	if bm25Data, ok := req.PreSearchData[search.BM25PreSearchDataKey.String()].(*search.BM25Stats); ok {
 		for _, index := range indexes {
-			rv[index.Name()][search.BM25PreSearchDataKey] = bm25Data
+			rv[index.Name()][search.BM25PreSearchDataKey.String()] = bm25Data
 		}
 	}
 	return rv, nil
@@ -910,7 +911,6 @@ func hitsInCurrentPage(req *SearchRequest, hits []*search.DocumentMatch) []*sear
 // MultiSearch executes a SearchRequest across multiple Index objects,
 // then merges the results.  The indexes must honor any ctx deadline.
 func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[string]map[string]interface{}, indexes ...Index) (*SearchResult, error) {
-
 	searchStart := time.Now()
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
 
@@ -925,7 +925,7 @@ func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[stri
 	// run search on each index in separate go routine
 	var waitGroup sync.WaitGroup
 
-	var searchChildIndex = func(in Index, childReq *SearchRequest) {
+	searchChildIndex := func(in Index, childReq *SearchRequest) {
 		rv := asyncSearchResult{Name: in.Name()}
 		rv.Result, rv.Err = in.SearchInContext(ctx, childReq)
 		asyncResults <- &rv
