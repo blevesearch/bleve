@@ -365,21 +365,6 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 			knnFilterResults[idx] = nil
 			continue
 		}
-
-		if _, ok := filterQ.(*query.MatchAllQuery); ok {
-			// Equivalent to not having a filter query.
-			requiresFiltering[idx] = false
-			continue
-		}
-
-		if _, ok := filterQ.(*query.MatchNoneQuery); ok {
-			// Filtering required since no hits are eligible.
-			requiresFiltering[idx] = true
-			// a match none query just means none the documents are eligible
-			// hence, we can save on running the query.
-			continue
-		}
-
 		// Applies to all supported types of queries.
 		filterSearcher, _ := filterQ.Searcher(ctx, reader, i.m, search.SearcherOptions{
 			Score: "none", // just want eligible hits --> don't compute scores if not needed
@@ -544,7 +529,7 @@ func requestHasKNN(req *SearchRequest) bool {
 func isKNNrequestSatisfiedByPreSearch(req *SearchRequest) bool {
 	// if req.Query is not match_none => then we need to go to phase 2
 	// to perform the actual query.
-	if _, ok := req.Query.(*query.MatchNoneQuery); !ok {
+	if !isMatchNoneQuery(req.Query) {
 		return false
 	}
 	// req.Query is a match_none query
