@@ -3,8 +3,8 @@ github.com/RoaringBitmap/roaring v1.9.3/go.mod h1:6AXUsoIEzDTFFQCe1RbGA6uFONMhve
 github.com/bits-and-blooms/bitset v1.12.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/bits-and-blooms/bitset v1.22.0 h1:Tquv9S8+SGaS3EhyA+up3FXzmkhxPGjQQCkcs2uw7w4=
 github.com/bits-and-blooms/bitset v1.22.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
-github.com/blevesearch/bleve_index_api v1.2.1-0.20250407171239-fd7f57705029 h1:q7C4qHL4Y+yqNAXH5YnjUraYAJizaS53nZRNbGQi7WA=
-github.com/blevesearch/bleve_index_api v1.2.1-0.20250407171239-fd7f57705029/go.mod h1:PbcwjIcRmjhGbkS/lJCpfgVSMROV6TRubGGAODaK1W8=
+github.com/blevesearch/bleve_index_api v1.1.13-0.20250408143424-7650bf7414fb h1:nXRaYG2FoHGWxc6wTq6e6zlo7UNQRtQggpvjjzffj7c=
+github.com/blevesearch/bleve_index_api v1.1.13-0.20250408143424-7650bf7414fb/go.mod h1:PbcwjIcRmjhGbkS/lJCpfgVSMROV6TRubGGAODaK1W8=
 github.com/blevesearch/geo v0.1.20 h1:paaSpu2Ewh/tn5DKn/FB5SzvH0EWupxHEIwbCk/QPqM=
 github.com/blevesearch/geo v0.1.20/go.mod h1:DVG2QjwHNMFmjo+ZgzrIq2sfCh6rIHzy9d9d0B59I6w=
 github.com/blevesearch/go-faiss v1.0.25 h1:lel1rkOUGbT1CJ0YgzKwC7k+XH0XVBHnCVWahdCXk4U=
@@ -20,8 +20,8 @@ github.com/blevesearch/gtreap v0.1.1/go.mod h1:QaQyDRAT51sotthUWAH4Sj08awFSSWzgY
 github.com/blevesearch/mmap-go v1.0.2/go.mod h1:ol2qBqYaOUsGdm7aRMRrYGgPvnwLe6Y+7LMvAB5IbSA=
 github.com/blevesearch/mmap-go v1.0.4 h1:OVhDhT5B/M1HNPpYPBKIEJaD0F3Si+CrEKULGCDPWmc=
 github.com/blevesearch/mmap-go v1.0.4/go.mod h1:EWmEAOmdAS9z/pi/+Toxu99DnsbhG1TIxUoRmJw/pSs=
-github.com/blevesearch/scorch_segment_api/v2 v2.2.17-0.20250407171917-6fe0debd32b2 h1:Je3/kw5BR/7yo7GXHc7+EmccIkotvQHOJe486mlrjXg=
-github.com/blevesearch/scorch_segment_api/v2 v2.2.17-0.20250407171917-6fe0debd32b2/go.mod h1:BvCHhDleyDmfz/jAAFgFBw9j/cZF99cXrghUPtnbx1Q=
+github.com/blevesearch/scorch_segment_api/v2 v2.2.17-0.20250408144238-c77c8b053a92 h1:oE5RG45+8++OB+f+cSspKm1vFvwHmK1oRVae3ac8YIw=
+github.com/blevesearch/scorch_segment_api/v2 v2.2.17-0.20250408144238-c77c8b053a92/go.mod h1:tzK9IFX1iLz96hXiJhLQnqg9Qk5Cg789zJ49aQfpySA=
 github.com/blevesearch/segment v0.9.1 h1:+dThDy+Lvgj5JMxhmOVlgFfkUtZV2kw49xax4+jTfSU=
 github.com/blevesearch/segment v0.9.1/go.mod h1:zN21iLm7+GnBHWTao9I+Au/7MBiL8pPFtJBJTsk6kQw=
 github.com/blevesearch/snowball v0.6.1 h1:cDYjn/NCH+wwt2UdehaLpr2e4BwLIjN4V/TdLsL+B5A=
@@ -44,8 +44,8 @@ github.com/blevesearch/zapx/v14 v14.3.10 h1:SG6xlsL+W6YjhX5N3aEiL/2tcWh3DO75Bnz7
 github.com/blevesearch/zapx/v14 v14.3.10/go.mod h1:qqyuR0u230jN1yMmE4FIAuCxmahRQEOehF78m6oTgns=
 github.com/blevesearch/zapx/v15 v15.3.16 h1:Ct3rv7FUJPfPk99TI/OofdC+Kpb4IdyfdMH48sb+FmE=
 github.com/blevesearch/zapx/v15 v15.3.16/go.mod h1:Turk/TNRKj9es7ZpKK95PS7f6D44Y7fAFy8F4LXQtGg=
-github.com/blevesearch/zapx/v16 v16.1.9-0.20250407172450-d7e1abd94198 h1:PtyZSL5ipLnr0HQGQV0ksAM8xuytMyMw8IDpVlmu+KU=
-github.com/blevesearch/zapx/v16 v16.1.9-0.20250407172450-d7e1abd94198/go.mod h1:tVFqkTyBZKEF+WCenFJZ+EfTCMO+uuWSqIpvVKZmf9o=
+github.com/blevesearch/zapx/v16 v16.1.9-0.20250408145346-d000edc04c2d h1:zKDdnn8Kp1qjpOGtm1zun65JQ4tn7r4guBUpcjCJvTs=
+github.com/blevesearch/zapx/v16 v16.1.9-0.20250408145346-d000edc04c2d/go.mod h1:F3s3AHNfAVUgl/7/aLAruyr650BGS3BliPRn/bDn+F4=
 github.com/couchbase/ghistogram v0.1.0 h1:b95QcQTCzjTUocDXp/uMgSNQi8oj1tGwnJ4bODWZnps=
 github.com/couchbase/ghistogram v0.1.0/go.mod h1:s1Jhy76zqfEecpNWJfWUiKZookAFaiGOEoyzgHt9i7k=
 github.com/couchbase/moss v0.2.0 h1:VCYrMzFwEryyhRSeI+/b3tRBSeTpi/8gn5Kf6dxqn+o=

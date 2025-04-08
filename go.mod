@@ -5,14 +5,14 @@ go 1.21
 require (
 	github.com/RoaringBitmap/roaring v1.9.3
 	github.com/bits-and-blooms/bitset v1.22.0
-	github.com/blevesearch/bleve_index_api v1.2.1-0.20250407171239-fd7f57705029
+	github.com/blevesearch/bleve_index_api v1.1.13-0.20250408143424-7650bf7414fb
 	github.com/blevesearch/geo v0.1.20
 	github.com/blevesearch/go-faiss v1.0.25
 	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/blevesearch/go-porterstemmer v1.0.3
 	github.com/blevesearch/goleveldb v1.0.1
 	github.com/blevesearch/gtreap v0.1.1
-	github.com/blevesearch/scorch_segment_api/v2 v2.2.17-0.20250407171917-6fe0debd32b2
+	github.com/blevesearch/scorch_segment_api/v2 v2.2.17-0.20250408144238-c77c8b053a92
 	github.com/blevesearch/segment v0.9.1
 	github.com/blevesearch/snowball v0.6.1
 	github.com/blevesearch/snowballstem v0.9.0
@@ -24,7 +24,7 @@ require (
 	github.com/blevesearch/zapx/v13 v13.3.10
 	github.com/blevesearch/zapx/v14 v14.3.10
 	github.com/blevesearch/zapx/v15 v15.3.16
-	github.com/blevesearch/zapx/v16 v16.1.9-0.20250407172450-d7e1abd94198
+	github.com/blevesearch/zapx/v16 v16.1.9-0.20250408145346-d000edc04c2d
 	github.com/couchbase/moss v0.2.0
 	github.com/golang/protobuf v1.3.2
 	github.com/spf13/cobra v1.7.0
