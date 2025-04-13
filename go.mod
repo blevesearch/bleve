@@ -27,11 +27,12 @@ require (
 	github.com/blevesearch/zapx/v14 v14.4.1
 	github.com/blevesearch/zapx/v15 v15.4.1
 	github.com/blevesearch/zapx/v16 v16.2.2
+	github.com/clipperhouse/uax29 v1.14.3
 	github.com/couchbase/moss v0.2.0
 	github.com/golang/protobuf v1.3.2
 	github.com/spf13/cobra v1.8.1
 	go.etcd.io/bbolt v1.4.0
-	golang.org/x/text v0.8.0
+	golang.org/x/text v0.16.0
 )
 
 require (
