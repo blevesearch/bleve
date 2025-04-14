@@ -331,7 +331,7 @@ func TestUnmarshalingSearchResult(t *testing.T) {
       "failed":1,
       "successful":0,
       "errors":{
-        "default_index_362ce020b3d62b13_348f5c3c":"context deadline exceeded"
+        "default_index_362ce020b3d62b13_348f5c3c":"query request timeout"
       }
     },
     "request":{
