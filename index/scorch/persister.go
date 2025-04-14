@@ -538,7 +538,6 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 				deleted: nil, // nil since merging handled deletions
 				stats:   nil,
 			})
-			break
 		}
 	}
 
