@@ -16,6 +16,7 @@ package search
 
 import (
 	"context"
+	"errors"
 
 	"github.com/blevesearch/geo/s2"
 )
@@ -205,4 +206,21 @@ var BM25_b float64 = 0.75
 type BM25Stats struct {
 	DocCount         float64        `json:"doc_count"`
 	FieldCardinality map[string]int `json:"field_cardinality"`
+}
+
+// Human-readable errors for query timeout and cancellation,
+// used instead of the generic context errors.
+var ErrorQueryReqTimeout = errors.New("query request timeout")
+var ErrorQueryReqCanceled = errors.New("query request canceled")
+
+// ContextError maps context errors to human-readable query errors.
+func ContextError(ctx context.Context) error {
+	switch ctx.Err() {
+	case context.DeadlineExceeded:
+		return ErrorQueryReqTimeout
+	case context.Canceled:
+		return ErrorQueryReqCanceled
+	default:
+		return ctx.Err()
+	}
 }

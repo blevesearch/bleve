@@ -176,7 +176,7 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 	select {
 	case <-ctx.Done():
 		search.RecordSearchCost(ctx, search.AbortM, 0)
-		return ctx.Err()
+		return search.ContextError(ctx)
 	default:
 		next, err = searcher.Next(searchContext)
 	}
@@ -185,7 +185,7 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 			select {
 			case <-ctx.Done():
 				search.RecordSearchCost(ctx, search.AbortM, 0)
-				return ctx.Err()
+				return search.ContextError(ctx)
 			default:
 			}
 		}

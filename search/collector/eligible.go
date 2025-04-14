@@ -93,7 +93,7 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 	select {
 	case <-ctx.Done():
 		search.RecordSearchCost(ctx, search.AbortM, 0)
-		return ctx.Err()
+		return search.ContextError(ctx)
 	default:
 		next, err = searcher.Next(searchContext)
 	}
@@ -102,7 +102,7 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 			select {
 			case <-ctx.Done():
 				search.RecordSearchCost(ctx, search.AbortM, 0)
-				return ctx.Err()
+				return search.ContextError(ctx)
 			default:
 			}
 		}
