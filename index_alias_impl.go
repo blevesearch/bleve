@@ -827,7 +827,6 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, flags *preSear
 		for indexName, indexErr := range indexErrors {
 			sr.Status.Errors[indexName] = indexErr
 			sr.Status.Total++
-			sr.Status.Failed++
 		}
 		// At this point, all errors have been recorded—either from the preSearch phase
 		// (via status.Merge) or from individual index search failures (indexErrors).
