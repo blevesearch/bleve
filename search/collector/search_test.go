@@ -114,10 +114,6 @@ func (sr *stubReader) DocIDReaderOnly(ids []string) (index.DocIDReader, error) {
 	return nil, nil
 }
 
-func (sr *stubReader) FieldCardinality(field string) (int, error) {
-	return 0, nil
-}
-
 func (sr *stubReader) FieldDict(field string) (index.FieldDict, error) {
 	return nil, nil
 }

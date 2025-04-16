@@ -207,27 +207,28 @@ func (is *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 
 func (is *IndexSnapshot) FieldCardinality(field string) (rv int, err error) {
 	is.m3.RLock()
-	if rv, ok := is.fieldCardinality[field]; ok {
+	rv, ok := is.fieldCardinality[field]
+	is.m3.RUnlock()
+	if ok {
 		return rv, nil
 	}
-	is.m3.RUnlock()
 
-	is.m2.Lock()
+	is.m3.Lock()
+	defer is.m3.Unlock()
 	if is.fieldCardinality == nil {
 		is.fieldCardinality = make(map[string]int)
 	}
 	// check again to avoid redundant fieldDict creation
-	if rv, ok := is.fieldCardinality[field]; !ok {
-		fd, err := is.FieldDict(field)
-		if err != nil {
-			return rv, err
-		}
-		rv = fd.Cardinality()
-
-		is.fieldCardinality[field] = rv
+	if rv, ok := is.fieldCardinality[field]; ok {
+		return rv, nil
 	}
-	is.m2.Unlock()
 
+	fd, err := is.FieldDict(field)
+	if err != nil {
+		return rv, err
+	}
+	rv = fd.Cardinality()
+	is.fieldCardinality[field] = rv
 	return rv, nil
 }
 
