@@ -92,11 +92,12 @@ func bm25ScoreMetrics(ctx context.Context, field string,
 		if err != nil {
 			return 0, 0, err
 		}
-		dict, err := indexReader.FieldDict(field)
-		if err != nil {
-			return 0, 0, err
+		if bm25Reader, ok := indexReader.(index.BM25Reader); ok {
+			fieldCardinality, err = bm25Reader.FieldCardinality(field)
+			if err != nil {
+				return 0, 0, err
+			}
 		}
-		fieldCardinality = dict.Cardinality()
 	} else {
 		count = uint64(bm25Stats.DocCount)
 		fieldCardinality, ok = bm25Stats.FieldCardinality[field]
