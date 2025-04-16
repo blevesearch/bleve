@@ -827,8 +827,12 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, flags *preSear
 		for indexName, indexErr := range indexErrors {
 			sr.Status.Errors[indexName] = indexErr
 			sr.Status.Total++
-			sr.Status.Failed++
 		}
+		// At this point, all errors have been recorded—either from the preSearch phase
+		// (via status.Merge) or from individual index search failures (indexErrors).
+		// Since partial results are not allowed, mark the entire request as failed.
+		sr.Status.Successful = 0
+		sr.Status.Failed = sr.Status.Total
 	} else {
 		prp.finalize(sr)
 	}
