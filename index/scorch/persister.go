@@ -481,8 +481,9 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 		return false, nil
 	}
 
-	// drains out (after merging in memory) the segments in the flushSet parallely
-	newSnapshot, newSegmentIDs, err := s.mergeSegmentBasesParallel(snapshot, flushSet)
+	// the newSnapshot at this point would contain the newly created file segments
+	// and updated with the root.
+	newSnapshot, newSegmentIDs, err := s.mergeAndPersistInMemorySegments(snapshot, flushSet)
 	if err != nil {
 		return false, err
 	}
@@ -529,7 +530,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 		}
 	}
 
-	// append to the equiv the new segment
+	// append to the equiv the newly merged segments
 	for _, segment := range newSnapshot.segment {
 		if _, ok := newMergedSegmentIDs[segment.id]; ok {
 			equiv.segment = append(equiv.segment, &SegmentSnapshot{
@@ -538,7 +539,6 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 				deleted: nil, // nil since merging handled deletions
 				stats:   nil,
 			})
-			break
 		}
 	}
 
