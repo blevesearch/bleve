@@ -509,11 +509,10 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 				return nil, err
 			}
 			for field := range fs {
-				dict, err := reader.FieldDict(field)
+				fieldCardinality[field], err = reader.FieldCardinality(field)
 				if err != nil {
 					return nil, err
 				}
-				fieldCardinality[field] = dict.Cardinality()
 			}
 		}
 	}

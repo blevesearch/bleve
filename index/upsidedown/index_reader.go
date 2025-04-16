@@ -16,11 +16,12 @@ package upsidedown
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/document"
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/upsidedown_store_api"
+	store "github.com/blevesearch/upsidedown_store_api"
 )
 
 var reflectStaticSizeIndexReader int
@@ -42,6 +43,11 @@ func (i *IndexReader) TermFieldReader(ctx context.Context, term []byte, fieldNam
 		return newUpsideDownCouchTermFieldReader(i, term, uint16(fieldIndex), includeFreq, includeNorm, includeTermVectors)
 	}
 	return newUpsideDownCouchTermFieldReader(i, []byte{ByteSeparator}, ^uint16(0), includeFreq, includeNorm, includeTermVectors)
+}
+
+func (i *IndexReader) FieldCardinality(field string) (int, error) {
+	// no-op for now
+	return 0, fmt.Errorf("not implemented")
 }
 
 func (i *IndexReader) FieldDict(fieldName string) (index.FieldDict, error) {

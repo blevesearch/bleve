@@ -81,6 +81,9 @@ type IndexSnapshot struct {
 
 	m2        sync.Mutex                                 // Protects the fields that follow.
 	fieldTFRs map[string][]*IndexSnapshotTermFieldReader // keyed by field, recycled TFR's
+
+	m3               sync.RWMutex //bm25 metrics specific - not to interfere with TFR creation
+	fieldCardinality map[string]int
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
@@ -198,6 +201,32 @@ func (is *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 		// prepare heap
 		heap.Init(rv)
 	}
+
+	return rv, nil
+}
+
+func (is *IndexSnapshot) FieldCardinality(field string) (rv int, err error) {
+	is.m3.RLock()
+	if rv, ok := is.fieldCardinality[field]; ok {
+		return rv, nil
+	}
+	is.m3.RUnlock()
+
+	is.m2.Lock()
+	if is.fieldCardinality == nil {
+		is.fieldCardinality = make(map[string]int)
+	}
+	// check again to avoid redundant fieldDict creation
+	if rv, ok := is.fieldCardinality[field]; !ok {
+		fd, err := is.FieldDict(field)
+		if err != nil {
+			return rv, err
+		}
+		rv = fd.Cardinality()
+
+		is.fieldCardinality[field] = rv
+	}
+	is.m2.Unlock()
 
 	return rv, nil
 }
