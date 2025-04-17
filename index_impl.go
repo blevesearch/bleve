@@ -616,7 +616,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				if v != nil {
 					bm25Data, ok = v.(*search.BM25Stats)
 					if !ok {
-						return nil, fmt.Errorf("bm25 preSearchData must be of type map[string]interface{}")
+						return nil, fmt.Errorf("bm25 preSearchData must be of type *search.BM25Stats")
 					}
 				}
 			}
@@ -661,7 +661,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	// set the bm25 presearch data (stats important for consistent scoring) in
 	// the context object
 	if bm25Data != nil {
-		ctx = context.WithValue(ctx, search.BM25PreSearchDataKey, bm25Data)
+		ctx = context.WithValue(ctx, search.BM25StatsKey, bm25Data)
 	}
 
 	// This callback and variable handles the tracking of bytes read

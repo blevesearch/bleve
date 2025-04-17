@@ -86,7 +86,7 @@ func bm25ScoreMetrics(ctx context.Context, field string,
 	var fieldCardinality int
 	var err error
 
-	bm25Stats, ok := ctx.Value(search.BM25PreSearchDataKey).(*search.BM25Stats)
+	bm25Stats, ok := ctx.Value(search.BM25StatsKey).(*search.BM25Stats)
 	if !ok {
 		count, err = indexReader.DocCount()
 		if err != nil {
