@@ -122,9 +122,9 @@ func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReade
 
 	// as a fallback case we track certain stats for tf-idf scoring
 	if ctx != nil {
-		if similaritModelCallback, ok := ctx.Value(search.
+		if similarityModelCallback, ok := ctx.Value(search.
 			GetScoringModelCallbackKey).(search.GetScoringModelCallbackFn); ok {
-			similarityModel = similaritModelCallback()
+			similarityModel = similarityModelCallback()
 		}
 	}
 	switch similarityModel {
