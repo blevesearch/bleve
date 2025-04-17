@@ -74,8 +74,6 @@ func MergeFieldTermLocations(dest []FieldTermLocation, matches []*DocumentMatch)
 	return dest
 }
 
-const SearchIOStatsCallbackKey = "_search_io_stats_callback_key"
-
 type SearchIOStatsCallbackFunc func(uint64)
 
 // Implementation of SearchIncrementalCostCallbackFn should handle the following messages
@@ -87,8 +85,11 @@ type SearchIOStatsCallbackFunc func(uint64)
 //     handled safely by the implementation.
 type SearchIncrementalCostCallbackFn func(SearchIncrementalCostCallbackMsg,
 	SearchQueryType, uint64)
-type SearchIncrementalCostCallbackMsg uint
-type SearchQueryType uint
+
+type (
+	SearchIncrementalCostCallbackMsg uint
+	SearchQueryType                  uint
+)
 
 const (
 	Term = SearchQueryType(1 << iota)
@@ -103,13 +104,55 @@ const (
 	DoneM
 )
 
-const SearchIncrementalCostKey = "_search_incremental_cost_key"
-const QueryTypeKey = "_query_type_key"
-const FuzzyMatchPhraseKey = "_fuzzy_match_phrase_key"
-const IncludeScoreBreakdownKey = "_include_score_breakdown_key"
+// ContextKey is used to identify the context key in the context.Context
+type ContextKey string
+
+func (c ContextKey) String() string {
+	return string(c)
+}
+
+const (
+	SearchIncrementalCostKey ContextKey = "_search_incremental_cost_key"
+	QueryTypeKey             ContextKey = "_query_type_key"
+	FuzzyMatchPhraseKey      ContextKey = "_fuzzy_match_phrase_key"
+	IncludeScoreBreakdownKey ContextKey = "_include_score_breakdown_key"
+
+	// PreSearchKey indicates whether to perform a preliminary search to gather necessary
+	// information which would be used in the actual search down the line.
+	PreSearchKey ContextKey = "_presearch_key"
+
+	// GetScoringModelCallbackKey is used to help the underlying searcher identify
+	// which scoring mechanism to use based on index mapping.
+	GetScoringModelCallbackKey ContextKey = "_get_scoring_model"
+
+	// SearchIOStatsCallbackKey is used to help the underlying searcher identify
+	SearchIOStatsCallbackKey ContextKey = "_search_io_stats_callback_key"
+
+	// GeoBufferPoolCallbackKey ContextKey is used to help the underlying searcher
+	GeoBufferPoolCallbackKey ContextKey = "_geo_buffer_pool_callback_key"
+
+	// SearchTypeKey is used to identify type of the search being performed.
+	//
+	// for consistent scoring in cases an index is partitioned/sharded (using an
+	// index alias), GlobalScoring helps in aggregating the necessary stats across
+	// all the child bleve indexes (shards/partitions) first before the actual search
+	// is performed, such that the scoring involved using these stats would be at a
+	// global level.
+	SearchTypeKey ContextKey = "_search_type_key"
+
+	// The following keys are used to invoke the callbacks at the start and end stages
+	// of optimizing the disjunction/conjunction searcher creation.
+	SearcherStartCallbackKey ContextKey = "_searcher_start_callback_key"
+	SearcherEndCallbackKey   ContextKey = "_searcher_end_callback_key"
+
+	// FieldTermSynonymMapKey is used to store and transport the synonym definitions data
+	// to the actual search phase which would use the synonyms to perform the search.
+	FieldTermSynonymMapKey ContextKey = "_field_term_synonym_map_key"
+)
 
 func RecordSearchCost(ctx context.Context,
-	msg SearchIncrementalCostCallbackMsg, bytes uint64) {
+	msg SearchIncrementalCostCallbackMsg, bytes uint64,
+) {
 	if ctx != nil {
 		queryType, ok := ctx.Value(QueryTypeKey).(SearchQueryType)
 		if !ok {
@@ -125,52 +168,30 @@ func RecordSearchCost(ctx context.Context,
 	}
 }
 
-const GeoBufferPoolCallbackKey = "_geo_buffer_pool_callback_key"
-
 // Assigning the size of the largest buffer in the pool to 24KB and
 // the smallest buffer to 24 bytes. The pools are used to read a
 // sequence of vertices which are always 24 bytes each.
-const MaxGeoBufPoolSize = 24 * 1024
-const MinGeoBufPoolSize = 24
+const (
+	MaxGeoBufPoolSize = 24 * 1024
+	MinGeoBufPoolSize = 24
+)
 
 type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
 
-// PreSearchKey indicates whether to perform a preliminary search to gather necessary
-// information which would be used in the actual search down the line.
-const PreSearchKey = "_presearch_key"
-
 // *PreSearchDataKey are used to store the data gathered during the presearch phase
 // which would be use in the actual search phase.
-const KnnPreSearchDataKey = "_knn_pre_search_data_key"
-const SynonymPreSearchDataKey = "_synonym_pre_search_data_key"
-const BM25PreSearchDataKey = "_bm25_pre_search_data_key"
-
-// SearchTypeKey is used to identify type of the search being performed.
-//
-// for consistent scoring in cases an index is partitioned/sharded (using an
-// index alias), GlobalScoring helps in aggregating the necessary stats across
-// all the child bleve indexes (shards/partitions) first before the actual search
-// is performed, such that the scoring involved using these stats would be at a
-// global level.
-const SearchTypeKey = "_search_type_key"
-
-// The following keys are used to invoke the callbacks at the start and end stages
-// of optimizing the disjunction/conjunction searcher creation.
-const SearcherStartCallbackKey = "_searcher_start_callback_key"
-const SearcherEndCallbackKey = "_searcher_end_callback_key"
-
-// FieldTermSynonymMapKey is used to store and transport the synonym definitions data
-// to the actual search phase which would use the synonyms to perform the search.
-const FieldTermSynonymMapKey = "_field_term_synonym_map_key"
+const (
+	KnnPreSearchDataKey     = "_knn_pre_search_data_key"
+	SynonymPreSearchDataKey = "_synonym_pre_search_data_key"
+	BM25PreSearchDataKey    = "_bm25_pre_search_data_key"
+)
 
 const GlobalScoring = "_global_scoring"
 
-// GetScoringModelCallbackKey is used to help the underlying searcher identify
-// which scoring mechanism to use based on index mapping.
-const GetScoringModelCallbackKey = "_get_scoring_model"
-
-type SearcherStartCallbackFn func(size uint64) error
-type SearcherEndCallbackFn func(size uint64) error
+type (
+	SearcherStartCallbackFn func(size uint64) error
+	SearcherEndCallbackFn   func(size uint64) error
+)
 
 type GetScoringModelCallbackFn func() string
 
@@ -199,8 +220,10 @@ func (f FieldTermSynonymMap) MergeWith(fts FieldTermSynonymMap) {
 // the default values are as per elastic search's implementation
 //   - https://www.elastic.co/guide/en/elasticsearch/reference/current/index-modules-similarity.html#bm25
 //   - https://www.elastic.co/blog/practical-bm25-part-3-considerations-for-picking-b-and-k1-in-elasticsearch
-var BM25_k1 float64 = 1.2
-var BM25_b float64 = 0.75
+var (
+	BM25_k1 float64 = 1.2
+	BM25_b  float64 = 0.75
+)
 
 type BM25Stats struct {
 	DocCount         float64        `json:"doc_count"`

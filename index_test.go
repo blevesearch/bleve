@@ -2520,10 +2520,7 @@ func TestSearchQueryCallback(t *testing.T) {
 		return expErr
 	}
 
-	ctx := context.WithValue(
-		context.Background(),
-		SearchQueryStartCallbackKey,
-		SearchQueryStartCallbackFn(f))
+	ctx := context.WithValue(context.Background(), SearchQueryStartCallbackKey, SearchQueryStartCallbackFn(f))
 	_, err = index.SearchInContext(ctx, req)
 	if err != expErr {
 		t.Fatalf("Expected: %v, Got: %v", expErr, err)
