@@ -59,16 +59,9 @@ const storePath = "store"
 
 var mappingInternalKey = []byte("_mapping")
 
-// ContextKey is used to identify the context key in the context.Context
-type ContextKey string
-
-func (k ContextKey) String() string {
-	return string(k)
-}
-
 const (
-	SearchQueryStartCallbackKey ContextKey = "_search_query_start_callback_key"
-	SearchQueryEndCallbackKey   ContextKey = "_search_query_end_callback_key"
+	SearchQueryStartCallbackKey search.ContextKey = "_search_query_start_callback_key"
+	SearchQueryEndCallbackKey   search.ContextKey = "_search_query_end_callback_key"
 )
 
 type (
@@ -618,7 +611,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 					}
 					skipSynonymCollector = true
 				}
-			case search.BM25PreSearchDataKey.String():
+			case search.BM25PreSearchDataKey:
 				if v != nil {
 					bm25Data, ok = v.(*search.BM25Stats)
 					if !ok {

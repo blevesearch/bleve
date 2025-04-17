@@ -724,7 +724,7 @@ func constructBM25PreSearchData(rv map[string]map[string]interface{}, sr *Search
 	bmStats := sr.BM25Stats
 	if bmStats != nil {
 		for _, index := range indexes {
-			rv[index.Name()][search.BM25PreSearchDataKey.String()] = &search.BM25Stats{
+			rv[index.Name()][search.BM25PreSearchDataKey] = &search.BM25Stats{
 				DocCount:         bmStats.DocCount,
 				FieldCardinality: bmStats.FieldCardinality,
 			}
@@ -866,9 +866,9 @@ func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]
 		}
 	}
 
-	if bm25Data, ok := req.PreSearchData[search.BM25PreSearchDataKey.String()].(*search.BM25Stats); ok {
+	if bm25Data, ok := req.PreSearchData[search.BM25PreSearchDataKey].(*search.BM25Stats); ok {
 		for _, index := range indexes {
-			rv[index.Name()][search.BM25PreSearchDataKey.String()] = bm25Data
+			rv[index.Name()][search.BM25PreSearchDataKey] = bm25Data
 		}
 	}
 	return rv, nil

@@ -125,10 +125,6 @@ const (
 	// which scoring mechanism to use based on index mapping.
 	GetScoringModelCallbackKey ContextKey = "_get_scoring_model"
 
-	// BM25PreSearchDataKey is used to store the data gathered during the presearch
-	// phase which would be use in the actual search phase.
-	BM25PreSearchDataKey ContextKey = "_bm25_pre_search_data_key"
-
 	// SearchIOStatsCallbackKey is used to help the underlying searcher identify
 	SearchIOStatsCallbackKey ContextKey = "_search_io_stats_callback_key"
 
@@ -143,6 +139,15 @@ const (
 	// is performed, such that the scoring involved using these stats would be at a
 	// global level.
 	SearchTypeKey ContextKey = "_search_type_key"
+
+	// The following keys are used to invoke the callbacks at the start and end stages
+	// of optimizing the disjunction/conjunction searcher creation.
+	SearcherStartCallbackKey = "_searcher_start_callback_key"
+	SearcherEndCallbackKey   = "_searcher_end_callback_key"
+
+	// FieldTermSynonymMapKey is used to store and transport the synonym definitions data
+	// to the actual search phase which would use the synonyms to perform the search.
+	FieldTermSynonymMapKey ContextKey = "_field_term_synonym_map_key"
 )
 
 func RecordSearchCost(ctx context.Context,
@@ -178,18 +183,11 @@ type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
 const (
 	KnnPreSearchDataKey     = "_knn_pre_search_data_key"
 	SynonymPreSearchDataKey = "_synonym_pre_search_data_key"
-)
 
-// The following keys are used to invoke the callbacks at the start and end stages
-// of optimizing the disjunction/conjunction searcher creation.
-const (
-	SearcherStartCallbackKey = "_searcher_start_callback_key"
-	SearcherEndCallbackKey   = "_searcher_end_callback_key"
+	// BM25PreSearchDataKey is used to store the data gathered during the presearch
+	// phase which would be use in the actual search phase.
+	BM25PreSearchDataKey = "_bm25_pre_search_data_key"
 )
-
-// FieldTermSynonymMapKey is used to store and transport the synonym definitions data
-// to the actual search phase which would use the synonyms to perform the search.
-const FieldTermSynonymMapKey ContextKey = "_field_term_synonym_map_key"
 
 const GlobalScoring = "_global_scoring"
 
