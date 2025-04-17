@@ -591,7 +591,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	var fts search.FieldTermSynonymMap
 	var skipSynonymCollector bool
 
-	var bm25Data *search.BM25Stats
+	var bm25Stats *search.BM25Stats
 	var ok bool
 	if req.PreSearchData != nil {
 		for k, v := range req.PreSearchData {
@@ -614,7 +614,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				}
 			case search.BM25PreSearchDataKey:
 				if v != nil {
-					bm25Data, ok = v.(*search.BM25Stats)
+					bm25Stats, ok = v.(*search.BM25Stats)
 					if !ok {
 						return nil, fmt.Errorf("bm25 preSearchData must be of type *search.BM25Stats")
 					}
@@ -658,10 +658,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	ctx = context.WithValue(ctx, search.GetScoringModelCallbackKey,
 		search.GetScoringModelCallbackFn(scoringModelCallback))
 
-	// set the bm25 presearch data (stats important for consistent scoring) in
+	// set the bm25Stats (stats important for consistent scoring) in
 	// the context object
-	if bm25Data != nil {
-		ctx = context.WithValue(ctx, search.BM25StatsKey, bm25Data)
+	if bm25Stats != nil {
+		ctx = context.WithValue(ctx, search.BM25StatsKey, bm25Stats)
 	}
 
 	// This callback and variable handles the tracking of bytes read
