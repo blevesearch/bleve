@@ -142,8 +142,8 @@ const (
 
 	// The following keys are used to invoke the callbacks at the start and end stages
 	// of optimizing the disjunction/conjunction searcher creation.
-	SearcherStartCallbackKey = "_searcher_start_callback_key"
-	SearcherEndCallbackKey   = "_searcher_end_callback_key"
+	SearcherStartCallbackKey ContextKey = "_searcher_start_callback_key"
+	SearcherEndCallbackKey   ContextKey = "_searcher_end_callback_key"
 
 	// FieldTermSynonymMapKey is used to store and transport the synonym definitions data
 	// to the actual search phase which would use the synonyms to perform the search.
@@ -183,10 +183,7 @@ type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
 const (
 	KnnPreSearchDataKey     = "_knn_pre_search_data_key"
 	SynonymPreSearchDataKey = "_synonym_pre_search_data_key"
-
-	// BM25PreSearchDataKey is used to store the data gathered during the presearch
-	// phase which would be use in the actual search phase.
-	BM25PreSearchDataKey = "_bm25_pre_search_data_key"
+	BM25PreSearchDataKey    = "_bm25_pre_search_data_key"
 )
 
 const GlobalScoring = "_global_scoring"

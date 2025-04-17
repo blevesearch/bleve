@@ -137,8 +137,8 @@ func (o *OptimizeVR) Finish() error {
 }
 
 func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
-	octx index.VectorOptimizableContext) (index.VectorOptimizableContext, error) {
-
+	octx index.VectorOptimizableContext,
+) (index.VectorOptimizableContext, error) {
 	if s.snapshot.parent.segPlugin.Version() < VectorSearchSupportedSegmentVersion {
 		return nil, fmt.Errorf("vector search not supported for this index, "+
 			"index's segment version %v, supported segment version for vector search %v",
@@ -146,8 +146,9 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 	}
 
 	if octx == nil {
-		octx = &OptimizeVR{snapshot: s.snapshot,
-			vrs: make(map[string][]*IndexSnapshotVectorReader),
+		octx = &OptimizeVR{
+			snapshot: s.snapshot,
+			vrs:      make(map[string][]*IndexSnapshotVectorReader),
 		}
 	}
 
