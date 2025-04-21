@@ -1113,7 +1113,10 @@ func getProtectedSnapshots(rollbackSamplingInterval time.Duration,
 	numSnapshotsToKeep int,
 	persistedSnapshots []*snapshotMetaData,
 ) map[uint64]time.Time {
-	lastPoint, protectedEpochs := getTimeSeriesSnapshots(numSnapshotsToKeep,
+	// keep numSnapshotsToKeep - 1 worth of time series snapshots, because we always
+	// must preserve the very latest snapshot in bolt as well to avoid accidental
+	// deletes of bolt entries and cleanups by the purger code.
+	lastPoint, protectedEpochs := getTimeSeriesSnapshots(numSnapshotsToKeep-1,
 		rollbackSamplingInterval, persistedSnapshots)
 	if len(protectedEpochs) < numSnapshotsToKeep {
 		numSnapshotsNeeded := numSnapshotsToKeep - len(protectedEpochs)
