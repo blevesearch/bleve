@@ -75,15 +75,108 @@ func TestConversionFromISOStyle(t *testing.T) {
 			output: "",
 			err:    fmt.Errorf("invalid format string, unknown format specifier: MMMMM"),
 		},
+		{
+			input:  "yy", // year (2 digits)
+			output: "06",
+			err:    nil,
+		},
+		{
+			input:  "yyyyy", // year (5 digits, padded)
+			output: "02006",
+			err:    nil,
+		},
+		{
+			input:  "h", // hour 1-12 (1 digit)
+			output: "3",
+			err:    nil,
+		},
+		{
+			input:  "hh", // hour 1-12 (2 digits)
+			output: "03",
+			err:    nil,
+		},
+		{
+			input:  "KK", // hour 1-12 (2 digits, alt)
+			output: "03",
+			err:    nil,
+		},
+		{
+			input:  "hhh", // invalid hour count
+			output: "",
+			err:    fmt.Errorf("invalid format string, unknown format specifier: hhh"),
+		},
+		{
+			input:  "E", // Day of week (short)
+			output: "Mon",
+			err:    nil,
+		},
+		{
+			input:  "EEE", // Day of week (short)
+			output: "Mon",
+			err:    nil,
+		},
+		{
+			input:  "EEEE", // Day of week (long)
+			output: "Monday",
+			err:    nil,
+		},
+		{
+			input:  "EEEEE", // Day of week (long)
+			output: "",
+			err:    fmt.Errorf("invalid format string, unknown format specifier: EEEEE"),
+		},
+		{
+			input:  "S", // Fraction of second (1 digit)
+			output: "0",
+			err:    nil,
+		},
+		{
+			input:  "SSSSSSSSS", // Fraction of second (9 digits)
+			output: "000000000",
+			err:    nil,
+		},
+		{
+			input:  "SSSSSSSSSS", // Invalid fraction of second count
+			output: "",
+			err:    fmt.Errorf("invalid format string, unknown format specifier: SSSSSSSSSS"),
+		},
+		{
+			input:  "z", // Timezone name (short)
+			output: "MST",
+			err:    nil,
+		},
+		{
+			input:  "zzz", // Timezone name (short) - Corrected expectation
+			output: "MST", // Should output MST
+			err:    nil,   // Should not produce an error
+		},
+		{
+			input:  "zzzz", // Timezone name (long) - Corrected expectation
+			output: "MST",  // Should output MST
+			err:    nil,    // Should not produce an error
+		},
+		{
+			input:  "G", // Era designator (unsupported)
+			output: "",
+			err:    fmt.Errorf("invalid format string, unknown format specifier: G"),
+		},
+		{
+			input:  "W", // Week of month (unsupported)
+			output: "",
+			err:    fmt.Errorf("invalid format string, unknown format specifier: W"),
+		},
 	}
-	for _, test := range tests {
-		out, err := parseISOString(test.input)
-		if err != nil && test.err == nil || err == nil && test.err != nil {
-			t.Fatalf("expected error %v, got error %v", test.err, err)
-		}
-		if out != test.output {
-			t.Fatalf("expected output %v, got %v", test.output, out)
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("test %d: %s", i, test.input), func(t *testing.T) {
+			out, err := parseISOString(test.input)
+			// Check error matching
+			if (err != nil && test.err == nil) || (err == nil && test.err != nil) || (err != nil && test.err != nil && err.Error() != test.err.Error()) {
+				t.Fatalf("expected error %v, got error %v", test.err, err)
+			}
+			// Check output matching only if no error was expected/occurred
+			if err == nil && test.err == nil && out != test.output {
+				t.Fatalf("expected output '%v', got '%v'", test.output, out)
+			}
+		})
 	}
-
 }
