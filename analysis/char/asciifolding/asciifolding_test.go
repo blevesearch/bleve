@@ -21,7 +21,6 @@ import (
 )
 
 func TestAsciiFoldingFilter(t *testing.T) {
-
 	tests := []struct {
 		input  []byte
 		output []byte
@@ -40,18 +39,76 @@ func TestAsciiFoldingFilter(t *testing.T) {
 			// Umlauts are folded to plain ASCII
 			input:  []byte(`The quick bröwn fox jümps over the läzy dog`),
 			output: []byte(`The quick brown fox jumps over the lazy dog`),
-		}, {
+		},
+		{
 			// composite unicode runes are folded to more than one ASCII rune
 			input:  []byte(`ÆꜴ`),
 			output: []byte(`AEAO`),
-		}, {
+		},
+		{
 			// apples from https://issues.couchbase.com/browse/MB-33486
 			input:  []byte(`Ápple Àpple Äpple Âpple Ãpple Åpple`),
 			output: []byte(`Apple Apple Apple Apple Apple Apple`),
-		}, {
+		},
+		{
 			// Fix ASCII folding of \u24A2
 			input:  []byte(`⒢`),
 			output: []byte(`(g)`),
+		},
+		{
+			// Test folding of \u2053 (SWUNG DASH)
+			input:  []byte(`a⁓b`),
+			output: []byte(`a~b`),
+		},
+		{
+			// Test folding of \uFF5E (FULLWIDTH TILDE)
+			input:  []byte(`c～d`),
+			output: []byte(`c~d`),
+		},
+		{
+			// Test folding of \uFF3F (FULLWIDTH LOW LINE) - case before tilde
+			input:  []byte(`e＿f`),
+			output: []byte(`e_f`),
+		},
+		{
+			// Test mix including tilde and default fallthrough (using a character not explicitly folded)
+			input:  []byte(`a⁓b✅c～d`),
+			output: []byte(`a~b✅c~d`),
+		},
+		{
+			// Test start of 'A' fallthrough block
+			input:  []byte(`ÀBC`),
+			output: []byte(`ABC`),
+		},
+		{
+			// Test end of 'A' fallthrough block
+			input:  []byte(`DEFẶ`),
+			output: []byte(`DEFA`),
+		},
+		{
+			// Test start of 'AE' fallthrough block
+			input:  []byte(`Æ`),
+			output: []byte(`AE`),
+		},
+		{
+			// Test end of 'AE' fallthrough block
+			input:  []byte(`ᴁ`),
+			output: []byte(`AE`),
+		},
+		{
+			// Test 'DZ' multi-rune output
+			input:  []byte(`Ǆebra`),
+			output: []byte(`DZebra`),
+		},
+		{
+			// Test start of 'a' fallthrough block
+			input:  []byte(`àbc`),
+			output: []byte(`abc`),
+		},
+		{
+			// Test end of 'a' fallthrough block
+			input:  []byte(`defａ`),
+			output: []byte(`defa`),
 		},
 	}
 
