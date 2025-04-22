@@ -154,15 +154,18 @@ func ParseSearchSortString(input string) SearchSort {
 	} else if strings.HasPrefix(input, "+") {
 		input = input[1:]
 	}
-	if input == "_id" {
+
+	switch input {
+	case "_id":
 		return &SortDocID{
 			Desc: descending,
 		}
-	} else if input == "_score" {
+	case "_score":
 		return &SortScore{
 			Desc: descending,
 		}
 	}
+
 	return &SortField{
 		Field: input,
 		Desc:  descending,
