@@ -571,9 +571,10 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		default:
 			if subDocMapping != nil {
 				for _, fieldMapping := range subDocMapping.Fields {
-					if fieldMapping.Type == "geopoint" {
+					switch fieldMapping.Type {
+					case "geopoint":
 						fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
-					} else if fieldMapping.Type == "geoshape" {
+					case "geoshape":
 						fieldMapping.processGeoShape(property, pathString, path, indexes, context)
 					}
 				}
