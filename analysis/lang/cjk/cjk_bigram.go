@@ -132,6 +132,7 @@ func (s *CJKBigramFilter) flush(r *ring.Ring, itemsInRing *int, pos int) *analys
 	}
 	r.Value = nil
 	*itemsInRing = 0
+
 	return rv
 }
 
@@ -158,11 +159,13 @@ func (s *CJKBigramFilter) outputBigram(r *ring.Ring, itemsInRing *int, pos int) 
 		}
 		return &token
 	}
+
 	return nil
 }
 
 func (s *CJKBigramFilter) buildUnigram(r *ring.Ring, itemsInRing *int, pos int) *analysis.Token {
-	if *itemsInRing == 2 {
+	switch *itemsInRing {
+	case 2:
 		thisShingleRing := r.Move(-1)
 		// do first token
 		prev := thisShingleRing.Value.(*analysis.Token)
@@ -174,7 +177,7 @@ func (s *CJKBigramFilter) buildUnigram(r *ring.Ring, itemsInRing *int, pos int) 
 			End:      prev.End,
 		}
 		return &token
-	} else if *itemsInRing == 1 {
+	case 1:
 		// do first token
 		prev := r.Value.(*analysis.Token)
 		token := analysis.Token{
@@ -186,6 +189,7 @@ func (s *CJKBigramFilter) buildUnigram(r *ring.Ring, itemsInRing *int, pos int) 
 		}
 		return &token
 	}
+
 	return nil
 }
 
