@@ -1303,7 +1303,10 @@ type snapshotMetaData struct {
 func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 	var rv []*snapshotMetaData
 	currTime := time.Now()
-	expirationDuration := time.Duration(s.numSnapshotsToKeep) * s.rollbackSamplingInterval
+	// including the very latest snapshot there should be n snapshots, so the
+	// very last one would be tc - (n-1) * d
+	// for eg for n = 3 the checkpoints preserved should be tc, tc - d, tc - 2d
+	expirationDuration := time.Duration(s.numSnapshotsToKeep-1) * s.rollbackSamplingInterval
 
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(boltSnapshotsBucket)
@@ -1312,6 +1315,7 @@ func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 		}
 		sc := snapshots.Cursor()
 		var found bool
+		// traversal order - latest -> oldest epoch
 		for sk, _ := sc.Last(); sk != nil; sk, _ = sc.Prev() {
 			_, snapshotEpoch, err := decodeUvarintAscending(sk)
 			if err != nil {
@@ -1361,7 +1365,6 @@ func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 					err = nil
 				}
 			}
-
 		}
 		return nil
 	})

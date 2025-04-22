@@ -532,10 +532,10 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 				atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
 				return
 			}
-			// as an extra layer of security, mark this file as ineligible for removal
-			// this will be flipped back when the bolt is updated - which means,
-			// the bolt entry will go away if the snapshot is zero ref'd and the
-			// file will be cleaned if its eligible to be removed.
+			// to prevent accidental cleanup of this newly created file, mark it
+			// as ineligible for removal. this will be flipped back when the bolt
+			// is updated - which is valid, since the snapshot updated in bolt is
+			// cleaned up only if its zero ref'd (MB-66163 for more details)
 			s.markIneligibleForRemoval(filename)
 			newMergedSegmentIDs[id] = newSegmentID
 			newDocIDsSet[id] = newDocIDs

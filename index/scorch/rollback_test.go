@@ -283,15 +283,14 @@ func TestGetProtectedSnapshots(t *testing.T) {
 				{epoch: 99, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 12))},
 				{epoch: 88, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 6))},
 				{epoch: 50, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval))},
-				{epoch: 35, timeStamp: currentTimeStamp.Add(-(6 * RollbackSamplingInterval / 5))},
-				{epoch: 10, timeStamp: currentTimeStamp.Add(-(2 * RollbackSamplingInterval))},
 			},
 			numSnapshotsToKeep: 2,
 			expCount:           2,
-			expEpochs:          []uint64{50, 10},
+			expEpochs:          []uint64{100, 50},
 		},
 		{
-			title: "epochs that have timestamps approximated to the expected value",
+			title: "epochs that have timestamps approximated to the expected value, " +
+				"always retain the latest one",
 			metaData: []*snapshotMetaData{
 				{epoch: 100, timeStamp: currentTimeStamp},
 				{epoch: 99, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 12))},
@@ -302,7 +301,7 @@ func TestGetProtectedSnapshots(t *testing.T) {
 			},
 			numSnapshotsToKeep: 3,
 			expCount:           3,
-			expEpochs:          []uint64{50, 35, 10},
+			expEpochs:          []uint64{100, 35, 10},
 		},
 		{
 			title: "protecting epochs when we don't have enough snapshots with RollbackSamplingInterval" +
