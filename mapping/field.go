@@ -337,7 +337,8 @@ func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
 		return
 	}
 
-	if shape == geo.CircleType {
+	switch shape {
+	case geo.CircleType:
 		center, radius, found := geo.ExtractCircle(propertyMightBeGeoShape)
 		if found {
 			fieldName := getFieldName(pathString, path, fm)
@@ -350,7 +351,7 @@ func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
 				context.excludedFromAll = append(context.excludedFromAll, fieldName)
 			}
 		}
-	} else if shape == geo.GeometryCollectionType {
+	case geo.GeometryCollectionType:
 		coordinates, shapes, found := geo.ExtractGeometryCollection(propertyMightBeGeoShape)
 		if found {
 			fieldName := getFieldName(pathString, path, fm)
@@ -363,7 +364,7 @@ func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
 				context.excludedFromAll = append(context.excludedFromAll, fieldName)
 			}
 		}
-	} else {
+	default:
 		coordinates, shape, found := geo.ExtractGeoShapeCoordinates(coordValue, shape)
 		if found {
 			fieldName := getFieldName(pathString, path, fm)
