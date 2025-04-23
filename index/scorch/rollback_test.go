@@ -350,3 +350,157 @@ func TestGetProtectedSnapshots(t *testing.T) {
 		}
 	}
 }
+func TestLatestSnapshotCheckpointed(t *testing.T) {
+
+	cfg := CreateConfig("TestLatestSnapshotCheckpointed")
+	numSnapshotsToKeepOrig := NumSnapshotsToKeep
+	NumSnapshotsToKeep = 3
+	RollbackSamplingInterval = 10 * time.Second
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		NumSnapshotsToKeep = numSnapshotsToKeepOrig
+
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
+	// disable merger and purger
+	RegistryEventCallbacks["test"] = func(e Event) bool {
+		if e.Kind == EventKindPreMergeCheck {
+			return false
+		} else if e.Kind == EventKindPurgerCheck {
+			return false
+		}
+		return true
+	}
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scorchy, ok := idx.(*Scorch)
+	if !ok {
+		t.Fatalf("Not a scorch index?")
+	}
+
+	err = scorchy.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create a batch, insert 2 new documents
+	batch := index.NewBatch()
+	doc := document.NewDocument("1")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
+	batch.Update(doc)
+	doc = document.NewDocument("2")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
+	batch.Update(doc)
+
+	err = scorchy.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	persistedSnapshots, err := scorchy.rootBoltSnapshotMetaData()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(persistedSnapshots) != 1 {
+		t.Fatalf("expected 1 persisted snapshot, got %d", len(persistedSnapshots))
+	}
+
+	time.Sleep(4 * RollbackSamplingInterval / 5)
+	// create a batch, insert 2 new documents
+	batch = index.NewBatch()
+	doc = document.NewDocument("3")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
+	batch.Update(doc)
+	doc = document.NewDocument("4")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
+	batch.Update(doc)
+
+	err = scorchy.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(9 * RollbackSamplingInterval / 20)
+	batch = index.NewBatch()
+	doc = document.NewDocument("5")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
+	batch.Update(doc)
+	doc = document.NewDocument("6")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
+	batch.Update(doc)
+
+	err = scorchy.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(7 * RollbackSamplingInterval / 12)
+
+	batch = index.NewBatch()
+	doc = document.NewDocument("7")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
+	batch.Update(doc)
+	doc = document.NewDocument("8")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
+	batch.Update(doc)
+
+	err = scorchy.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(1 * RollbackSamplingInterval / 12)
+	batch = index.NewBatch()
+	doc = document.NewDocument("9")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
+	batch.Update(doc)
+	doc = document.NewDocument("10")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
+	batch.Update(doc)
+
+	err = scorchy.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	batch = index.NewBatch()
+	doc = document.NewDocument("11")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
+	batch.Update(doc)
+	doc = document.NewDocument("12")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
+	batch.Update(doc)
+
+	err = scorchy.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	persistedSnapshots, err = scorchy.rootBoltSnapshotMetaData()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	protectedSnapshots := getProtectedSnapshots(RollbackSamplingInterval, NumSnapshotsToKeep, persistedSnapshots)
+
+	if len(protectedSnapshots) != 3 {
+		t.Fatalf("expected %d protected snapshots, got %d", NumSnapshotsToKeep, len(protectedSnapshots))
+	}
+
+	if _, ok := protectedSnapshots[persistedSnapshots[0].epoch]; !ok {
+		t.Fatalf("expected %d to be protected, but not found", persistedSnapshots[0].epoch)
+	}
+}

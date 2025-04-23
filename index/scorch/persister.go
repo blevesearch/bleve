@@ -228,7 +228,9 @@ OUTER:
 		case s.introducerNotifier <- w:
 		}
 
-		s.removeOldData() // might as well cleanup while waiting
+		if ok := s.fireEvent(EventKindPurgerCheck, 0); ok {
+			s.removeOldData() // might as well cleanup while waiting
+		}
 
 		atomic.AddUint64(&s.stats.TotPersistLoopWait, 1)
 
@@ -296,7 +298,9 @@ func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64,
 	// 1. Too many older snapshots awaiting the clean up.
 	// 2. The merger could be lagging behind on merging the disk files.
 	if numFilesOnDisk > uint64(po.PersisterNapUnderNumFiles) {
-		s.removeOldData()
+		if ok := s.fireEvent(EventKindPurgerCheck, 0); ok {
+			s.removeOldData()
+		}
 		numFilesOnDisk, _, _ = s.diskFileStats(nil)
 	}
 
