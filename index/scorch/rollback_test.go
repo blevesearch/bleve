@@ -15,6 +15,7 @@
 package scorch
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -350,8 +351,24 @@ func TestGetProtectedSnapshots(t *testing.T) {
 		}
 	}
 }
-func TestLatestSnapshotCheckpointed(t *testing.T) {
 
+func indexDummyData(t *testing.T, scorchi *Scorch, i int) {
+	// create a batch, insert 2 new documents
+	batch := index.NewBatch()
+	doc := document.NewDocument(fmt.Sprintf("%d", i))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
+	batch.Update(doc)
+	doc = document.NewDocument(fmt.Sprintf("%d", i+1))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
+	batch.Update(doc)
+
+	err := scorchi.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLatestSnapshotCheckpointed(t *testing.T) {
 	cfg := CreateConfig("TestLatestSnapshotCheckpointed")
 	numSnapshotsToKeepOrig := NumSnapshotsToKeep
 	NumSnapshotsToKeep = 3
@@ -385,31 +402,22 @@ func TestLatestSnapshotCheckpointed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	scorchy, ok := idx.(*Scorch)
+	scorchi, ok := idx.(*Scorch)
 	if !ok {
 		t.Fatalf("Not a scorch index?")
 	}
 
-	err = scorchy.Open()
+	err = scorchi.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// create a batch, insert 2 new documents
-	batch := index.NewBatch()
-	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
-	batch.Update(doc)
-	doc = document.NewDocument("2")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
-	batch.Update(doc)
-
-	err = scorchy.Batch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	persistedSnapshots, err := scorchy.rootBoltSnapshotMetaData()
+	// replicate the following scenario of persistence of snapshots
+	// tc, tc - d/12, tc - d/6, tc - 3d/4, tc - 5d/6, tc - 6d/5, tc - 2d
+	// approximate timestamps where there's a chance that the latest snapshot
+	// might not fit into the time-series
+	indexDummyData(t, scorchi, 1)
+	persistedSnapshots, err := scorchi.rootBoltSnapshotMetaData()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -417,79 +425,17 @@ func TestLatestSnapshotCheckpointed(t *testing.T) {
 	if len(persistedSnapshots) != 1 {
 		t.Fatalf("expected 1 persisted snapshot, got %d", len(persistedSnapshots))
 	}
-
 	time.Sleep(4 * RollbackSamplingInterval / 5)
-	// create a batch, insert 2 new documents
-	batch = index.NewBatch()
-	doc = document.NewDocument("3")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
-	batch.Update(doc)
-	doc = document.NewDocument("4")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
-	batch.Update(doc)
-
-	err = scorchy.Batch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	indexDummyData(t, scorchi, 3)
 	time.Sleep(9 * RollbackSamplingInterval / 20)
-	batch = index.NewBatch()
-	doc = document.NewDocument("5")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
-	batch.Update(doc)
-	doc = document.NewDocument("6")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
-	batch.Update(doc)
-
-	err = scorchy.Batch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	indexDummyData(t, scorchi, 5)
 	time.Sleep(7 * RollbackSamplingInterval / 12)
-
-	batch = index.NewBatch()
-	doc = document.NewDocument("7")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
-	batch.Update(doc)
-	doc = document.NewDocument("8")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
-	batch.Update(doc)
-
-	err = scorchy.Batch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	indexDummyData(t, scorchi, 7)
 	time.Sleep(1 * RollbackSamplingInterval / 12)
-	batch = index.NewBatch()
-	doc = document.NewDocument("9")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
-	batch.Update(doc)
-	doc = document.NewDocument("10")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
-	batch.Update(doc)
+	indexDummyData(t, scorchi, 9)
+	indexDummyData(t, scorchi, 11)
 
-	err = scorchy.Batch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	batch = index.NewBatch()
-	doc = document.NewDocument("11")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
-	batch.Update(doc)
-	doc = document.NewDocument("12")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
-	batch.Update(doc)
-
-	err = scorchy.Batch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	persistedSnapshots, err = scorchy.rootBoltSnapshotMetaData()
+	persistedSnapshots, err = scorchi.rootBoltSnapshotMetaData()
 	if err != nil {
 		t.Fatal(err)
 	}
