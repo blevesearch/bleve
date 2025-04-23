@@ -409,9 +409,7 @@ func TestLatestSnapshotProtected(t *testing.T) {
 
 	// disable merger and purger
 	RegistryEventCallbacks["test"] = func(e Event) bool {
-		if e.Kind == EventKindPreMergeCheck {
-			return false
-		} else if e.Kind == EventKindPurgerCheck {
+		if e.Kind == EventKindPreMergeCheck || e.Kind == EventKindPurgerCheck {
 			return false
 		}
 		return true
@@ -490,9 +488,7 @@ func TestBackupRacingWithPurge(t *testing.T) {
 
 	// disable merger and purger
 	RegistryEventCallbacks["test"] = func(e Event) bool {
-		if e.Kind == EventKindPreMergeCheck {
-			return false
-		} else if e.Kind == EventKindPurgerCheck {
+		if e.Kind == EventKindPreMergeCheck || e.Kind == EventKindPurgerCheck {
 			return false
 		}
 		return true
