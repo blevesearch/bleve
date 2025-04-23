@@ -81,6 +81,10 @@ OUTER:
 					// Retry instead of blocking/waiting here since a long wait
 					// can result in more segments introduced i.e. s.root will
 					// be updated.
+
+					// decrement the ref count since its no longer needed in this
+					// iteration
+					_ = ourSnapshot.DecRef()
 					continue OUTER
 				}
 

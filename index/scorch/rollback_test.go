@@ -16,6 +16,9 @@ package scorch
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -368,18 +371,36 @@ func indexDummyData(t *testing.T, scorchi *Scorch, i int) {
 	}
 }
 
-func TestLatestSnapshotCheckpointed(t *testing.T) {
-	cfg := CreateConfig("TestLatestSnapshotCheckpointed")
+type testFSDirector string
+
+func (f testFSDirector) GetWriter(filePath string) (io.WriteCloser,
+	error) {
+	dir, file := filepath.Split(filePath)
+	if dir != "" {
+		err := os.MkdirAll(filepath.Join(string(f), dir), os.ModePerm)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return os.OpenFile(filepath.Join(string(f), dir, file),
+		os.O_RDWR|os.O_CREATE, 0600)
+}
+
+func TestLatestSnapshotProtected(t *testing.T) {
+	cfg := CreateConfig("TestLatestSnapshotProtected")
 	numSnapshotsToKeepOrig := NumSnapshotsToKeep
 	NumSnapshotsToKeep = 3
+	rollbackSamplingIntervalOrig := RollbackSamplingInterval
 	RollbackSamplingInterval = 10 * time.Second
+
 	err := InitTest(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
 		NumSnapshotsToKeep = numSnapshotsToKeepOrig
-
+		RollbackSamplingInterval = rollbackSamplingIntervalOrig
 		err := DestroyTest(cfg)
 		if err != nil {
 			t.Log(err)
@@ -395,7 +416,7 @@ func TestLatestSnapshotCheckpointed(t *testing.T) {
 		}
 		return true
 	}
-
+	cfg["eventCallbackName"] = "test"
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
@@ -413,7 +434,7 @@ func TestLatestSnapshotCheckpointed(t *testing.T) {
 	}
 
 	// replicate the following scenario of persistence of snapshots
-	// tc, tc - d/12, tc - d/6, tc - 3d/4, tc - 5d/6, tc - 6d/5, tc - 2d
+	// tc, tc - d/12, tc - d/6, tc - 3d/4, tc - 5d/6, tc - 6d/5
 	// approximate timestamps where there's a chance that the latest snapshot
 	// might not fit into the time-series
 	indexDummyData(t, scorchi, 1)
@@ -433,7 +454,6 @@ func TestLatestSnapshotCheckpointed(t *testing.T) {
 	indexDummyData(t, scorchi, 7)
 	time.Sleep(1 * RollbackSamplingInterval / 12)
 	indexDummyData(t, scorchi, 9)
-	indexDummyData(t, scorchi, 11)
 
 	persistedSnapshots, err = scorchi.rootBoltSnapshotMetaData()
 	if err != nil {
@@ -441,12 +461,96 @@ func TestLatestSnapshotCheckpointed(t *testing.T) {
 	}
 
 	protectedSnapshots := getProtectedSnapshots(RollbackSamplingInterval, NumSnapshotsToKeep, persistedSnapshots)
-
 	if len(protectedSnapshots) != 3 {
 		t.Fatalf("expected %d protected snapshots, got %d", NumSnapshotsToKeep, len(protectedSnapshots))
 	}
-
 	if _, ok := protectedSnapshots[persistedSnapshots[0].epoch]; !ok {
 		t.Fatalf("expected %d to be protected, but not found", persistedSnapshots[0].epoch)
+	}
+}
+
+func TestBackupRacingWithPurge(t *testing.T) {
+	cfg := CreateConfig("TestBackupRacingWithPurge")
+	numSnapshotsToKeepOrig := NumSnapshotsToKeep
+	NumSnapshotsToKeep = 3
+	rollbackSamplingIntervalOrig := RollbackSamplingInterval
+	RollbackSamplingInterval = 10 * time.Second
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		NumSnapshotsToKeep = numSnapshotsToKeepOrig
+		RollbackSamplingInterval = rollbackSamplingIntervalOrig
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
+	// disable merger and purger
+	RegistryEventCallbacks["test"] = func(e Event) bool {
+		if e.Kind == EventKindPreMergeCheck {
+			return false
+		} else if e.Kind == EventKindPurgerCheck {
+			return false
+		}
+		return true
+	}
+	cfg["eventCallbackName"] = "test"
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer idx.Close()
+
+	scorchi, ok := idx.(*Scorch)
+	if !ok {
+		t.Fatalf("Not a scorch index?")
+	}
+
+	err = scorchi.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// replicate the following scenario of persistence of snapshots
+	// tc, tc - d/12, tc - d/6, tc - 3d/4, tc - 5d/6, tc - 6d/5, tc - 2d
+	// approximate timestamps where there's a chance that the latest snapshot
+	// might not fit into the time-series
+	indexDummyData(t, scorchi, 1)
+	time.Sleep(4 * RollbackSamplingInterval / 5)
+	indexDummyData(t, scorchi, 3)
+	time.Sleep(9 * RollbackSamplingInterval / 20)
+	indexDummyData(t, scorchi, 5)
+	time.Sleep(7 * RollbackSamplingInterval / 12)
+	indexDummyData(t, scorchi, 7)
+	time.Sleep(1 * RollbackSamplingInterval / 12)
+	indexDummyData(t, scorchi, 9)
+
+	// now if the purge code is invoked, there's a possiblity of the latest snapshot
+	// being removed from bolt and the corresponding file segment getting cleaned up.
+	scorchi.removeOldData()
+
+	copyReader := scorchi.CopyReader()
+	defer func() { copyReader.CloseCopyReader() }()
+
+	backupidxConfig := CreateConfig("backup-directory")
+	err = InitTest(backupidxConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := DestroyTest(backupidxConfig)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
+	// if the latest snapshot was purged, the following will return error
+	err = copyReader.CopyTo(testFSDirector(backupidxConfig["path"].(string)))
+	if err != nil {
+		t.Fatalf("error copying the index: %v", err)
 	}
 }
