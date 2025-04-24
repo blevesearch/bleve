@@ -71,3 +71,7 @@ var EventKindPreMergeCheck = EventKind(9)
 // EventKindIndexStart is fired when Index() is invoked which
 // creates a new Document object from an interface using the index mapping.
 var EventKindIndexStart = EventKind(10)
+
+// EventKindPurgerCheck is fired before the purge code is invoked and decides
+// whether to execute or not. For unit test purposes
+var EventKindPurgerCheck = EventKind(11)
