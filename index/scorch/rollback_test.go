@@ -512,7 +512,7 @@ func TestBackupRacingWithPurge(t *testing.T) {
 	}
 
 	// replicate the following scenario of persistence of snapshots
-	// tc, tc - d/12, tc - d/6, tc - 3d/4, tc - 5d/6, tc - 6d/5, tc - 2d
+	// tc, tc - d/12, tc - d/6, tc - 3d/4, tc - 5d/6, tc - 6d/5
 	// approximate timestamps where there's a chance that the latest snapshot
 	// might not fit into the time-series
 	indexDummyData(t, scorchi, 1)
@@ -595,10 +595,7 @@ func TestSparseMutationCheckpointing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// replicate the following scenario of persistence of snapshots
-	// tc, tc - d/12, tc - d/6, tc - 3d/4, tc - 5d/6, tc - 6d/5
-	// approximate timestamps where there's a chance that the latest snapshot
-	// might not fit into the time-series
+	// create 4 snapshots every 2 seconds
 	indexDummyData(t, scorchi, 1)
 	time.Sleep(RollbackSamplingInterval)
 	indexDummyData(t, scorchi, 3)

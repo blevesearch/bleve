@@ -1302,10 +1302,12 @@ func getBoundaryCheckPoint(retentionFactor float64,
 		boundary := checkPoints[int(math.Floor(float64(len(checkPoints))*
 			retentionFactor))]
 		if timeStamp.Sub(boundary.timeStamp) > 0 {
-			// too less checkPoints would be left.
+			// return the extended boundary which will dictate the older snapshots
+			// to be retained
 			return boundary.timeStamp
 		}
 	}
+
 	return timeStamp
 }
 
