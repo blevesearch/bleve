@@ -81,6 +81,10 @@ OUTER:
 					// Retry instead of blocking/waiting here since a long wait
 					// can result in more segments introduced i.e. s.root will
 					// be updated.
+
+					// decrement the ref count since its no longer needed in this
+					// iteration
+					_ = ourSnapshot.DecRef()
 					continue OUTER
 				}
 
@@ -532,6 +536,11 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 				atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
 				return
 			}
+			// to prevent accidental cleanup of this newly created file, mark it
+			// as ineligible for removal. this will be flipped back when the bolt
+			// is updated - which is valid, since the snapshot updated in bolt is
+			// cleaned up only if its zero ref'd (MB-66163 for more details)
+			s.markIneligibleForRemoval(filename)
 			newMergedSegmentIDs[id] = newSegmentID
 			newDocIDsSet[id] = newDocIDs
 			newMergedSegments[id], err = s.segPlugin.Open(path)

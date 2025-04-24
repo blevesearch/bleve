@@ -228,7 +228,9 @@ OUTER:
 		case s.introducerNotifier <- w:
 		}
 
-		s.removeOldData() // might as well cleanup while waiting
+		if ok := s.fireEvent(EventKindPurgerCheck, 0); ok {
+			s.removeOldData() // might as well cleanup while waiting
+		}
 
 		atomic.AddUint64(&s.stats.TotPersistLoopWait, 1)
 
@@ -296,7 +298,9 @@ func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64,
 	// 1. Too many older snapshots awaiting the clean up.
 	// 2. The merger could be lagging behind on merging the disk files.
 	if numFilesOnDisk > uint64(po.PersisterNapUnderNumFiles) {
-		s.removeOldData()
+		if ok := s.fireEvent(EventKindPurgerCheck, 0); ok {
+			s.removeOldData()
+		}
 		numFilesOnDisk, _, _ = s.diskFileStats(nil)
 	}
 
@@ -1113,7 +1117,10 @@ func getProtectedSnapshots(rollbackSamplingInterval time.Duration,
 	numSnapshotsToKeep int,
 	persistedSnapshots []*snapshotMetaData,
 ) map[uint64]time.Time {
-	lastPoint, protectedEpochs := getTimeSeriesSnapshots(numSnapshotsToKeep,
+	// keep numSnapshotsToKeep - 1 worth of time series snapshots, because we always
+	// must preserve the very latest snapshot in bolt as well to avoid accidental
+	// deletes of bolt entries and cleanups by the purger code.
+	lastPoint, protectedEpochs := getTimeSeriesSnapshots(numSnapshotsToKeep-1,
 		rollbackSamplingInterval, persistedSnapshots)
 	if len(protectedEpochs) < numSnapshotsToKeep {
 		numSnapshotsNeeded := numSnapshotsToKeep - len(protectedEpochs)
@@ -1300,7 +1307,10 @@ type snapshotMetaData struct {
 func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 	var rv []*snapshotMetaData
 	currTime := time.Now()
-	expirationDuration := time.Duration(s.numSnapshotsToKeep) * s.rollbackSamplingInterval
+	// including the very latest snapshot there should be n snapshots, so the
+	// very last one would be tc - (n-1) * d
+	// for eg for n = 3 the checkpoints preserved should be tc, tc - d, tc - 2d
+	expirationDuration := time.Duration(s.numSnapshotsToKeep-1) * s.rollbackSamplingInterval
 
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(boltSnapshotsBucket)
@@ -1309,6 +1319,7 @@ func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 		}
 		sc := snapshots.Cursor()
 		var found bool
+		// traversal order - latest -> oldest epoch
 		for sk, _ := sc.Last(); sk != nil; sk, _ = sc.Prev() {
 			_, snapshotEpoch, err := decodeUvarintAscending(sk)
 			if err != nil {
@@ -1358,7 +1369,6 @@ func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 					err = nil
 				}
 			}
-
 		}
 		return nil
 	})
