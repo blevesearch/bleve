@@ -846,7 +846,7 @@ var (
 )
 
 func (s *Scorch) loadFromBolt() error {
-	return s.rootBolt.View(func(tx *bolt.Tx) error {
+	err := s.rootBolt.View(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(boltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
@@ -896,6 +896,16 @@ func (s *Scorch) loadFromBolt() error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	persistedSnapshots, err := s.rootBoltSnapshotMetaData()
+	if err != nil {
+		return err
+	}
+	s.checkPoints = persistedSnapshots
+	return nil
 }
 
 // LoadSnapshot loads the segment with the specified epoch
