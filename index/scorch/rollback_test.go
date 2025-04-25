@@ -512,7 +512,7 @@ func TestBackupRacingWithPurge(t *testing.T) {
 	}
 
 	// replicate the following scenario of persistence of snapshots
-	// tc, tc - d/12, tc - d/6, tc - 3d/4, tc - 5d/6, tc - 6d/5, tc - 2d
+	// tc, tc - d/12, tc - d/6, tc - 3d/4, tc - 5d/6, tc - 6d/5
 	// approximate timestamps where there's a chance that the latest snapshot
 	// might not fit into the time-series
 	indexDummyData(t, scorchi, 1)
@@ -548,5 +548,76 @@ func TestBackupRacingWithPurge(t *testing.T) {
 	err = copyReader.CopyTo(testFSDirector(backupidxConfig["path"].(string)))
 	if err != nil {
 		t.Fatalf("error copying the index: %v", err)
+	}
+}
+
+func TestSparseMutationCheckpointing(t *testing.T) {
+	cfg := CreateConfig("TestSparseMutationCheckpointing")
+	numSnapshotsToKeepOrig := NumSnapshotsToKeep
+	NumSnapshotsToKeep = 3
+	rollbackSamplingIntervalOrig := RollbackSamplingInterval
+	RollbackSamplingInterval = 2 * time.Second
+
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		NumSnapshotsToKeep = numSnapshotsToKeepOrig
+		RollbackSamplingInterval = rollbackSamplingIntervalOrig
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
+	// disable merger and purger
+	RegistryEventCallbacks["test"] = func(e Event) bool {
+		if e.Kind == EventKindPreMergeCheck {
+			return false
+		}
+		return true
+	}
+	cfg["eventCallbackName"] = "test"
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scorchi, ok := idx.(*Scorch)
+	if !ok {
+		t.Fatalf("Not a scorch index?")
+	}
+
+	err = scorchi.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create 4 snapshots every 2 seconds
+	indexDummyData(t, scorchi, 1)
+	time.Sleep(RollbackSamplingInterval)
+	indexDummyData(t, scorchi, 3)
+	time.Sleep(RollbackSamplingInterval)
+	indexDummyData(t, scorchi, 5)
+	time.Sleep(RollbackSamplingInterval)
+	indexDummyData(t, scorchi, 7)
+
+	// now the another snapshot is persisted outside of the window of checkpointing
+	// and we should be able to retain some older checkpoints as well along with
+	// the latest one
+	time.Sleep(time.Duration(NumSnapshotsToKeep) * RollbackSamplingInterval)
+	indexDummyData(t, scorchi, 9)
+
+	persistedSnapshots, err := scorchi.rootBoltSnapshotMetaData()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// should have more than 1 snapshots
+	protectedSnapshots := getProtectedSnapshots(RollbackSamplingInterval, NumSnapshotsToKeep, persistedSnapshots)
+	if len(protectedSnapshots) <= 1 {
+		t.Fatalf("expected %d protected snapshots, got %d", NumSnapshotsToKeep, len(protectedSnapshots))
 	}
 }
