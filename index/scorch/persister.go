@@ -729,7 +729,7 @@ var boltStatsKey = []byte("stats")
 var TotBytesWrittenKey = []byte("TotBytesWritten")
 
 func (s *Scorch) loadFromBolt() error {
-	return s.rootBolt.View(func(tx *bolt.Tx) error {
+	err := s.rootBolt.View(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(boltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
@@ -779,6 +779,16 @@ func (s *Scorch) loadFromBolt() error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	persistedSnapshots, err := s.rootBoltSnapshotMetaData()
+	if err != nil {
+		return err
+	}
+	s.checkPoints = persistedSnapshots
+	return nil
 }
 
 // LoadSnapshot loads the segment with the specified epoch
@@ -1166,18 +1176,20 @@ func (s *Scorch) removeOldZapFiles() error {
 // duration. This results in all of them being purged from the boltDB
 // and the next iteration of the removeOldData() would end up protecting
 // latest contiguous snapshot which is a poor pattern in the rollback checkpoints.
-// Hence we try to retain atleast retentionFactor portion worth of old snapshots
+// Hence we try to retain atmost retentionFactor portion worth of old snapshots
 // in such a scenario using the following function
 func getBoundaryCheckPoint(retentionFactor float64,
 	checkPoints []*snapshotMetaData, timeStamp time.Time) time.Time {
 	if checkPoints != nil {
 		boundary := checkPoints[int(math.Floor(float64(len(checkPoints))*
 			retentionFactor))]
-		if timeStamp.Sub(boundary.timeStamp) < 0 {
-			// too less checkPoints would be left.
+		if timeStamp.Sub(boundary.timeStamp) > 0 {
+			// return the extended boundary which will dictate the older snapshots
+			// to be retained
 			return boundary.timeStamp
 		}
 	}
+
 	return timeStamp
 }
 
