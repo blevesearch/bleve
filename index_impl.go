@@ -567,6 +567,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if err != nil {
 			return nil, err
 		}
+		// increment the search count here itself,
+		// since the presearch may already satisfy
+		// the search request
+		atomic.AddUint64(&i.stats.searches, 1)
 		return preSearchResult, nil
 	}
 
@@ -811,7 +815,11 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	totalSearchCost += storedFieldsCost
 	search.RecordSearchCost(ctx, search.AddM, storedFieldsCost)
 
-	atomic.AddUint64(&i.stats.searches, 1)
+	if req.PreSearchData == nil {
+		// increment the search count only if this is not a second-phase search
+		// (e.g., for Hybrid Search), since the first-phase search already increments it
+		atomic.AddUint64(&i.stats.searches, 1)
+	}
 	searchDuration := time.Since(searchStart)
 	atomic.AddUint64(&i.stats.searchTime, uint64(searchDuration))
 
