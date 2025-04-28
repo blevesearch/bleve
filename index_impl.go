@@ -571,6 +571,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		// since the presearch may already satisfy
 		// the search request
 		atomic.AddUint64(&i.stats.searches, 1)
+		// increment the search time stat here as well,
+		// since presearch is part of the overall search
+		// operation and should be included in the search
+		// time stat
+		searchDuration := time.Since(searchStart)
+		atomic.AddUint64(&i.stats.searchTime, uint64(searchDuration))
 		return preSearchResult, nil
 	}
 
@@ -820,6 +826,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		// (e.g., for Hybrid Search), since the first-phase search already increments it
 		atomic.AddUint64(&i.stats.searches, 1)
 	}
+	// increment the search time stat, as the first-phase search is part of
+	// the overall operation; adding second-phase time later keeps it accurate
 	searchDuration := time.Since(searchStart)
 	atomic.AddUint64(&i.stats.searchTime, uint64(searchDuration))
 
