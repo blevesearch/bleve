@@ -133,26 +133,6 @@ func checkTZOptions(formatString string, idx int) (string, int) {
 	return layout, finalIdx
 }
 
-// func checkTZOptions(formatString string, idx int) (string, int) {
-// 	// idx is pointing to %
-// 	// idx + 1 is pointing to z
-// 	if idx+2 < len(formatString) {
-// 		if formatString[idx+2] == ':' {
-// 			// check if there is a character after the colon
-// 			if idx+3 < len(formatString) && (formatString[idx+3] == 'M' || formatString[idx+3] == 'S') {
-// 				return timezoneOptions[fmt.Sprintf("z:%s", string(formatString[idx+3]))], idx + 4
-// 			}
-// 			// %z:<some char> OR %z: detected; return the default layout Z0700 and increment idx by 2 to print : literally
-// 			return timezoneOptions["z"], idx + 2
-// 		} else if formatString[idx+2] == 'H' || formatString[idx+2] == 'S' {
-// 			// %zH or %zS detected; return the layouts Z07 / z070000 and increment idx by 2 to point to the next character
-// 			// after %zH or %zS
-// 			return timezoneOptions[fmt.Sprintf("z%s", string(formatString[idx+2]))], idx + 3
-// 		}
-// 	}
-// 	return timezoneOptions["z"], idx + 2
-// }
-
 func parseFormatString(formatString string) (string, error) {
 	var dateTimeLayout strings.Builder
 	// iterate over the format string and replace the format specifiers with
