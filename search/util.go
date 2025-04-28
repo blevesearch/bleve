@@ -148,6 +148,10 @@ const (
 	// FieldTermSynonymMapKey is used to store and transport the synonym definitions data
 	// to the actual search phase which would use the synonyms to perform the search.
 	FieldTermSynonymMapKey ContextKey = "_field_term_synonym_map_key"
+
+	// BM25StatsKey is used to store and transport the BM25 Data
+	// to the actual search phase which would use it to perform the search.
+	BM25StatsKey ContextKey = "_bm25_stats_key"
 )
 
 func RecordSearchCost(ctx context.Context,
