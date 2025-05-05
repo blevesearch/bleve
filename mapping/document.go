@@ -52,7 +52,8 @@ type DocumentMapping struct {
 }
 
 func (dm *DocumentMapping) Validate(cache *registry.Cache,
-	parentName string, fieldAliasCtx map[string]*FieldMapping) error {
+	parentName string, fieldAliasCtx map[string]*FieldMapping,
+) error {
 	var err error
 	if dm.DefaultAnalyzer != "" {
 		_, err := cache.AnalyzerNamed(dm.DefaultAnalyzer)
@@ -183,7 +184,8 @@ func (dm *DocumentMapping) fieldDescribedByPath(path string) *FieldMapping {
 // document or for an explicitly mapped field; the closest most specific
 // document mapping could be one that matches part of the provided path.
 func (dm *DocumentMapping) documentMappingForPathElements(pathElements []string) (
-	*DocumentMapping, *DocumentMapping) {
+	*DocumentMapping, *DocumentMapping,
+) {
 	var pathElementsCopy []string
 	if len(pathElements) == 0 {
 		pathElementsCopy = []string{""}
@@ -217,7 +219,8 @@ OUTER:
 // document or for an explicitly mapped field; the closest most specific
 // document mapping could be one that matches part of the provided path.
 func (dm *DocumentMapping) documentMappingForPath(path string) (
-	*DocumentMapping, *DocumentMapping) {
+	*DocumentMapping, *DocumentMapping,
+) {
 	pathElements := decodePath(path)
 	return dm.documentMappingForPathElements(pathElements)
 }
@@ -457,7 +460,6 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 	case reflect.Bool:
 		dm.processProperty(val.Bool(), path, indexes, context)
 	}
-
 }
 
 func (dm *DocumentMapping) processProperty(property interface{}, path []string, indexes []uint64, context *walkContext) {
@@ -483,13 +485,14 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		if subDocMapping != nil {
 			// index by explicit mapping
 			for _, fieldMapping := range subDocMapping.Fields {
-				if fieldMapping.Type == "geoshape" {
+				switch fieldMapping.Type {
+				case "geoshape":
 					fieldMapping.processGeoShape(property, pathString, path, indexes, context)
-				} else if fieldMapping.Type == "geopoint" {
+				case "geopoint":
 					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
-				} else if fieldMapping.Type == "vector_base64" {
+				case "vector_base64":
 					fieldMapping.processVectorBase64(property, pathString, path, indexes, context)
-				} else {
+				default:
 					fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
 				}
 			}
@@ -568,9 +571,10 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		default:
 			if subDocMapping != nil {
 				for _, fieldMapping := range subDocMapping.Fields {
-					if fieldMapping.Type == "geopoint" {
+					switch fieldMapping.Type {
+					case "geopoint":
 						fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
-					} else if fieldMapping.Type == "geoshape" {
+					case "geoshape":
 						fieldMapping.processGeoShape(property, pathString, path, indexes, context)
 					}
 				}

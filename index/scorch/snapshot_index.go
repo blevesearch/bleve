@@ -82,7 +82,7 @@ type IndexSnapshot struct {
 	m2        sync.Mutex                                 // Protects the fields that follow.
 	fieldTFRs map[string][]*IndexSnapshotTermFieldReader // keyed by field, recycled TFR's
 
-	m3               sync.RWMutex //bm25 metrics specific - not to interfere with TFR creation
+	m3               sync.RWMutex // bm25 metrics specific - not to interfere with TFR creation
 	fieldCardinality map[string]int
 }
 
@@ -331,9 +331,10 @@ func (is *IndexSnapshot) fieldDictRegexp(field string,
 func (is *IndexSnapshot) getLevAutomaton(term string,
 	fuzziness uint8,
 ) (vellum.Automaton, error) {
-	if fuzziness == 1 {
+	switch fuzziness {
+	case 1:
 		return lb1.BuildDfa(term, fuzziness)
-	} else if fuzziness == 2 {
+	case 2:
 		return lb2.BuildDfa(term, fuzziness)
 	}
 	return nil, fmt.Errorf("fuzziness exceeds the max limit")

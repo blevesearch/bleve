@@ -81,23 +81,56 @@ func New(layouts []string) *DateTimeParser {
 }
 
 func checkTZOptions(formatString string, idx int) (string, int) {
-	// idx is pointing to %
-	// idx + 1 is pointing to z
-	if idx+2 < len(formatString) {
-		if formatString[idx+2] == ':' {
-			// check if there is a character after the colon
-			if idx+3 < len(formatString) && (formatString[idx+3] == 'M' || formatString[idx+3] == 'S') {
-				return timezoneOptions[fmt.Sprintf("z:%s", string(formatString[idx+3]))], idx + 4
+	// idx points to '%'
+	// We know formatString[idx+1] == 'z'
+	nextIdx := idx + 2 // Index of the character immediately after 'z'
+
+	// Default values assume only '%z' is present
+	layout := timezoneOptions["z"]
+	finalIdx := nextIdx // Index after '%z'
+
+	if nextIdx < len(formatString) {
+		switch formatString[nextIdx] {
+		case ':':
+			// Check for modifier after the colon ':'
+			colonModifierIdx := nextIdx + 1
+			if colonModifierIdx < len(formatString) {
+				switch formatString[colonModifierIdx] {
+				case 'M':
+					// Found %z:M
+					layout = timezoneOptions["z:M"]
+					finalIdx = colonModifierIdx + 1 // Index after %z:M
+				case 'S':
+					// Found %z:S
+					layout = timezoneOptions["z:S"]
+					finalIdx = colonModifierIdx + 1 // Index after %z:S
+					// default: If %z: is followed by something else, or just %z: at the end.
+					// Keep the default layout ("z") and finalIdx (idx + 2).
+					// The ':' will be treated as a literal by the main loop.
+				}
 			}
-			// %z:<some char> OR %z: detected; return the default layout Z0700 and increment idx by 2 to print : literally
-			return timezoneOptions["z"], idx + 2
-		} else if formatString[idx+2] == 'H' || formatString[idx+2] == 'S' {
-			// %zH or %zS detected; return the layouts Z07 / z070000 and increment idx by 2 to point to the next character
-			// after %zH or %zS
-			return timezoneOptions[fmt.Sprintf("z%s", string(formatString[idx+2]))], idx + 3
+			// else: %z: is at the very end of the string.
+			// Keep the default layout ("z") and finalIdx (idx + 2).
+			// The ':' will be treated as a literal by the main loop.
+
+		case 'H':
+			// Found %zH
+			layout = timezoneOptions["zH"]
+			finalIdx = nextIdx + 1 // Index after %zH
+		case 'S':
+			// Found %zS
+			layout = timezoneOptions["zS"]
+			finalIdx = nextIdx + 1 // Index after %zS
+
+			// default: If %z is followed by something other than ':', 'H', or 'S'.
+			// Keep the default layout ("z") and finalIdx (idx + 2).
+			// The character formatString[nextIdx] will be handled by the main loop.
 		}
 	}
-	return timezoneOptions["z"], idx + 2
+	// else: %z is at the very end of the string.
+	// Keep the default layout ("z") and finalIdx (idx + 2).
+
+	return layout, finalIdx
 }
 
 func parseFormatString(formatString string) (string, error) {
@@ -109,7 +142,7 @@ func parseFormatString(formatString string) (string, error) {
 		if formatString[idx] == formatDelimiter {
 			// check if there is a character after the format delimiter (%)
 			if idx+1 >= len(formatString) {
-				return "", fmt.Errorf("invalid format string, expected character after " + string(formatDelimiter))
+				return "", fmt.Errorf("invalid format string, expected character after %s", string(formatDelimiter))
 			}
 			formatSpecifier := formatString[idx+1]
 			if layout, ok := formatSpecifierToLayout[formatSpecifier]; ok {
@@ -122,7 +155,7 @@ func parseFormatString(formatString string) (string, error) {
 				tzLayout, idx = checkTZOptions(formatString, idx)
 				dateTimeLayout.WriteString(tzLayout)
 			} else {
-				return "", fmt.Errorf("invalid format string, unknown format specifier: " + string(formatSpecifier))
+				return "", fmt.Errorf("invalid format string, unknown format specifier: %s", string(formatSpecifier))
 			}
 			continue
 		}
@@ -148,7 +181,8 @@ func DateTimeParserConstructor(config map[string]interface{}, cache *registry.Ca
 	if !ok {
 		return nil, fmt.Errorf("must specify layouts")
 	}
-	var layoutStrs []string
+
+	layoutStrs := make([]string, 0, len(layouts))
 	for _, layout := range layouts {
 		layoutStr, ok := layout.(string)
 		if ok {
@@ -159,6 +193,7 @@ func DateTimeParserConstructor(config map[string]interface{}, cache *registry.Ca
 			layoutStrs = append(layoutStrs, layout)
 		}
 	}
+
 	return New(layoutStrs), nil
 }
 

@@ -42,13 +42,14 @@ func TestObsoleteSegmentMergeIntroduction(t *testing.T) {
 	mergeIntroComplete.Add(1)
 	var segIntroCompleted int
 	RegistryEventCallbacks["test"] = func(e Event) bool {
-		if e.Kind == EventKindBatchIntroduction {
+		switch e.Kind {
+		case EventKindBatchIntroduction:
 			segIntroCompleted++
 			if segIntroCompleted == 3 {
 				// all 3 segments introduced
 				introComplete.Done()
 			}
-		} else if e.Kind == EventKindMergeTaskIntroductionStart {
+		case EventKindMergeTaskIntroductionStart:
 			// signal the start of merge task introduction so that
 			// we can introduce a new batch which obsoletes the
 			// merged segment's contents.
@@ -56,11 +57,12 @@ func TestObsoleteSegmentMergeIntroduction(t *testing.T) {
 			// hold the merge task introduction until the merged segment contents
 			// are obsoleted with the next batch/segment introduction.
 			introComplete.Wait()
-		} else if e.Kind == EventKindMergeTaskIntroduction {
+		case EventKindMergeTaskIntroduction:
 			// signal the completion of the merge task introduction.
 			mergeIntroComplete.Done()
 
 		}
+
 		return true
 	}
 

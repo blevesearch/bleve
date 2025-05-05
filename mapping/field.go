@@ -231,7 +231,9 @@ func (fm *FieldMapping) Options() index.FieldIndexingOptions {
 func (fm *FieldMapping) processString(propertyValueString string, pathString string, path []string, indexes []uint64, context *walkContext) {
 	fieldName := getFieldName(pathString, path, fm)
 	options := fm.Options()
-	if fm.Type == "text" {
+
+	switch fm.Type {
+	case "text":
 		analyzer := fm.analyzerForField(path, context)
 		field := document.NewTextFieldCustom(fieldName, indexes, []byte(propertyValueString), options, analyzer)
 		context.doc.AddField(field)
@@ -239,7 +241,7 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 		if !fm.IncludeInAll {
 			context.excludedFromAll = append(context.excludedFromAll, fieldName)
 		}
-	} else if fm.Type == "datetime" {
+	case "datetime":
 		dateTimeFormat := context.im.DefaultDateTimeParser
 		if fm.DateFormat != "" {
 			dateTimeFormat = fm.DateFormat
@@ -251,7 +253,7 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 				fm.processTime(parsedDateTime, layout, pathString, path, indexes, context)
 			}
 		}
-	} else if fm.Type == "IP" {
+	case "IP":
 		ip := net.ParseIP(propertyValueString)
 		if ip != nil {
 			fm.processIP(ip, pathString, path, indexes, context)
@@ -328,13 +330,15 @@ func (fm *FieldMapping) processIP(ip net.IP, pathString string, path []string, i
 }
 
 func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
-	pathString string, path []string, indexes []uint64, context *walkContext) {
+	pathString string, path []string, indexes []uint64, context *walkContext,
+) {
 	coordValue, shape, err := geo.ParseGeoShapeField(propertyMightBeGeoShape)
 	if err != nil {
 		return
 	}
 
-	if shape == geo.CircleType {
+	switch shape {
+	case geo.CircleType:
 		center, radius, found := geo.ExtractCircle(propertyMightBeGeoShape)
 		if found {
 			fieldName := getFieldName(pathString, path, fm)
@@ -347,7 +351,7 @@ func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
 				context.excludedFromAll = append(context.excludedFromAll, fieldName)
 			}
 		}
-	} else if shape == geo.GeometryCollectionType {
+	case geo.GeometryCollectionType:
 		coordinates, shapes, found := geo.ExtractGeometryCollection(propertyMightBeGeoShape)
 		if found {
 			fieldName := getFieldName(pathString, path, fm)
@@ -360,7 +364,7 @@ func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
 				context.excludedFromAll = append(context.excludedFromAll, fieldName)
 			}
 		}
-	} else {
+	default:
 		coordinates, shape, found := geo.ExtractGeoShapeCoordinates(coordValue, shape)
 		if found {
 			fieldName := getFieldName(pathString, path, fm)
@@ -401,7 +405,6 @@ func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) 
 
 // UnmarshalJSON offers custom unmarshaling with optional strict validation
 func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
-
 	var tmp map[string]json.RawMessage
 	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {
