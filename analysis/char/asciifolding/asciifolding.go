@@ -3561,7 +3561,6 @@ func foldToASCII(input []rune, inputPos int, output []rune, outputPos int, lengt
 			case '\uFF5E': // ～ [FULLWIDTH TILDE]
 				output[outputPos] = '~'
 				outputPos++
-				break
 
 			default:
 				output[outputPos] = c

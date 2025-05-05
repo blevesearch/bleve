@@ -173,21 +173,25 @@ func parseISOString(layout string) (string, error) {
 					}
 				case 'h', 'K':
 					// hour (1-12)
-					if count == 2 {
+					switch count {
+					case 2:
+						// hh, KK -> 03
 						dateTimeLayout.WriteString("03")
-					} else if count == 1 {
+					case 1:
+						// h, K -> 3
 						dateTimeLayout.WriteString("3")
-					} else {
+					default:
+						// e.g., hhh
 						return "", invalidFormatError(character, count)
 					}
 				case 'E':
 					// day of week
 					if count == 4 {
-						dateTimeLayout.WriteString("Monday")
+						dateTimeLayout.WriteString("Monday") // EEEE -> Monday
 					} else if count <= 3 {
-						dateTimeLayout.WriteString("Mon")
+						dateTimeLayout.WriteString("Mon") // E, EE, EEE -> Mon
 					} else {
-						return "", invalidFormatError(character, count)
+						return "", invalidFormatError(character, count) // e.g., EEEEE
 					}
 				case 'S':
 					// fraction of second

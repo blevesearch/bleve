@@ -154,15 +154,18 @@ func ParseSearchSortString(input string) SearchSort {
 	} else if strings.HasPrefix(input, "+") {
 		input = input[1:]
 	}
-	if input == "_id" {
+
+	switch input {
+	case "_id":
 		return &SortDocID{
 			Desc: descending,
 		}
-	} else if input == "_score" {
+	case "_score":
 		return &SortScore{
 			Desc: descending,
 		}
 	}
+
 	return &SortField{
 		Field: input,
 		Desc:  descending,
@@ -426,7 +429,9 @@ func (s *SortField) filterTermsByMode(terms [][]byte) string {
 // prefix coded numbers with shift of 0
 func (s *SortField) filterTermsByType(terms [][]byte) [][]byte {
 	stype := s.Type
-	if stype == SortFieldAuto {
+
+	switch stype {
+	case SortFieldAuto:
 		allTermsPrefixCoded := true
 		termsWithShiftZero := s.tmp[:0]
 		for _, term := range terms {
@@ -442,7 +447,7 @@ func (s *SortField) filterTermsByType(terms [][]byte) [][]byte {
 			terms = termsWithShiftZero
 			s.tmp = termsWithShiftZero[:0]
 		}
-	} else if stype == SortFieldAsNumber || stype == SortFieldAsDate {
+	case SortFieldAsNumber, SortFieldAsDate:
 		termsWithShiftZero := s.tmp[:0]
 		for _, term := range terms {
 			valid, shift := numeric.ValidPrefixCodedTermBytes(term)
@@ -453,6 +458,7 @@ func (s *SortField) filterTermsByType(terms [][]byte) [][]byte {
 		terms = termsWithShiftZero
 		s.tmp = termsWithShiftZero[:0]
 	}
+
 	return terms
 }
 
