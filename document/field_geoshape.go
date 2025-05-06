@@ -161,7 +161,9 @@ func NewGeoShapeFieldWithIndexingOptions(name string, arrayPositions []uint64,
 		return nil
 	}
 
-	options = options | DefaultGeoShapeIndexingOptions
+	// docvalues are always enabled for geoshape fields, even if the
+	// indexing options are set to not include docvalues.
+	options = options | index.DocValues
 
 	return &GeoShapeField{
 		shape:             shape,
@@ -192,7 +194,9 @@ func NewGeometryCollectionFieldWithIndexingOptions(name string,
 		return nil
 	}
 
-	options = options | DefaultGeoShapeIndexingOptions
+	// docvalues are always enabled for geoshape fields, even if the
+	// indexing options are set to not include docvalues.
+	options = options | index.DocValues
 
 	return &GeoShapeField{
 		shape:             shape,
@@ -223,7 +227,9 @@ func NewGeoCircleFieldWithIndexingOptions(name string, arrayPositions []uint64,
 		return nil
 	}
 
-	options = options | DefaultGeoShapeIndexingOptions
+	// docvalues are always enabled for geoshape fields, even if the
+	// indexing options are set to not include docvalues.
+	options = options | index.DocValues
 
 	return &GeoShapeField{
 		shape:             shape,
