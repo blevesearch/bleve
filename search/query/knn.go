@@ -35,8 +35,7 @@ type KNNQuery struct {
 	BoostVal    *Boost    `json:"boost,omitempty"`
 
 	// see KNNRequest.Params for description
-	Params      json.RawMessage `json:"params"`
-	FilterQuery Query           `json:"filter,omitempty"`
+	Params json.RawMessage `json:"params"`
 	// elegibleSelector is used to filter out documents that are
 	// eligible for the KNN search from a pre-filter query.
 	elegibleSelector index.EligibleDocumentSelector
