@@ -109,7 +109,6 @@ func NewVectorField(name string, arrayPositions []uint64,
 func NewVectorFieldWithIndexingOptions(name string, arrayPositions []uint64,
 	vector []float32, dims int, similarity, vectorIndexOptimizedFor string,
 	options index.FieldIndexingOptions) *VectorField {
-	options = options | DefaultVectorIndexingOptions
 
 	return &VectorField{
 		name:                    name,
