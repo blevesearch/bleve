@@ -1263,7 +1263,10 @@ func TestKNNScoreBoosting(t *testing.T) {
 
 	batch := index.NewBatch()
 	for i := 0; i < len(dataset); i++ {
-		batch.Index(strconv.Itoa(i), dataset[i])
+		err = batch.Index(strconv.Itoa(i), dataset[i])
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	err = index.Batch(batch)
@@ -1354,7 +1357,10 @@ func TestKNNOperator(t *testing.T) {
 
 	batch := index.NewBatch()
 	for i := 0; i < len(dataset); i++ {
-		batch.Index(strconv.Itoa(i), dataset[i])
+		err = batch.Index(strconv.Itoa(i), dataset[i])
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	err = index.Batch(batch)
@@ -1464,7 +1470,10 @@ func TestKNNFiltering(t *testing.T) {
 	batch := index.NewBatch()
 	for i := 0; i < len(dataset); i++ {
 		// the id of term "i" is (i-1000)
-		batch.Index(strconv.Itoa(i), dataset[i])
+		err = batch.Index(strconv.Itoa(i), dataset[i])
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	err = index.Batch(batch)
@@ -1582,7 +1591,10 @@ func TestNestedVectors(t *testing.T) {
 
 	batch := index.NewBatch()
 	for docID, doc := range dataset {
-		batch.Index(docID, doc)
+		err = batch.Index(docID, doc)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	err = index.Batch(batch)

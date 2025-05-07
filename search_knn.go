@@ -203,6 +203,9 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 			r.KNN[i].FilterQuery = nil
 		} else {
 			r.KNN[i].FilterQuery, err = query.ParseQuery(knnReq.FilterQuery)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	r.KNNOperator = temp.KNNOperator
@@ -305,6 +308,17 @@ func validateKNN(req *SearchRequest) error {
 		}
 		if q.K > BleveMaxK {
 			return fmt.Errorf("k must be less than %d", BleveMaxK)
+		}
+		// since the DefaultField is not applicable for knn,
+		// the field must be specified.
+		if q.Field == "" {
+			return fmt.Errorf("knn query field must be non-empty")
+		}
+		if vfq, ok := q.FilterQuery.(query.ValidatableQuery); ok {
+			err := vfq.Validate()
+			if err != nil {
+				return fmt.Errorf("knn filter query is invalid: %v", err)
+			}
 		}
 	}
 	switch req.KNNOperator {
