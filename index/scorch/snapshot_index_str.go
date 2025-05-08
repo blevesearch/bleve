@@ -42,11 +42,15 @@ func (i *IndexSnapshotThesaurusTermReader) Size() int {
 		len(i.name) + size.SizeOfString
 
 	for _, postings := range i.postings {
-		sizeInBytes += postings.Size()
+		if postings != nil {
+			sizeInBytes += postings.Size()
+		}
 	}
 
 	for _, iterator := range i.iterators {
-		sizeInBytes += iterator.Size()
+		if iterator != nil {
+			sizeInBytes += iterator.Size()
+		}
 	}
 
 	return sizeInBytes
@@ -64,8 +68,8 @@ func (i *IndexSnapshotThesaurusTermReader) Next() (string, error) {
 				synTerm := next.Term()
 				return synTerm, nil
 			}
-			i.segmentOffset++
 		}
+		i.segmentOffset++
 	}
 	return "", nil
 }
