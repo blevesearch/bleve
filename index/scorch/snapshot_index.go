@@ -1033,11 +1033,12 @@ func (is *IndexSnapshot) CloseCopyReader() error {
 
 func (is *IndexSnapshot) ThesaurusTermReader(ctx context.Context, thesaurusName string, term []byte) (index.ThesaurusTermReader, error) {
 	rv := &IndexSnapshotThesaurusTermReader{
-		name:      thesaurusName,
-		snapshot:  is,
-		postings:  make([]segment.SynonymsList, len(is.segment)),
-		iterators: make([]segment.SynonymsIterator, len(is.segment)),
-		thesauri:  make([]segment.Thesaurus, len(is.segment)),
+		name:          thesaurusName,
+		snapshot:      is,
+		postings:      make([]segment.SynonymsList, len(is.segment)),
+		iterators:     make([]segment.SynonymsIterator, len(is.segment)),
+		thesauri:      make([]segment.Thesaurus, len(is.segment)),
+		segmentOffset: 0,
 	}
 
 	for i, s := range is.segment {
