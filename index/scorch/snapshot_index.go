@@ -1032,32 +1032,22 @@ func (is *IndexSnapshot) CloseCopyReader() error {
 }
 
 func (is *IndexSnapshot) ThesaurusTermReader(ctx context.Context, thesaurusName string, term []byte) (index.ThesaurusTermReader, error) {
-	rv := &IndexSnapshotThesaurusTermReader{}
-	rv.name = thesaurusName
-	rv.snapshot = is
-	if rv.postings == nil {
-		rv.postings = make([]segment.SynonymsList, len(is.segment))
-	}
-	if rv.iterators == nil {
-		rv.iterators = make([]segment.SynonymsIterator, len(is.segment))
-	}
-	rv.segmentOffset = 0
-
-	if rv.thesauri == nil {
-		rv.thesauri = make([]segment.Thesaurus, len(is.segment))
-		for i, s := range is.segment {
-			if synSeg, ok := s.segment.(segment.ThesaurusSegment); ok {
-				thes, err := synSeg.Thesaurus(thesaurusName)
-				if err != nil {
-					return nil, err
-				}
-				rv.thesauri[i] = thes
-			}
-		}
+	rv := &IndexSnapshotThesaurusTermReader{
+		name:          thesaurusName,
+		snapshot:      is,
+		postings:      make([]segment.SynonymsList, len(is.segment)),
+		iterators:     make([]segment.SynonymsIterator, len(is.segment)),
+		thesauri:      make([]segment.Thesaurus, len(is.segment)),
+		segmentOffset: 0,
 	}
 
 	for i, s := range is.segment {
-		if _, ok := s.segment.(segment.ThesaurusSegment); ok {
+		if synSeg, ok := s.segment.(segment.ThesaurusSegment); ok {
+			thes, err := synSeg.Thesaurus(thesaurusName)
+			if err != nil {
+				return nil, err
+			}
+			rv.thesauri[i] = thes
 			pl, err := rv.thesauri[i].SynonymsList(term, s.deleted, rv.postings[i])
 			if err != nil {
 				return nil, err
