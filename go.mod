@@ -2,7 +2,7 @@ module github.com/blevesearch/bleve/v2
 
 go 1.23
 
-toolchain go1.23.5
+toolchain go1.23.9
 
 require (
 	github.com/RoaringBitmap/roaring/v2 v2.4.5
