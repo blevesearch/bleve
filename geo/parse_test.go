@@ -341,15 +341,15 @@ func TestExtractGeoShape(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result, shapeType, success := extractGeoShape(test.in)
+		res, success := extractGeoShape(test.in)
 		if success != test.success {
 			t.Errorf("expected extract geo point: %t, got: %t for: %v", test.success, success, test.in)
 		}
-		if shapeType != test.resTyp {
-			t.Errorf("expected shape type: %v, got: %v for input: %v", test.resTyp, shapeType, test.in)
+		if success && res.Type != test.resTyp {
+			t.Errorf("expected shape type: %v, got: %v for input: %v", test.resTyp, res.Type, test.in)
 		}
-		if !reflect.DeepEqual(test.result, result) {
-			t.Errorf("expected result %+v, got %+v for %v", test.result, result, test.in)
+		if success && !reflect.DeepEqual(test.result, res.Coordinates) {
+			t.Errorf("expected result %+v, got %+v for %v", test.result, res.Coordinates, test.in)
 		}
 	}
 }
@@ -443,13 +443,13 @@ func TestExtractGeoShapeCoordinates(t *testing.T) {
 			t.Fatalf("[%d] JSON err: %v", i+1, err)
 		}
 
-		_, typ, ok := ExtractGeoShapeCoordinates(x, tests[i].typ)
+		res, ok := ExtractGeoShapeCoordinates(x, tests[i].typ)
 		if ok != tests[i].expectOK {
 			t.Errorf("[%d] expected ok %t, got %t", i+1, tests[i].expectOK, ok)
 		}
 
-		if ok && typ != tests[i].typ {
-			t.Errorf("[%d] expected type %s, got %s", i+1, tests[i].typ, typ)
+		if ok && res.Type != tests[i].typ {
+			t.Errorf("[%d] expected type %s, got %s", i+1, tests[i].typ, res.Type)
 		}
 	}
 }
