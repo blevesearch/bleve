@@ -274,4 +274,10 @@ First, all of this geo code is a Go adaptation of the [Lucene 5.3.2 sandbox geo 
 
 - All of the APIs will use float64 for lon/lat values.
 - When describing a point in function arguments or return values, we always use the order lon, lat.
-- High level APIs will use TopLeft and BottomRight to describe bounding boxes.  This may not map cleanly to min/max lon/lat when crossing the dateline.  The lower level APIs will use min/max lon/lat and require the higher-level code to split boxes accordingly.
+- High level APIs will use TopLeft and BottomRight to describe bounding boxes. This may not map cleanly to min/max lon/lat when crossing the dateline. The lower level APIs will use min/max lon/lat and require the higher-level code to split boxes accordingly.
+- Points and MultiPoints may only contain Points and MultiPoints.
+- LineStrings and MultiLineStrings may only contain Points and MultiPoints.
+- Polygons or MultiPolygons intersecting Polygons and MultiPolygons may return arbitrary results when the overlap is only an edge or a vertex.
+- Circles containing polygon will return a false positive result if all of the vertices of the polygon are within the circle, but the orientation of those points are clock-wise.
+- The edges of an Envelope follows the latitude and logitude lines instead of the shortest path on a globe.
+- Envelope intersecting queries with LineStrings, MultiLineStrings, Polygons and MultiPolygons implicitly converts the Envelope into a Polygon which changes the curvature of the edges causing inaccurate results for few edge cases.
