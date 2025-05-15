@@ -205,10 +205,11 @@ func (s *s12) Lat() float64 {
 
 func TestExtractGeoShape(t *testing.T) {
 	tests := []struct {
-		in      interface{}
-		resTyp  string
-		result  [][][][]float64
-		success bool
+		in          interface{}
+		resTyp      string
+		coordinates [][][][]float64
+		center      []float64
+		success     bool
 	}{
 		// valid point slice
 		{
@@ -216,9 +217,9 @@ func TestExtractGeoShape(t *testing.T) {
 				"coordinates": []interface{}{3.4, 5.9},
 				"type":        "Point",
 			},
-			resTyp:  "point",
-			result:  [][][][]float64{{{{3.4, 5.9}}}},
-			success: true,
+			resTyp:      "point",
+			coordinates: [][][][]float64{{{{3.4, 5.9}}}},
+			success:     true,
 		},
 		// invalid point slice
 		{
@@ -226,116 +227,135 @@ func TestExtractGeoShape(t *testing.T) {
 				"coordinates": []interface{}{3.4},
 				"type":        "point"},
 
-			resTyp:  "point",
-			result:  nil,
-			success: false,
+			resTyp:      "point",
+			coordinates: nil,
+			success:     false,
 		},
 		// valid multipoint slice containing single point
 		{
 			in: map[string]interface{}{
 				"coordinates": [][]interface{}{{3.4, 5.9}},
 				"type":        "multipoint"},
-			resTyp:  "multipoint",
-			result:  [][][][]float64{{{{3.4, 5.9}}}},
-			success: true,
+			resTyp:      "multipoint",
+			coordinates: [][][][]float64{{{{3.4, 5.9}}}},
+			success:     true,
 		},
 		// valid multipoint slice
 		{
 			in: map[string]interface{}{
 				"coordinates": [][]interface{}{{3.4, 5.9}, {6.7, 9.8}},
 				"type":        "multipoint"},
-			resTyp:  "multipoint",
-			result:  [][][][]float64{{{{3.4, 5.9}, {6.7, 9.8}}}},
-			success: true,
+			resTyp:      "multipoint",
+			coordinates: [][][][]float64{{{{3.4, 5.9}, {6.7, 9.8}}}},
+			success:     true,
 		},
 		// valid multipoint slice containing one invalid entry
 		{
 			in: map[string]interface{}{
 				"coordinates": [][]interface{}{{3.4, 5.9}, {6.7}},
 				"type":        "multipoint"},
-			resTyp:  "multipoint",
-			result:  [][][][]float64{{{{3.4, 5.9}}}},
-			success: true,
+			resTyp:      "multipoint",
+			coordinates: [][][][]float64{{{{3.4, 5.9}}}},
+			success:     true,
 		},
 		// invalid multipoint slice
 		{
 			in: map[string]interface{}{
 				"coordinates": [][]interface{}{{3.4}},
 				"type":        "multipoint"},
-			resTyp:  "multipoint",
-			result:  nil,
-			success: false,
+			resTyp:      "multipoint",
+			coordinates: nil,
+			success:     false,
 		},
 		// valid linestring slice
 		{
 			in: map[string]interface{}{
 				"coordinates": [][]interface{}{{3.4, 4.4}, {8.4, 9.4}},
 				"type":        "linestring"},
-			resTyp:  "linestring",
-			result:  [][][][]float64{{{{3.4, 4.4}, {8.4, 9.4}}}},
-			success: true,
+			resTyp:      "linestring",
+			coordinates: [][][][]float64{{{{3.4, 4.4}, {8.4, 9.4}}}},
+			success:     true,
 		},
 		// valid linestring slice
 		{
 			in: map[string]interface{}{
 				"coordinates": [][]interface{}{{3.4, 4.4}, {8.4, 9.4}, {10.1, 12.3}},
 				"type":        "linestring"},
-			resTyp:  "linestring",
-			result:  [][][][]float64{{{{3.4, 4.4}, {8.4, 9.4}, {10.1, 12.3}}}},
-			success: true,
+			resTyp:      "linestring",
+			coordinates: [][][][]float64{{{{3.4, 4.4}, {8.4, 9.4}, {10.1, 12.3}}}},
+			success:     true,
 		},
 		// invalid linestring slice with single entry
 		{
 			in: map[string]interface{}{
 				"coordinates": [][]interface{}{{3.4, 4.4}},
 				"type":        "linestring"},
-			resTyp:  "linestring",
-			result:  nil,
-			success: false,
+			resTyp:      "linestring",
+			coordinates: nil,
+			success:     false,
 		},
 		// invalid linestring slice with wrong paranthesis
 		{
 			in: map[string]interface{}{
 				"coordinates": [][][]interface{}{{{3.4, 4.4}, {8.4, 9.4}}},
 				"type":        "linestring"},
-			resTyp:  "linestring",
-			result:  nil,
-			success: false,
+			resTyp:      "linestring",
+			coordinates: nil,
+			success:     false,
 		},
 		// valid envelope
 		{
 			in: map[string]interface{}{
 				"coordinates": [][]interface{}{{3.4, 4.4}, {8.4, 9.4}},
 				"type":        "envelope"},
-			resTyp:  "envelope",
-			result:  [][][][]float64{{{{3.4, 4.4}, {8.4, 9.4}}}},
-			success: true,
+			resTyp:      "envelope",
+			coordinates: [][][][]float64{{{{3.4, 4.4}, {8.4, 9.4}}}},
+			success:     true,
 		},
 		// invalid envelope
 		{
 			in: map[string]interface{}{
 				"coordinates": [][]interface{}{{3.4, 4.4}},
 				"type":        "envelope"},
-			resTyp:  "envelope",
-			result:  nil,
-			success: false,
+			resTyp:      "envelope",
+			coordinates: nil,
+			success:     false,
 		},
 		// invalid envelope
 		{
 			in: map[string]interface{}{
 				"coordinates": [][][]interface{}{{{3.4, 4.4}, {8.4, 9.4}}},
 				"type":        "envelope"},
-			resTyp:  "envelope",
-			result:  nil,
-			success: false,
+			resTyp:      "envelope",
+			coordinates: nil,
+			success:     false,
 		},
 		// invalid envelope with >2 vertices
 		{
 			in: map[string]interface{}{
 				"coordinates": [][]interface{}{{3.4, 4.4}, {5.6, 6.4}, {7.4, 7.4}},
 				"type":        "envelope"},
-			resTyp:  "envelope",
-			result:  nil,
+			resTyp:      "envelope",
+			coordinates: nil,
+			success:     false,
+		},
+		// valid circle
+		{
+			in: map[string]interface{}{
+				"coordinates": []interface{}{4.4, 5.0},
+				"radius":      "200m",
+				"type":        "circle"},
+			resTyp:  "circle",
+			center:  []float64{4.4, 5.0},
+			success: true,
+		},
+		// invalid circle
+		{
+			in: map[string]interface{}{
+				"coordinates": []interface{}{4.4},
+				"radius":      "200m",
+				"type":        "circle"},
+			resTyp:  "circle",
 			success: false,
 		},
 	}
@@ -348,8 +368,11 @@ func TestExtractGeoShape(t *testing.T) {
 		if success && res.Type != test.resTyp {
 			t.Errorf("expected shape type: %v, got: %v for input: %v", test.resTyp, res.Type, test.in)
 		}
-		if success && !reflect.DeepEqual(test.result, res.Coordinates) {
-			t.Errorf("expected result %+v, got %+v for %v", test.result, res.Coordinates, test.in)
+		if success && !reflect.DeepEqual(test.coordinates, res.Coordinates) {
+			t.Errorf("expected result %+v, got %+v for %v", test.coordinates, res.Coordinates, test.in)
+		}
+		if success && test.center != nil && !reflect.DeepEqual(test.center, res.Center) {
+			t.Errorf("expected center %+v, got %+v for %v", test.center, res.Center, test.in)
 		}
 	}
 }

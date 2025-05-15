@@ -148,11 +148,11 @@ func NewGeoShapeFieldWithIndexingOptions(name string, arrayPositions []uint64,
 		Type:        typ,
 	}
 
-	return NewGeoShapeFieldFromShapesWithIndexingOptions(name,
+	return NewGeoShapeFieldFromShapeWithIndexingOptions(name,
 		arrayPositions, shape, options)
 }
 
-func NewGeoShapeFieldFromShapesWithIndexingOptions(name string, arrayPositions []uint64,
+func NewGeoShapeFieldFromShapeWithIndexingOptions(name string, arrayPositions []uint64,
 	geoShape *geojson.GeoShape, options index.FieldIndexingOptions) *GeoShapeField {
 
 	var shape index.GeoJSON
@@ -255,7 +255,7 @@ func NewGeoCircleFieldWithIndexingOptions(name string, arrayPositions []uint64,
 		Type:   geo.CircleType,
 	}
 
-	return NewGeoShapeFieldFromShapesWithIndexingOptions(name,
+	return NewGeoShapeFieldFromShapeWithIndexingOptions(name,
 		arrayPositions, shape, options)
 }
 

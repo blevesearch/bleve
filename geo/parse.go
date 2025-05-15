@@ -377,8 +377,7 @@ func ExtractCircle(thing interface{}) (*geojson.GeoShape, bool) {
 				if !found {
 					return nil, false
 				}
-				rv.Center = append(rv.Center, lng)
-				rv.Center = append(rv.Center, lat)
+				rv.Center = append(rv.Center, lng, lat)
 			}
 		}
 	}

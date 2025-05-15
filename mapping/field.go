@@ -364,7 +364,7 @@ func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
 		if found {
 			fieldName := getFieldName(pathString, path, fm)
 			options := fm.Options()
-			field := document.NewGeoShapeFieldFromShapesWithIndexingOptions(fieldName,
+			field := document.NewGeoShapeFieldFromShapeWithIndexingOptions(fieldName,
 				indexes, geoShape, options)
 			context.doc.AddField(field)
 
