@@ -484,12 +484,11 @@ func TestLinestringPointWithin(t *testing.T) {
 		Desc             string
 		QueryType        string
 	}{
-		// expect nil in each case since when linestring is the query shape, it's always nil
 		{
 			QueryShape:       [][]float64{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}},
 			DocShapeVertices: []float64{1.0, 1.0},
 			DocShapeName:     "point1",
-			Expected:         nil,
+			Expected:         []string{"point1"},
 			Desc:             "point at start of linestring",
 			QueryType:        "within",
 		},
@@ -497,7 +496,7 @@ func TestLinestringPointWithin(t *testing.T) {
 			QueryShape:       [][]float64{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}},
 			DocShapeVertices: []float64{2.0, 2.0},
 			DocShapeName:     "point1",
-			Expected:         nil,
+			Expected:         []string{"point1"},
 			Desc:             "point in the middle of linestring",
 			QueryType:        "within",
 		},
@@ -505,7 +504,7 @@ func TestLinestringPointWithin(t *testing.T) {
 			QueryShape:       [][]float64{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}},
 			DocShapeVertices: []float64{3.0, 3.0},
 			DocShapeName:     "point1",
-			Expected:         nil,
+			Expected:         []string{"point1"},
 			Desc:             "point at end of linestring",
 			QueryType:        "within",
 		},
@@ -1258,7 +1257,7 @@ func TestGeometryCollectionWithin(t *testing.T) {
 			DocShapeVertices: [][][][][]float64{{{{{1, 2}}}}},
 			DocShapeName:     "geometrycollection1",
 			Desc:             "geometry collection with a linestring",
-			Expected:         nil, // linestring in geometry collection does not support within
+			Expected:         []string{"geometrycollection1"},
 			QueryShapeTypes:  []string{"linestring"},
 			DocShapeTypes:    []string{"point"},
 			QueryType:        "within",
