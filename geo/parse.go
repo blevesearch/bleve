@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/blevesearch/bleve/v2/util"
+	"github.com/blevesearch/geo/geojson"
 )
 
 // ExtractGeoPoint takes an arbitrary interface{} and tries it's best to
@@ -298,10 +299,15 @@ func ParseGeoShapeField(thing interface{}) (interface{}, string, error) {
 	return coordValue, strings.ToLower(shape), nil
 }
 
-func extractGeoShape(thing interface{}) ([][][][]float64, string, bool) {
+func extractGeoShape(thing interface{}) (*geojson.GeoShape, bool) {
+
 	coordValue, typ, err := ParseGeoShapeField(thing)
 	if err != nil {
-		return nil, "", false
+		return nil, false
+	}
+
+	if typ == CircleType {
+		return ExtractCircle(thing)
 	}
 
 	return ExtractGeoShapeCoordinates(coordValue, typ)
@@ -309,13 +315,12 @@ func extractGeoShape(thing interface{}) ([][][][]float64, string, bool) {
 
 // ExtractGeometryCollection takes an interface{} and tries it's best to
 // interpret all the member geojson shapes within it.
-func ExtractGeometryCollection(thing interface{}) ([][][][][]float64, []string, bool) {
+func ExtractGeometryCollection(thing interface{}) ([]*geojson.GeoShape, bool) {
 	thingVal := reflect.ValueOf(thing)
 	if !thingVal.IsValid() {
-		return nil, nil, false
+		return nil, false
 	}
-	var rv [][][][][]float64
-	var types []string
+	var rv []*geojson.GeoShape
 	var f bool
 
 	if thingVal.Kind() == reflect.Map {
@@ -331,70 +336,74 @@ func ExtractGeometryCollection(thing interface{}) ([][][][][]float64, []string, 
 				items := reflect.ValueOf(collection)
 
 				for j := 0; j < items.Len(); j++ {
-					coords, shape, found := extractGeoShape(items.Index(j).Interface())
+					shape, found := extractGeoShape(items.Index(j).Interface())
 					if found {
 						f = found
-						rv = append(rv, coords)
-						types = append(types, shape)
+						rv = append(rv, shape)
 					}
 				}
 			}
 		}
 	}
 
-	return rv, types, f
+	return rv, f
 }
 
 // ExtractCircle takes an interface{} and tries it's best to
 // interpret the center point coordinates and the radius for a
 // given circle shape.
-func ExtractCircle(thing interface{}) ([]float64, string, bool) {
+func ExtractCircle(thing interface{}) (*geojson.GeoShape, bool) {
 	thingVal := reflect.ValueOf(thing)
 	if !thingVal.IsValid() {
-		return nil, "", false
+		return nil, false
 	}
-	var rv []float64
-	var radiusStr string
+
+	rv := &geojson.GeoShape{
+		Type:   CircleType,
+		Center: make([]float64, 0, 2),
+	}
 
 	if thingVal.Kind() == reflect.Map {
 		iter := thingVal.MapRange()
 		for iter.Next() {
 
 			if iter.Key().String() == "radius" {
-				radiusStr = iter.Value().Interface().(string)
+				rv.Radius = iter.Value().Interface().(string)
 				continue
 			}
 
 			if iter.Key().String() == "coordinates" {
 				lng, lat, found := ExtractGeoPoint(iter.Value().Interface())
 				if !found {
-					return nil, radiusStr, false
+					return nil, false
 				}
-				rv = append(rv, lng)
-				rv = append(rv, lat)
+				rv.Center = append(rv.Center, lng, lat)
 			}
 		}
 	}
 
-	return rv, radiusStr, true
+	return rv, true
 }
 
 // ExtractGeoShapeCoordinates takes an interface{} and tries it's best to
 // interpret the coordinates for any of the given geoshape typ like
 // a point, multipoint, linestring, multilinestring, polygon, multipolygon,
 func ExtractGeoShapeCoordinates(coordValue interface{},
-	typ string) ([][][][]float64, string, bool) {
-	var rv [][][][]float64
+	typ string) (*geojson.GeoShape, bool) {
+	rv := &geojson.GeoShape{
+		Type: typ,
+	}
+
 	if typ == PointType {
 		point := extractCoordinates(coordValue)
 
 		// ignore the contents with invalid entry.
 		if len(point) < 2 {
-			return nil, typ, false
+			return nil, false
 		}
 
-		rv = [][][][]float64{{{point}}}
-		return rv, typ, true
+		rv.Coordinates = [][][][]float64{{{point}}}
+		return rv, true
 	}
 
 	if typ == MultiPointType || typ == LineStringType ||
@@ -403,19 +412,19 @@ func ExtractGeoShapeCoordinates(coordValue interface{},
 
 		// ignore the contents with invalid entry.
 		if len(coords) == 0 {
-			return nil, typ, false
+			return nil, false
 		}
 
 		if typ == EnvelopeType && len(coords) != 2 {
-			return nil, typ, false
+			return nil, false
 		}
 
 		if typ == LineStringType && len(coords) < 2 {
-			return nil, typ, false
+			return nil, false
 		}
 
-		rv = [][][][]float64{{coords}}
-		return rv, typ, true
+		rv.Coordinates = [][][][]float64{{coords}}
+		return rv, true
 	}
 
 	if typ == PolygonType || typ == MultiLineStringType {
@@ -423,33 +432,34 @@ func ExtractGeoShapeCoordinates(coordValue interface{},
 
 		// ignore the contents with invalid entry.
 		if len(coords) == 0 {
-			return nil, typ, false
+			return nil, false
 		}
 
 		if typ == PolygonType && len(coords[0]) < 3 ||
 			typ == MultiLineStringType && len(coords[0]) < 2 {
-			return nil, typ, false
+			return nil, false
 		}
 
-		rv = [][][][]float64{coords}
-		return rv, typ, true
+		rv.Coordinates = [][][][]float64{coords}
+		return rv, true
 	}
 
 	if typ == MultiPolygonType {
-		rv = extract4DCoordinates(coordValue)
+		coords := extract4DCoordinates(coordValue)
 
 		// ignore the contents with invalid entry.
-		if len(rv) == 0 || len(rv[0]) == 0 {
-			return nil, typ, false
+		if len(coords) == 0 || len(coords[0]) == 0 {
+			return nil, false
 
 		}
 
-		if len(rv[0][0]) < 3 {
-			return nil, typ, false
+		if len(coords[0][0]) < 3 {
+			return nil, false
 		}
 
-		return rv, typ, true
+		rv.Coordinates = coords
+		return rv, true
 	}
 
-	return rv, typ, false
+	return rv, false
 }
