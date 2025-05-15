@@ -11,12 +11,12 @@
 * A `vectors` GO TAG needs to be set for bleve to access all the supporting code. This TAG must be set only after the FAISS shared library is made available. Failure to do either will inhibit you from using this feature.
 * Please follow these [instructions](#setup-instructions) below for any assistance in the area.
 * Releases of `blevesearch/bleve` work with select checkpoints of `blevesearch/faiss` owing to API changes and improvements (tracking over the `bleve` branch):
-    * *v2.4.0* requires [blevesearch/faiss@7b119f4](https://github.com/blevesearch/faiss/tree/7b119f4b9c408989b696b36f8cc53908e53de6db) (modified v1.7.4)
-    * *v2.4.1* requires [blevesearch/faiss@d9db66a](https://github.com/blevesearch/faiss/tree/d9db66a38518d99eb334218697e1df0732f3fdf8) (modified v1.7.4)
-    * *v2.4.2* requires [blevesearch/faiss@d9db66a](https://github.com/blevesearch/faiss/tree/d9db66a38518d99eb334218697e1df0732f3fdf8) (modified v1.7.4)
-    * *v2.4.3* requires [blevesearch/faiss@b747c55](https://github.com/blevesearch/faiss/tree/b747c55a93a9627039c34d44b081f375dca94e57) (modified v1.8.0)
-    * *v2.4.4* requires [blevesearch/faiss@b747c55](https://github.com/blevesearch/faiss/tree/b747c55a93a9627039c34d44b081f375dca94e57) (modified v1.8.0)
-    * *v2.5.0* requires [blevesearch/faiss@352484e](https://github.com/blevesearch/faiss/tree/352484e0fc9d1f8f46737841efe5f26e0f383f71) (modified v1.10.0)
+    | bleve version(s) | blevesearch/faiss version |
+    | --- | --- |
+    | `v2.4.0` | [blevesearch/faiss@7b119f4](https://github.com/blevesearch/faiss/tree/7b119f4b9c408989b696b36f8cc53908e53de6db) (modified v1.7.4) |
+    | `v2.4.1`, `v2.4.2` | [blevesearch/faiss@d9db66a](https://github.com/blevesearch/faiss/tree/d9db66a38518d99eb334218697e1df0732f3fdf8) (modified v1.7.4) |
+    | `v2.4.3`, `v2.4.4` | [blevesearch/faiss@b747c55](https://github.com/blevesearch/faiss/tree/b747c55a93a9627039c34d44b081f375dca94e57) (modified v1.8.0) |
+    | `v2.5.0`, `v2.5.1` | [blevesearch/faiss@352484e](https://github.com/blevesearch/faiss/tree/352484e0fc9d1f8f46737841efe5f26e0f383f71) (modified v1.10.0) |
 
 ## Supported
 
