@@ -143,7 +143,27 @@ func NewGeoShapeFieldFromBytes(name string, arrayPositions []uint64,
 func NewGeoShapeFieldWithIndexingOptions(name string, arrayPositions []uint64,
 	coordinates [][][][]float64, typ string,
 	options index.FieldIndexingOptions) *GeoShapeField {
-	shape, encodedValue, err := geo.NewGeoJsonShape(coordinates, typ)
+	shape := &geojson.GeoShape{
+		Coordinates: coordinates,
+		Type:        typ,
+	}
+
+	return NewGeoShapeFieldFromShapeWithIndexingOptions(name,
+		arrayPositions, shape, options)
+}
+
+func NewGeoShapeFieldFromShapeWithIndexingOptions(name string, arrayPositions []uint64,
+	geoShape *geojson.GeoShape, options index.FieldIndexingOptions) *GeoShapeField {
+
+	var shape index.GeoJSON
+	var encodedValue []byte
+	var err error
+
+	if geoShape.Type == geo.CircleType {
+		shape, encodedValue, err = geo.NewGeoCircleShape(geoShape.Center, geoShape.Radius)
+	} else {
+		shape, encodedValue, err = geo.NewGeoJsonShape(geoShape.Coordinates, geoShape.Type)
+	}
 	if err != nil {
 		return nil
 	}
@@ -176,7 +196,26 @@ func NewGeoShapeFieldWithIndexingOptions(name string, arrayPositions []uint64,
 func NewGeometryCollectionFieldWithIndexingOptions(name string,
 	arrayPositions []uint64, coordinates [][][][][]float64, types []string,
 	options index.FieldIndexingOptions) *GeoShapeField {
-	shape, encodedValue, err := geo.NewGeometryCollection(coordinates, types)
+	if len(coordinates) != len(types) {
+		return nil
+	}
+
+	shapes := make([]*geojson.GeoShape, len(types))
+	for i := range coordinates {
+		shapes[i] = &geojson.GeoShape{
+			Coordinates: coordinates[i],
+			Type:        types[i],
+		}
+	}
+
+	return NewGeometryCollectionFieldFromShapesWithIndexingOptions(name,
+		arrayPositions, shapes, options)
+}
+
+func NewGeometryCollectionFieldFromShapesWithIndexingOptions(name string,
+	arrayPositions []uint64, geoShapes []*geojson.GeoShape,
+	options index.FieldIndexingOptions) *GeoShapeField {
+	shape, encodedValue, err := geo.NewGeometryCollectionFromShapes(geoShapes)
 	if err != nil {
 		return nil
 	}
@@ -209,34 +248,15 @@ func NewGeometryCollectionFieldWithIndexingOptions(name string,
 func NewGeoCircleFieldWithIndexingOptions(name string, arrayPositions []uint64,
 	centerPoint []float64, radius string,
 	options index.FieldIndexingOptions) *GeoShapeField {
-	shape, encodedValue, err := geo.NewGeoCircleShape(centerPoint, radius)
-	if err != nil {
-		return nil
+
+	shape := &geojson.GeoShape{
+		Center: centerPoint,
+		Radius: radius,
+		Type:   geo.CircleType,
 	}
 
-	// extra glue bytes to work around the term splitting logic from interfering
-	// the custom encoding of the geoshape coordinates inside the docvalues.
-	encodedValue = append(geo.GlueBytes, append(encodedValue, geo.GlueBytes...)...)
-
-	// get the byte value for the circle.
-	value, err := shape.Value()
-	if err != nil {
-		return nil
-	}
-
-	// docvalues are always enabled for geoshape fields, even if the
-	// indexing options are set to not include docvalues.
-	options = options | index.DocValues
-
-	return &GeoShapeField{
-		shape:             shape,
-		name:              name,
-		arrayPositions:    arrayPositions,
-		options:           options,
-		encodedValue:      encodedValue,
-		value:             value,
-		numPlainTextBytes: uint64(len(value)),
-	}
+	return NewGeoShapeFieldFromShapeWithIndexingOptions(name,
+		arrayPositions, shape, options)
 }
 
 // GeoShape is an implementation of the index.GeoShapeField interface.

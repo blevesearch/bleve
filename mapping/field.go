@@ -26,6 +26,7 @@ import (
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/geo/geojson"
 )
 
 // control the default behavior for dynamic fields (those not explicitly mapped)
@@ -337,40 +338,34 @@ func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
 		return
 	}
 
-	switch shape {
-	case geo.CircleType:
-		center, radius, found := geo.ExtractCircle(propertyMightBeGeoShape)
+	if shape == geo.GeometryCollectionType {
+		geoShapes, found := geo.ExtractGeometryCollection(propertyMightBeGeoShape)
 		if found {
 			fieldName := getFieldName(pathString, path, fm)
 			options := fm.Options()
-			field := document.NewGeoCircleFieldWithIndexingOptions(fieldName,
-				indexes, center, radius, options)
+			field := document.NewGeometryCollectionFieldFromShapesWithIndexingOptions(fieldName,
+				indexes, geoShapes, options)
 			context.doc.AddField(field)
 
 			if !fm.IncludeInAll {
 				context.excludedFromAll = append(context.excludedFromAll, fieldName)
 			}
 		}
-	case geo.GeometryCollectionType:
-		coordinates, shapes, found := geo.ExtractGeometryCollection(propertyMightBeGeoShape)
-		if found {
-			fieldName := getFieldName(pathString, path, fm)
-			options := fm.Options()
-			field := document.NewGeometryCollectionFieldWithIndexingOptions(fieldName,
-				indexes, coordinates, shapes, options)
-			context.doc.AddField(field)
+	} else {
+		var geoShape *geojson.GeoShape
+		var found bool
 
-			if !fm.IncludeInAll {
-				context.excludedFromAll = append(context.excludedFromAll, fieldName)
-			}
+		if shape == geo.CircleType {
+			geoShape, found = geo.ExtractCircle(propertyMightBeGeoShape)
+		} else {
+			geoShape, found = geo.ExtractGeoShapeCoordinates(coordValue, shape)
 		}
-	default:
-		coordinates, shape, found := geo.ExtractGeoShapeCoordinates(coordValue, shape)
+
 		if found {
 			fieldName := getFieldName(pathString, path, fm)
 			options := fm.Options()
-			field := document.NewGeoShapeFieldWithIndexingOptions(fieldName,
-				indexes, coordinates, shape, options)
+			field := document.NewGeoShapeFieldFromShapeWithIndexingOptions(fieldName,
+				indexes, geoShape, options)
 			context.doc.AddField(field)
 
 			if !fm.IncludeInAll {

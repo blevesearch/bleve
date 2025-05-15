@@ -396,8 +396,21 @@ func (pd *pointDistance) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 // can be used later while filering the doc values.
 func NewGeometryCollection(coordinates [][][][][]float64,
 	typs []string) (index.GeoJSON, []byte, error) {
+	shapes := make([]*geojson.GeoShape, len(coordinates))
+	for i := range coordinates {
+		shapes[i] = &geojson.GeoShape{
+			Coordinates: coordinates[i],
+			Type:        typs[i],
+		}
+	}
 
-	return geojson.NewGeometryCollection(coordinates, typs)
+	return geojson.NewGeometryCollection(shapes)
+}
+
+func NewGeometryCollectionFromShapes(shapes []*geojson.GeoShape) (
+	index.GeoJSON, []byte, error) {
+
+	return geojson.NewGeometryCollection(shapes)
 }
 
 // NewGeoCircleShape instantiate a circle shape and
