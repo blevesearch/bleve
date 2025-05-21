@@ -108,7 +108,6 @@ fmt.Println(hybridResult.Hits) // Scores are the sum of text search and kNN scor
 // Pre-filtered vector/hybrid search: filter query narrows candidates before KNN search
 searchRequest := bleve.NewSearchRequest(bleve.NewMatchNoneQuery()) // replace with any Bleve query for Pre-filtered Hybrid Search
 filterQuery := bleve.NewTermQuery("hello") // Filter query to narrow candidates
-
 searchRequest.AddKNNWithFilter(
     "vec",                              // Vector field name
     []float32{0, 1, 1, 4, 4, 5, 7, 6, 8, 9}, // Query vector (must match indexed vector dims)
