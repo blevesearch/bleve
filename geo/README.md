@@ -36,7 +36,7 @@ To specify GeoJSON data, use a nested field with:
 - a field named type that specifies the GeoJSON object type and the type value will be case-insensitive.
 - a field named coordinates that specifies the object's coordinates.
 
-```json
+```text
          "fieldName": { 
               "type": "GeoJSON Type", 
               "coordinates": <coordinates> 
