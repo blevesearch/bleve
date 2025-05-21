@@ -37,7 +37,7 @@ A modern indexing + search library in GO
 ## Indexing
 
 ```go
-message := struct{
+message := struct {
   Id   string
   From string
   Body string
@@ -69,7 +69,7 @@ searchResult, _ := index.Search(searchRequest)
 To install the CLI for the latest release of bleve, run:
 
 ```shell
-$ go install github.com/blevesearch/bleve/v2/cmd/bleve@latest
+go install github.com/blevesearch/bleve/v2/cmd/bleve@latest
 ```
 
 ```text
