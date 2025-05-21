@@ -290,8 +290,8 @@ Geometrycollection, MultiLineString, MultiPolygon, Circle and Envelope.
 |   FilterName   |  Description                                                             |
 |   :-----------:|  :-----------------------------------------------------------------:     |
 |   `intersects` |  Return all documents whose shape field intersects the query  geometry.  |
-|   `contains`   |  Return all documents whose shape field contains the query geometry    |
-|   `within`     |  Return all documents whose shape field is within the query geometry.  |
+|   `contains`   |  Return all documents whose shape field contains the query geometry      |
+|   `within`     |  Return all documents whose shape field is within the query geometry.    |
 
 ------------------------------------------------------------------------------------------------------------------------
 
