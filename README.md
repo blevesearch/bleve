@@ -68,11 +68,11 @@ searchResult, _ := index.Search(searchRequest)
 
 To install the CLI for the latest release of bleve, run:
 
-```bash
+```shell
 $ go install github.com/blevesearch/bleve/v2/cmd/bleve@latest
 ```
 
-```bash
+```text
 $ bleve --help
 Bleve is a command-line tool to interact with a bleve index.
 
