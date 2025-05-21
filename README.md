@@ -16,41 +16,41 @@ A modern indexing + search library in GO
 * Index any GO data structure or JSON
 * Intelligent defaults backed up by powerful configuration ([scorch](https://github.com/blevesearch/bleve/blob/master/index/scorch/README.md))
 * Supported field types:
-    * `text`, `number`, `datetime`, `boolean`, `geopoint`, `geoshape`, `IP`, `vector`
+  * `text`, `number`, `datetime`, `boolean`, `geopoint`, `geoshape`, `IP`, `vector`
 * Supported query types:
-    * `term`, `phrase`, `match`, `match_phrase`, `prefix`, `regexp`, `wildcard`, `fuzzy`
-    * term range, numeric range, date range, boolean field
-    * compound queries: `conjuncts`, `disjuncts`, boolean (`must`/`should`/`must_not`)
-    * [query string syntax](http://www.blevesearch.com/docs/Query-String-Query/)
-    * [geo spatial search](https://github.com/blevesearch/bleve/blob/master/geo/README.md)
-    * approximate k-nearest neighbors via [vector search](https://github.com/blevesearch/bleve/blob/master/docs/vectors.md)
-    * [synonym search](https://github.com/blevesearch/bleve/blob/master/docs/synonyms.md)
+  * `term`, `phrase`, `match`, `match_phrase`, `prefix`, `regexp`, `wildcard`, `fuzzy`
+  * term range, numeric range, date range, boolean field
+  * compound queries: `conjuncts`, `disjuncts`, boolean (`must`/`should`/`must_not`)
+  * [query string syntax](http://www.blevesearch.com/docs/Query-String-Query/)
+  * [geo spatial search](https://github.com/blevesearch/bleve/blob/master/geo/README.md)
+  * approximate k-nearest neighbors via [vector search](https://github.com/blevesearch/bleve/blob/master/docs/vectors.md)
+  * [synonym search](https://github.com/blevesearch/bleve/blob/master/docs/synonyms.md)
 * [tf-idf](https://github.com/blevesearch/bleve/blob/master/docs/scoring.md#tf-idf) / [bm25](https://github.com/blevesearch/bleve/blob/master/docs/scoring.md#bm25) scoring models
 * Hybrid search: exact + semantic
 * Query time boosting
 * Search result match highlighting with document fragments
 * Aggregations/faceting support:
-    * terms facet
-    * numeric range facet
-    * date range facet
+  * terms facet
+  * numeric range facet
+  * date range facet
 
 ## Indexing
 
 ```go
-message := struct{
-	Id   string
-	From string
-	Body string
+message := struct {
+    Id   string
+    From string
+    Body string
 }{
-	Id:   "example",
-	From: "xyz@couchbase.com",
-	Body: "bleve indexing is easy",
+    Id:   "example",
+    From: "xyz@couchbase.com",
+    Body: "bleve indexing is easy",
 }
 
 mapping := bleve.NewIndexMapping()
 index, err := bleve.New("example.bleve", mapping)
 if err != nil {
-	panic(err)
+    panic(err)
 }
 index.Index(message.Id, message)
 ```
@@ -69,10 +69,10 @@ searchResult, _ := index.Search(searchRequest)
 To install the CLI for the latest release of bleve, run:
 
 ```bash
-$ go install github.com/blevesearch/bleve/v2/cmd/bleve@latest
+go install github.com/blevesearch/bleve/v2/cmd/bleve@latest
 ```
 
-```
+```text
 $ bleve --help
 Bleve is a command-line tool to interact with a bleve index.
 
@@ -113,6 +113,7 @@ Arabic (ar), Bulgarian (bg), Catalan (ca), Chinese-Japanese-Korean (cjk), Kurdis
 ## Discussion/Issues
 
 Discuss usage/development of bleve and/or report issues here:
+
 * [Github issues](https://github.com/blevesearch/bleve/issues)
 * [Google group](https://groups.google.com/forum/#!forum/bleve)
 
