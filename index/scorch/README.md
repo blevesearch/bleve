@@ -3,13 +3,16 @@
 ## Definitions
 
 Batch
+
 - A collection of Documents to mutate in the index.
 
 Document
+
 - Has a unique identifier (arbitrary bytes).
 - Is comprised of a list of fields.
 
 Field
+
 - Has a name (string).
 - Has a type (text, number, date, geopoint).
 - Has a value (depending on type).
@@ -41,7 +44,7 @@ NOTE: If a document already contains a field \_id, it will be replaced.  If this
 
 ### Proposed Structures
 
-```
+```go
 type Segment interface {
 
   Dictionary(field string) TermDictionary
@@ -92,9 +95,11 @@ type IndexSnapshot struct {
   segment []SegmentSnapshot
 }
 ```
+
 **What about errors?**
 **What about memory mgmnt or context?**
 **Postings List separate iterator to separate stateful from stateless**
+
 ### Mutating the Index
 
 The bleve.index API has methods for directly making individual mutations (Update/Delete/SetInternal/DeleteInternal), however for this first implementation, we assume that all of these calls can simply be turned into a Batch of size 1.  This may be highly inefficient, but it will be correct.  This decision is made based on the fact that Couchbase FTS always uses Batches.
@@ -105,9 +110,9 @@ From this point forward, only Batch mutations will be discussed.
 
 Sequence of Operations:
 
-1.  For each document in the batch, search through all existing segments.  The goal is to build up a per-segment bitset which tells us which documents in that segment are obsoleted by the addition of the new segment we're currently building.  NOTE: we're not ready for this change to take effect yet, so rather than this operation mutating anything, they simply return bitsets, which we can apply later.  Logically, this is something like:
+1. For each document in the batch, search through all existing segments.  The goal is to build up a per-segment bitset which tells us which documents in that segment are obsoleted by the addition of the new segment we're currently building.  NOTE: we're not ready for this change to take effect yet, so rather than this operation mutating anything, they simply return bitsets, which we can apply later.  Logically, this is something like:
 
-    ```
+    ```go
       foreach segment {
         dict := segment.Dictionary("\_id")
         postings := empty postings list
@@ -119,21 +124,21 @@ Sequence of Operations:
 
     NOTE: it is illustrated above as nested for loops, but some or all of these could be concurrently.  The end result is that for each segment, we have (possibly empty) bitset.
 
-2.  Also concurrent with 1, the documents in the batch are analyzed.  This analysis proceeds using the existing analyzer pool.
+2. Also concurrent with 1, the documents in the batch are analyzed.  This analysis proceeds using the existing analyzer pool.
 
 3. (after 2 completes) Analyzed documents are fed into a function which builds a new Segment representing this information.
 
-4.  We now have everything we need to update the state of the system to include this new snapshot.
-
-  -  Acquire a lock
-  -  Create a new IndexSnapshot
-  -  For each SegmentSnapshot in the IndexSnapshot, take the deleted PostingsList and OR it with the new postings list for this Segment.  Construct a new SegmentSnapshot for the segment using this new deleted PostingsList.  Append this SegmentSnapshot to the IndexSnapshot.
-  -  Create a new SegmentSnapshot wrapping our new segment with nil deleted docs.
-  -  Append the new SegmentSnapshot to the IndexSnapshot
-  -  Release the lock
+4. We now have everything we need to update the state of the system to include this new snapshot.
+    - Acquire a lock
+    - Create a new IndexSnapshot
+    - For each SegmentSnapshot in the IndexSnapshot, take the deleted PostingsList and OR it with the new postings list for this Segment.  Construct a new SegmentSnapshot for the segment using this new deleted PostingsList.  Append this SegmentSnapshot to the IndexSnapshot.
+    - Create a new SegmentSnapshot wrapping our new segment with nil deleted docs.
+    - Append the new SegmentSnapshot to the IndexSnapshot
+    - Release the lock
 
 An ASCII art example:
-  ```
+
+```text
   0 - Empty Index
 
   No segments
@@ -209,7 +214,7 @@ Term search is the only searching primitive exposed in today's bleve.index API. 
 
 A term search for term T in field F will look something like this:
 
-```
+```go
   searchResultPostings = empty
   foreach segment {
     dict := segment.Dictionary(F)
@@ -222,31 +227,31 @@ The searchResultPostings will be a new implementation of the TermFieldReader int
 
 As a reminder this interface is:
 
-```
+```go
 // TermFieldReader is the interface exposing the enumeration of documents
 // containing a given term in a given field. Documents are returned in byte
 // lexicographic order over their identifiers.
 type TermFieldReader interface {
-	// Next returns the next document containing the term in this field, or nil
-	// when it reaches the end of the enumeration.  The preAlloced TermFieldDoc
-	// is optional, and when non-nil, will be used instead of allocating memory.
-	Next(preAlloced *TermFieldDoc) (*TermFieldDoc, error)
+  // Next returns the next document containing the term in this field, or nil
+  // when it reaches the end of the enumeration.  The preAlloced TermFieldDoc
+  // is optional, and when non-nil, will be used instead of allocating memory.
+  Next(preAlloced *TermFieldDoc) (*TermFieldDoc, error)
 
-	// Advance resets the enumeration at specified document or its immediate
-	// follower.
-	Advance(ID IndexInternalID, preAlloced *TermFieldDoc) (*TermFieldDoc, error)
+  // Advance resets the enumeration at specified document or its immediate
+  // follower.
+  Advance(ID IndexInternalID, preAlloced *TermFieldDoc) (*TermFieldDoc, error)
 
-	// Count returns the number of documents contains the term in this field.
-	Count() uint64
-	Close() error
+  // Count returns the number of documents contains the term in this field.
+  Count() uint64
+  Close() error
 }
 ```
 
 At first glance this appears problematic, we have no way to return documents in order of their identifiers.  But it turns out the wording of this perhaps too strong, or a bit ambiguous.  Originally, this referred to the external identifiers, but with the introduction of a distinction between internal/external identifiers, returning them in order of their internal identifiers is also acceptable.  **ASIDE**: the reason for this is that most callers just use Next() and literally don't care what the order is, they could be in any order and it would be fine.  There is only one search that cares and that is the ConjunctionSearcher, which relies on Next/Advance having very specific semantics.  Later in this document we will have a proposal to split into multiple interfaces:
 
--  The weakest interface, only supports Next() no ordering at all.
--  Ordered, supporting Advance()
--  And/Or'able capable of internally efficiently doing these ops with like interfaces (if not capable then can always fall back to external walking)
+- The weakest interface, only supports Next() no ordering at all.
+- Ordered, supporting Advance()
+- And/Or'able capable of internally efficiently doing these ops with like interfaces (if not capable then can always fall back to external walking)
 
 But, the good news is that we don't even have to do that for our first implementation.  As long as the global numbers we use for internal identifiers are consistent within this IndexSnapshot, then Next() will be ordered by ascending document number, and Advance() will still work correctly.
 
@@ -254,7 +259,7 @@ NOTE: there is another place where we rely on the ordering of these hits, and th
 
 An ASCII art example:
 
-```
+```text
 Let's start with the IndexSnapshot we ended with earlier:
 
 3 - Index Batch [ C' ]
@@ -320,7 +325,6 @@ In the future, interfaces to detect these non-serially operating TermFieldReader
 
 Another related topic is that of peak memory usage.  With serially operating TermFieldReaders it was necessary to start them all at the same time and operate in unison.  However, with these non-serially operating TermFieldReaders we have the option of doing a few at a time, consolidating them, dispoting the intermediaries, and then doing a few more.  For very complex queries with many clauses this could reduce peak memory usage.
 
-
 ### Memory Tracking
 
 All segments must be able to produce two statistics, an estimate of their explicit memory usage, and their actual size on disk (if any).  For in-memory segments, disk usage could be zero, and the memory usage represents the entire information content.  For mmap-based disk segments, the memory could be as low as the size of tracking structure itself (say just a few pointers).
@@ -335,13 +339,11 @@ At runtime, the state of an index (it's IndexSnapshot) is not only the contents 
 
 This also relates to the topic rollback, addressed next...
 
-
 ### Rollback
 
 One desirable property in the Couchbase ecosystem is the ability to rollback to some previous (though typically not long ago) state.  One idea for keeping this property in this design is to protect some of the most recent segments from merging.  Then, if necessary, they could be "undone" to reveal previous states of the system.  In these scenarios "undone" has to properly undo the deleted bitmasks on the other segments.  Again, the current thinking is that rather than "undo" anything, it could be work that was deferred in the first place, thus making it easier to logically undo.
 
 Another possibly related approach would be to tie this into our existing snapshot mechanism.  Perhaps simulating a slow reader (holding onto index snapshots) for some period of time, can be the mechanism to achieve the desired end goal.
-
 
 ### Internal Storage
 
