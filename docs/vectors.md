@@ -73,7 +73,7 @@ index.Index(doc.Id, doc)
 ## Querying
 
 ```go
-// Vector search: finds nearest neighbors using kNN on vectors
+// Vector Search: finds nearest neighbors using kNN on vectors
 searchRequest := bleve.NewSearchRequest(bleve.NewMatchNoneQuery())
 searchRequest.AddKNN(
     "vec",                                   // Vector field name in index
@@ -87,7 +87,7 @@ if err != nil {
 }
 fmt.Println(searchResult.Hits) // Scores are 1 / squared L2 distance, e.g., score = 0.25 for squared distance of 4
 
-// Hybrid search: combining kNN vector search with Bleve search
+// Hybrid Search: combining kNN vector search with Bleve search
 hybridRequest := bleve.NewSearchRequest(bleve.NewMatchQuery("united states")) // Bleve query (can be replaced with any Bleve query)
 hybridRequest.AddKNN(
     "vec",
