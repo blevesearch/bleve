@@ -38,19 +38,19 @@ A modern indexing + search library in GO
 
 ```go
 message := struct {
-  Id   string
-  From string
-  Body string
+    Id   string
+    From string
+    Body string
 }{
-  Id:   "example",
-  From: "xyz@couchbase.com",
-  Body: "bleve indexing is easy",
+    Id:   "example",
+    From: "xyz@couchbase.com",
+    Body: "bleve indexing is easy",
 }
 
 mapping := bleve.NewIndexMapping()
 index, err := bleve.New("example.bleve", mapping)
 if err != nil {
-  panic(err)
+    panic(err)
 }
 index.Index(message.Id, message)
 ```
