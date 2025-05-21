@@ -38,6 +38,7 @@ aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distanc
 
 * Multi kNN searches are supported - the `knn` object within the search request accepts an array of requests. These sub objects are unioned by default but this behavior can be overriden by setting `knn_operator` to `"and"`.
 * Previously supported pagination settings will work as they were, with size/limit being applied over the top-K hits combined with any exact search hits.
+* Pre-filtered vector and hybrid search (v2.4.3+): Apply any Bleve filter query first to narrow down candidates before running kNN search, making vector and hybrid searches faster and more relevant.
 
 ## Indexing
 
@@ -72,31 +73,48 @@ index.Index(doc.Id, doc)
 ## Querying
 
 ```go
+// Vector search: finds nearest neighbors using kNN on vectors
 searchRequest := bleve.NewSearchRequest(bleve.NewMatchNoneQuery())
 searchRequest.AddKNN(
-    "vec", // vector field name
-    []float32{10, 11, 12, 13, 14, 15, 16, 17, 18, 19}, // query vector (same dims)
-    5, // k
-    0, // boost
+    "vec",                                   // Vector field name in index
+    []float32{0, 1, 1, 4, 4, 5, 7, 6, 8, 9}, // Query vector (must match indexed vector dims)
+    5,                                       // Number of nearest neighbors to return (k)
+    1,                                       // Boost factor for kNN score
 )
 searchResult, err := index.Search(searchRequest)
 if err != nil {
     panic(err)
 }
-fmt.Println(searchResult.Hits)
+fmt.Println(searchResult.Hits) // Scores are 1 / squared L2 distance, e.g., score = 0.25 for squared distance of 4
+
+// Hybrid search: combining kNN vector search with Bleve search
+hybridRequest := bleve.NewSearchRequest(bleve.NewMatchQuery("united states")) // Bleve query (can be replaced with any Bleve query)
+hybridRequest.AddKNN(
+    "vec",
+    []float32{0, 1, 1, 4, 4, 5, 7, 6, 8, 9},
+    5,
+    1,
+)
+hybridResult, err := index.Search(hybridRequest)
+if err != nil {
+    panic(err)
+}
+fmt.Println(hybridResult.Hits) // Scores are the sum of text search and kNN scores, e.g., 0.25 + 0.25 = 0.50
 ```
 
 ## Querying with filters (v2.4.3+)
 
 ```go
-searchRequest := bleve.NewSearchRequest(bleve.NewMatchNoneQuery())
-filterQuery := bleve.NewTermQuery("hello")
+// Pre-filtered vector/hybrid search: filter query narrows candidates before KNN search
+searchRequest := bleve.NewSearchRequest(bleve.NewMatchNoneQuery()) // replace with any Bleve query for Pre-filtered Hybrid Search
+filterQuery := bleve.NewTermQuery("hello") // Filter query to narrow candidates
+
 searchRequest.AddKNNWithFilter(
-    "vec", // vector field name
-    []float32{10, 11, 12, 13, 14, 15, 16, 17, 18, 19}, // query vector (same dims)
-    5,           // k
-    0,           // boost
-    filterQuery, // filter query
+    "vec",                              // Vector field name
+    []float32{0, 1, 1, 4, 4, 5, 7, 6, 8, 9}, // Query vector (must match indexed vector dims)
+    5,                                 // Number of nearest neighbors to return (k)
+    1,                                 // Boost factor for KNN score
+    filterQuery,                       // Filter query applied before KNN search
 )
 searchResult, err := index.Search(searchRequest)
 if err != nil {
