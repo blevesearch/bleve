@@ -240,7 +240,7 @@ A  sample circular shape is as below.
 
 Circle is specified over the center point coordinates along with the radius.
 Example formats supported for radius are:
-"5in" , "5inch" , "7yd" , "7yards",  "9ft" , "9feet", "11km", "11kilometers", "3nm", "3nauticalmiles", "13mm" , "13millimeters",  "15cm", "15centimeters", "17mi", "17miles" "19m" or "19meters".
+"5in" , "5inch" , "7yd" , "7yards",  "9ft" , "9feet", "11km", "11kilometers", "3nm", "3nauticalmiles", "13mm" , "13millimeters",  "15cm", "15centimeters", "17mi", "17miles", "19m" or "19meters".
 
 If the unit cannot be determined, the entire string is parsed and the unit of meters is assumed.
 
