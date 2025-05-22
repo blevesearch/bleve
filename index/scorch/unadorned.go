@@ -165,6 +165,10 @@ func newUnadornedPostingsIteratorFrom1Hit(docNum1Hit uint64) segment.PostingsIte
 	}
 }
 
+type ResetablePostingsIterator interface {
+	ResetIterator()
+}
+
 type UnadornedPosting uint64
 
 func (p UnadornedPosting) Number() uint64 {
