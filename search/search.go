@@ -154,6 +154,7 @@ type DocumentMatch struct {
 	Locations       FieldTermLocationMap  `json:"locations,omitempty"`
 	Fragments       FieldFragmentMap      `json:"fragments,omitempty"`
 	Sort            []string              `json:"sort,omitempty"`
+	GeoDistance     []string              `json:"geo_distance,omitempty"`
 
 	// Fields contains the values for document fields listed in
 	// SearchRequest.Fields. Text fields are returned as strings, numeric

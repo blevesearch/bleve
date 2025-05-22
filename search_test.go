@@ -4533,7 +4533,7 @@ func TestGeoDistanceInSort(t *testing.T) {
 	}
 
 	for i, doc := range res.Hits {
-		hitDist, err := strconv.ParseFloat(doc.Sort[0], 64)
+		hitDist, err := strconv.ParseFloat(doc.GeoDistance[0], 64)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -212,7 +213,11 @@ type SortOrder []SearchSort
 
 func (so SortOrder) Value(doc *DocumentMatch) {
 	for _, soi := range so {
-		doc.Sort = append(doc.Sort, soi.Value(doc))
+		value := soi.Value(doc)
+		doc.Sort = append(doc.Sort, value)
+		if _, ok := soi.(*SortGeoDistance); ok {
+			doc.GeoDistance = append(doc.GeoDistance, decodeGeoValue(value))
+		}
 	}
 }
 
@@ -755,6 +760,14 @@ func (s *SortGeoDistance) Copy() SearchSort {
 
 func (s *SortGeoDistance) Reverse() {
 	s.Desc = !s.Desc
+}
+
+func decodeGeoValue(value string) string {
+	distInt, err := numeric.PrefixCoded(value).Int64()
+	if err != nil {
+		return ""
+	}
+	return strconv.FormatFloat(numeric.Int64ToFloat64(distInt), 'f', -1, 64)
 }
 
 type BytesSlice [][]byte
