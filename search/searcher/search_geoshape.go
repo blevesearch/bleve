@@ -77,7 +77,7 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 		bufPool = bufPoolCallback()
 	}
 
-	return func(d *search.DocumentMatch) bool {
+	return func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
 		var found bool
 
 		err := dvReader.VisitDocValues(d.IndexInternalID,
