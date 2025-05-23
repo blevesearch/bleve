@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"reflect"
 	"sort"
 	"strconv"
 	"sync"
@@ -1701,9 +1702,14 @@ func TestNumVecsStat(t *testing.T) {
 	}
 }
 
-func TestSerialAndBatchRequestsToVectorIndex(t *testing.T) {
+func TestBatchingRequestsToVectorIndex(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
-	defer cleanupTmpIndexPath(t, tmpIndexPath)
+	prevValue := scorch.BleveVectorSearchBatchExecution
+	scorch.BleveVectorSearchBatchExecution = true
+	defer func() {
+		scorch.BleveVectorSearchBatchExecution = prevValue
+		cleanupTmpIndexPath(t, tmpIndexPath)
+	}()
 
 	docs := []map[string]interface{}{
 		{
@@ -1788,12 +1794,14 @@ func TestSerialAndBatchRequestsToVectorIndex(t *testing.T) {
 		{
 			queryVec: []float32{11, 14, 17},
 		},
-		{
-			queryVec: []float32{2, 5, 8, 11, 14, 17},
-		},
 	}
 
-	for _, test := range tests {
+	expectedHitsSortedByID := [][]string{
+		{"1", "2", "3"},
+		{"4", "5", "6"},
+	}
+
+	for testi, test := range tests {
 		searchReq := NewSearchRequest(query.NewMatchNoneQuery())
 		searchReq.AddKNN("vec", test.queryVec, 3, 1)
 
@@ -1802,6 +1810,19 @@ func TestSerialAndBatchRequestsToVectorIndex(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		fmt.Println(test.queryVec, res.Hits)
+		if len(res.Hits) != 3 {
+			t.Fatalf("[%d] unexpected number of hits: %v", testi+1, len(res.Hits))
+		}
+
+		var gotHitIDs []string
+		for i := 0; i < len(res.Hits); i++ {
+			gotHitIDs = append(gotHitIDs, res.Hits[i].ID)
+		}
+
+		sort.Strings(gotHitIDs)
+		if !reflect.DeepEqual(gotHitIDs, expectedHitsSortedByID[testi]) {
+			t.Fatalf("[%d] expect hits: %v, got hits: %v", testi+1,
+				expectedHitsSortedByID[testi], gotHitIDs)
+		}
 	}
 }
