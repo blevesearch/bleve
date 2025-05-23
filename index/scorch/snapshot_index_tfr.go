@@ -165,11 +165,9 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 			// back to the beginning, which effectively
 			// achives the same thing as the above
 			for _, iter := range i.iterators {
-				optimizedIterator, ok := iter.(*unadornedPostingsIteratorBitmap)
-				if !ok {
-					return nil, fmt.Errorf("unexpected iterator type %T", iter)
+				if optimizedIterator, ok := iter.(ResetablePostingsIterator); ok {
+					optimizedIterator.ResetIterator()
 				}
-				optimizedIterator.ResetIterator()
 			}
 		}
 	}

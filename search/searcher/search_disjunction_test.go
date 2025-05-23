@@ -16,6 +16,7 @@ package searcher
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -220,4 +221,136 @@ func TestDisjunctionSearchTooMany(t *testing.T) {
 	if err == nil {
 		t.Fatal(err)
 	}
+}
+
+func TestUnadornedDisjunctionAdvance(t *testing.T) {
+	dir, _ := os.MkdirTemp("", "scorchTwoDoc")
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
+	twoDocIndex := initTwoDocScorch(dir)
+	twoDocIndexReader, err := twoDocIndex.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := twoDocIndexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	getNewOptimizedCompositeSearcher := func(t *testing.T) search.Searcher {
+		optimizedCompositeSearcherOptions := search.SearcherOptions{Explain: false, IncludeTermVectors: false, Score: "none"}
+		martyTermSearcher, err := NewTermSearcher(context.Background(), twoDocIndexReader, "marty", "name", 1.0, optimizedCompositeSearcherOptions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dustinTermSearcher, err := NewTermSearcher(context.Background(), twoDocIndexReader, "dustin", "name", 1.0, optimizedCompositeSearcherOptions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		steveTermSearcher, err := NewTermSearcher(context.Background(), twoDocIndexReader, "steve", "name", 1.0, optimizedCompositeSearcherOptions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		martyOrDustinOrSteveSearcher, err := NewDisjunctionSearcher(context.Background(), twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher, steveTermSearcher}, 0, optimizedCompositeSearcherOptions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return martyOrDustinOrSteveSearcher
+	}
+	martyOrDustinOrSteveSearcher := getNewOptimizedCompositeSearcher(t)
+	ctx := &search.SearchContext{
+		DocumentMatchPool: search.NewDocumentMatchPool(martyOrDustinOrSteveSearcher.DocumentMatchPoolSize(), 0),
+	}
+	// get the correct order using only next calls
+	dm, err := martyOrDustinOrSteveSearcher.Next(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedDocIDs := []index.IndexInternalID{}
+	for dm != nil && err == nil {
+		expectedDocIDs = append(expectedDocIDs, dm.IndexInternalID)
+		dm, err = martyOrDustinOrSteveSearcher.Next(ctx)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(expectedDocIDs) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(expectedDocIDs))
+	}
+	// Test 1 - Advance in reverse direction after getting the correct order using only next calls
+	// Next(->) - Next(->) - Next(->) - Advance(<-) - Advance(<-)
+	for i := len(expectedDocIDs) - 1; i >= 0; i-- {
+		xID := expectedDocIDs[i]
+		dm, err = martyOrDustinOrSteveSearcher.Advance(ctx, xID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if dm == nil {
+			t.Fatalf("expected to find %v", xID)
+		}
+		if !dm.IndexInternalID.Equals(xID) {
+			t.Fatalf("expected %v, got %v", xID, dm.IndexInternalID)
+		}
+	}
+	// Test 2 - Advance in forward direction after getting the correct order using only next calls
+	// Next(->) - Next(->) - Next(->) - Advance(ResetTo0) - Advance(->) - Advance(->)
+	martyOrDustinOrSteveSearcher = getNewOptimizedCompositeSearcher(t)
+	for i := 0; i < len(expectedDocIDs); i++ {
+		xID := expectedDocIDs[i]
+		dm, err = martyOrDustinOrSteveSearcher.Advance(ctx, xID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if dm == nil {
+			t.Fatalf("expected to find %v", xID)
+		}
+		if !dm.IndexInternalID.Equals(xID) {
+			t.Fatalf("expected %v, got %v", xID, dm.IndexInternalID)
+		}
+	}
+	// Test 3 - Alternate Next and Advance calls
+	// Next(->) -> Next(->) -> Advance(<-) -> Next(->) -> Next(->) -> Advance(<-) -> Advance(<-) -> Next(->)
+	martyOrDustinOrSteveSearcher = getNewOptimizedCompositeSearcher(t)
+	goNext := func(expectedDocID index.IndexInternalID) {
+		dm, err = martyOrDustinOrSteveSearcher.Next(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if dm == nil {
+			t.Fatal("expected a document, got nil")
+		}
+		if !dm.IndexInternalID.Equals(expectedDocID) {
+			t.Fatalf("expected %v, got %v", expectedDocID, dm.IndexInternalID)
+		}
+	}
+	goBack := func(goTo index.IndexInternalID) {
+		dm, err = martyOrDustinOrSteveSearcher.Advance(ctx, goTo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if dm == nil {
+			t.Fatalf("expected to find %v", goTo)
+		}
+		if !dm.IndexInternalID.Equals(goTo) {
+			t.Fatalf("expected %v, got %v", goTo, dm.IndexInternalID)
+		}
+	}
+	// Next		(->)
+	goNext(expectedDocIDs[0])
+	// Next		(->)
+	goNext(expectedDocIDs[1])
+	// Advance	(<-)
+	goBack(expectedDocIDs[0])
+	// Next		(->)
+	goNext(expectedDocIDs[1])
+	// Next		(->)
+	goNext(expectedDocIDs[2])
+	// Advance	(<-)
+	goBack(expectedDocIDs[1])
+	// Advance	(<-)
+	goBack(expectedDocIDs[0])
+	// Next		(->)
+	goNext(expectedDocIDs[1])
 }
