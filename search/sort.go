@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/blevesearch/bleve/v2/geo"
@@ -216,7 +217,11 @@ func (so SortOrder) Value(doc *DocumentMatch) {
 		value := soi.Value(doc)
 		doc.Sort = append(doc.Sort, value)
 		if _, ok := soi.(*SortGeoDistance); ok {
-			doc.GeoDistance = append(doc.GeoDistance, decodeGeoValue(value))
+			doc.DecodedSort = append(doc.DecodedSort, decodeGeoValue(value))
+		} else if s, ok := soi.(*SortField); ok {
+			doc.DecodedSort = append(doc.DecodedSort, s.decodeValue(value))
+		} else {
+			doc.DecodedSort = append(doc.DecodedSort, value)
 		}
 	}
 }
@@ -393,6 +398,25 @@ func (s *SortField) Value(i *DocumentMatch) string {
 	iTerm := s.filterTermsByMode(iTerms)
 	s.values = s.values[:0]
 	return iTerm
+}
+
+func (s *SortField) decodeValue(value string) string {
+	switch s.Type {
+	default:
+		return value
+	case SortFieldAsNumber:
+		i64, err := numeric.PrefixCoded(value).Int64()
+		if err != nil {
+			return value
+		}
+		return strconv.FormatFloat(numeric.Int64ToFloat64(i64), 'f', -1, 64)
+	case SortFieldAsDate:
+		i64, err := numeric.PrefixCoded(value).Int64()
+		if err != nil {
+			return value
+		}
+		return time.Unix(0, i64).UTC().String()
+	}
 }
 
 // Descending determines the order of the sort
