@@ -1644,7 +1644,6 @@ func TestNestedVectors(t *testing.T) {
 }
 
 func TestNumVecsStat(t *testing.T) {
-
 	dataset, _, err := readDatasetAndQueries(testInputCompressedFile)
 	if err != nil {
 		t.Fatal(err)
@@ -1699,5 +1698,110 @@ func TestNumVecsStat(t *testing.T) {
 				t.Fatalf("mismatch in the number of vectors, expected 300, got %d", indexStatsMap["field:vector:num_vectors"])
 			}
 		}
+	}
+}
+
+func TestSerialAndBatchRequestsToVectorIndex(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	docs := []map[string]interface{}{
+		{
+			"id":  "1",
+			"vec": []float32{1.0, 2.0, 3.0},
+		},
+		{
+			"id":  "2",
+			"vec": []float32{4.0, 5.0, 6.0},
+		},
+		{
+			"id":  "3",
+			"vec": []float32{7.0, 8.0, 9.0},
+		},
+		{
+			"id":  "4",
+			"vec": []float32{10.0, 11.0, 12.0},
+		},
+		{
+			"id":  "5",
+			"vec": []float32{13.0, 14.0, 15.0},
+		},
+		{
+			"id":  "6",
+			"vec": []float32{16.0, 17.0, 18.0},
+		},
+		{
+			"id":  "7",
+			"vec": []float32{19.0, 20.0, 21.0},
+		},
+		{
+			"id":  "8",
+			"vec": []float32{22.0, 23.0, 24.0},
+		},
+		{
+			"id":  "9",
+			"vec": []float32{25.0, 26.0, 27.0},
+		},
+		{
+			"id":  "10",
+			"vec": []float32{28.0, 29.0, 30.0},
+		},
+	}
+	// Index mapping
+	indexMapping := NewIndexMapping()
+	vm := mapping.NewVectorFieldMapping()
+	vm.Dims = 3
+	vm.Similarity = "l2_norm"
+	indexMapping.DefaultMapping.AddFieldMappingsAt("vec", vm)
+
+	// Create index and upload documents
+	idx, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch := idx.NewBatch()
+	for _, doc := range docs {
+		err = batch.Index(doc["id"].(string), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		queryVec []float32
+	}{
+		{
+			queryVec: []float32{2, 5, 8},
+		},
+		{
+			queryVec: []float32{11, 14, 17},
+		},
+		{
+			queryVec: []float32{2, 5, 8, 11, 14, 17},
+		},
+	}
+
+	for _, test := range tests {
+		searchReq := NewSearchRequest(query.NewMatchNoneQuery())
+		searchReq.AddKNN("vec", test.queryVec, 3, 1)
+
+		res, err := idx.Search(searchReq)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		fmt.Println(test.queryVec, res.Hits)
 	}
 }
