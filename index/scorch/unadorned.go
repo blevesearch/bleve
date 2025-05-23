@@ -96,6 +96,12 @@ func (i *unadornedPostingsIteratorBitmap) ReplaceActual(actual *roaring.Bitmap) 
 	i.actual = actual.Iterator()
 }
 
+// Resets the iterator to the beginning of the postings list.
+// by resetting the actual iterator.
+func (i *unadornedPostingsIteratorBitmap) ResetIterator() {
+	i.actual = i.actualBM.Iterator()
+}
+
 func newUnadornedPostingsIteratorFromBitmap(bm *roaring.Bitmap) segment.PostingsIterator {
 	return &unadornedPostingsIteratorBitmap{
 		actualBM: bm,
@@ -106,7 +112,8 @@ func newUnadornedPostingsIteratorFromBitmap(bm *roaring.Bitmap) segment.Postings
 const docNum1HitFinished = math.MaxUint64
 
 type unadornedPostingsIterator1Hit struct {
-	docNum uint64
+	docNumOrig uint64 // original 1-hit docNum used to create this iterator
+	docNum     uint64 // current docNum
 }
 
 func (i *unadornedPostingsIterator1Hit) Next() (segment.Posting, error) {
@@ -153,10 +160,20 @@ func (i *unadornedPostingsIterator1Hit) BytesWritten() uint64 {
 
 func (i *unadornedPostingsIterator1Hit) ResetBytesRead(uint64) {}
 
+// ResetIterator resets the iterator to the original state.
+func (i *unadornedPostingsIterator1Hit) ResetIterator() {
+	i.docNum = i.docNumOrig
+}
+
 func newUnadornedPostingsIteratorFrom1Hit(docNum1Hit uint64) segment.PostingsIterator {
 	return &unadornedPostingsIterator1Hit{
-		docNum1Hit,
+		docNumOrig: docNum1Hit,
+		docNum:     docNum1Hit,
 	}
+}
+
+type ResetablePostingsIterator interface {
+	ResetIterator()
 }
 
 type UnadornedPosting uint64

@@ -50,6 +50,7 @@ type IndexSnapshotTermFieldReader struct {
 	recycle            bool
 	bytesRead          uint64
 	ctx                context.Context
+	unadorned          bool
 }
 
 func (i *IndexSnapshotTermFieldReader) incrementBytesRead(val uint64) {
@@ -146,14 +147,29 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 	// FIXME do something better
 	// for now, if we need to seek backwards, then restart from the beginning
 	if i.currPosting != nil && bytes.Compare(i.currID, ID) >= 0 {
-		i2, err := i.snapshot.TermFieldReader(context.TODO(), i.term, i.field,
-			i.includeFreq, i.includeNorm, i.includeTermVectors)
-		if err != nil {
-			return nil, err
+		// Check if the TFR is a special unadorned composite optimization.
+		// Such a TFR will NOT have a valid `term` or `field` set, making it
+		// impossible for the TFR to replace itself with a new one.
+		if !i.unadorned {
+			i2, err := i.snapshot.TermFieldReader(context.TODO(), i.term, i.field,
+				i.includeFreq, i.includeNorm, i.includeTermVectors)
+			if err != nil {
+				return nil, err
+			}
+			// close the current term field reader before replacing it with a new one
+			_ = i.Close()
+			*i = *(i2.(*IndexSnapshotTermFieldReader))
+		} else {
+			// unadorned composite optimization
+			// we need to reset all the iterators
+			// back to the beginning, which effectively
+			// achives the same thing as the above
+			for _, iter := range i.iterators {
+				if optimizedIterator, ok := iter.(ResetablePostingsIterator); ok {
+					optimizedIterator.ResetIterator()
+				}
+			}
 		}
-		// close the current term field reader before replacing it with a new one
-		_ = i.Close()
-		*i = *(i2.(*IndexSnapshotTermFieldReader))
 	}
 	num, err := docInternalToNumber(ID)
 	if err != nil {
