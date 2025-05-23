@@ -38,6 +38,7 @@ var (
 type SearchSort interface {
 	UpdateVisitor(field string, term []byte)
 	Value(a *DocumentMatch) string
+	DecodeValue(value string) string
 	Descending() bool
 
 	RequiresDocID() bool
@@ -216,13 +217,7 @@ func (so SortOrder) Value(doc *DocumentMatch) {
 	for _, soi := range so {
 		value := soi.Value(doc)
 		doc.Sort = append(doc.Sort, value)
-		if _, ok := soi.(*SortGeoDistance); ok {
-			doc.DecodedSort = append(doc.DecodedSort, decodeGeoValue(value))
-		} else if s, ok := soi.(*SortField); ok {
-			doc.DecodedSort = append(doc.DecodedSort, s.decodeValue(value))
-		} else {
-			doc.DecodedSort = append(doc.DecodedSort, value)
-		}
+		doc.DecodedSort = append(doc.DecodedSort, soi.DecodeValue(value))
 	}
 }
 
@@ -400,10 +395,8 @@ func (s *SortField) Value(i *DocumentMatch) string {
 	return iTerm
 }
 
-func (s *SortField) decodeValue(value string) string {
+func (s *SortField) DecodeValue(value string) string {
 	switch s.Type {
-	default:
-		return value
 	case SortFieldAsNumber:
 		i64, err := numeric.PrefixCoded(value).Int64()
 		if err != nil {
@@ -416,6 +409,8 @@ func (s *SortField) decodeValue(value string) string {
 			return value
 		}
 		return time.Unix(0, i64).UTC().String()
+	default:
+		return value
 	}
 }
 
@@ -574,6 +569,10 @@ func (s *SortDocID) Value(i *DocumentMatch) string {
 	return i.ID
 }
 
+func (s *SortDocID) DecodeValue(value string) string {
+	return value
+}
+
 // Descending determines the order of the sort
 func (s *SortDocID) Descending() bool {
 	return s.Desc
@@ -617,6 +616,10 @@ func (s *SortScore) UpdateVisitor(field string, term []byte) {
 // Value returns the sort value of the DocumentMatch
 func (s *SortScore) Value(i *DocumentMatch) string {
 	return "_score"
+}
+
+func (s *SortScore) DecodeValue(value string) string {
+	return value
 }
 
 // Descending determines the order of the sort
@@ -723,6 +726,14 @@ func (s *SortGeoDistance) Value(i *DocumentMatch) string {
 	return string(numeric.MustNewPrefixCodedInt64(distInt64, 0))
 }
 
+func (s *SortGeoDistance) DecodeValue(value string) string {
+	distInt, err := numeric.PrefixCoded(value).Int64()
+	if err != nil {
+		return ""
+	}
+	return strconv.FormatFloat(numeric.Int64ToFloat64(distInt), 'f', -1, 64)
+}
+
 // Descending determines the order of the sort
 func (s *SortGeoDistance) Descending() bool {
 	return s.Desc
@@ -784,14 +795,6 @@ func (s *SortGeoDistance) Copy() SearchSort {
 
 func (s *SortGeoDistance) Reverse() {
 	s.Desc = !s.Desc
-}
-
-func decodeGeoValue(value string) string {
-	distInt, err := numeric.PrefixCoded(value).Int64()
-	if err != nil {
-		return ""
-	}
-	return strconv.FormatFloat(numeric.Int64ToFloat64(distInt), 'f', -1, 64)
 }
 
 type BytesSlice [][]byte
