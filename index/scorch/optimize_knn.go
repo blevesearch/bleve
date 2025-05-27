@@ -70,6 +70,14 @@ func (o *OptimizeVR) Finish() error {
 
 	defer o.invokeSearcherEndCallback()
 
+	var interpretVectorIndexOptions *segment_api.InterpretVectorIndexOptions
+	if BleveVectorSearchBatchExecution {
+		interpretVectorIndexOptions = &segment_api.InterpretVectorIndexOptions{
+			Batch:               BleveVectorSearchBatchExecution,
+			BatchExecutionDelay: BleveVectorSearchBatchExecutionDelay,
+		}
+	}
+
 	wg := sync.WaitGroup{}
 	semaphore := make(chan struct{}, BleveMaxKNNConcurrency)
 	// Launch goroutines to get vector index for each segment
@@ -84,11 +92,7 @@ func (o *OptimizeVR) Finish() error {
 				}()
 				for field, vrs := range o.vrs {
 					vecIndex, err := segment.InterpretVectorIndex(field,
-						o.requiresFiltering, origSeg.deleted,
-						segment_api.InterpretVectorIndexOptions{
-							Batch:               BleveVectorSearchBatchExecution,
-							BatchExecutionDelay: BleveVectorSearchBatchExecutionDelay,
-						})
+						o.requiresFiltering, origSeg.deleted, interpretVectorIndexOptions)
 					if err != nil {
 						errorsM.Lock()
 						errors = append(errors, err)
