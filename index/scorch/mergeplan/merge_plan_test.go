@@ -719,3 +719,46 @@ func TestPlanMaxSegmentFileSize(t *testing.T) {
 		})
 	}
 }
+
+func TestSingleTaskMergePlan(t *testing.T) {
+	o := &DefaultMergePlanOptions
+	o.FloorSegmentFileSize = 209715200
+
+	// borrowing the spec values from MB-66112
+	//
+	// both segments are eligible, but the roster with a single segment is scored
+	// higher than the roster with two segments
+	// in this case the merge plan returns task with a single segment non-empty
+	// segment which when introduced into the scorch system doesn't cause any change
+	// and you'd be stuck in an infinite loop where the plan keeps generating the
+	// same task with the same single segment, which doesn't converge the index to
+	// a steady state
+	spec := testCyclesSpec{
+		descrip: "mssswdbm",
+		verbose: os.Getenv("VERBOSE") == "mssswdbm" || os.Getenv("VERBOSE") == "y",
+		o:       o,
+		segments: []Segment{
+			&segment{
+				MyId:       2,
+				MyFullSize: 78059,
+				MyLiveSize: 78059,
+				MyFileSize: 129475914,
+			},
+			&segment{
+				MyId:       1,
+				MyFullSize: 3959,
+				MyLiveSize: 3959,
+				MyFileSize: 24805725,
+			},
+		},
+	}
+
+	plan, err := Plan(spec.segments, spec.o)
+	if err != nil {
+		t.Fatalf("Plan failed, err: %v", err)
+	}
+
+	if len(plan.Tasks) > 0 {
+		t.Fatalf("expected 0 tasks, got: %d", len(plan.Tasks))
+	}
+}
