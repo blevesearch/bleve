@@ -4533,12 +4533,278 @@ func TestGeoDistanceInSort(t *testing.T) {
 	}
 
 	for i, doc := range res.Hits {
-		hitDist, err := strconv.ParseFloat(doc.Sort[0], 64)
+		hitDist, err := strconv.ParseFloat(doc.DecodedSort[0], 64)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if math.Abs(hitDist-docs[i].distance) > 1 {
 			t.Fatalf("distance error greater than 1 meter, expected distance - %v, got - %v", docs[i].distance, hitDist)
+		}
+	}
+}
+
+func TestGeoDistanceInSortAlias(t *testing.T) {
+	tmpIndexPath1 := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath1)
+
+	tmpIndexPath2 := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath2)
+
+	fm := mapping.NewGeoPointFieldMapping()
+	imap := mapping.NewIndexMapping()
+	imap.DefaultMapping.AddFieldMappingsAt("geo", fm)
+
+	idx1, err := New(tmpIndexPath1, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx1.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	idx2, err := New(tmpIndexPath2, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx2.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	qp := []float64{0, 0}
+
+	docs := []struct {
+		id       string
+		point    []float64
+		distance float64
+	}{
+		{
+			id:       "1",
+			point:    []float64{1, 1},
+			distance: geo.Haversin(1, 1, qp[0], qp[1]) * 1000,
+		},
+		{
+			id:       "2",
+			point:    []float64{2, 2},
+			distance: geo.Haversin(2, 2, qp[0], qp[1]) * 1000,
+		},
+		{
+			id:       "3",
+			point:    []float64{3, 3},
+			distance: geo.Haversin(3, 3, qp[0], qp[1]) * 1000,
+		},
+	}
+	if err := idx1.Index(docs[0].id, map[string]interface{}{"geo": docs[0].point}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx2.Index(docs[1].id, map[string]interface{}{"geo": docs[1].point}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx1.Index(docs[2].id, map[string]interface{}{"geo": docs[2].point}); err != nil {
+		t.Fatal(err)
+	}
+
+	idx := NewIndexAlias(idx1, idx2)
+
+	q := NewGeoDistanceQuery(qp[0], qp[1], "1000000m")
+	q.SetField("geo")
+	req := NewSearchRequest(q)
+	req.Sort = make(search.SortOrder, 0)
+	req.Sort = append(req.Sort, &search.SortGeoDistance{
+		Field: "geo",
+		Lon:   qp[0],
+		Lat:   qp[1],
+	})
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, doc := range res.Hits {
+		hitDist, err := strconv.ParseFloat(doc.DecodedSort[0], 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if math.Abs(hitDist-docs[i].distance) > 1 {
+			t.Fatalf("distance error greater than 1 meter, expected distance - %v, got - %v", docs[i].distance, hitDist)
+		}
+	}
+}
+
+func TestDateSortAlias(t *testing.T) {
+	tmpIndexPath1 := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath1)
+
+	tmpIndexPath2 := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath2)
+
+	fm := mapping.NewDateTimeFieldMapping()
+	imap := mapping.NewIndexMapping()
+	imap.DefaultMapping.AddFieldMappingsAt("date", fm)
+
+	idx1, err := New(tmpIndexPath1, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx1.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	idx2, err := New(tmpIndexPath2, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx2.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	docs := []struct {
+		id   string
+		date string
+	}{
+		{
+			id:   "1",
+			date: "2023-01-01",
+		},
+		{
+			id:   "2",
+			date: "2023-02-01",
+		},
+		{
+			id:   "3",
+			date: "2023-03-01",
+		},
+	}
+
+	if err := idx1.Index(docs[0].id, map[string]interface{}{"date": docs[0].date}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx2.Index(docs[1].id, map[string]interface{}{"date": docs[1].date}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx1.Index(docs[2].id, map[string]interface{}{"date": docs[2].date}); err != nil {
+		t.Fatal(err)
+	}
+
+	idx := NewIndexAlias(idx1, idx2)
+
+	q := query.NewMatchAllQuery()
+	req := NewSearchRequest(q)
+	req.Sort = make(search.SortOrder, 0)
+	req.Sort = append(req.Sort, &search.SortField{
+		Field: "date",
+		Type:  search.SortFieldAsDate,
+	})
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, doc := range res.Hits {
+		expectedDate, err := time.Parse("2006-01-02", docs[i].date)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedDateStr := expectedDate.UTC().String()
+		if doc.DecodedSort[0] != expectedDateStr {
+			t.Fatalf("expected date %s, got %s", doc.DecodedSort[0], expectedDateStr)
+		}
+	}
+}
+
+func TestNumericSortAlias(t *testing.T) {
+	tmpIndexPath1 := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath1)
+
+	tmpIndexPath2 := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath2)
+
+	fm := mapping.NewNumericFieldMapping()
+	imap := mapping.NewIndexMapping()
+	imap.DefaultMapping.AddFieldMappingsAt("num", fm)
+
+	idx1, err := New(tmpIndexPath1, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx1.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	idx2, err := New(tmpIndexPath2, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx2.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	docs := []struct {
+		id  string
+		num int
+	}{
+		{
+			id:  "1",
+			num: 10,
+		},
+		{
+			id:  "2",
+			num: 20,
+		},
+		{
+			id:  "3",
+			num: 30,
+		},
+	}
+
+	if err := idx1.Index(docs[0].id, map[string]interface{}{"num": docs[0].num}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx2.Index(docs[1].id, map[string]interface{}{"num": docs[1].num}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx1.Index(docs[2].id, map[string]interface{}{"num": docs[2].num}); err != nil {
+		t.Fatal(err)
+	}
+
+	idx := NewIndexAlias(idx1, idx2)
+
+	q := query.NewMatchAllQuery()
+	req := NewSearchRequest(q)
+	req.Sort = make(search.SortOrder, 0)
+	req.Sort = append(req.Sort, &search.SortField{
+		Field: "num",
+		Type:  search.SortFieldAsNumber,
+	})
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, doc := range res.Hits {
+		hitNum, err := strconv.Atoi(doc.DecodedSort[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if hitNum != docs[i].num {
+			t.Fatalf("expected num %d, got %d", docs[i].num, hitNum)
 		}
 	}
 }
