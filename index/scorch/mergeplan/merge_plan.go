@@ -295,8 +295,10 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		if len(bestRoster) == 0 {
 			return rv, nil
 		}
-
-		rv.Tasks = append(rv.Tasks, &MergeTask{Segments: bestRoster})
+		// create tasks with valid merges - i.e. there should be atleast 2 non-empty segments
+		if len(bestRoster) > 1 {
+			rv.Tasks = append(rv.Tasks, &MergeTask{Segments: bestRoster})
+		}
 
 		eligibles = removeSegments(eligibles, bestRoster)
 	}
