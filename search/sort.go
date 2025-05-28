@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/blevesearch/bleve/v2/geo"
@@ -36,6 +38,7 @@ var (
 type SearchSort interface {
 	UpdateVisitor(field string, term []byte)
 	Value(a *DocumentMatch) string
+	DecodeValue(value string) string
 	Descending() bool
 
 	RequiresDocID() bool
@@ -212,7 +215,9 @@ type SortOrder []SearchSort
 
 func (so SortOrder) Value(doc *DocumentMatch) {
 	for _, soi := range so {
-		doc.Sort = append(doc.Sort, soi.Value(doc))
+		value := soi.Value(doc)
+		doc.Sort = append(doc.Sort, value)
+		doc.DecodedSort = append(doc.DecodedSort, soi.DecodeValue(value))
 	}
 }
 
@@ -390,6 +395,25 @@ func (s *SortField) Value(i *DocumentMatch) string {
 	return iTerm
 }
 
+func (s *SortField) DecodeValue(value string) string {
+	switch s.Type {
+	case SortFieldAsNumber:
+		i64, err := numeric.PrefixCoded(value).Int64()
+		if err != nil {
+			return value
+		}
+		return strconv.FormatFloat(numeric.Int64ToFloat64(i64), 'f', -1, 64)
+	case SortFieldAsDate:
+		i64, err := numeric.PrefixCoded(value).Int64()
+		if err != nil {
+			return value
+		}
+		return time.Unix(0, i64).UTC().String()
+	default:
+		return value
+	}
+}
+
 // Descending determines the order of the sort
 func (s *SortField) Descending() bool {
 	return s.Desc
@@ -545,6 +569,10 @@ func (s *SortDocID) Value(i *DocumentMatch) string {
 	return i.ID
 }
 
+func (s *SortDocID) DecodeValue(value string) string {
+	return value
+}
+
 // Descending determines the order of the sort
 func (s *SortDocID) Descending() bool {
 	return s.Desc
@@ -588,6 +616,10 @@ func (s *SortScore) UpdateVisitor(field string, term []byte) {
 // Value returns the sort value of the DocumentMatch
 func (s *SortScore) Value(i *DocumentMatch) string {
 	return "_score"
+}
+
+func (s *SortScore) DecodeValue(value string) string {
+	return value
 }
 
 // Descending determines the order of the sort
@@ -692,6 +724,14 @@ func (s *SortGeoDistance) Value(i *DocumentMatch) string {
 	}
 	distInt64 := numeric.Float64ToInt64(dist)
 	return string(numeric.MustNewPrefixCodedInt64(distInt64, 0))
+}
+
+func (s *SortGeoDistance) DecodeValue(value string) string {
+	distInt, err := numeric.PrefixCoded(value).Int64()
+	if err != nil {
+		return ""
+	}
+	return strconv.FormatFloat(numeric.Int64ToFloat64(distInt), 'f', -1, 64)
 }
 
 // Descending determines the order of the sort

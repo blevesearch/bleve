@@ -154,6 +154,7 @@ type DocumentMatch struct {
 	Locations       FieldTermLocationMap  `json:"locations,omitempty"`
 	Fragments       FieldFragmentMap      `json:"fragments,omitempty"`
 	Sort            []string              `json:"sort,omitempty"`
+	DecodedSort     []string              `json:"decoded_sort,omitempty"`
 
 	// Fields contains the values for document fields listed in
 	// SearchRequest.Fields. Text fields are returned as strings, numeric
@@ -224,6 +225,7 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	dm.IndexInternalID = indexInternalID[:0]
 	// reuse the []interface{} already allocated (and reset len to 0)
 	dm.Sort = sort[:0]
+	dm.DecodedSort = dm.DecodedSort[:0]
 	// reuse the FieldTermLocations already allocated (and reset len to 0)
 	dm.FieldTermLocations = ftls[:0]
 	return dm
@@ -260,6 +262,10 @@ func (dm *DocumentMatch) Size() int {
 	}
 
 	for _, entry := range dm.Sort {
+		sizeInBytes += size.SizeOfString + len(entry)
+	}
+
+	for _, entry := range dm.DecodedSort {
 		sizeInBytes += size.SizeOfString + len(entry)
 	}
 
