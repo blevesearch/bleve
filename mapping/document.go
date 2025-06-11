@@ -42,6 +42,7 @@ import (
 type DocumentMapping struct {
 	Enabled              bool                        `json:"enabled"`
 	Dynamic              bool                        `json:"dynamic"`
+	Nested               bool                        `json:"nested,omitempty"`
 	Properties           map[string]*DocumentMapping `json:"properties,omitempty"`
 	Fields               []*FieldMapping             `json:"fields,omitempty"`
 	DefaultAnalyzer      string                      `json:"default_analyzer,omitempty"`
@@ -313,6 +314,11 @@ func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
 			}
 		case "dynamic":
 			err := util.UnmarshalJSON(v, &dm.Dynamic)
+			if err != nil {
+				return err
+			}
+		case "nested":
+			err := util.UnmarshalJSON(v, &dm.Nested)
 			if err != nil {
 				return err
 			}

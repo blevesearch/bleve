@@ -152,6 +152,8 @@ const (
 	// BM25StatsKey is used to store and transport the BM25 Data
 	// to the actual search phase which would use it to perform the search.
 	BM25StatsKey ContextKey = "_bm25_stats_key"
+
+	NestedInfoCallbackKey ContextKey = "_nested_info_callback_key"
 )
 
 func RecordSearchCost(ctx context.Context,
@@ -232,4 +234,9 @@ var (
 type BM25Stats struct {
 	DocCount         float64        `json:"doc_count"`
 	FieldCardinality map[string]int `json:"field_cardinality"`
+}
+
+type NestedInfo struct {
+	Path          string `json:"path"`
+	ArrayPosition int    `json:"array_position"`
 }

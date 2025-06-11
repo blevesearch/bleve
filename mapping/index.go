@@ -196,10 +196,16 @@ func (im *IndexMappingImpl) Validate() error {
 	if err != nil {
 		return err
 	}
-	for _, docMapping := range im.TypeMapping {
+	if im.DefaultMapping.Nested {
+		return fmt.Errorf("default mapping cannot be nested")
+	}
+	for typ, docMapping := range im.TypeMapping {
 		err = docMapping.Validate(im.cache, "", fieldAliasCtx)
 		if err != nil {
 			return err
+		}
+		if docMapping.Nested {
+			return fmt.Errorf("document mapping for type '%s' cannot be nested", typ)
 		}
 	}
 
