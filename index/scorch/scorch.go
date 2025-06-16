@@ -45,6 +45,7 @@ type Scorch struct {
 	readOnly      bool
 	version       uint8
 	config        map[string]interface{}
+	segmentConfig map[string]interface{}
 	analysisQueue *index.AnalysisQueue
 	path          string
 
@@ -123,6 +124,7 @@ func NewScorch(storeName string,
 		forceMergeRequestCh:  make(chan *mergerCtrl, 1),
 		segPlugin:            defaultSegmentPlugin,
 		copyScheduled:        map[string]int{},
+		segmentConfig:        make(map[string]interface{}),
 	}
 
 	forcedSegmentType, forcedSegmentVersion, err := configForceSegmentTypeVersion(config)
@@ -466,7 +468,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	stats := newFieldStats()
 
 	if len(analysisResults) > 0 {
-		newSegment, bufBytes, err = s.segPlugin.New(analysisResults)
+		newSegment, bufBytes, err = s.segPlugin.NewEx(analysisResults, s.segmentConfig)
 		if err != nil {
 			return err
 		}

@@ -793,7 +793,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot, exclude map[uint
 			}
 		}()
 		for segmentID, path := range newSegmentPaths {
-			newSegments[segmentID], err = s.segPlugin.Open(path)
+			newSegments[segmentID], err = s.segPlugin.OpenEx(path, s.segmentConfig)
 			if err != nil {
 				return fmt.Errorf("error opening new segment at %s, %v", path, err)
 			}
@@ -1005,7 +1005,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		return nil, fmt.Errorf("segment path missing")
 	}
 	segmentPath := s.path + string(os.PathSeparator) + string(pathBytes)
-	seg, err := s.segPlugin.Open(segmentPath)
+	seg, err := s.segPlugin.OpenEx(segmentPath, s.segmentConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error opening bolt segment: %v", err)
 	}
