@@ -66,13 +66,16 @@ func init() {
 }
 
 type IndexSnapshot struct {
-	parent   *Scorch
-	segment  []*SegmentSnapshot
-	offsets  []uint64
-	internal map[string][]byte
-	epoch    uint64
-	size     uint64
-	creator  string
+	parent *Scorch
+
+	// POC: trainData is ephemeral
+	trainData [][]float32
+	segment   []*SegmentSnapshot
+	offsets   []uint64
+	internal  map[string][]byte
+	epoch     uint64
+	size      uint64
+	creator   string
 
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
