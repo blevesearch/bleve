@@ -425,7 +425,6 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	var totSize int
 	var numSegsToFlushOut int
 	var totDocs uint64
-
 	// legacy behaviour of merge + flush of all in-memory segments in one-shot
 	if legacyFlushBehaviour(po.MaxSizeInMemoryMergePerWorker, po.NumPersisterWorkers) {
 		val := &flushable{
@@ -853,6 +852,10 @@ func zapFileName(epoch uint64) string {
 	return fmt.Sprintf("%012x.zap", epoch)
 }
 
+func (s *Scorch) loadTrainedData(bucket *bolt.Bucket) error {
+	return s.trainer.loadTrainedData(bucket)
+}
+
 // bolt snapshot code
 
 func (s *Scorch) loadFromBolt() error {
@@ -861,6 +864,7 @@ func (s *Scorch) loadFromBolt() error {
 		if snapshots == nil {
 			return nil
 		}
+		var mappingBytes []byte
 		foundRoot := false
 		c := snapshots.Cursor()
 		for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
@@ -902,8 +906,21 @@ func (s *Scorch) loadFromBolt() error {
 				_ = rootPrev.DecRef()
 			}
 
+			mappingBytes, err = indexSnapshot.GetInternal(util.MappingInternalKey)
 			foundRoot = true
 		}
+
+		// try init trainer with the mapping details
+		if s.trainer == nil {
+			s.config["index_mapping"] = mappingBytes
+			s.trainer = initTrainer(s, s.config)
+		}
+		trainerBucket := snapshots.Bucket(util.BoltTrainerKey)
+		err := s.trainer.loadTrainedData(trainerBucket)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {
