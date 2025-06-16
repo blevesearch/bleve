@@ -864,7 +864,6 @@ func (s *Scorch) loadFromBolt() error {
 		if snapshots == nil {
 			return nil
 		}
-
 		foundRoot := false
 		c := snapshots.Cursor()
 		for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
@@ -906,6 +905,7 @@ func (s *Scorch) loadFromBolt() error {
 				_ = rootPrev.DecRef()
 			}
 
+			mappingBytes, err = indexSnapshot.GetInternal(util.MappingInternalKey)
 			foundRoot = true
 		}
 
