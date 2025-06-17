@@ -68,7 +68,7 @@ func init() {
 type IndexSnapshot struct {
 	parent *Scorch
 
-	// POC: trainData is ephemeral
+	// POC: trainData is ephemeral and read-only just like []*SegmentSnapshot
 	trainData [][]float32
 	segment   []*SegmentSnapshot
 	offsets   []uint64
