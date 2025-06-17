@@ -360,6 +360,10 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 		creator:  "introduceMerge",
 	}
 
+	if len(nextMerge.trainData) > 0 {
+		newSnapshot.trainData = append(root.trainData, nextMerge.trainData...)
+	}
+
 	var running, docsToPersistCount, memSegments, fileSegments uint64
 	var droppedSegmentFiles []string
 	newSegmentDeleted := make([]*roaring.Bitmap, len(nextMerge.new))
