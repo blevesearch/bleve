@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -482,7 +483,7 @@ type mergedSegmentHistory struct {
 type segmentMerge struct {
 	id               []uint64
 	new              []segment.Segment
-	trainData        [][]float32
+	trainData        []float32
 	mergedSegHistory map[uint64]*mergedSegmentHistory
 	notifyCh         chan *mergeTaskIntroStatus
 	mmaped           uint32
@@ -529,9 +530,10 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 	var em sync.Mutex
 	var errs []error
 
-	var trainingSample [][]float32
-	collectTrainData := func(segTrainData [][]float32) {
-		trainingSample = append(trainingSample, segTrainData...)
+	var trainingSample []float32
+	collectTrainData := func(segTrainData []float32) {
+		// append a clone of the training sample
+		trainingSample = append(trainingSample, slices.Clone(segTrainData)...)
 	}
 
 	numDocs, err := snapshot.DocCount()
