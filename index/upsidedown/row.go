@@ -23,7 +23,7 @@ import (
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/size"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -37,6 +37,10 @@ func init() {
 	var tv TermVector
 	reflectStaticSizeTermVector = int(reflect.TypeOf(tv).Size())
 }
+
+var (
+	ErrInvalidLengthUpsidedown = fmt.Errorf("proto: negative length found during unmarshaling")
+)
 
 const ByteSeparator byte = 0xff
 
