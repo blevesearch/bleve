@@ -23,6 +23,10 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+var (
+	ErrInvalidLengthUpsidedown = fmt.Errorf("proto: negative length found during unmarshaling")
+)
+
 type BackIndexTermsEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Field         *uint32                `protobuf:"varint,1,req,name=field" json:"field,omitempty"`
@@ -81,7 +85,7 @@ func (x *BackIndexTermsEntry) MarshalTo(data []byte) (n int, err error) {
 	var l int
 	_ = l
 	if x.Field == nil {
-		return 0, fmt.Errorf("missing required field")
+		return 0, fmt.Errorf("missing required `Field`")
 	} else {
 		data[i] = 0x8
 		i++
@@ -178,7 +182,7 @@ func (x *BackIndexStoreEntry) MarshalTo(data []byte) (n int, err error) {
 	var l int
 	_ = l
 	if x.Field == nil {
-		return 0, fmt.Errorf("missing required field")
+		return 0, fmt.Errorf("missing required `Field`")
 	} else {
 		data[i] = 0x8
 		i++

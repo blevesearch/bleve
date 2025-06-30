@@ -38,10 +38,6 @@ func init() {
 	reflectStaticSizeTermVector = int(reflect.TypeOf(tv).Size())
 }
 
-var (
-	ErrInvalidLengthUpsidedown = fmt.Errorf("proto: negative length found during unmarshaling")
-)
-
 const ByteSeparator byte = 0xff
 
 type UpsideDownCouchRowStream chan UpsideDownCouchRow
