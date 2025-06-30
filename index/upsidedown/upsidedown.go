@@ -30,7 +30,7 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 	store "github.com/blevesearch/upsidedown_store_api"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 const Name = "upside_down"
