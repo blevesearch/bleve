@@ -20,9 +20,10 @@ import (
 	"strconv"
 	"time"
 
+	index "github.com/blevesearch/bleve_index_api"
+
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
-	index "github.com/blevesearch/bleve_index_api"
 )
 
 var reflectStaticSizeTopNCollector int
@@ -246,12 +247,12 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			}
 		}
 
-		err = hc.adjustDocumentMatch(searchContext, reader, next)
+		err = hc.adjustDocumentMatch(reader, next)
 		if err != nil {
 			break
 		}
 
-		err = hc.prepareDocumentMatch(searchContext, reader, next, false)
+		err = hc.prepareDocumentMatch(reader, next, false)
 		if err != nil {
 			break
 		}
@@ -270,7 +271,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		// we may have some knn hits left that did not match any of the top N tf-idf hits
 		// we need to add them to the collector store to consider them as well.
 		for _, knnDoc := range hc.knnHits {
-			err = hc.prepareDocumentMatch(searchContext, reader, knnDoc, true)
+			err = hc.prepareDocumentMatch(reader, knnDoc, true)
 			if err != nil {
 				return err
 			}
@@ -311,7 +312,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 
 var sortByScoreOpt = []string{"_score"}
 
-func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
+func (hc *TopNCollector) adjustDocumentMatch(
 	reader index.IndexReader, d *search.DocumentMatch) (err error) {
 	if hc.knnHits != nil {
 		d.ID, err = reader.ExternalID(d.IndexInternalID)
@@ -326,7 +327,7 @@ func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 	return nil
 }
 
-func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
+func (hc *TopNCollector) prepareDocumentMatch(
 	reader index.IndexReader, d *search.DocumentMatch, isKnnDoc bool) (err error) {
 
 	// visit field terms for features that require it (sort, facets)
