@@ -353,7 +353,6 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
-
 	_, hasGeo := tmp["geometry"]
 	if hasGeo {
 		var rv GeoShapeQuery
@@ -363,10 +362,18 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
-
 	_, hasCIDR := tmp["cidr"]
 	if hasCIDR {
 		var rv IPRangeQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	_, hasNested := tmp["nested"]
+	if hasNested {
+		var rv NestedQuery
 		err := util.UnmarshalJSON(input, &rv)
 		if err != nil {
 			return nil, err

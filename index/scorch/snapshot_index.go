@@ -28,6 +28,7 @@ import (
 
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	"github.com/blevesearch/vellum"
@@ -621,6 +622,12 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 	rv.includeTermVectors = includeTermVectors
 	rv.currPosting = nil
 	rv.currID = rv.currID[:0]
+	rv.nestedState = nil
+	if ctx != nil {
+		if nestedState, ok := ctx.Value(search.NestedStateKey).(index.NestedState); ok {
+			rv.nestedState = nestedState
+		}
+	}
 
 	if rv.dicts == nil {
 		rv.dicts = make([]segment.TermDictionary, len(is.segment))
@@ -634,7 +641,13 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 				segBytesRead := s.segment.BytesRead()
 				rv.incrementBytesRead(segBytesRead)
 			}
-			dict, err := s.segment.Dictionary(field)
+			var dict segment.TermDictionary
+			var err error
+			if ns, ok := s.segment.(segment.NestedSegment); ok && rv.nestedState != nil {
+				dict, err = ns.NestedDictionary(rv.nestedState, field)
+			} else {
+				dict, err = s.segment.Dictionary(field)
+			}
 			if err != nil {
 				return nil, err
 			}
