@@ -622,10 +622,10 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 	rv.includeTermVectors = includeTermVectors
 	rv.currPosting = nil
 	rv.currID = rv.currID[:0]
-	rv.nestInfo = nil
+	rv.nestedState = nil
 	if ctx != nil {
-		if nInfo, ok := ctx.Value(search.NestedInfoCallbackKey).(*search.NestedInfo); ok {
-			rv.nestInfo = nInfo
+		if nestedState, ok := ctx.Value(search.NestedStateKey).(index.NestedState); ok {
+			rv.nestedState = nestedState
 		}
 	}
 
@@ -643,8 +643,8 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 			}
 			var dict segment.TermDictionary
 			var err error
-			if nestedSegment, ok := s.segment.(segment.NestedSegment); ok && rv.nestInfo != nil {
-				dict, err = nestedSegment.NestedDictionary(field, rv.nestInfo.Path, rv.nestInfo.ArrayPosition)
+			if ns, ok := s.segment.(segment.NestedSegment); ok && rv.nestedState != nil {
+				dict, err = ns.NestedDictionary(rv.nestedState, field)
 			} else {
 				dict, err = s.segment.Dictionary(field)
 			}

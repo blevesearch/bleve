@@ -43,16 +43,23 @@ func (q *NestedQuery) Searcher(ctx context.Context, i index.IndexReader, m mappi
 	if !ok {
 		return nil, fmt.Errorf("nested searcher requires an index reader that supports nested documents")
 	}
-	childCount := nr.ChildCount(q.Path)
+	if q.Path == "" || q.InnerQuery == nil {
+		return nil, fmt.Errorf("nested searcher requires a valid path and inner query")
+	}
+	var baseState index.NestedState
+	if existing, ok := ctx.Value(search.NestedStateKey).(index.NestedState); ok {
+		baseState = existing
+	} else {
+		baseState = search.NewNestedState()
+	}
+	childCount := nr.ChildCount(baseState, q.Path)
 	if childCount == 0 {
 		return nil, fmt.Errorf("nested searcher: path %q has no child documents", q.Path)
 	}
 	innerSearchers := make([]search.Searcher, 0, childCount)
-	for arrayPos := range childCount {
-		nctx := context.WithValue(ctx, search.NestedInfoCallbackKey, &search.NestedInfo{
-			Path:          q.Path,
-			ArrayPosition: arrayPos,
-		})
+	for arrayPos := 0; arrayPos < childCount; arrayPos++ {
+		newState := baseState.Append(q.Path, arrayPos)
+		nctx := context.WithValue(ctx, search.NestedStateKey, newState)
 		innerSearcher, err := q.InnerQuery.Searcher(nctx, i, m, options)
 		if err != nil {
 			return nil, fmt.Errorf("nested searcher: failed to create inner searcher at pos %d: %w", arrayPos, err)

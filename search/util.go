@@ -16,7 +16,9 @@ package search
 
 import (
 	"context"
+	"slices"
 
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/s2"
 )
 
@@ -153,7 +155,7 @@ const (
 	// to the actual search phase which would use it to perform the search.
 	BM25StatsKey ContextKey = "_bm25_stats_key"
 
-	NestedInfoCallbackKey ContextKey = "_nested_info_callback_key"
+	NestedStateKey ContextKey = "_nested_state_key"
 )
 
 func RecordSearchCost(ctx context.Context,
@@ -236,7 +238,75 @@ type BM25Stats struct {
 	FieldCardinality map[string]int `json:"field_cardinality"`
 }
 
-type NestedInfo struct {
-	Path          string `json:"path"`
-	ArrayPosition int    `json:"array_position"`
+type nestedState struct {
+	paths          []string
+	arrayPositions []int
+}
+
+func NewNestedState() index.NestedState {
+	return &nestedState{
+		paths:          make([]string, 0),
+		arrayPositions: make([]int, 0),
+	}
+}
+
+// Append returns a new NestedState with the given path and array position added.
+// It does NOT modify the original NestedState.
+func (s *nestedState) Append(path string, pos int) index.NestedState {
+	return &nestedState{
+		paths:          append(slices.Clone(s.paths), path),
+		arrayPositions: append(slices.Clone(s.arrayPositions), pos),
+	}
+}
+
+func (s *nestedState) Empty() bool {
+	return len(s.paths) == 0 && len(s.arrayPositions) == 0
+}
+
+func (s *nestedState) Clear() {
+	s.paths = s.paths[:0]
+	s.arrayPositions = s.arrayPositions[:0]
+}
+
+func (s *nestedState) Root() string {
+	if len(s.paths) == 0 {
+		return ""
+	}
+	return s.paths[0]
+}
+
+func (s *nestedState) Iterator() index.NestedIterator {
+	return &nestedIterator{
+		paths:         s.paths,
+		arrayPosition: s.arrayPositions,
+		index:         0,
+	}
+}
+
+type nestedIterator struct {
+	paths         []string
+	arrayPosition []int
+	index         int
+}
+
+func (ni *nestedIterator) HasNext() bool {
+	return ni.index < len(ni.paths)
+}
+
+func (ni *nestedIterator) Next() (string, int, bool) {
+	if ni.index >= len(ni.paths) {
+		return "", 0, false
+	}
+	path := ni.paths[ni.index]
+	arrayPos := ni.arrayPosition[ni.index]
+	ni.index++
+	return path, arrayPos, true
+}
+
+func (ni *nestedIterator) Reset() {
+	ni.index = 0
+}
+
+func (ni *nestedIterator) Size() int {
+	return len(ni.paths)
 }

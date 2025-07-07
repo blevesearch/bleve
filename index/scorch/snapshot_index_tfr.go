@@ -51,7 +51,7 @@ type IndexSnapshotTermFieldReader struct {
 	bytesRead          uint64
 	ctx                context.Context
 	unadorned          bool
-	nestInfo           *search.NestedInfo
+	nestedState        index.NestedState
 }
 
 func (i *IndexSnapshotTermFieldReader) incrementBytesRead(val uint64) {
