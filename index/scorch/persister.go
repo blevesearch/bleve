@@ -1027,6 +1027,10 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 				rv.MergeUpdateFieldsInfo(segmentSnapshot.updatedFields)
 			}
 			running += segmentSnapshot.segment.Count()
+			// persistedSegment, ok := segmentSnapshot.segment.(segment.PersistedSegment)
+			// if ok {
+			// 	fmt.Println("segment path", persistedSegment.Path())
+			// }
 		}
 	}
 	return rv, nil
