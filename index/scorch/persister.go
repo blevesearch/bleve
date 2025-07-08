@@ -991,6 +991,10 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 			rv.segment = append(rv.segment, segmentSnapshot)
 			rv.offsets = append(rv.offsets, running)
 			running += segmentSnapshot.segment.Count()
+			// persistedSegment, ok := segmentSnapshot.segment.(segment.PersistedSegment)
+			// if ok {
+			// 	fmt.Println("segment path", persistedSegment.Path())
+			// }
 		}
 	}
 	return rv, nil

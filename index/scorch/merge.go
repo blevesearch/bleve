@@ -353,6 +353,11 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 		var seg segment.Segment
 		var filename string
+		var trainingSample []float32
+		collectTrainData := func(segTrainData []float32) {
+			// append a clone of the training sample
+			trainingSample = append(trainingSample, slices.Clone(segTrainData)...)
+		}
 		if len(segmentsToMerge) > 0 {
 			filename = zapFileName(newSegmentID)
 			s.markIneligibleForRemoval(filename)
@@ -362,7 +367,13 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
 			prevBytesReadTotal := cumulateBytesRead(segmentsToMerge)
-			s.segmentConfig["trainData"] = ourSnapshot.trainData
+
+			trainingSampleSize := math.Ceil(4 * math.Sqrt(float64(1000000)) * 39)
+			if len(ourSnapshot.trainData) < int(trainingSampleSize) {
+				s.segmentConfig["collectTrainDataCallback"] = collectTrainData
+			} else {
+				s.segmentConfig["trainData"] = ourSnapshot.trainData
+			}
 			newDocNums, _, err := s.segPlugin.MergeEx(segmentsToMerge, docsToDrop, path,
 				cw.cancelCh, s, s.segmentConfig)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
@@ -408,6 +419,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			newCount:         seg.Count(),
 			notifyCh:         make(chan *mergeTaskIntroStatus),
 			mmaped:           1,
+			trainData:        trainingSample,
 		}
 
 		s.fireEvent(EventKindMergeTaskIntroductionStart, 0)
@@ -525,17 +537,22 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 		trainingSample = append(trainingSample, slices.Clone(segTrainData)...)
 	}
 
-	numDocs, err := snapshot.DocCount()
-	if err != nil {
-		return nil, nil, err
-	}
+	// numDocs, err := snapshot.DocCount()
+	// if err != nil {
+	// 	return nil, nil, err
+	// }
+
+	// harcoding the total docs for now, need to get it from CB level
+	numDocs := 1000000
 	trainingSampleSize := math.Ceil(4 * math.Sqrt(float64(numDocs)) * 39)
 
 	// collect train data only if needed
 	if len(snapshot.trainData) < int(trainingSampleSize) {
 		s.segmentConfig["collectTrainDataCallback"] = collectTrainData
+	} else {
+		s.segmentConfig["trainData"] = snapshot.trainData
 	}
-	s.segmentConfig["trainData"] = snapshot.trainData
+
 	// deploy the workers to merge and flush the batches of segments concurrently
 	// and create a new file segment
 	for i := 0; i < numFlushes; i++ {
