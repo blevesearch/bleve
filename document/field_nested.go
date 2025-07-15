@@ -83,6 +83,16 @@ func (s *NestedField) Value() []byte {
 	return nil
 }
 
+func (s *NestedField) NumChildren() int {
+	return len(s.nestedDocuments)
+}
+
+func (s *NestedField) VisitChildren(visitor func(arrayPosition int, document index.Document)) {
+	for i, doc := range s.nestedDocuments {
+		visitor(i, doc)
+	}
+}
+
 func NewNestedField(name string, nestedDocuments []index.Document, docAnalyzer index.DocumentAnalyzer) *NestedField {
 	return &NestedField{
 		name:            name,
