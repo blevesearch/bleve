@@ -4808,3 +4808,114 @@ func TestNumericSortAlias(t *testing.T) {
 		}
 	}
 }
+
+func TestNestedMapping(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	doc := `
+	{
+		"blog": {
+			"title": "Tech Insights",
+			"posts": [
+				{
+					"title": "AI Trends",
+					"published_date": "2025-04-22",
+					"comments": [
+						{
+							"author": "Jane",
+							"text": "Very informative!",
+							"likes": 3
+						},
+						{
+							"author": "Tom",
+							"text": "Needs more detail.",
+							"likes": 1
+						}
+					]
+					
+				},
+				{
+					"title": "Quantum Computing",
+					"published_date": "2024-11-15",
+					"comments": [
+						{
+							"author": "Jane",
+							"text": "Mind-blowing!",
+							"likes": 5
+						}
+					]
+				}
+			]
+		}
+	}
+	`
+	imap := mapping.NewIndexMapping()
+	keywordMapping := NewTextFieldMapping()
+	keywordMapping.Analyzer = keyword.Name
+	englishMapping := NewTextFieldMapping()
+	englishMapping.Analyzer = en.AnalyzerName
+	numericMapping := NewNumericFieldMapping()
+	dateTimeMapping := NewDateTimeFieldMapping()
+	commentMapping := NewDocumentMapping()
+	commentMapping.Nested = true
+	commentMapping.AddFieldMappingsAt("author", englishMapping)
+	commentMapping.AddFieldMappingsAt("text", englishMapping)
+	commentMapping.AddFieldMappingsAt("likes", numericMapping)
+	postsMapping := NewDocumentMapping()
+	postsMapping.Nested = true
+	postsMapping.AddFieldMappingsAt("title", englishMapping)
+	postsMapping.AddFieldMappingsAt("published_date", dateTimeMapping)
+	postsMapping.AddSubDocumentMapping("comments", commentMapping)
+	blogMapping := NewDocumentMapping()
+	blogMapping.AddFieldMappingsAt("title", englishMapping)
+	blogMapping.AddSubDocumentMapping("posts", postsMapping)
+	imap.DefaultMapping.AddSubDocumentMapping("blog", blogMapping)
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	var document map[string]interface{}
+	err = json.Unmarshal([]byte(doc), &document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Index("1", document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Return all blogs with titles containing the word "Tech".
+	mq := query.NewMatchQuery("Tech")
+	mq.SetField("blog.title")
+	req := NewSearchRequest(mq)
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	// Return all blog posts tagged with the keyword "AI" and published in 2024.
+	q1 := query.NewMatchQuery("Jane")
+	q1.SetField("blog.posts.comments.author")
+	q2 := query.NewDateRangeStringQuery("2024-01-01", "2024-12-31")
+	q2.SetField("blog.posts.published_date")
+	cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+	req = NewSearchRequest(cq)
+	req.Explain = true
+	req.Fields = []string{"*"}
+	req.Highlight = NewHighlightWithStyle(ansi.Name)
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 0 {
+		t.Fatalf("expected 0 hits, got %d", len(res.Hits))
+	}
+}
