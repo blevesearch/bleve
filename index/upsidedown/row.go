@@ -23,7 +23,7 @@ import (
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/size"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 var (
