@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -1233,4 +1234,89 @@ func (is *IndexSnapshot) MergeUpdateFieldsInfo(updatedFields map[string]*index.U
 			}
 		}
 	}
+}
+
+type TermFreq struct {
+	Term      string `json:"term"`
+	Frequency uint64 `json:"frequency"`
+}
+
+// HighestFrequencyTerms returns the top N terms with the highest frequencies
+// for a given field across all segments in the index snapshot.
+// Returns a slice of term-frequency pairs sorted by frequency (descending).
+func (is *IndexSnapshot) HighestFrequencyTerms(field string, limit int) (
+	termsFreqs []TermFreq, err error) {
+	if len(is.segment) == 0 {
+		return nil, fmt.Errorf("no segments available")
+	}
+
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be positive")
+	}
+
+	// Use a map to aggregate frequencies across segments
+	termFreqs := make(map[string]uint64)
+
+	// Process each segment to collect term frequencies
+	for _, segment := range is.segment {
+		dict, err := segment.segment.Dictionary(field)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get dictionary for field %s in segment: %v", field, err)
+		}
+
+		// Get iterator for all terms in this segment
+		itr := dict.AutomatonIterator(nil, nil, nil)
+		if itr == nil {
+			continue
+		}
+
+		// Iterate through all terms in this segment
+		for {
+			next, err := itr.Next()
+			if err != nil {
+				return nil, fmt.Errorf("error iterating dictionary: %v", err)
+			}
+			if next == nil {
+				break // End of terms
+			}
+
+			// Get postings list for this term
+			pl, err := dict.PostingsList([]byte(next.Term), segment.deleted, nil)
+			if err != nil {
+				continue // Skip this term if we can't get postings
+			}
+
+			// Aggregate frequency across segments
+			termStr := string(next.Term)
+			termFreqs[termStr] += pl.Count()
+		}
+	}
+
+	if len(termFreqs) == 0 {
+		return nil, fmt.Errorf("no terms found for field %s", field)
+	}
+
+	var termFreqList []TermFreq
+	for termStr, freq := range termFreqs {
+		termFreqList = append(termFreqList, TermFreq{
+			Term:      termStr,
+			Frequency: freq,
+		})
+	}
+
+	// Sort by frequency (descending)
+	sort.Slice(termFreqList, func(i, j int) bool {
+		if termFreqList[i].Frequency == termFreqList[j].Frequency {
+			// If frequencies are equal, sort by term lexicographically
+			return strings.Compare(termFreqList[i].Term, termFreqList[j].Term) < 0
+		}
+		return termFreqList[i].Frequency > termFreqList[j].Frequency
+	})
+
+	// Limit results
+	if limit > len(termFreqList) {
+		limit = len(termFreqList)
+	}
+
+	return termFreqList[:limit], nil
 }
