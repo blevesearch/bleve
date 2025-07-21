@@ -145,33 +145,35 @@ func createSearchAfterDocument(sort search.SortOrder, after []string) *search.Do
 // if required to enable pagination on numeric, datetime,
 // and geo fields
 func encodeSearchAfter(ss search.SearchSort, after string) string {
-	switch ss := ss.(type) {
-	case *search.SortGeoDistance:
-		dist, err := strconv.ParseFloat(after, 64)
+	encodeFloat := func() string {
+		f64, err := strconv.ParseFloat(after, 64)
 		if err != nil {
 			return after
 		}
 
-		distInt64 := numeric.Float64ToInt64(dist)
-		return string(numeric.MustNewPrefixCodedInt64(distInt64, 0))
+		i64 := numeric.Float64ToInt64(f64)
+		return string(numeric.MustNewPrefixCodedInt64(i64, 0))
+	}
+
+	encodeDate := func() string {
+		t, err := time.Parse(time.RFC3339Nano, after)
+		if err != nil {
+			return after
+		}
+
+		i64 := t.UnixNano()
+		return string(numeric.MustNewPrefixCodedInt64(i64, 0))
+	}
+
+	switch ss := ss.(type) {
+	case *search.SortGeoDistance:
+		return encodeFloat()
 	case *search.SortField:
 		switch ss.Type {
 		case search.SortFieldAsNumber:
-			f64, err := strconv.ParseFloat(after, 64)
-			if err != nil {
-				return after
-			}
-
-			i64 := numeric.Float64ToInt64(f64)
-			return string(numeric.MustNewPrefixCodedInt64(i64, 0))
+			return encodeFloat()
 		case search.SortFieldAsDate:
-			t, err := time.Parse("2006-01-02 15:04:05.999999999 +0000 UTC", after)
-			if err != nil {
-				return after
-			}
-
-			i64 := t.UnixNano()
-			return string(numeric.MustNewPrefixCodedInt64(i64, 0))
+			return encodeDate()
 		default:
 			// For SortFieldAsString and SortFieldAuto
 			// NOTE: SortFieldAuto is used if you set Sort with a string

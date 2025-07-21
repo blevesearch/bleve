@@ -53,6 +53,7 @@ import (
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
 	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/highlight/highlighter/ansi"
 	"github.com/blevesearch/bleve/v2/search/highlight/highlighter/html"
@@ -4806,5 +4807,118 @@ func TestNumericSortAlias(t *testing.T) {
 		if hitNum != docs[i].num {
 			t.Fatalf("expected num %d, got %d", docs[i].num, hitNum)
 		}
+	}
+}
+
+func TestSearchRequestValidatePagination(t *testing.T) {
+	tests := []struct {
+		name      string
+		req       *SearchRequest
+		expectErr error
+	}{
+		{
+			name: "invalid search after with numeric sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortField{Field: "num", Type: search.SortFieldAsNumber},
+				},
+				SearchAfter: []string{"50"},
+			},
+			expectErr: fmt.Errorf("invalid search after value for sort field 'num': '50'"),
+		},
+		{
+			name: "invalid search before with numeric sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortField{Field: "num", Type: search.SortFieldAsNumber},
+				},
+				SearchBefore: []string{"50"},
+			},
+			expectErr: fmt.Errorf("invalid search before value for sort field 'num': '50'"),
+		},
+		{
+			name: "invalid search after with date sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortField{Field: "date", Type: search.SortFieldAsDate},
+				},
+				SearchAfter: []string{"1 March 2023"},
+			},
+			expectErr: fmt.Errorf("invalid search after value for sort field 'date': '1 March 2023'"),
+		},
+		{
+			name: "invalid search before with date sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortField{Field: "date", Type: search.SortFieldAsDate},
+				},
+				SearchBefore: []string{"1 March 2023"},
+			},
+			expectErr: fmt.Errorf("invalid search before value for sort field 'date': '1 March 2023'"),
+		},
+		{
+			name: "invalid search after with geo distance sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortGeoDistance{Field: "geo"},
+				},
+				SearchAfter: []string{"1.234"},
+			},
+			expectErr: fmt.Errorf("invalid search after value for sort field 'geo': '1.234'"),
+		},
+		{
+			name: "invalid search before with geo distance sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortGeoDistance{Field: "geo"},
+				},
+				SearchBefore: []string{"1.234"},
+			},
+			expectErr: fmt.Errorf("invalid search before value for sort field 'geo': '1.234'"),
+		},
+		{
+			name: "valid search after with text sort (no validation)",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortField{Field: "text", Type: search.SortFieldAsString},
+				},
+				SearchAfter: []string{"anything"},
+			},
+			expectErr: nil,
+		},
+		{
+			name: "valid search after with numeric sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortField{Field: "num", Type: search.SortFieldAsNumber},
+				},
+				SearchAfter: []string{string(numeric.MustNewPrefixCodedInt64(5, 0))}, // valid prefix coded term
+			},
+			expectErr: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.req.Validate()
+			if test.expectErr != nil {
+				if err == nil {
+					t.Fatalf("expected error: %v, got nil", test.expectErr)
+				}
+				if err.Error() != test.expectErr.Error() {
+					t.Fatalf("expected error: %v, got: %v", test.expectErr, err)
+				}
+			} else if err != nil {
+				t.Fatalf("expected no error, got: %v", err)
+			}
+		})
 	}
 }

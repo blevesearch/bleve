@@ -408,7 +408,7 @@ func (s *SortField) DecodeValue(value string) string {
 		if err != nil {
 			return value
 		}
-		return time.Unix(0, i64).UTC().String()
+		return time.Unix(0, i64).UTC().Format(time.RFC3339Nano)
 	default:
 		return value
 	}

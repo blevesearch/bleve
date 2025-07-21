@@ -23,6 +23,7 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
 	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/collector"
@@ -301,6 +302,11 @@ func (r *SearchRequest) Validate() error {
 		if len(r.SearchAfter) != len(r.Sort) {
 			return fmt.Errorf("search after must have same size as sort order")
 		}
+		
+		err := validatePagination(r.Sort, r.SearchAfter, "search after")
+		if err != nil {
+			return err
+		}
 	}
 	if r.SearchBefore != nil {
 		if r.From != 0 {
@@ -309,6 +315,11 @@ func (r *SearchRequest) Validate() error {
 		if len(r.SearchBefore) != len(r.Sort) {
 			return fmt.Errorf("search before must have same size as sort order")
 		}
+
+		err := validatePagination(r.Sort, r.SearchBefore, "search before")
+		if err != nil {
+			return err
+		}
 	}
 
 	err := validateKNN(r)
@@ -316,6 +327,29 @@ func (r *SearchRequest) Validate() error {
 		return err
 	}
 	return r.Facets.Validate()
+}
+
+// Validates SearchAfter/SearchBefore
+func validatePagination(sort search.SortOrder, pagination []string, afterOrBefore string) error {
+	for i := range pagination {
+		switch ss := sort[i].(type) {
+		case *search.SortGeoDistance:
+			valid, _ := numeric.ValidPrefixCodedTerm(pagination[i])
+			if !valid {
+				return fmt.Errorf("invalid %s value for sort field '%s': '%s'", afterOrBefore, ss.Field, pagination[i])
+			}
+		case *search.SortField:
+			switch ss.Type {
+			case search.SortFieldAsNumber, search.SortFieldAsDate:
+				valid, _ := numeric.ValidPrefixCodedTerm(pagination[i])
+				if !valid {
+					return fmt.Errorf("invalid %s value for sort field '%s': '%s'", afterOrBefore, ss.Field, pagination[i])
+				}
+			}
+		} 
+	}
+
+	return nil
 }
 
 // AddFacet adds a FacetRequest to this SearchRequest

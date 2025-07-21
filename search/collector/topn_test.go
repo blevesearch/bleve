@@ -869,7 +869,7 @@ func TestSearchAfterDateTime(t *testing.T) {
 	batch := index.NewBatch()
 	for _, d := range docs {
 		doc := document.NewDocument(d.id)
-		field, err := document.NewDateTimeFieldWithIndexingOptions("data", []uint64{}, d.data, time.RFC3339, index.IndexField|index.StoreField|index.IncludeTermVectors)
+		field, err := document.NewDateTimeFieldWithIndexingOptions("data", []uint64{}, d.data, time.RFC3339Nano, index.IndexField|index.StoreField|index.IncludeTermVectors)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -901,7 +901,7 @@ func TestSearchAfterDateTime(t *testing.T) {
 	sortOrder := search.SortOrder{&search.SortField{Field: "data", Type: search.SortFieldAsDate, Desc: true}}
 
 	afterTime := time.Unix(6, 0).UTC()
-	after := []string{afterTime.String()}
+	after := []string{afterTime.Format(time.RFC3339Nano)}
 
 	collectorAfter := NewTopNCollectorAfter(5, sortOrder, after)
 	err = collectorAfter.Collect(context.Background(), searcher, reader)
