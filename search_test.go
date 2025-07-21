@@ -4716,7 +4716,7 @@ func TestDateSortAlias(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expectedDateStr := expectedDate.UTC().String()
+		expectedDateStr := expectedDate.UTC().Format(time.RFC3339Nano)
 		if doc.DecodedSort[0] != expectedDateStr {
 			t.Fatalf("expected date %s, got %s", doc.DecodedSort[0], expectedDateStr)
 		}
@@ -4806,5 +4806,140 @@ func TestNumericSortAlias(t *testing.T) {
 		if hitNum != docs[i].num {
 			t.Fatalf("expected num %d, got %d", docs[i].num, hitNum)
 		}
+	}
+}
+
+func TestSearchRequestValidatePagination(t *testing.T) {
+	tests := []struct {
+		name      string
+		req       *SearchRequest
+		expectErr error
+	}{
+		{
+			name: "invalid search after with numeric sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortField{Field: "num", Type: search.SortFieldAsNumber},
+				},
+				SearchAfter: []string{"not-a-number"},
+			},
+			expectErr: fmt.Errorf("invalid search after value for sort field 'num': 'not-a-number'. strconv.ParseFloat: parsing \"not-a-number\": invalid syntax"),
+		},
+		{
+			name: "invalid search before with numeric sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortField{Field: "num", Type: search.SortFieldAsNumber},
+				},
+				SearchBefore: []string{"not-a-number"},
+			},
+			expectErr: fmt.Errorf("invalid search before value for sort field 'num': 'not-a-number'. strconv.ParseFloat: parsing \"not-a-number\": invalid syntax"),
+		},
+		{
+			name: "invalid search after with date sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortField{Field: "date", Type: search.SortFieldAsDate},
+				},
+				SearchAfter: []string{"1 March 2023"},
+			},
+			expectErr: fmt.Errorf("invalid search after value for sort field 'date': '1 March 2023'. parsing time \"1 March 2023\" as \"2006-01-02T15:04:05.999999999Z07:00\": cannot parse \"1 March 2023\" as \"2006\""),
+		},
+		{
+			name: "invalid search before with date sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortField{Field: "date", Type: search.SortFieldAsDate},
+				},
+				SearchBefore: []string{"1 March 2023"},
+			},
+			expectErr: fmt.Errorf("invalid search before value for sort field 'date': '1 March 2023'. parsing time \"1 March 2023\" as \"2006-01-02T15:04:05.999999999Z07:00\": cannot parse \"1 March 2023\" as \"2006\""),
+		},
+		{
+			name: "invalid search after with geo distance sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortGeoDistance{Field: "geo"},
+				},
+				SearchAfter: []string{"not-a-number"},
+			},
+			expectErr: fmt.Errorf("invalid search after value for sort field 'geo': 'not-a-number'. strconv.ParseFloat: parsing \"not-a-number\": invalid syntax"),
+		},
+		{
+			name: "invalid search before with geo distance sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortGeoDistance{Field: "geo"},
+				},
+				SearchBefore: []string{"not-a-number"},
+			},
+			expectErr: fmt.Errorf("invalid search before value for sort field 'geo': 'not-a-number'. strconv.ParseFloat: parsing \"not-a-number\": invalid syntax"),
+		},
+		{
+			name: "valid search after with text sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortField{Field: "text", Type: search.SortFieldAsString},
+				},
+				SearchAfter: []string{"anything"},
+			},
+			expectErr: nil,
+		},
+		{
+			name: "valid search after with numeric sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortField{Field: "num", Type: search.SortFieldAsNumber},
+				},
+				SearchAfter: []string{"50.5"},
+			},
+			expectErr: nil,
+		},
+		{
+			name: "valid search after with date sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortField{Field: "date", Type: search.SortFieldAsDate},
+				},
+				SearchAfter: []string{time.Now().UTC().Format(time.RFC3339Nano)},
+			},
+			expectErr: nil,
+		},
+		{
+			name: "valid search after with geo distance sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortGeoDistance{Field: "geo"},
+				},
+				SearchAfter: []string{"1.234"},
+			},
+			expectErr: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.req.Validate()
+			if test.expectErr != nil {
+				if err == nil {
+					t.Fatalf("expected error: %v, got nil", test.expectErr)
+				}
+				if err.Error() != test.expectErr.Error() {
+					t.Fatalf("expected error: %v, got: %v", test.expectErr, err)
+				}
+			} else if err != nil {
+				t.Fatalf("expected no error, got: %v", err)
+			}
+		})
 	}
 }
