@@ -4717,7 +4717,7 @@ func TestDateSortAlias(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expectedDateStr := expectedDate.UTC().String()
+		expectedDateStr := expectedDate.UTC().Format(time.RFC3339Nano)
 		if doc.DecodedSort[0] != expectedDateStr {
 			t.Fatalf("expected date %s, got %s", doc.DecodedSort[0], expectedDateStr)
 		}
