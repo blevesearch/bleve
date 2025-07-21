@@ -146,21 +146,13 @@ func createSearchAfterDocument(sort search.SortOrder, after []string) *search.Do
 // and geo fields
 func encodeSearchAfter(ss search.SearchSort, after string) string {
 	encodeFloat := func() string {
-		f64, err := strconv.ParseFloat(after, 64)
-		if err != nil {
-			return after
-		}
-
+		f64, _ := strconv.ParseFloat(after, 64) // error checking in SearchRequest.Validate
 		i64 := numeric.Float64ToInt64(f64)
 		return string(numeric.MustNewPrefixCodedInt64(i64, 0))
 	}
 
 	encodeDate := func() string {
-		t, err := time.Parse(time.RFC3339Nano, after)
-		if err != nil {
-			return after
-		}
-
+		t, _ := time.Parse(time.RFC3339Nano, after) // error checking in SearchRequest.Validate
 		i64 := t.UnixNano()
 		return string(numeric.MustNewPrefixCodedInt64(i64, 0))
 	}

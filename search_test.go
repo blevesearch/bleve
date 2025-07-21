@@ -53,7 +53,6 @@ import (
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
 	"github.com/blevesearch/bleve/v2/mapping"
-	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/highlight/highlighter/ansi"
 	"github.com/blevesearch/bleve/v2/search/highlight/highlighter/html"
@@ -4823,9 +4822,9 @@ func TestSearchRequestValidatePagination(t *testing.T) {
 				Sort: search.SortOrder{
 					&search.SortField{Field: "num", Type: search.SortFieldAsNumber},
 				},
-				SearchAfter: []string{"50"},
+				SearchAfter: []string{"not-a-number"},
 			},
-			expectErr: fmt.Errorf("invalid search after value for sort field 'num': '50'"),
+			expectErr: fmt.Errorf("invalid search after value for sort field 'num': 'not-a-number'. strconv.ParseFloat: parsing \"not-a-number\": invalid syntax"),
 		},
 		{
 			name: "invalid search before with numeric sort",
@@ -4834,9 +4833,9 @@ func TestSearchRequestValidatePagination(t *testing.T) {
 				Sort: search.SortOrder{
 					&search.SortField{Field: "num", Type: search.SortFieldAsNumber},
 				},
-				SearchBefore: []string{"50"},
+				SearchBefore: []string{"not-a-number"},
 			},
-			expectErr: fmt.Errorf("invalid search before value for sort field 'num': '50'"),
+			expectErr: fmt.Errorf("invalid search before value for sort field 'num': 'not-a-number'. strconv.ParseFloat: parsing \"not-a-number\": invalid syntax"),
 		},
 		{
 			name: "invalid search after with date sort",
@@ -4847,7 +4846,7 @@ func TestSearchRequestValidatePagination(t *testing.T) {
 				},
 				SearchAfter: []string{"1 March 2023"},
 			},
-			expectErr: fmt.Errorf("invalid search after value for sort field 'date': '1 March 2023'"),
+			expectErr: fmt.Errorf("invalid search after value for sort field 'date': '1 March 2023'. parsing time \"1 March 2023\" as \"2006-01-02T15:04:05.999999999Z07:00\": cannot parse \"1 March 2023\" as \"2006\""),
 		},
 		{
 			name: "invalid search before with date sort",
@@ -4858,7 +4857,7 @@ func TestSearchRequestValidatePagination(t *testing.T) {
 				},
 				SearchBefore: []string{"1 March 2023"},
 			},
-			expectErr: fmt.Errorf("invalid search before value for sort field 'date': '1 March 2023'"),
+			expectErr: fmt.Errorf("invalid search before value for sort field 'date': '1 March 2023'. parsing time \"1 March 2023\" as \"2006-01-02T15:04:05.999999999Z07:00\": cannot parse \"1 March 2023\" as \"2006\""),
 		},
 		{
 			name: "invalid search after with geo distance sort",
@@ -4867,9 +4866,9 @@ func TestSearchRequestValidatePagination(t *testing.T) {
 				Sort: search.SortOrder{
 					&search.SortGeoDistance{Field: "geo"},
 				},
-				SearchAfter: []string{"1.234"},
+				SearchAfter: []string{"not-a-number"},
 			},
-			expectErr: fmt.Errorf("invalid search after value for sort field 'geo': '1.234'"),
+			expectErr: fmt.Errorf("invalid search after value for sort field 'geo': 'not-a-number'. strconv.ParseFloat: parsing \"not-a-number\": invalid syntax"),
 		},
 		{
 			name: "invalid search before with geo distance sort",
@@ -4878,12 +4877,12 @@ func TestSearchRequestValidatePagination(t *testing.T) {
 				Sort: search.SortOrder{
 					&search.SortGeoDistance{Field: "geo"},
 				},
-				SearchBefore: []string{"1.234"},
+				SearchBefore: []string{"not-a-number"},
 			},
-			expectErr: fmt.Errorf("invalid search before value for sort field 'geo': '1.234'"),
+			expectErr: fmt.Errorf("invalid search before value for sort field 'geo': 'not-a-number'. strconv.ParseFloat: parsing \"not-a-number\": invalid syntax"),
 		},
 		{
-			name: "valid search after with text sort (no validation)",
+			name: "valid search after with text sort",
 			req: &SearchRequest{
 				Query: NewMatchAllQuery(),
 				Sort: search.SortOrder{
@@ -4900,7 +4899,29 @@ func TestSearchRequestValidatePagination(t *testing.T) {
 				Sort: search.SortOrder{
 					&search.SortField{Field: "num", Type: search.SortFieldAsNumber},
 				},
-				SearchAfter: []string{string(numeric.MustNewPrefixCodedInt64(5, 0))}, // valid prefix coded term
+				SearchAfter: []string{"50.5"},
+			},
+			expectErr: nil,
+		},
+		{
+			name: "valid search after with date sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortField{Field: "date", Type: search.SortFieldAsDate},
+				},
+				SearchAfter: []string{time.Now().UTC().Format(time.RFC3339Nano)},
+			},
+			expectErr: nil,
+		},
+		{
+			name: "valid search after with geo distance sort",
+			req: &SearchRequest{
+				Query: NewMatchAllQuery(),
+				Sort: search.SortOrder{
+					&search.SortGeoDistance{Field: "geo"},
+				},
+				SearchAfter: []string{"1.234"},
 			},
 			expectErr: nil,
 		},

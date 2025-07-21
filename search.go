@@ -18,12 +18,12 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
 	"github.com/blevesearch/bleve/v2/document"
-	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/collector"
@@ -342,16 +342,21 @@ func (r *SearchRequest) validatePagination() error {
 	for i := range pagination {
 		switch ss := r.Sort[i].(type) {
 		case *search.SortGeoDistance:
-			valid, _ := numeric.ValidPrefixCodedTerm(pagination[i])
-			if !valid {
-				return fmt.Errorf("invalid %s value for sort field '%s': '%s'", afterOrBefore, ss.Field, pagination[i])
+			_, err := strconv.ParseFloat(pagination[i], 64)
+			if err != nil {
+				return fmt.Errorf("invalid %s value for sort field '%s': '%s'. %s", afterOrBefore, ss.Field, pagination[i], err)
 			}
 		case *search.SortField:
 			switch ss.Type {
-			case search.SortFieldAsNumber, search.SortFieldAsDate:
-				valid, _ := numeric.ValidPrefixCodedTerm(pagination[i])
-				if !valid {
-					return fmt.Errorf("invalid %s value for sort field '%s': '%s'", afterOrBefore, ss.Field, pagination[i])
+			case search.SortFieldAsNumber:
+				_, err := strconv.ParseFloat(pagination[i], 64)
+				if err != nil {
+					return fmt.Errorf("invalid %s value for sort field '%s': '%s'. %s", afterOrBefore, ss.Field, pagination[i], err)
+				}
+			case search.SortFieldAsDate:
+				_, err := time.Parse(time.RFC3339Nano, pagination[i])
+				if err != nil {
+					return fmt.Errorf("invalid %s value for sort field '%s': '%s'. %s", afterOrBefore, ss.Field, pagination[i], err)
 				}
 			}
 		} 
