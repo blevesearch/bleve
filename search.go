@@ -302,11 +302,6 @@ func (r *SearchRequest) Validate() error {
 		if len(r.SearchAfter) != len(r.Sort) {
 			return fmt.Errorf("search after must have same size as sort order")
 		}
-		
-		err := validatePagination(r.Sort, r.SearchAfter, "search after")
-		if err != nil {
-			return err
-		}
 	}
 	if r.SearchBefore != nil {
 		if r.From != 0 {
@@ -315,14 +310,14 @@ func (r *SearchRequest) Validate() error {
 		if len(r.SearchBefore) != len(r.Sort) {
 			return fmt.Errorf("search before must have same size as sort order")
 		}
-
-		err := validatePagination(r.Sort, r.SearchBefore, "search before")
-		if err != nil {
-			return err
-		}
 	}
 
-	err := validateKNN(r)
+	err := r.validatePagination()
+	if err != nil {
+		return err
+	}
+
+	err = validateKNN(r)
 	if err != nil {
 		return err
 	}
@@ -330,9 +325,22 @@ func (r *SearchRequest) Validate() error {
 }
 
 // Validates SearchAfter/SearchBefore
-func validatePagination(sort search.SortOrder, pagination []string, afterOrBefore string) error {
+func (r *SearchRequest) validatePagination() error {
+	var pagination []string
+	var afterOrBefore string
+
+	if r.SearchAfter != nil {
+		pagination = r.SearchAfter
+		afterOrBefore = "search after"
+	} else if r.SearchBefore != nil {
+		pagination = r.SearchBefore
+		afterOrBefore = "search before"
+	} else {
+		return nil
+	}
+
 	for i := range pagination {
-		switch ss := sort[i].(type) {
+		switch ss := r.Sort[i].(type) {
 		case *search.SortGeoDistance:
 			valid, _ := numeric.ValidPrefixCodedTerm(pagination[i])
 			if !valid {
