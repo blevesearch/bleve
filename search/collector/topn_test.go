@@ -17,11 +17,16 @@ package collector
 import (
 	"bytes"
 	"context"
+	"strconv"
 	"testing"
+	"time"
 
+	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/facet"
+	"github.com/blevesearch/bleve/v2/search/searcher"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -756,6 +761,249 @@ func TestSetFacetsBuilder(t *testing.T) {
 	// Should not duplicate the "locations" field in the collector.
 	if len(coll.neededFields) != 1 || coll.neededFields[0] != sortFacetsField {
 		t.Errorf("expected fields in collector: %v, observed: %v", []string{sortFacetsField}, coll.neededFields)
+	}
+}
+
+func TestSearchAfterNumeric(t *testing.T) {
+	idx := setupIndex(t)
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	docs := []struct {
+		id   string
+		data int64
+	}{
+		{"a", 10},
+		{"b", 9},
+		{"c", 8},
+		{"d", 7},
+		{"e", 6},
+		{"f", 5},
+		{"g", 4},
+		{"h", 3},
+		{"i", 2},
+		{"j", 1},
+	}
+
+	batch := index.NewBatch()
+	for _, d := range docs {
+		doc := document.NewDocument(d.id)
+		field := document.NewNumericFieldWithIndexingOptions("data", []uint64{}, float64(d.data), index.IndexField|index.StoreField|index.IncludeTermVectors)
+		doc.AddField(field)
+		batch.Update(doc)
+	}
+
+	err := idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reader, err := idx.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	searcher, err := searcher.NewMatchAllSearcher(context.Background(), reader, 1.0, search.SearcherOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sortOrder := search.SortOrder{&search.SortField{Field: "data", Type: search.SortFieldAsNumber, Desc: true}}
+
+	after := []string{"6"}
+
+	collectorAfter := NewTopNCollectorAfter(5, sortOrder, after)
+	err = collectorAfter.Collect(context.Background(), searcher, reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resultsAfter := collectorAfter.Results()
+	if len(resultsAfter) != 5 {
+		t.Fatalf("expected 5 results, got %d", len(resultsAfter))
+	}
+	for i := range resultsAfter {
+		raID := resultsAfter[i].ID
+		docID := docs[i+len(resultsAfter)].id
+		if raID != docID {
+			t.Errorf("expected result '%s', got '%s'", docID, raID)
+		}
+	}
+}
+
+func TestSearchAfterDateTime(t *testing.T) {
+	idx := setupIndex(t)
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	docs := []struct {
+		id   string
+		data time.Time
+	}{
+		{"a", time.Unix(10, 0).UTC()},
+		{"b", time.Unix(9, 0).UTC()},
+		{"c", time.Unix(8, 0).UTC()},
+		{"d", time.Unix(7, 0).UTC()},
+		{"e", time.Unix(6, 0).UTC()},
+		{"f", time.Unix(5, 0).UTC()},
+		{"g", time.Unix(4, 0).UTC()},
+		{"h", time.Unix(3, 0).UTC()},
+		{"i", time.Unix(2, 0).UTC()},
+		{"j", time.Unix(1, 0).UTC()},
+	}
+
+	batch := index.NewBatch()
+	for _, d := range docs {
+		doc := document.NewDocument(d.id)
+		field, err := document.NewDateTimeFieldWithIndexingOptions("data", []uint64{}, d.data, time.RFC3339Nano, index.IndexField|index.StoreField|index.IncludeTermVectors)
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc.AddField(field)
+		batch.Update(doc)
+	}
+
+	err := idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reader, err := idx.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	searcher, err := searcher.NewMatchAllSearcher(context.Background(), reader, 1.0, search.SearcherOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sortOrder := search.SortOrder{&search.SortField{Field: "data", Type: search.SortFieldAsDate, Desc: true}}
+
+	afterTime := time.Unix(6, 0).UTC()
+	after := []string{afterTime.Format(time.RFC3339Nano)}
+
+	collectorAfter := NewTopNCollectorAfter(5, sortOrder, after)
+	err = collectorAfter.Collect(context.Background(), searcher, reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resultsAfter := collectorAfter.Results()
+	if len(resultsAfter) != 5 {
+		t.Fatalf("expected 5 results, got %d", len(resultsAfter))
+	}
+	for i := range resultsAfter {
+		raID := resultsAfter[i].ID
+		docID := docs[i+len(resultsAfter)].id
+		if raID != docID {
+			t.Errorf("expected result '%s', got '%s'", docID, raID)
+		}
+	}
+}
+
+func TestSearchAfterGeo(t *testing.T) {
+	idx := setupIndex(t)
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	docs := []struct {
+		id  string
+		lon float64
+		lat float64
+	}{
+		{"a", 1, 0},
+		{"b", 2, 0},
+		{"c", 3, 0},
+		{"d", 4, 0},
+		{"e", 5, 0},
+		{"f", 6, 0},
+		{"g", 7, 0},
+		{"h", 8, 0},
+		{"i", 9, 0},
+		{"j", 10, 0},
+	}
+
+	batch := index.NewBatch()
+	for _, d := range docs {
+		doc := document.NewDocument(d.id)
+		field := document.NewGeoPointFieldWithIndexingOptions("location", []uint64{}, d.lon, d.lat, index.IndexField|index.StoreField|index.IncludeTermVectors)
+		doc.AddField(field)
+		batch.Update(doc)
+	}
+
+	err := idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reader, err := idx.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	searcher, err := searcher.NewMatchAllSearcher(context.Background(), reader, 1.0, search.SearcherOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	centerLon, centerLat := 0.0, 0.0
+	sortOrder := search.SortOrder{&search.SortGeoDistance{Field: "location", Lon: centerLon, Lat: centerLat, Desc: false}}
+
+	// search after doc "e" which has lon 5, lat 0
+	afterLon, afterLat := 5.0, 0.0
+	afterDistance := geo.Haversin(centerLon, centerLat, afterLon, afterLat)
+	// to compensate scaling
+	afterDistance *= 1000
+	after := []string{strconv.FormatFloat(afterDistance, 'f', -1, 64)}
+
+	collectorAfter := NewTopNCollectorAfter(5, sortOrder, after)
+	err = collectorAfter.Collect(context.Background(), searcher, reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resultsAfter := collectorAfter.Results()
+
+	if len(resultsAfter) != 5 {
+		t.Fatalf("expected 5 results, got %d", len(resultsAfter))
+	}
+	for i := range resultsAfter {
+		raID := resultsAfter[i].ID
+		docID := docs[i+len(resultsAfter)].id
+		if raID != docID {
+			t.Errorf("expected result '%s', got '%s'", docID, raID)
+		}
 	}
 }
 

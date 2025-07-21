@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
@@ -117,9 +118,15 @@ func newTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector 
 	return hc
 }
 
+// Creates a dummy document to compare with for pagination.
 func createSearchAfterDocument(sort search.SortOrder, after []string) *search.DocumentMatch {
+	encodedAfter := make([]string, len(after))
+	for i, ss := range sort {
+		encodedAfter[i] = encodeSearchAfter(ss, after[i])
+	}
+
 	rv := &search.DocumentMatch{
-		Sort: after,
+		Sort: encodedAfter,
 	}
 	for pos, ss := range sort {
 		if ss.RequiresDocID() {
@@ -132,6 +139,46 @@ func createSearchAfterDocument(sort search.SortOrder, after []string) *search.Do
 		}
 	}
 	return rv
+}
+
+// encodeSearchAfter applies prefix-coding to SearchAfter
+// if required to enable pagination on numeric, datetime,
+// and geo fields
+func encodeSearchAfter(ss search.SearchSort, after string) string {
+	encodeFloat := func() string {
+		f64, _ := strconv.ParseFloat(after, 64) // error checking in SearchRequest.Validate
+		i64 := numeric.Float64ToInt64(f64)
+		return string(numeric.MustNewPrefixCodedInt64(i64, 0))
+	}
+
+	encodeDate := func() string {
+		t, _ := time.Parse(time.RFC3339Nano, after) // error checking in SearchRequest.Validate
+		i64 := t.UnixNano()
+		return string(numeric.MustNewPrefixCodedInt64(i64, 0))
+	}
+
+	switch ss := ss.(type) {
+	case *search.SortGeoDistance:
+		return encodeFloat()
+	case *search.SortField:
+		switch ss.Type {
+		case search.SortFieldAsNumber:
+			return encodeFloat()
+		case search.SortFieldAsDate:
+			return encodeDate()
+		default:
+			// For SortFieldAsString and SortFieldAuto
+			// NOTE: SortFieldAuto is used if you set Sort with a string
+			// or if the type of the field is not set in the object
+			// in the Sort slice. We cannot perform type inference in
+			// this case, so we return the original string, even if
+			// its actually numeric or date.
+			return after
+		}
+	default:
+		// For SortDocID and SortScore
+		return after
+	}
 }
 
 // Filter document matches based on the SearchAfter field in the SearchRequest.

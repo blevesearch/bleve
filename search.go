@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis"
@@ -311,11 +312,57 @@ func (r *SearchRequest) Validate() error {
 		}
 	}
 
-	err := validateKNN(r)
+	err := r.validatePagination()
+	if err != nil {
+		return err
+	}
+
+	err = validateKNN(r)
 	if err != nil {
 		return err
 	}
 	return r.Facets.Validate()
+}
+
+// Validates SearchAfter/SearchBefore
+func (r *SearchRequest) validatePagination() error {
+	var pagination []string
+	var afterOrBefore string
+
+	if r.SearchAfter != nil {
+		pagination = r.SearchAfter
+		afterOrBefore = "search after"
+	} else if r.SearchBefore != nil {
+		pagination = r.SearchBefore
+		afterOrBefore = "search before"
+	} else {
+		return nil
+	}
+
+	for i := range pagination {
+		switch ss := r.Sort[i].(type) {
+		case *search.SortGeoDistance:
+			_, err := strconv.ParseFloat(pagination[i], 64)
+			if err != nil {
+				return fmt.Errorf("invalid %s value for sort field '%s': '%s'. %s", afterOrBefore, ss.Field, pagination[i], err)
+			}
+		case *search.SortField:
+			switch ss.Type {
+			case search.SortFieldAsNumber:
+				_, err := strconv.ParseFloat(pagination[i], 64)
+				if err != nil {
+					return fmt.Errorf("invalid %s value for sort field '%s': '%s'. %s", afterOrBefore, ss.Field, pagination[i], err)
+				}
+			case search.SortFieldAsDate:
+				_, err := time.Parse(time.RFC3339Nano, pagination[i])
+				if err != nil {
+					return fmt.Errorf("invalid %s value for sort field '%s': '%s'. %s", afterOrBefore, ss.Field, pagination[i], err)
+				}
+			}
+		} 
+	}
+
+	return nil
 }
 
 // AddFacet adds a FacetRequest to this SearchRequest
