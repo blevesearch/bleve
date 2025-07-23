@@ -561,328 +561,324 @@ func TestBM25GlobalScoring(t *testing.T) {
 }
 
 func TestBytesRead(t *testing.T) {
-	// CHECK num bytes stats
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	// tmpIndexPath := createTmpIndexPath(t)
-	// defer cleanupTmpIndexPath(t, tmpIndexPath)
+	indexMapping := NewIndexMapping()
+	indexMapping.TypeField = "type"
+	indexMapping.DefaultAnalyzer = "en"
+	documentMapping := NewDocumentMapping()
+	indexMapping.AddDocumentMapping("hotel", documentMapping)
+	indexMapping.StoreDynamic = false
+	indexMapping.DocValuesDynamic = false
+	contentFieldMapping := NewTextFieldMapping()
+	contentFieldMapping.Store = false
 
-	// indexMapping := NewIndexMapping()
-	// indexMapping.TypeField = "type"
-	// indexMapping.DefaultAnalyzer = "en"
-	// documentMapping := NewDocumentMapping()
-	// indexMapping.AddDocumentMapping("hotel", documentMapping)
-	// indexMapping.StoreDynamic = false
-	// indexMapping.DocValuesDynamic = false
-	// contentFieldMapping := NewTextFieldMapping()
-	// contentFieldMapping.Store = false
+	reviewsMapping := NewDocumentMapping()
+	reviewsMapping.AddFieldMappingsAt("content", contentFieldMapping)
+	documentMapping.AddSubDocumentMapping("reviews", reviewsMapping)
 
-	// reviewsMapping := NewDocumentMapping()
-	// reviewsMapping.AddFieldMappingsAt("content", contentFieldMapping)
-	// documentMapping.AddSubDocumentMapping("reviews", reviewsMapping)
+	typeFieldMapping := NewTextFieldMapping()
+	typeFieldMapping.Store = false
+	documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
 
-	// typeFieldMapping := NewTextFieldMapping()
-	// typeFieldMapping.Store = false
-	// documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
+	idx, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// idx, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
-	// defer func() {
-	// 	err := idx.Close()
-	// 	if err != nil {
-	// 		t.Fatal(err)
-	// 	}
-	// }()
+	batch, err := getBatchFromData(idx, "sample-data.json")
+	if err != nil {
+		t.Fatalf("failed to form a batch")
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to index batch %v\n", err)
+	}
+	query := NewQueryStringQuery("united")
+	searchRequest := NewSearchRequestOptions(query, int(10), 0, true)
 
-	// batch, err := getBatchFromData(idx, "sample-data.json")
-	// if err != nil {
-	// 	t.Fatalf("failed to form a batch")
-	// }
-	// err = idx.Batch(batch)
-	// if err != nil {
-	// 	t.Fatalf("failed to index batch %v\n", err)
-	// }
-	// query := NewQueryStringQuery("united")
-	// searchRequest := NewSearchRequestOptions(query, int(10), 0, true)
+	res, err := idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
+	prevBytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
 
-	// res, err := idx.Search(searchRequest)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
-	// stats, _ := idx.StatsMap()["index"].(map[string]interface{})
-	// prevBytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
+	expectedBytesRead := uint64(22049)
+	if supportForVectorSearch {
+		expectedBytesRead = 22459
+	}
 
-	// expectedBytesRead := uint64(22049)
-	// if supportForVectorSearch {
-	// 	expectedBytesRead = 22459
-	// }
+	if prevBytesRead != expectedBytesRead && res.Cost == prevBytesRead {
+		t.Fatalf("expected bytes read for query string %v, got %v",
+			expectedBytesRead, prevBytesRead)
+	}
 
-	// if prevBytesRead != expectedBytesRead && res.Cost == prevBytesRead {
-	// 	t.Fatalf("expected bytes read for query string %v, got %v",
-	// 		expectedBytesRead, prevBytesRead)
-	// }
+	// subsequent queries on the same field results in lesser amount
+	// of bytes read because the segment static and dictionary is reused and not
+	// loaded from mmap'd filed
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 66 && res.Cost == bytesRead-prevBytesRead {
+		t.Fatalf("expected bytes read for query string 66, got %v",
+			bytesRead-prevBytesRead)
+	}
+	prevBytesRead = bytesRead
 
-	// // subsequent queries on the same field results in lesser amount
-	// // of bytes read because the segment static and dictionary is reused and not
-	// // loaded from mmap'd filed
-	// res, err = idx.Search(searchRequest)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
-	// stats, _ = idx.StatsMap()["index"].(map[string]interface{})
-	// bytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
-	// if bytesRead-prevBytesRead != 66 && res.Cost == bytesRead-prevBytesRead {
-	// 	t.Fatalf("expected bytes read for query string 66, got %v",
-	// 		bytesRead-prevBytesRead)
-	// }
-	// prevBytesRead = bytesRead
+	fuzz := NewFuzzyQuery("hotel")
+	fuzz.FieldVal = "reviews.content"
+	fuzz.Fuzziness = 2
+	searchRequest = NewSearchRequest(fuzz)
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 8468 && res.Cost == bytesRead-prevBytesRead {
+		t.Fatalf("expected bytes read for fuzzy query is 8468, got %v",
+			bytesRead-prevBytesRead)
+	}
+	prevBytesRead = bytesRead
 
-	// fuzz := NewFuzzyQuery("hotel")
-	// fuzz.FieldVal = "reviews.content"
-	// fuzz.Fuzziness = 2
-	// searchRequest = NewSearchRequest(fuzz)
-	// res, err = idx.Search(searchRequest)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
-	// stats, _ = idx.StatsMap()["index"].(map[string]interface{})
-	// bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	// if bytesRead-prevBytesRead != 8468 && res.Cost == bytesRead-prevBytesRead {
-	// 	t.Fatalf("expected bytes read for fuzzy query is 8468, got %v",
-	// 		bytesRead-prevBytesRead)
-	// }
-	// prevBytesRead = bytesRead
+	typeFacet := NewFacetRequest("type", 2)
+	query = NewQueryStringQuery("united")
+	searchRequest = NewSearchRequestOptions(query, int(0), 0, true)
+	searchRequest.AddFacet("types", typeFacet)
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
 
-	// typeFacet := NewFacetRequest("type", 2)
-	// query = NewQueryStringQuery("united")
-	// searchRequest = NewSearchRequestOptions(query, int(0), 0, true)
-	// searchRequest.AddFacet("types", typeFacet)
-	// res, err = idx.Search(searchRequest)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if !approxSame(bytesRead-prevBytesRead, 196) && res.Cost == bytesRead-prevBytesRead {
+		t.Fatalf("expected bytes read for faceted query is around 196, got %v",
+			bytesRead-prevBytesRead)
+	}
+	prevBytesRead = bytesRead
 
-	// stats, _ = idx.StatsMap()["index"].(map[string]interface{})
-	// bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	// if !approxSame(bytesRead-prevBytesRead, 196) && res.Cost == bytesRead-prevBytesRead {
-	// 	t.Fatalf("expected bytes read for faceted query is around 196, got %v",
-	// 		bytesRead-prevBytesRead)
-	// }
-	// prevBytesRead = bytesRead
+	min := float64(8660)
+	max := float64(8665)
+	numRangeQuery := NewNumericRangeQuery(&min, &max)
+	numRangeQuery.FieldVal = "id"
+	searchRequest = NewSearchRequestOptions(numRangeQuery, int(10), 0, true)
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
 
-	// min := float64(8660)
-	// max := float64(8665)
-	// numRangeQuery := NewNumericRangeQuery(&min, &max)
-	// numRangeQuery.FieldVal = "id"
-	// searchRequest = NewSearchRequestOptions(numRangeQuery, int(10), 0, true)
-	// res, err = idx.Search(searchRequest)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 924 && res.Cost == bytesRead-prevBytesRead {
+		t.Fatalf("expected bytes read for numeric range query is 924, got %v",
+			bytesRead-prevBytesRead)
+	}
+	prevBytesRead = bytesRead
 
-	// stats, _ = idx.StatsMap()["index"].(map[string]interface{})
-	// bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	// if bytesRead-prevBytesRead != 924 && res.Cost == bytesRead-prevBytesRead {
-	// 	t.Fatalf("expected bytes read for numeric range query is 924, got %v",
-	// 		bytesRead-prevBytesRead)
-	// }
-	// prevBytesRead = bytesRead
+	searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
+	searchRequest.Highlight = &HighlightRequest{}
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
 
-	// searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
-	// searchRequest.Highlight = &HighlightRequest{}
-	// res, err = idx.Search(searchRequest)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 105 && res.Cost == bytesRead-prevBytesRead {
+		t.Fatalf("expected bytes read for query with highlighter is 105, got %v",
+			bytesRead-prevBytesRead)
+	}
+	prevBytesRead = bytesRead
 
-	// stats, _ = idx.StatsMap()["index"].(map[string]interface{})
-	// bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	// if bytesRead-prevBytesRead != 105 && res.Cost == bytesRead-prevBytesRead {
-	// 	t.Fatalf("expected bytes read for query with highlighter is 105, got %v",
-	// 		bytesRead-prevBytesRead)
-	// }
-	// prevBytesRead = bytesRead
-
-	// disQuery := NewDisjunctionQuery(NewMatchQuery("hotel"), NewMatchQuery("united"))
-	// searchRequest = NewSearchRequestOptions(disQuery, int(10), 0, true)
-	// res, err = idx.Search(searchRequest)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
-	// // expectation is that the bytes read is roughly equal to sum of sub queries in
-	// // the disjunction query plus the segment loading portion for the second subquery
-	// // since it's created afresh and not reused
-	// stats, _ = idx.StatsMap()["index"].(map[string]interface{})
-	// bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	// if bytesRead-prevBytesRead != 120 && res.Cost == bytesRead-prevBytesRead {
-	// 	t.Fatalf("expected bytes read for disjunction query is 120, got %v",
-	// 		bytesRead-prevBytesRead)
-	// }
+	disQuery := NewDisjunctionQuery(NewMatchQuery("hotel"), NewMatchQuery("united"))
+	searchRequest = NewSearchRequestOptions(disQuery, int(10), 0, true)
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	// expectation is that the bytes read is roughly equal to sum of sub queries in
+	// the disjunction query plus the segment loading portion for the second subquery
+	// since it's created afresh and not reused
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 120 && res.Cost == bytesRead-prevBytesRead {
+		t.Fatalf("expected bytes read for disjunction query is 120, got %v",
+			bytesRead-prevBytesRead)
+	}
 }
 
 func TestBytesReadStored(t *testing.T) {
-	// CHECK num bytes stats
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	// tmpIndexPath := createTmpIndexPath(t)
-	// defer cleanupTmpIndexPath(t, tmpIndexPath)
+	indexMapping := NewIndexMapping()
+	indexMapping.TypeField = "type"
+	indexMapping.DefaultAnalyzer = "en"
+	documentMapping := NewDocumentMapping()
+	indexMapping.AddDocumentMapping("hotel", documentMapping)
 
-	// indexMapping := NewIndexMapping()
-	// indexMapping.TypeField = "type"
-	// indexMapping.DefaultAnalyzer = "en"
-	// documentMapping := NewDocumentMapping()
-	// indexMapping.AddDocumentMapping("hotel", documentMapping)
+	indexMapping.DocValuesDynamic = false
+	indexMapping.StoreDynamic = false
 
-	// indexMapping.DocValuesDynamic = false
-	// indexMapping.StoreDynamic = false
+	contentFieldMapping := NewTextFieldMapping()
+	contentFieldMapping.Store = true
+	contentFieldMapping.IncludeInAll = false
+	contentFieldMapping.IncludeTermVectors = false
 
-	// contentFieldMapping := NewTextFieldMapping()
-	// contentFieldMapping.Store = true
-	// contentFieldMapping.IncludeInAll = false
-	// contentFieldMapping.IncludeTermVectors = false
+	reviewsMapping := NewDocumentMapping()
+	reviewsMapping.AddFieldMappingsAt("content", contentFieldMapping)
+	documentMapping.AddSubDocumentMapping("reviews", reviewsMapping)
 
-	// reviewsMapping := NewDocumentMapping()
-	// reviewsMapping.AddFieldMappingsAt("content", contentFieldMapping)
-	// documentMapping.AddSubDocumentMapping("reviews", reviewsMapping)
+	typeFieldMapping := NewTextFieldMapping()
+	typeFieldMapping.Store = false
+	typeFieldMapping.IncludeInAll = false
+	typeFieldMapping.IncludeTermVectors = false
+	documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
+	idx, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch, err := getBatchFromData(idx, "sample-data.json")
+	if err != nil {
+		t.Fatalf("failed to form a batch %v\n", err)
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to index batch %v\n", err)
+	}
+	query := NewTermQuery("hotel")
+	query.FieldVal = "reviews.content"
+	searchRequest := NewSearchRequestOptions(query, int(10), 0, true)
+	res, err := idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
 
-	// typeFieldMapping := NewTextFieldMapping()
-	// typeFieldMapping.Store = false
-	// typeFieldMapping.IncludeInAll = false
-	// typeFieldMapping.IncludeTermVectors = false
-	// documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
-	// idx, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// batch, err := getBatchFromData(idx, "sample-data.json")
-	// if err != nil {
-	// 	t.Fatalf("failed to form a batch %v\n", err)
-	// }
-	// err = idx.Batch(batch)
-	// if err != nil {
-	// 	t.Fatalf("failed to index batch %v\n", err)
-	// }
-	// query := NewTermQuery("hotel")
-	// query.FieldVal = "reviews.content"
-	// searchRequest := NewSearchRequestOptions(query, int(10), 0, true)
-	// res, err := idx.Search(searchRequest)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
+	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
 
-	// stats, _ := idx.StatsMap()["index"].(map[string]interface{})
-	// bytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
+	expectedBytesRead := uint64(11911)
+	if supportForVectorSearch {
+		expectedBytesRead = 12321
+	}
 
-	// expectedBytesRead := uint64(11911)
-	// if supportForVectorSearch {
-	// 	expectedBytesRead = 12321
-	// }
+	if bytesRead != expectedBytesRead && bytesRead == res.Cost {
+		t.Fatalf("expected the bytes read stat to be around %v, got %v", expectedBytesRead, bytesRead)
+	}
+	prevBytesRead := bytesRead
 
-	// if bytesRead != expectedBytesRead && bytesRead == res.Cost {
-	// 	t.Fatalf("expected the bytes read stat to be around %v, got %v", expectedBytesRead, bytesRead)
-	// }
-	// prevBytesRead := bytesRead
+	searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 48 && bytesRead-prevBytesRead == res.Cost {
+		t.Fatalf("expected the bytes read stat to be around 48, got %v", bytesRead-prevBytesRead)
+	}
+	prevBytesRead = bytesRead
 
-	// searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
-	// res, err = idx.Search(searchRequest)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
-	// stats, _ = idx.StatsMap()["index"].(map[string]interface{})
-	// bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	// if bytesRead-prevBytesRead != 48 && bytesRead-prevBytesRead == res.Cost {
-	// 	t.Fatalf("expected the bytes read stat to be around 48, got %v", bytesRead-prevBytesRead)
-	// }
-	// prevBytesRead = bytesRead
+	searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
+	searchRequest.Fields = []string{"*"}
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
 
-	// searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
-	// searchRequest.Fields = []string{"*"}
-	// res, err = idx.Search(searchRequest)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
 
-	// stats, _ = idx.StatsMap()["index"].(map[string]interface{})
-	// bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 26511 && bytesRead-prevBytesRead == res.Cost {
+		t.Fatalf("expected the bytes read stat to be around 26511, got %v",
+			bytesRead-prevBytesRead)
+	}
+	idx.Close()
+	cleanupTmpIndexPath(t, tmpIndexPath)
 
-	// if bytesRead-prevBytesRead != 26511 && bytesRead-prevBytesRead == res.Cost {
-	// 	t.Fatalf("expected the bytes read stat to be around 26511, got %v",
-	// 		bytesRead-prevBytesRead)
-	// }
-	// idx.Close()
-	// cleanupTmpIndexPath(t, tmpIndexPath)
+	// same type of querying but on field "type"
+	contentFieldMapping.Store = false
+	typeFieldMapping.Store = true
 
-	// // same type of querying but on field "type"
-	// contentFieldMapping.Store = false
-	// typeFieldMapping.Store = true
+	tmpIndexPath1 := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath1)
 
-	// tmpIndexPath1 := createTmpIndexPath(t)
-	// defer cleanupTmpIndexPath(t, tmpIndexPath1)
+	idx1, err := NewUsing(tmpIndexPath1, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx1.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
-	// idx1, err := NewUsing(tmpIndexPath1, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// defer func() {
-	// 	err := idx1.Close()
-	// 	if err != nil {
-	// 		t.Fatal(err)
-	// 	}
-	// }()
+	batch, err = getBatchFromData(idx1, "sample-data.json")
+	if err != nil {
+		t.Fatalf("failed to form a batch %v\n", err)
+	}
+	err = idx1.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to index batch %v\n", err)
+	}
 
-	// batch, err = getBatchFromData(idx1, "sample-data.json")
-	// if err != nil {
-	// 	t.Fatalf("failed to form a batch %v\n", err)
-	// }
-	// err = idx1.Batch(batch)
-	// if err != nil {
-	// 	t.Fatalf("failed to index batch %v\n", err)
-	// }
+	query = NewTermQuery("hotel")
+	query.FieldVal = "type"
+	searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
+	res, err = idx1.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
 
-	// query = NewTermQuery("hotel")
-	// query.FieldVal = "type"
-	// searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
-	// res, err = idx1.Search(searchRequest)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
+	stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
 
-	// stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
-	// bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	expectedBytesRead = uint64(4097)
+	if supportForVectorSearch {
+		expectedBytesRead = 4507
+	}
 
-	// expectedBytesRead = uint64(4097)
-	// if supportForVectorSearch {
-	// 	expectedBytesRead = 4507
-	// }
+	if bytesRead != expectedBytesRead && bytesRead == res.Cost {
+		t.Fatalf("expected the bytes read stat to be around %v, got %v", expectedBytesRead, bytesRead)
+	}
+	prevBytesRead = bytesRead
 
-	// if bytesRead != expectedBytesRead && bytesRead == res.Cost {
-	// 	t.Fatalf("expected the bytes read stat to be around %v, got %v", expectedBytesRead, bytesRead)
-	// }
-	// prevBytesRead = bytesRead
+	res, err = idx1.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 47 && bytesRead-prevBytesRead == res.Cost {
+		t.Fatalf("expected the bytes read stat to be around 47, got %v", bytesRead-prevBytesRead)
+	}
+	prevBytesRead = bytesRead
 
-	// res, err = idx1.Search(searchRequest)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
-	// stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
-	// bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	// if bytesRead-prevBytesRead != 47 && bytesRead-prevBytesRead == res.Cost {
-	// 	t.Fatalf("expected the bytes read stat to be around 47, got %v", bytesRead-prevBytesRead)
-	// }
-	// prevBytesRead = bytesRead
+	searchRequest.Fields = []string{"*"}
+	res, err = idx1.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
 
-	// searchRequest.Fields = []string{"*"}
-	// res, err = idx1.Search(searchRequest)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
-
-	// stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
-	// bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	// if bytesRead-prevBytesRead != 77 && bytesRead-prevBytesRead == res.Cost {
-	// 	t.Fatalf("expected the bytes read stat to be around 77, got %v", bytesRead-prevBytesRead)
-	// }
+	stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 77 && bytesRead-prevBytesRead == res.Cost {
+		t.Fatalf("expected the bytes read stat to be around 77, got %v", bytesRead-prevBytesRead)
+	}
 }
 
 func readDataFromFile(fileName string) ([]map[string]interface{}, error) {
@@ -3249,138 +3245,3 @@ func TestFuzzyScoring(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
-// func TestEncr(t *testing.T) {
-// 	tmpIndexPath := createTmpIndexPath(t)
-// 	defer cleanupTmpIndexPath(t, tmpIndexPath)
-
-// 	// use default mapping
-// 	mapping := NewIndexMapping()
-
-// 	// create a scorch index with default SAFE batches
-// 	var index Index
-// 	index, err = NewUsing(tmpIndexPath, mapping, scorch.Name, scorch.Name, nil)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	defer func() {
-// 		err := index.Close()
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 	}()
-
-// 	docs := []map[string]interface{}{
-// 		{
-// 			"field1": "abc",
-// 			"field2": "def",
-// 			"field3": "ghi",
-// 		},
-// 		{
-// 			"field1": "jkl",
-// 			"field2": "mno",
-// 			"field3": "pqr",
-// 		},
-// 		{
-// 			"field1": "stu",
-// 			"field2": "vwx",
-// 			"field3": "yz",
-// 		},
-// 	}
-
-// 	for j := 0; j < 100; j++ {
-// 		batch := index.NewBatch()
-// 		for i, doc := range docs {
-// 			err := batch.Index(fmt.Sprintf("%d", i+j*3), doc)
-// 			if err != nil {
-// 				t.Fatal(err)
-// 			}
-// 		}
-// 		err = index.Batch(batch)
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 	}
-
-// 	query := NewMatchQuery("abc")
-// 	query.SetField("field1")
-// 	searchRequest := NewSearchRequestOptions(query, 10, 0, true)
-// 	res, err := index.Search(searchRequest)
-// 	if err != nil {
-// 		t.Error(err)
-// 	}
-// 	fmt.Printf("Search result: %+v\n", res)
-
-// 	return
-// }
-
-// func TestEncrMerge(t *testing.T) {
-// 	tmpIndexPath := createTmpIndexPath(t)
-// 	defer cleanupTmpIndexPath(t, tmpIndexPath)
-
-// 	// use default mapping
-// 	mapping := NewIndexMapping()
-
-// 	idx, err := NewUsing(tmpIndexPath, mapping, scorch.Name, scorch.Name, nil)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	defer func() {
-// 		err := idx.Close()
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 	}()
-// 	cbId := 0
-// 	go func() {
-// 		for {
-// 			time.Sleep(time.Second)
-// 			key := make([]byte, 32)
-// 			if _, err := crand.Read(key); err != nil {
-// 				panic("failed to generate AES key: " + err.Error())
-// 			}
-
-// 			SetNewCallback(fmt.Sprintf("cb-%d", cbId), key)
-// 			cbId++
-// 			fmt.Println(cbId)
-// 		}
-// 	}()
-
-// 	genRandomString := func(length int) string {
-// 		const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-// 		b := make([]byte, length)
-// 		for i := range b {
-// 			b[i] = charset[rand.Intn(len(charset))]
-// 		}
-// 		return string(b)
-// 	}
-
-// 	for i := 0; i < 1000; i++ {
-// 		docs := []map[string]interface{}{
-// 			{
-// 				"f1": genRandomString(10),
-// 			},
-// 			{
-// 				"f1": genRandomString(10),
-// 			},
-// 		}
-
-// 		batch := idx.NewBatch()
-// 		for j, doc := range docs {
-// 			err := batch.Index(fmt.Sprintf("%d", i*len(docs)+j), doc)
-// 			if err != nil {
-// 				t.Fatal(err)
-// 			}
-// 		}
-
-// 		err = idx.Batch(batch)
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 	}
-
-// 	sIndex := idx.(*indexImpl).i.(*scorch.Scorch)
-// 	time.Sleep(10 * time.Second)
-// 	sIndex.RemoveCallback(sIndex.GetUsedIds()) // remove the first callback
-// 	time.Sleep(10000 * time.Second)
-// }
