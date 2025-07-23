@@ -45,14 +45,16 @@ import (
 )
 
 type indexImpl struct {
-	path  string
-	name  string
-	meta  *indexMeta
-	i     index.Index
-	m     mapping.IndexMapping
-	mutex sync.RWMutex
-	open  bool
-	stats *IndexStat
+	path   string
+	name   string
+	meta   *indexMeta
+	i      index.Index
+	m      mapping.IndexMapping
+	mutex  sync.RWMutex
+	open   bool
+	stats  *IndexStat
+	writer *util.FileWriter
+	reader *util.FileReader
 }
 
 const storePath = "store"
@@ -88,22 +90,29 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 		return nil, fmt.Errorf("bleve not configured for file based indexing")
 	}
 
+	fileWriter, err := util.NewFileWriter()
+	if err != nil {
+		return nil, err
+	}
+
 	rv := indexImpl{
-		path: path,
-		name: path,
-		m:    mapping,
-		meta: newIndexMeta(indexType, kvstore, kvconfig),
+		path:   path,
+		name:   path,
+		m:      mapping,
+		meta:   newIndexMeta(indexType, kvstore, kvconfig),
+		writer: fileWriter,
 	}
 	rv.stats = &IndexStat{i: &rv}
 	// at this point there is hope that we can be successful, so save index meta
 	if path != "" {
-		err = rv.meta.Save(path)
+		err = rv.meta.Save(path, rv.writer)
 		if err != nil {
 			return nil, err
 		}
 		kvconfig["create_if_missing"] = true
 		kvconfig["error_if_exists"] = true
 		kvconfig["path"] = indexStorePath(path)
+		kvconfig["callback_id"] = rv.writer.Id()
 	} else {
 		kvconfig["path"] = ""
 	}
@@ -153,7 +162,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	}
 	rv.stats = &IndexStat{i: rv}
 
-	rv.meta, err = openIndexMeta(path)
+	rv.meta, rv.reader, err = openIndexMeta(path)
 	if err != nil {
 		return nil, err
 	}
@@ -174,6 +183,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	storeConfig["path"] = indexStorePath(path)
 	storeConfig["create_if_missing"] = false
 	storeConfig["error_if_exists"] = false
+	storeConfig["callback_id"] = rv.reader.Id()
 	for rck, rcv := range runtimeConfig {
 		storeConfig[rck] = rcv
 		if rck == "updated_mapping" {

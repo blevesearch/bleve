@@ -80,6 +80,9 @@ type Scorch struct {
 	rootBolt                 *bolt.DB
 	asyncTasks               sync.WaitGroup
 
+	writer *util.FileWriter
+	reader *util.FileReader
+
 	onEvent      func(event Event) bool
 	onAsyncError func(err error, path string)
 
@@ -163,6 +166,24 @@ func NewScorch(storeName string,
 	if ok {
 		rv.onAsyncError = RegistryAsyncErrorCallbacks[aecbName]
 	}
+	writerId, ok := config["writerId"].(string)
+	var writer *util.FileWriter
+	if ok {
+		writer, err = util.NewFileWriterWithId(writerId)
+	} else {
+		writer, err = util.NewFileWriter()
+	}
+	if err != nil {
+		return nil, err
+	}
+	rv.writer = writer
+
+	reader, err := util.NewFileReader(rv.writer.Id())
+	if err != nil {
+		return nil, err
+	}
+	rv.reader = reader
+
 	// validate any custom persistor options to
 	// prevent an async error in the persistor routine
 	_, err = rv.parsePersisterOptions()

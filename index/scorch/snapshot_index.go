@@ -1018,7 +1018,7 @@ func (is *IndexSnapshot) CopyTo(d index.Directory) error {
 		return err
 	}
 
-	_, _, err = prepareBoltSnapshot(is, tx, "", is.parent.segPlugin, nil, d)
+	_, _, err = prepareBoltSnapshot(is, tx, "", is.parent.segPlugin, nil, d, nil)
 	if err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("error backing up index snapshot: %v", err)

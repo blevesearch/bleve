@@ -606,8 +606,12 @@ func persistToDirectory(seg segment.UnpersistedSegment, d index.Directory,
 }
 
 func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
-	segPlugin SegmentPlugin, exclude map[uint64]struct{}, d index.Directory) (
+	segPlugin SegmentPlugin, exclude map[uint64]struct{}, d index.Directory,
+	writer *util.FileWriter) (
 	[]string, map[uint64]string, error) {
+	if writer == nil {
+		writer = &util.FileWriter{}
+	}
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
 	if err != nil {
 		return nil, nil, err
@@ -655,7 +659,11 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 	}
 	// TODO optimize writing these in order?
 	for k, v := range snapshot.internal {
-		err = internalBucket.Put([]byte(k), v)
+		buf, err := writer.Process(v)
+		if err != nil {
+			return nil, nil, err
+		}
+		err = internalBucket.Put([]byte(k), buf)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -721,7 +729,11 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			if err != nil {
 				return nil, nil, fmt.Errorf("error persisting roaring bytes: %v", err)
 			}
-			err = snapshotSegmentBucket.Put(util.BoltDeletedKey, roaringBuf.Bytes())
+			roaringBytes, err := writer.Process(roaringBuf.Bytes())
+			if err != nil {
+				return nil, nil, err
+			}
+			err = snapshotSegmentBucket.Put(util.BoltDeletedKey, roaringBytes)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -733,7 +745,11 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			if err != nil {
 				return nil, nil, err
 			}
-			err = snapshotSegmentBucket.Put(util.BoltStatsKey, b)
+			statsBytes, err := writer.Process(b)
+			if err != nil {
+				return nil, nil, err
+			}
+			err = snapshotSegmentBucket.Put(util.BoltStatsKey, statsBytes)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -768,7 +784,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot, exclude map[uint
 		}
 	}()
 
-	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin, exclude, nil)
+	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin, exclude, nil, s.writer)
 	if err != nil {
 		return err
 	}
@@ -963,7 +979,10 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 				return nil, fmt.Errorf("internal bucket missing")
 			}
 			err := internalBucket.ForEach(func(key []byte, val []byte) error {
-				copiedVal := append([]byte(nil), val...)
+				copiedVal, err := s.reader.Process(append([]byte(nil), val...))
+				if err != nil {
+					return err
+				}
 				rv.internal[string(key)] = copiedVal
 				return nil
 			})
@@ -1017,6 +1036,11 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	}
 	deletedBytes := segmentBucket.Get(util.BoltDeletedKey)
 	if deletedBytes != nil {
+		deletedBytes, err = s.reader.Process(deletedBytes)
+		if err != nil {
+			_ = segment.Close()
+			return nil, err
+		}
 		deletedBitmap := roaring.NewBitmap()
 		r := bytes.NewReader(deletedBytes)
 		_, err := deletedBitmap.ReadFrom(r)
@@ -1031,7 +1055,11 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	statBytes := segmentBucket.Get(util.BoltStatsKey)
 	if statBytes != nil {
 		var statsMap map[string]map[string]uint64
-
+		statBytes, err = s.reader.Process(statBytes)
+		if err != nil {
+			_ = segment.Close()
+			return nil, err
+		}
 		err := json.Unmarshal(statBytes, &statsMap)
 		stats := &fieldStats{statMap: statsMap}
 		if err != nil {

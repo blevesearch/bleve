@@ -15,6 +15,7 @@
 package bleve
 
 import (
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,27 +41,50 @@ func newIndexMeta(indexType string, storage string, config map[string]interface{
 	}
 }
 
-func openIndexMeta(path string) (*indexMeta, error) {
+func openIndexMeta(path string) (*indexMeta, *util.FileReader, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, ErrorIndexPathDoesNotExist
+		return nil, nil, ErrorIndexPathDoesNotExist
 	}
 	indexMetaPath := indexMetaPath(path)
 	metaBytes, err := os.ReadFile(indexMetaPath)
 	if err != nil {
-		return nil, ErrorIndexMetaMissing
+		return nil, nil, ErrorIndexMetaMissing
 	}
+
 	var im indexMeta
+	fileReader := &util.FileReader{}
 	err = util.UnmarshalJSON(metaBytes, &im)
 	if err != nil {
-		return nil, ErrorIndexMetaCorrupt
+		if len(metaBytes) < 4 {
+			return nil, nil, ErrorIndexMetaCorrupt
+		}
+
+		pos := len(metaBytes) - 4
+		writerIdLen := int(binary.BigEndian.Uint32(metaBytes[pos:]))
+		pos -= writerIdLen
+		if pos < 0 {
+			return nil, nil, ErrorIndexMetaCorrupt
+		}
+
+		writerId := metaBytes[pos : pos+writerIdLen]
+		fileReader, err = util.NewFileReader(string(writerId))
+		if err != nil {
+			return nil, nil, err
+		}
+		pos -= len(writerId)
+		err = util.UnmarshalJSON(metaBytes[0:pos], &im)
+		if err != nil {
+			return nil, nil, ErrorIndexMetaCorrupt
+		}
 	}
+
 	if im.IndexType == "" {
 		im.IndexType = upsidedown.Name
 	}
-	return &im, nil
+	return &im, fileReader, nil
 }
 
-func (i *indexMeta) Save(path string) (err error) {
+func (i *indexMeta) Save(path string, writer *util.FileWriter) (err error) {
 	indexMetaPath := indexMetaPath(path)
 	// ensure any necessary parent directories exist
 	err = os.MkdirAll(path, 0700)
@@ -86,10 +110,27 @@ func (i *indexMeta) Save(path string) (err error) {
 			err = ierr
 		}
 	}()
+
+	metaBytes, err = writer.Process(metaBytes)
+	if err != nil {
+		return err
+	}
+
 	_, err = indexMetaFile.Write(metaBytes)
 	if err != nil {
 		return err
 	}
+
+	_, err = indexMetaFile.Write([]byte(writer.Id()))
+	if err != nil {
+		return err
+	}
+
+	err = binary.Write(indexMetaFile, binary.BigEndian, uint32(len(writer.Id())))
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

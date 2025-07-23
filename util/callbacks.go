@@ -1,4 +1,4 @@
-package bleve
+package util
 
 import (
 	zapv16 "github.com/blevesearch/zapx/v16"
@@ -11,6 +11,12 @@ import (
 
 var WriterCallbackGetter = func() (string, func(data, counter []byte) ([]byte, error), error) {
 	return "", func(data, counter []byte) ([]byte, error) {
+		return data, nil
+	}, nil
+}
+
+var WriterCallbackGetterWithId = func(cbId string) (func(data, counter []byte) ([]byte, error), error) {
+	return func(data, counter []byte) ([]byte, error) {
 		return data, nil
 	}, nil
 }
@@ -130,15 +136,15 @@ func init() {
 // 	}
 // }
 
-type fileWriter struct {
+type FileWriter struct {
 	writerCB func(data, counter []byte) ([]byte, error)
 	counter  []byte
 	id       string
 }
 
-func NewFileWriter() (*fileWriter, error) {
+func NewFileWriter() (*FileWriter, error) {
 	var err error
-	rv := &fileWriter{}
+	rv := &FileWriter{}
 	rv.id, rv.writerCB, err = WriterCallbackGetter()
 	if err != nil {
 		return nil, err
@@ -151,7 +157,25 @@ func NewFileWriter() (*fileWriter, error) {
 	return rv, nil
 }
 
-func (w *fileWriter) Process(data []byte) ([]byte, error) {
+func NewFileWriterWithId(cbId string) (*FileWriter, error) {
+	writerCB, err := WriterCallbackGetterWithId(cbId)
+	if err != nil {
+		return nil, err
+	}
+
+	counter, err := CounterGetter()
+	if err != nil {
+		return nil, err
+	}
+
+	return &FileWriter{
+		writerCB: writerCB,
+		counter:  counter,
+		id:       cbId,
+	}, nil
+}
+
+func (w *FileWriter) Process(data []byte) ([]byte, error) {
 	if w.writerCB != nil {
 		w.incrementCounter()
 		return w.writerCB(data, w.counter)
@@ -159,7 +183,7 @@ func (w *fileWriter) Process(data []byte) ([]byte, error) {
 	return data, nil
 }
 
-func (w *fileWriter) incrementCounter() {
+func (w *FileWriter) incrementCounter() {
 	if w.counter != nil {
 		for i := len(w.counter) - 1; i >= 0; i-- {
 			if w.counter[i] < 255 {
@@ -171,26 +195,34 @@ func (w *fileWriter) incrementCounter() {
 	}
 }
 
-type fileReader struct {
+func (w *FileWriter) Id() string {
+	return w.id
+}
+
+type FileReader struct {
 	readerCB func(data []byte) ([]byte, error)
 	id       string
 }
 
-func NewFileReader(cbId string) (*fileReader, error) {
+func NewFileReader(cbId string) (*FileReader, error) {
 	readerCB, err := ReaderCallbackGetter(cbId)
 	if err != nil {
 		return nil, err
 	}
 
-	return &fileReader{
+	return &FileReader{
 		readerCB: readerCB,
 		id:       cbId,
 	}, nil
 }
 
-func (r *fileReader) Process(data []byte) ([]byte, error) {
+func (r *FileReader) Process(data []byte) ([]byte, error) {
 	if r.readerCB != nil {
 		return r.readerCB(data)
 	}
 	return data, nil
+}
+
+func (r *FileReader) Id() string {
+	return r.id
 }
