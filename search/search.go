@@ -17,6 +17,7 @@ package search
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/size"
@@ -39,18 +40,6 @@ func init() {
 }
 
 type ArrayPositions []uint64
-
-func (ap ArrayPositions) Equals(other ArrayPositions) bool {
-	if len(ap) != len(other) {
-		return false
-	}
-	for i := range ap {
-		if ap[i] != other[i] {
-			return false
-		}
-	}
-	return true
-}
 
 func (ap ArrayPositions) Compare(other ArrayPositions) int {
 	for i, p := range ap {
@@ -117,7 +106,7 @@ func (p Locations) Dedupe() Locations { // destructive!
 		if pslow.Pos == pfast.Pos &&
 			pslow.Start == pfast.Start &&
 			pslow.End == pfast.End &&
-			pslow.ArrayPositions.Equals(pfast.ArrayPositions) {
+			slices.Equal(pslow.ArrayPositions, pfast.ArrayPositions) {
 			continue // duplicate, so only move fast ahead
 		}
 
