@@ -15,6 +15,7 @@
 package scorch
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -24,7 +25,9 @@ import (
 	"time"
 
 	"github.com/RoaringBitmap/roaring/v2"
+	"github.com/blevesearch/bleve/v2/index/scorch/mergeplan"
 	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	bolt "go.etcd.io/bbolt"
@@ -76,6 +79,9 @@ type Scorch struct {
 	persisterNotifier        chan *epochWatcher
 	rootBolt                 *bolt.DB
 	asyncTasks               sync.WaitGroup
+
+	writer *util.FileWriter
+	reader *util.FileReader
 
 	onEvent      func(event Event) bool
 	onAsyncError func(err error, path string)
@@ -160,6 +166,24 @@ func NewScorch(storeName string,
 	if ok {
 		rv.onAsyncError = RegistryAsyncErrorCallbacks[aecbName]
 	}
+	writerId, ok := config["writerId"].(string)
+	var writer *util.FileWriter
+	if ok {
+		writer, err = util.NewFileWriterWithId(writerId)
+	} else {
+		writer, err = util.NewFileWriter()
+	}
+	if err != nil {
+		return nil, err
+	}
+	rv.writer = writer
+
+	reader, err := util.NewFileReader(rv.writer.Id())
+	if err != nil {
+		return nil, err
+	}
+	rv.reader = reader
+
 	// validate any custom persistor options to
 	// prevent an async error in the persistor routine
 	_, err = rv.parsePersisterOptions()
@@ -939,4 +963,118 @@ func (s *Scorch) CopyReader() index.CopyReader {
 // external API to fire a scorch event (EventKindIndexStart) externally from bleve
 func (s *Scorch) FireIndexEvent() {
 	s.fireEvent(EventKindIndexStart, 0)
+}
+
+// Used when a callback expires or is removed
+func (s *Scorch) RemoveCallback(cbId string) error {
+	s.rootLock.Lock()
+	defer s.rootLock.Unlock()
+
+	segsToCompact := make([]mergeplan.Segment, 0)
+	for _, segmentSnapShot := range s.root.segment {
+		if seg, ok := segmentSnapShot.segment.(segment.CustomizableSegment); ok {
+			if seg.CallbackId() == cbId {
+				segsToCompact = append(segsToCompact, segmentSnapShot)
+			}
+		}
+	}
+
+	if len(segsToCompact) > 0 {
+		return s.forceMergeSegs(segsToCompact)
+	}
+
+	return nil
+}
+
+// Used when all callbacks need to be removed
+func (s *Scorch) RemoveAllCallbacks() error {
+	s.rootLock.Lock()
+	defer s.rootLock.Unlock()
+
+	segsToCompact := make([]mergeplan.Segment, 0)
+	for _, segmentSnapShot := range s.root.segment {
+		if _, ok := segmentSnapShot.segment.(segment.CustomizableSegment); ok {
+			segsToCompact = append(segsToCompact, segmentSnapShot)
+		}
+	}
+
+	if len(segsToCompact) > 0 {
+		return s.forceMergeSegs(segsToCompact)
+	}
+
+	return nil
+}
+
+// Force merge all given segments regardless of their elibility for compaction
+// Large segments will be rewritten instead of merging
+func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment) error {
+	// Create a merge plan with the filtered segments and force a merge
+	// to remove the callback from the segments.
+	mergePlannerOptions, err := s.parseMergePlannerOptions()
+	if err != nil {
+		return fmt.Errorf("mergePlannerOption json parsing err: %v", err)
+
+	}
+
+	atomic.AddUint64(&s.stats.TotFileMergePlan, 1)
+
+	mergePlan, err := mergeplan.Plan(segsToCompact, mergePlannerOptions)
+	if err != nil {
+		atomic.AddUint64(&s.stats.TotFileMergePlanErr, 1)
+		return fmt.Errorf("merge plan creation err: %v", err)
+	}
+
+	segDictionary := make(map[uint64]bool)
+	for _, seg := range segsToCompact {
+		segDictionary[seg.Id()] = true
+	}
+
+	if mergePlan == nil {
+		mergePlan = &mergeplan.MergePlan{
+			Tasks: make([]*mergeplan.MergeTask, 0),
+		}
+	}
+
+	for _, task := range mergePlan.Tasks {
+		for _, seg := range task.Segments {
+			segDictionary[seg.Id()] = false
+		}
+	}
+
+	for _, seg := range segsToCompact {
+		if segDictionary[seg.Id()] {
+			mergePlan.Tasks = append(mergePlan.Tasks, &mergeplan.MergeTask{
+				Segments: []mergeplan.Segment{seg},
+			})
+		}
+	}
+
+	atomic.AddUint64(&s.stats.TotFileMergePlanOk, 1)
+	atomic.AddUint64(&s.stats.TotFileMergePlanTasks, uint64(len(mergePlan.Tasks)))
+
+	s.forceMergeRequestCh <- &mergerCtrl{
+		plan: mergePlan,
+		ctx:  context.Background(),
+	}
+
+	return nil
+}
+
+// CBIDsInUse returns a map of all the callback IDs that are currently in use
+func (s *Scorch) CBIDsInUse() map[string]struct{} {
+	s.rootLock.RLock()
+	defer s.rootLock.RUnlock()
+
+	rv := make(map[string]struct{})
+	if s.root == nil {
+		return rv
+	}
+
+	for _, segmentSnapShot := range s.root.segment {
+		if seg, ok := segmentSnapShot.segment.(segment.CustomizableSegment); ok {
+			rv[seg.CallbackId()] = struct{}{}
+		}
+	}
+
+	return rv
 }
