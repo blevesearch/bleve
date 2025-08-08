@@ -1586,7 +1586,7 @@ func TestGeometryCollectionPointIntersects(t *testing.T) {
 			Types:            []string{"linestring"},
 		},
 		{
-			QueryShape:       [][][][][]float64{{{{{1, 1}, {2, 2}, {0, 2}, {1, 0}}, {{5, 6}}}}},
+			QueryShape:       [][][][][]float64{{{{{1, 1}, {2, 2}, {0, 2}, {1, 1}}}, {{{5, 6}}}}},
 			DocShapeVertices: []float64{1.5, 1.9},
 			DocShapeName:     "point1",
 			Desc:             "point inside polygon in geometry collection",
