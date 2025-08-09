@@ -132,6 +132,14 @@ func (d *Document) VisitFields(visitor index.FieldVisitor) {
 	}
 }
 
+func (d *Document) VisitNestedFields(visitor index.FieldVisitor) {
+	for _, f := range d.Fields {
+		if _, ok := f.(index.NestedField); ok {
+			visitor(f)
+		}
+	}
+}
+
 func (d *Document) VisitComposite(visitor index.CompositeFieldVisitor) {
 	for _, f := range d.CompositeFields {
 		visitor(f)
