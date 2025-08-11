@@ -1,4 +1,4 @@
-# Pagination in Bleve
+# Pagination
 
 ## Why pagination matters
 
