@@ -1,19 +1,19 @@
-## Pagination in Bleve
+# Pagination in Bleve
 
-### Why pagination matters
+## Why pagination matters
 
 Search queries can match many documents. Pagination lets you fetch and display results in chunks, keeping responses small and fast. 
 
 By default, Bleve returns the first 10 hits sorted by relevance (score), highest first.
 
-### Two pagination modes
+## Two pagination modes
 
 - `From`/`Size`: simple and stateless; cost grows with page depth.
 - `SearchAfter`/`SearchBefore`: efficient for deep paging; requires passing sort keys from the previous page.
 
 Both modes can be used with any valid sort.
 
-### `Size`/`From`
+## `Size`/`From`
 
 Offset-based pagination uses `Size` (page length) and `From` (number of hits to skip). Bleve collects at least `Size + From` ordered results, then returns the `Size` slice starting at `From`.
 
@@ -35,7 +35,7 @@ When to use:
 - Simple, stateless pagination for shallow pages.
 - Avoid for deep pages, as memory grows with `From` for deeper pages.
 
-### `SearchAfter` and `SearchBefore`
+## `SearchAfter` and `SearchBefore`
 
 This returns the next (or previous) page based on a boundary defined by the sort keys of a specific hit. This keeps resource usage proportional to the page size, even for deep pages.
 
@@ -75,7 +75,23 @@ Backward pagination over `_id` and `_score`:
 }
 ```
 
-### Total Sort Order
+Pagination using numeric, datetime and geo fields. Notice how we specify the sort objects, with the "type" field explicitly declared in case of numeric and datetime:
+```json
+{
+  "query": {
+    "match_all": {}
+  },
+  "size": 10,
+  "sort": [
+    {"by": "field", "field": "price", "type": "number"},
+    {"by": "field", "field": "created_at", "type": "date"},
+    {"by": "geo_distance", "field": "location", "location": {"lat": 40.7128,"lon": -74.0060}}
+  ],
+  "search_after": ["99.99", "2023-10-15T10:30:00Z", "5.2"]
+}
+
+```
+## Total Sort Order
 
 Pagination is deterministic. Ensure your `Sort` defines a total order, so that documents with the same sort keys are not left out:
 
@@ -85,7 +101,7 @@ Pagination is deterministic. Ensure your `Sort` defines a total order, so that d
   - `["country", "-age", "_id"]`
   - `["-_score", "_id"]` (default score desc with a tie-breaker)
 
-### Performance guidance
+## Performance guidance
 
 - Offset pagination cost grows with `From` (collects at least `Size + From` results before slicing).
 - `SearchAfter`/`SearchBefore` keeps memory and network proportional to `Size`.
