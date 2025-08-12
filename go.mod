@@ -9,7 +9,7 @@ require (
 	github.com/bits-and-blooms/bitset v1.22.0
 	github.com/blevesearch/bleve_index_api v1.2.10
 	github.com/blevesearch/geo v0.2.4
-	github.com/blevesearch/go-faiss v1.0.25
+	github.com/blevesearch/go-faiss v1.0.26-0.20250808221324-a1d3051837ea
 	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/blevesearch/go-porterstemmer v1.0.3
 	github.com/blevesearch/goleveldb v1.0.1
