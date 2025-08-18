@@ -26,10 +26,12 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"reflect"
 	"sort"
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis/lang/en"
 	"github.com/blevesearch/bleve/v2/index/scorch"
@@ -1907,5 +1909,195 @@ func TestIndexUpdateVector(t *testing.T) {
 	}
 	if len(res4.Hits) != 0 {
 		t.Fatalf("Expected 0 hits, got %d\n", len(res4.Hits))
+	}
+}
+
+func TestIndexInsightsHighestFrequencyTerms(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	mp := mapping.NewIndexMapping()
+	textMapping := mapping.NewTextFieldMapping()
+	textMapping.Analyzer = "en"
+	mp.DefaultMapping.AddFieldMappingsAt("text", textMapping)
+
+	idx, err := New(tmpIndexPath, mp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	data := []map[string]string{
+		{
+			"id":   "one",
+			"text": "She sells sea shells by the sea shore",
+		},
+		{
+			"id":   "two",
+			"text": "The quick brown fox jumps over the lazy dog",
+		},
+		{
+			"id":   "three",
+			"text": "She sold sea shells to the person with the dog",
+		},
+		{
+			"id":   "four",
+			"text": "But there are a lot of dogs on the beach",
+		},
+		{
+			"id":   "five",
+			"text": "To hell with the foxes",
+		},
+		{
+			"id":   "six",
+			"text": "What about the dogs",
+		},
+		{
+			"id":   "seven",
+			"text": "Dogs are OK, foxes are not",
+		},
+	}
+
+	expectTermFreqs := []index.TermFreq{
+		{Term: "dog", Frequency: 5},
+		{Term: "fox", Frequency: 3},
+		{Term: "sea", Frequency: 2},
+		{Term: "shell", Frequency: 2},
+		{Term: "beach", Frequency: 1},
+	}
+
+	for _, d := range data {
+		err = idx.Index(d["id"], d)
+		if err != nil {
+			t.Errorf("Error updating index: %v", err)
+		}
+	}
+
+	insightsIdx, ok := idx.(InsightsIndex)
+	if !ok {
+		t.Fatal("index does not support insights")
+	}
+
+	termFreqs, err := insightsIdx.HighestFrequencyTerms("text", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	q1 := NewSearchRequest(NewMatchNoneQuery())
+	q1.AddKNN("a", []float32{1, 2, 3, 4}, 3, 1.0)
+	res1, err := index.Search(q1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res1.Hits) != 3 {
+		t.Fatalf("Expected 3 hits, got %d\n", len(res1.Hits))
+	}
+	q2 := NewSearchRequest(NewMatchNoneQuery())
+	q2.AddKNN("b", []float32{1, 2, 3, 4}, 3, 1.0)
+	res2, err := index.Search(q2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res2.Hits) != 0 {
+		t.Fatalf("Expected 0 hits, got %d\n", len(res2.Hits))
+	}
+	q3 := NewSearchRequest(NewMatchNoneQuery())
+	q3.AddKNN("c", []float32{1, 2, 3, 4}, 3, 1.0)
+	res3, err := index.Search(q3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res3.Hits) != 3 {
+		t.Fatalf("Expected 3 hits, got %d\n", len(res3.Hits))
+	}
+	q4 := NewSearchRequest(NewMatchNoneQuery())
+	q4.AddKNN("d", []float32{1, 2, 3, 4}, 3, 1.0)
+	res4, err := index.Search(q4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res4.Hits) != 0 {
+		t.Fatalf("Expected 0 hits, got %d\n", len(res4.Hits))
+    }
+	if !reflect.DeepEqual(termFreqs, expectTermFreqs) {
+		t.Fatalf("term freqs do not match: got: %v, expected: %v", termFreqs, expectTermFreqs)
+	}
+}
+
+func TestIndexInsightsHighestCardinalityCentroids(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	vectorDims := 5
+
+	mp := mapping.NewIndexMapping()
+	vecFieldMapping := mapping.NewVectorFieldMapping()
+	vecFieldMapping.Dims = vectorDims
+	vecFieldMapping.Similarity = index.CosineSimilarity
+	mp.DefaultMapping.AddFieldMappingsAt("vec", vecFieldMapping)
+
+	idx, err := New(tmpIndexPath, mp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	rand.Seed(time.Now().UnixNano())
+	min, max := float32(-10.0), float32(10.0)
+	genRandomVector := func() []float32 {
+		vec := make([]float32, vectorDims)
+		for i := range vec {
+			vec[i] = min + rand.Float32()*(max-min)
+		}
+		return vec
+	}
+
+	batch := idx.NewBatch()
+	for i := 1; i <= 50000; i++ {
+		if err = batch.Index(fmt.Sprintf("doc-%d", i), map[string]interface{}{
+			"vec": genRandomVector(),
+		}); err != nil {
+			t.Fatalf("error indexing doc: %v", err)
+		}
+
+		if i%200 == 0 {
+			err = idx.Batch(batch)
+			if err != nil {
+				t.Fatalf("Error adding batch to index: %v", err)
+			}
+			batch = idx.NewBatch()
+		}
+	}
+
+	if batch.Size() > 0 {
+		// In case doc count is not a multiple of 200, we need to add the final batch
+		err = idx.Batch(batch)
+		if err != nil {
+			t.Errorf("Error adding final batch to index: %v", err)
+		}
+	}
+
+	insightsIdx, ok := idx.(InsightsIndex)
+	if !ok {
+		t.Fatal("index does not support insights")
+	}
+
+	centroids, err := insightsIdx.HighestCardinalityCentroids("vec", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(centroids) != 5 {
+		t.Fatalf("expected 5 centroids, got %d", len(centroids))
 	}
 }

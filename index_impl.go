@@ -1399,12 +1399,22 @@ func (i *indexImpl) HighestFrequencyTerms(field string, limit int) ([]index.Term
 		return nil, ErrorIndexClosed
 	}
 
-	insightsIndex, ok := i.i.(index.InsightsIndex)
+	reader, err := i.i.Reader()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if cerr := reader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	insightsReader, ok := reader.(index.IndexInsightsReader)
 	if !ok {
-		return nil, fmt.Errorf("index implementation does not support HighestFrequencyTerms")
+		return nil, fmt.Errorf("index reader does not support HighestFrequencyTerms")
 	}
 
-    return insightsIndex.HighestFrequencyTerms(field, limit)
+	return insightsReader.HighestFrequencyTerms(field, limit)
 }
 
 func (i *indexImpl) HighestCardinalityCentroids(field string, limit int) ([]index.CentroidCardinality, error) {
@@ -1415,10 +1425,20 @@ func (i *indexImpl) HighestCardinalityCentroids(field string, limit int) ([]inde
 		return nil, ErrorIndexClosed
 	}
 
-	insightsIndex, ok := i.i.(index.InsightsIndex)
+	reader, err := i.i.Reader()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if cerr := reader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	insightsReader, ok := reader.(index.IndexInsightsReader)
 	if !ok {
-		return nil, fmt.Errorf("index implementation does not support HighestCardinalityCentroids")
+		return nil, fmt.Errorf("index reader does not support HighestCardinalityCentroids")
 	}
 
-    return insightsIndex.HighestCardinalityCentroids(field, limit)
+	return insightsReader.HighestCardinalityCentroids(field, limit)
 }

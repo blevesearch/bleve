@@ -1236,16 +1236,11 @@ func (is *IndexSnapshot) MergeUpdateFieldsInfo(updatedFields map[string]*index.U
 	}
 }
 
-type TermFreq struct {
-	Term      string `json:"term"`
-	Frequency uint64 `json:"frequency"`
-}
-
 // HighestFrequencyTerms returns the top N terms with the highest frequencies
 // for a given field across all segments in the index snapshot.
 // Returns a slice of term-frequency pairs sorted by frequency (descending).
 func (is *IndexSnapshot) HighestFrequencyTerms(field string, limit int) (
-	termsFreqs []TermFreq, err error) {
+	termsFreqs []index.TermFreq, err error) {
 	if len(is.segment) == 0 {
 		return nil, fmt.Errorf("no segments available")
 	}
@@ -1296,9 +1291,9 @@ func (is *IndexSnapshot) HighestFrequencyTerms(field string, limit int) (
 		return nil, fmt.Errorf("no terms found for field %s", field)
 	}
 
-	var termFreqList []TermFreq
+	var termFreqList []index.TermFreq
 	for termStr, freq := range termFreqs {
-		termFreqList = append(termFreqList, TermFreq{
+		termFreqList = append(termFreqList, index.TermFreq{
 			Term:      termStr,
 			Frequency: freq,
 		})
