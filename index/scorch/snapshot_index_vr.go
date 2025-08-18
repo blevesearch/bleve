@@ -170,7 +170,7 @@ func (i *IndexSnapshotVectorReader) Close() error {
 }
 
 func (i *IndexSnapshot) HighestCardinalityCentroids(field string, limit int) (
-	centroids []segment_api.CentroidCardinality, err error) {
+	centroids []index.CentroidCardinality, err error) {
 	if len(i.segment) == 0 {
 		return nil, fmt.Errorf("no segments available")
 	}
@@ -179,7 +179,7 @@ func (i *IndexSnapshot) HighestCardinalityCentroids(field string, limit int) (
 		return nil, fmt.Errorf("limit must be positive")
 	}
 
-	rvCentroids := make([]segment_api.CentroidCardinality, limit)
+	rvCentroids := make([]index.CentroidCardinality, limit)
 
 	for _, segment := range i.segment {
 		if sv, ok := segment.segment.(segment_api.VectorSegment); ok {
