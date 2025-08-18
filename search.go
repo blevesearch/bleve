@@ -359,7 +359,7 @@ func (r *SearchRequest) validatePagination() error {
 					return fmt.Errorf("invalid %s value for sort field '%s': '%s'. %s", afterOrBefore, ss.Field, pagination[i], err)
 				}
 			}
-		} 
+		}
 	}
 
 	return nil
