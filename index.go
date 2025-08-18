@@ -388,3 +388,9 @@ type SynonymIndex interface {
 	// IndexSynonym indexes a synonym definition, with the specified id and belonging to the specified collection.
 	IndexSynonym(id string, collection string, definition *SynonymDefinition) error
 }
+
+type InsightsIndex interface {
+    Index
+    HighestFrequencyTerms(field string, limit int) ([]index.TermFreq, error)
+    HighestCardinalityCentroids(field string, limit int) ([]index.CentroidCardinality, error)
+}

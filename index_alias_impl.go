@@ -17,6 +17,7 @@ package bleve
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -1135,4 +1136,128 @@ func (f *indexAliasImplFieldDict) Close() error {
 
 func (f *indexAliasImplFieldDict) Cardinality() int {
 	return f.fieldDict.Cardinality()
+}
+
+// -----------------------------------------------------------------------------
+
+type asyncInsightsResult struct {
+	Name                              string
+	HighestFrequencyTermsResult       []index.TermFreq
+	HighestCardinalityCentroidsResult []index.CentroidCardinality
+}
+
+func (i *indexAliasImpl) HighestFrequencyTerms(field string, limit int) (
+	[]index.TermFreq, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
+	if len(i.indexes) < 1 {
+		return nil, ErrorAliasEmpty
+	}
+
+	// short circuit the simple case
+	if len(i.indexes) == 1 {
+		if idx, ok := i.indexes[0].(InsightsIndex); ok {
+			return idx.HighestFrequencyTerms(field, limit)
+		}
+		return nil, nil
+	}
+
+	// run search on each index in separate go routine
+	var waitGroup sync.WaitGroup
+	asyncResults := make(chan *asyncInsightsResult, len(i.indexes))
+
+	searchChildIndex := func(in Index, field string, limit int) {
+		rv := asyncInsightsResult{Name: in.Name()}
+		if idx, ok := in.(InsightsIndex); ok {
+			rv.HighestFrequencyTermsResult, _ = idx.HighestFrequencyTerms(field, limit)
+		}
+		asyncResults <- &rv
+		waitGroup.Done()
+	}
+
+	waitGroup.Add(len(i.indexes))
+	for _, in := range i.indexes {
+		go searchChildIndex(in, field, limit)
+	}
+
+	// on another go routine, close after finished
+	go func() {
+		waitGroup.Wait()
+		close(asyncResults)
+	}()
+
+	rvhighestFrequencyTermsResult := make([]index.TermFreq, limit)
+	for asr := range asyncResults {
+		asr.HighestFrequencyTermsResult = append(
+			asr.HighestFrequencyTermsResult, rvhighestFrequencyTermsResult...)
+		sort.Slice(asr.HighestFrequencyTermsResult, func(i, j int) bool {
+			return asr.HighestFrequencyTermsResult[i].Frequency > asr.HighestFrequencyTermsResult[j].Frequency
+		})
+		rvhighestFrequencyTermsResult = asr.HighestFrequencyTermsResult[:limit]
+	}
+
+	return rvhighestFrequencyTermsResult, nil
+}
+
+func (i *indexAliasImpl) HighestCardinalityCentroids(field string, limit int) (
+	[]index.CentroidCardinality, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
+	if len(i.indexes) < 1 {
+		return nil, ErrorAliasEmpty
+	}
+
+	// short circuit the simple case
+	if len(i.indexes) == 1 {
+		if idx, ok := i.indexes[0].(InsightsIndex); ok {
+			return idx.HighestCardinalityCentroids(field, limit)
+		}
+		return nil, nil
+	}
+
+	// run search on each index in separate go routine
+	var waitGroup sync.WaitGroup
+	asyncResults := make(chan *asyncInsightsResult, len(i.indexes))
+
+	searchChildIndex := func(in Index, field string, limit int) {
+		rv := asyncInsightsResult{Name: in.Name()}
+		if idx, ok := in.(InsightsIndex); ok {
+			rv.HighestCardinalityCentroidsResult, _ = idx.HighestCardinalityCentroids(field, limit)
+		}
+		asyncResults <- &rv
+		waitGroup.Done()
+	}
+
+	waitGroup.Add(len(i.indexes))
+	for _, in := range i.indexes {
+		go searchChildIndex(in, field, limit)
+	}
+
+	// on another go routine, close after finished
+	go func() {
+		waitGroup.Wait()
+		close(asyncResults)
+	}()
+
+	rvhighestCardinalityCentroidsResult := make([]index.CentroidCardinality, limit)
+	for asr := range asyncResults {
+		asr.HighestCardinalityCentroidsResult = append(
+			asr.HighestCardinalityCentroidsResult, rvhighestCardinalityCentroidsResult...)
+		sort.Slice(asr.HighestCardinalityCentroidsResult, func(i, j int) bool {
+			return asr.HighestCardinalityCentroidsResult[i].Cardinality > asr.HighestCardinalityCentroidsResult[j].Cardinality
+		})
+		rvhighestCardinalityCentroidsResult = asr.HighestCardinalityCentroidsResult[:limit]
+	}
+
+	return rvhighestCardinalityCentroidsResult, nil
 }

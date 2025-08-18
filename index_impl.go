@@ -1388,3 +1388,37 @@ func (i *indexImpl) FireIndexEvent() {
 		internalEventIndex.FireIndexEvent()
 	}
 }
+
+// -----------------------------------------------------------------------------
+
+func (i *indexImpl) HighestFrequencyTerms(field string, limit int) ([]index.TermFreq, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
+	insightsIndex, ok := i.i.(index.InsightsIndex)
+	if !ok {
+		return nil, fmt.Errorf("index implementation does not support HighestFrequencyTerms")
+	}
+
+    return insightsIndex.HighestFrequencyTerms(field, limit)
+}
+
+func (i *indexImpl) HighestCardinalityCentroids(field string, limit int) ([]index.CentroidCardinality, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
+	insightsIndex, ok := i.i.(index.InsightsIndex)
+	if !ok {
+		return nil, fmt.Errorf("index implementation does not support HighestCardinalityCentroids")
+	}
+
+    return insightsIndex.HighestCardinalityCentroids(field, limit)
+}
