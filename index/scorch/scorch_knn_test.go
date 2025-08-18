@@ -82,7 +82,7 @@ func TestIndexSnapshotHighestCardinalityCentroids(t *testing.T) {
 	}
 
 	var batch *index.Batch
-	for i := 1; i <= 20000; i++ {
+	for i := 1; i <= 50000; i++ {
 		doc := document.NewDocument(fmt.Sprintf("doc-%d", i))
 		err = mp.MapDocument(doc, map[string]interface{}{
 			"vec": genRandomVector(),
