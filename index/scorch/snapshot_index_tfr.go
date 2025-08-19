@@ -15,7 +15,6 @@
 package scorch
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"reflect"
@@ -146,7 +145,7 @@ func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Postin
 func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
 	// FIXME do something better
 	// for now, if we need to seek backwards, then restart from the beginning
-	if i.currPosting != nil && bytes.Compare(i.currID, ID) >= 0 {
+	if i.currPosting != nil && i.currID.Compare(ID) >= 0 {
 		// Check if the TFR is a special unadorned composite optimization.
 		// Such a TFR will NOT have a valid `term` or `field` set, making it
 		// impossible for the TFR to replace itself with a new one.
