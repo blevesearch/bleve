@@ -15,7 +15,6 @@
 package scorch
 
 import (
-	"bytes"
 	"reflect"
 
 	"github.com/RoaringBitmap/roaring/v2"
@@ -63,7 +62,7 @@ func (i *IndexSnapshotDocIDReader) Advance(ID index.IndexInternalID) (index.Inde
 	if next == nil {
 		return nil, nil
 	}
-	for bytes.Compare(next, ID) < 0 {
+	for next.Compare(ID) < 0 {
 		next, err = i.Next()
 		if err != nil {
 			return nil, err
