@@ -317,6 +317,19 @@ func (r *SearchRequest) Validate() error {
 		return err
 	}
 
+	err = validateScore(r)
+	if err != nil {
+		return err
+	}
+
+	if isHybridSearch(r) {
+		if r.SearchAfter != nil || r.SearchBefore != nil {
+			return fmt.Errorf("cannot use search after or search before with hybrid search")
+		} else if so := (search.SortOrder{&search.SortScore{Desc: true}}); r.Sort != nil && !reflect.DeepEqual(r.Sort, so) {
+			return fmt.Errorf("sort must be empty or descending order of score for hybrid search")
+		}
+	}
+
 	err = validateKNN(r)
 	if err != nil {
 		return err
@@ -359,7 +372,7 @@ func (r *SearchRequest) validatePagination() error {
 					return fmt.Errorf("invalid %s value for sort field '%s': '%s'. %s", afterOrBefore, ss.Field, pagination[i], err)
 				}
 			}
-		} 
+		}
 	}
 
 	return nil
@@ -653,4 +666,61 @@ func isMatchNoneQuery(q query.Query) bool {
 func isMatchAllQuery(q query.Query) bool {
 	_, ok := q.(*query.MatchAllQuery)
 	return ok
+}
+
+// Checks if the request is hybrid search. Currently supports: RRF.
+func isHybridSearch(req *SearchRequest) bool {
+	switch req.Score {
+	case ReciprocalRankFusionStrategy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Additional parameters in the search request. Currently only being 
+// used for hybrid search parameters.
+type Params struct {
+	ScoreRankConstant *int `json:"score_rank_constant,omitempty"`
+	ScoreWindowSize   *int `json:"score_window_size,omitempty"`
+}
+
+func parseParams(r *SearchRequest, input []byte) (*Params, error) {
+	if len(input) == 0 {
+		src := 60
+		sws := r.Size
+		return &Params{ScoreRankConstant: &src, ScoreWindowSize: &sws}, nil
+	}
+
+	var params Params
+	err := util.UnmarshalJSON(input, &params)
+	if err != nil {
+		return nil, err
+	}
+
+	if params.ScoreRankConstant == nil {
+		src := 60
+		params.ScoreRankConstant = &src
+	}
+
+	if params.ScoreWindowSize != nil {
+		if *params.ScoreWindowSize < 1 {
+			return nil, fmt.Errorf("score window size must be greater than 0")
+		} else if *params.ScoreWindowSize < r.Size {
+			return nil, fmt.Errorf("score window size must be greater than or equal to Size (%d)", r.Size)
+		}
+	} else {
+		sws := r.Size
+		params.ScoreWindowSize = &sws
+	}
+
+	return &params, nil
+}
+
+func validateScore(r *SearchRequest) error {
+	if r.Score == "" || r.Score == "none" || isHybridSearch(r) {
+		return nil
+	}
+
+	return fmt.Errorf("score field must be one of \"\", \"none\", \"%s\"", ReciprocalRankFusionStrategy)
 }

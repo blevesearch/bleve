@@ -246,10 +246,17 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	if hc.size+hc.skip > PreAllocSizeSkipCap {
 		backingSize = PreAllocSizeSkipCap + 1
 	}
+	
+	var hybridSearch bool
+	if _, ok := ctx.Value(search.HybridSearchKey).(bool); ok {
+		hybridSearch = true
+	}
+
 	searchContext := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(backingSize+searcher.DocumentMatchPoolSize(), len(hc.sort)),
 		Collector:         hc,
 		IndexReader:       reader,
+		HybridSearch:	   hybridSearch,
 	}
 
 	hc.dvReader, err = reader.DocValueReader(hc.neededFields)
@@ -366,6 +373,12 @@ func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 			return err
 		}
 		if knnHit, ok := hc.knnHits[d.ID]; ok {
+			// if hybrid search, adds the knn ScoreBreakdown field to the
+			// query doc. Query doc now contains the query score (Score field)
+			// as well as the individual knn scores (ScoreBreakdown)
+			if ctx.HybridSearch {
+				d.ScoreBreakdown = knnHit.ScoreBreakdown
+			} 
 			d.Score, d.Expl = hc.computeNewScoreExpl(d, knnHit)
 			delete(hc.knnHits, d.ID)
 		}

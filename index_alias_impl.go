@@ -186,6 +186,25 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	if len(i.indexes) < 1 {
 		return nil, ErrorAliasEmpty
 	}
+
+	var doHybridSearch bool
+	var rescorer rescorer
+	if _, ok := ctx.Value(search.HybridSearchKey).(bool); !ok {
+		// Since hybrid search key is not set, check if it is a hybrid search.
+		// If it is, then set doHybridSearch. This indicates that score
+		// combination must happen at this alias.
+		doHybridSearch = isHybridSearch(req)
+
+		// new context will be used in internal functions to collect data
+		// as suitable for hybrid search. Rescorer is used for rescoring
+		// using fusion algorithms.
+		if doHybridSearch {
+			ctx = context.WithValue(ctx, search.HybridSearchKey, true)
+			rescorer = newFusionRescorer(req)
+			rescorer.prepareSearchRequest()
+		}
+	}
+
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
 		// since preSearchKey is set, it means that the request
 		// is being executed as part of a preSearch, which
@@ -224,7 +243,17 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		if preSearchData != nil {
 			req.PreSearchData = preSearchData[i.indexes[0].Name()]
 		}
-		return i.indexes[0].SearchInContext(ctx, req)
+		sr, err := i.indexes[0].SearchInContext(ctx, req)
+		if err != nil {
+			return sr, err
+		}
+
+		if doHybridSearch {
+			rescorer.rescore(sr)
+			rescorer.restoreSearchRequest()
+		}
+
+		return sr, nil
 	}
 
 	// at this stage we know we have multiple indexes
@@ -261,7 +290,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// if the request is satisfied by the preSearch result, then we can
 		// directly return the preSearch result as the final result
 		if requestSatisfiedByPreSearch(req, flags) {
-			sr = finalizeSearchResult(req, preSearchResult)
+			sr = finalizeSearchResult(req, preSearchResult, doHybridSearch, rescorer)
 			// no need to run the 2nd phase MultiSearch(..)
 		} else {
 			preSearchData, err = constructPreSearchData(req, flags, preSearchResult, i.indexes)
@@ -274,7 +303,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 
 	// check if search result was generated as part of preSearch itself
 	if sr == nil {
-		sr, err = MultiSearch(ctx, req, preSearchData, i.indexes...)
+		sr, err = MultiSearch(ctx, req, preSearchData, doHybridSearch, rescorer, i.indexes...)
 		if err != nil {
 			return nil, err
 		}
@@ -653,7 +682,7 @@ func preSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, i
 // if the request is satisfied by just the preSearch result,
 // finalize the result and return it directly without
 // performing multi search
-func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult) *SearchResult {
+func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult, doHybridSearch bool, rescorer rescorer) *SearchResult {
 	if preSearchResult == nil {
 		return nil
 	}
@@ -682,6 +711,13 @@ func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult) *Se
 	if req.SearchAfter != nil {
 		preSearchResult.Hits = collector.FilterHitsBySearchAfter(preSearchResult.Hits, req.Sort, req.SearchAfter)
 	}
+
+	// rescore if hybrid search flag is set
+	if doHybridSearch {
+		rescorer.rescore(preSearchResult)
+		rescorer.restoreSearchRequest()
+	}
+
 	preSearchResult.Hits = hitsInCurrentPage(req, preSearchResult.Hits)
 	if reverseQueryExecution {
 		// reverse the sort back to the original
@@ -914,7 +950,7 @@ func hitsInCurrentPage(req *SearchRequest, hits []*search.DocumentMatch) []*sear
 
 // MultiSearch executes a SearchRequest across multiple Index objects,
 // then merges the results.  The indexes must honor any ctx deadline.
-func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[string]map[string]interface{}, indexes ...Index) (*SearchResult, error) {
+func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[string]map[string]interface{}, doHybridSearch bool, rescorer rescorer, indexes ...Index) (*SearchResult, error) {
 	searchStart := time.Now()
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
 
@@ -978,6 +1014,12 @@ func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[stri
 				Errors: make(map[string]error),
 			},
 		}
+	}
+
+	// rescore if hybrid search flag is set
+	if doHybridSearch {
+		rescorer.rescore(sr)
+		rescorer.restoreSearchRequest()
 	}
 
 	sr.Hits = hitsInCurrentPage(req, sr.Hits)
