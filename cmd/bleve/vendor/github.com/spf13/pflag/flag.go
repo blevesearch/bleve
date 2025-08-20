@@ -237,13 +237,13 @@ func (f *FlagSet) VisitAll(fn func(*Flag)) {
 	}
 }
 
-// HasFlags returns a bool to indicate if the FlagSet has any flags definied.
+// HasFlags returns a bool to indicate if the FlagSet has any flags defined.
 func (f *FlagSet) HasFlags() bool {
 	return len(f.formal) > 0
 }
 
 // HasAvailableFlags returns a bool to indicate if the FlagSet has any flags
-// definied that are not hidden or deprecated.
+// defined that are not hidden or deprecated.
 func (f *FlagSet) HasAvailableFlags() bool {
 	for _, flag := range f.formal {
 		if !flag.Hidden && len(flag.Deprecated) == 0 {

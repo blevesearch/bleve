@@ -371,6 +371,6 @@ func (r *UpsideDownCouchDocIDReader) nextOnly() bool {
 		start = r.onlyPos
 		r.onlyPos++
 	}
-	// inidicate if we got to the end of the list
+	// indicate if we got to the end of the list
 	return r.onlyPos < len(r.only)
 }

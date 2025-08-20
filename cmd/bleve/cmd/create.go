@@ -52,7 +52,7 @@ var createCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("error creating index: %v", err)
 		}
-		// the inheritted Post action will close the index
+		// the inherited Post action will close the index
 		return nil
 	},
 }

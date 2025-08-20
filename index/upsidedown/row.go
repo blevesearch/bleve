@@ -924,7 +924,7 @@ type backIndexFieldTermVisitor func(field uint32, term []byte)
 //
 // This code originates from:
 // func (m *BackIndexRowValue) Unmarshal(data []byte) error
-// the sections which create garbage or parse unintersting sections
+// the sections which create garbage or parse uninteresting sections
 // have been commented out.  This was done by design to allow for easier
 // merging in the future if that original function is regenerated
 func visitBackIndexRow(data []byte, callback backIndexFieldTermVisitor) error {

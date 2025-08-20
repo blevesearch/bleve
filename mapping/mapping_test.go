@@ -1018,7 +1018,7 @@ func TestMappingForTextMarshaler(t *testing.T) {
 	}
 
 	// first verify that when using a mapping that doesn't explicitly
-	// map the stuct field as text, then we traverse inside the struct
+	// map the struct field as text, then we traverse inside the struct
 	// and do our best
 	m := NewIndexMapping()
 	doc := document.NewDocument("x")

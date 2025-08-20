@@ -96,7 +96,7 @@ func NewRegexpStringSearcher(ctx context.Context, indexReader index.IndexReader,
 // NewRegexpSearcher creates a searcher which will match documents that
 // contain terms which match the pattern regexp.  The match must be EXACT
 // matching the entire term.  The provided regexp SHOULD NOT start with ^
-// or end with $ as this can intefere with the implementation.  Separately,
+// or end with $ as this can interfere with the implementation.  Separately,
 // matches will be checked to ensure they match the entire term.
 func NewRegexpSearcher(ctx context.Context, indexReader index.IndexReader, pattern Regexp,
 	field string, boost float64, options search.SearcherOptions) (

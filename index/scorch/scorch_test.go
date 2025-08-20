@@ -2191,7 +2191,7 @@ func TestForceVersion(t *testing.T) {
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
-		t.Fatalf("error opening a supported vesion: %v", err)
+		t.Fatalf("error opening a supported version: %v", err)
 	}
 	s := idx.(*Scorch)
 	if s.segPlugin.Version() != 11 {
@@ -2200,7 +2200,7 @@ func TestForceVersion(t *testing.T) {
 	cfg["forceSegmentVersion"] = 12
 	idx, err = NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
-		t.Fatalf("error opening a supported vesion: %v", err)
+		t.Fatalf("error opening a supported version: %v", err)
 	}
 	s = idx.(*Scorch)
 	if s.segPlugin.Version() != 12 {
@@ -2209,7 +2209,7 @@ func TestForceVersion(t *testing.T) {
 	cfg["forceSegmentVersion"] = 10
 	_, err = NewScorch(Name, cfg, analysisQueue)
 	if err == nil {
-		t.Fatalf("expected an error opening an unsupported vesion, got nil")
+		t.Fatalf("expected an error opening an unsupported version, got nil")
 	}
 }
 

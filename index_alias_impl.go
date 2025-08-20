@@ -32,7 +32,7 @@ type indexAliasImpl struct {
 	indexes []Index
 	mutex   sync.RWMutex
 	open    bool
-	// if all the indexes in tha alias have the same mapping
+	// if all the indexes in that alias have the same mapping
 	// then the user can set the mapping here to avoid
 	// checking the mapping of each index in the alias
 	mapping mapping.IndexMapping

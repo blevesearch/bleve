@@ -386,7 +386,7 @@ type flushable struct {
 	totDocs  uint64
 }
 
-// number workers which parallely perform an in-memory merge of the segments
+// number workers which parallelly perform an in-memory merge of the segments
 // followed by a flush operation.
 var DefaultNumPersisterWorkers = 1
 
@@ -395,7 +395,7 @@ var DefaultNumPersisterWorkers = 1
 var DefaultMaxSizeInMemoryMergePerWorker = 0
 
 func legacyFlushBehaviour(maxSizeInMemoryMergePerWorker, numPersisterWorkers int) bool {
-	// DefaultMaxSizeInMemoryMergePerWorker = 0 is a special value to preserve the leagcy
+	// DefaultMaxSizeInMemoryMergePerWorker = 0 is a special value to preserve the legacy
 	// one-shot in-memory merge + flush behaviour.
 	return maxSizeInMemoryMergePerWorker == 0 && numPersisterWorkers == 1
 }
@@ -1293,7 +1293,7 @@ func (s *Scorch) removeOldZapFiles() error {
 // duration. This results in all of them being purged from the boltDB
 // and the next iteration of the removeOldData() would end up protecting
 // latest contiguous snapshot which is a poor pattern in the rollback checkpoints.
-// Hence we try to retain atmost retentionFactor portion worth of old snapshots
+// Hence we try to retain at most retentionFactor portion worth of old snapshots
 // in such a scenario using the following function
 func getBoundaryCheckPoint(retentionFactor float64,
 	checkPoints []*snapshotMetaData, timeStamp time.Time,
