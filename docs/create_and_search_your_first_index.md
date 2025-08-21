@@ -219,9 +219,3 @@ for _, doc := range documents {
 err := index.Batch(batch)
 ```
 
-### search autocomplete
-return the response for 
-n gram token filter
-
-
-

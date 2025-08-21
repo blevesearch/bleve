@@ -162,7 +162,7 @@ func (s *EdgeNgramFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
     for _, token := range input {
         runeCount := utf8.RuneCount(token.Term)
         runes := bytes.Runes(token.Term)
-        // ..builds tokens based form either end, specified in the input
+        // ..builds tokens based from either end, specified in the input
     }
     return rv
 }
@@ -204,7 +204,7 @@ Result: Instant match, then retrieve documents containing this term
 3. **Better caching**: Exact term queries cache better than prefix queries
 4. **Consistent performance**: Query time doesn't increase with index size
 
-## 5. On low level implementaion sample:
+## 5. On low level implementation sample:
 
 How edge n-gram would look like at low level:
 
