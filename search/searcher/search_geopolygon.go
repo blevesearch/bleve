@@ -85,7 +85,7 @@ func almostEqual(a, b float64) bool {
 // here: https://wrf.ecse.rpi.edu/nikola/pubdetails/pnpoly.html
 func buildPolygonFilter(ctx context.Context, dvReader index.DocValueReader, field string,
 	coordinates []geo.Point) FilterFunc {
-	return func(d *search.DocumentMatch) bool {
+	return func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
 		// check geo matches against all numeric type terms indexed
 		var lons, lats []float64
 		var found bool
