@@ -543,10 +543,10 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 
 	// harcoding the total docs for now, need to get it from CB level
 	numDocs := 1000000
-	trainingSampleSize := math.Ceil(4 * math.Sqrt(float64(numDocs)) * 39)
+	trainingSampleSize := math.Ceil(4 * math.Sqrt(float64(numDocs)) * 50)
 
 	// collect train data only if needed
-	if len(snapshot.trainData) < int(trainingSampleSize) {
+	if len(snapshot.trainData)/768 < int(trainingSampleSize) {
 		s.segmentConfig["collectTrainDataCallback"] = collectTrainData
 	} else {
 		s.segmentConfig["trainData"] = snapshot.trainData
