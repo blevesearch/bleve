@@ -70,12 +70,14 @@ type IndexSnapshot struct {
 
 	// POC: trainData is ephemeral and read-only just like []*SegmentSnapshot
 	trainData []float32
-	segment   []*SegmentSnapshot
-	offsets   []uint64
-	internal  map[string][]byte
-	epoch     uint64
-	size      uint64
-	creator   string
+	// trainSegments []*SegmentSnapshot // either store []float32 or []faissIndexes aka centroid indexes
+
+	segment  []*SegmentSnapshot
+	offsets  []uint64
+	internal map[string][]byte
+	epoch    uint64
+	size     uint64
+	creator  string
 
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
