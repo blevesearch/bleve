@@ -293,7 +293,7 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 			newIndexSnapshot.segment[i] = newSegmentSnapshot
 			delete(persist.persisted, segmentSnapshot.id)
 
-			// update items persisted incase of a new segment snapshot
+			// update items persisted in case of a new segment snapshot
 			atomic.AddUint64(&s.stats.TotPersistedItems, newSegmentSnapshot.Count())
 			atomic.AddUint64(&s.stats.TotPersistedSegments, 1)
 			fileSegments++

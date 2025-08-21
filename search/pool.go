@@ -31,7 +31,7 @@ func init() {
 // a message, or panic, etc.
 type DocumentMatchPoolTooSmall func(p *DocumentMatchPool) *DocumentMatch
 
-// DocumentMatchPool manages use/re-use of DocumentMatch instances
+// DocumentMatchPool manages use/reuse of DocumentMatch instances
 // it pre-allocates space from a single large block with the expected
 // number of instances.  It is not thread-safe as currently all
 // aspects of search take place in a single goroutine.

@@ -29,7 +29,7 @@ $IDF(q_i)$ here refers to Inverse Document Frequency talks about how rare (and h
 
 Coming back to the BM25 scoring, $f(q_i,D)$ refers to the frequency of the query term in document $D$. The entire equation has certain multipliers
 
-* $k1$ - helps in controlling the saturation of the score with respect to query term in a document. Basicaly if the query term's frequency is too high, the score value gets saturated and doesn't increase beyond a certain point.
+* $k1$ - helps in controlling the saturation of the score with respect to query term in a document. Basically if the query term's frequency is too high, the score value gets saturated and doesn't increase beyond a certain point.
 * $b$ - controls the extent to which the $fieldLen$ normalizes the term's frequency.
 
 ### How to enable and use BM25
@@ -87,4 +87,4 @@ where $IDF(q_i)$ is
     1 + {{docTotal}\over{1 + docTerm}}
 ```
 
-Note: TF-IDF formula doesn't accomodate logic for score saturation due to term frequency or fieldLen. So, it's recommended to use BM25 scoring by explicity setting it in the index mapping.
+Note: TF-IDF formula doesn't accommodate logic for score saturation due to term frequency or fieldLen. So, it's recommended to use BM25 scoring by explicitly setting it in the index mapping.

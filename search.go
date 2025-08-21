@@ -359,7 +359,7 @@ func (r *SearchRequest) validatePagination() error {
 					return fmt.Errorf("invalid %s value for sort field '%s': '%s'. %s", afterOrBefore, ss.Field, pagination[i], err)
 				}
 			}
-		} 
+		}
 	}
 
 	return nil
@@ -424,7 +424,7 @@ func NewSearchRequestOptions(q query.Query, size, from int, explain bool) *Searc
 // IndexErrMap tracks errors with the name of the index where it occurred
 type IndexErrMap map[string]error
 
-// MarshalJSON seralizes the error into a string for JSON consumption
+// MarshalJSON serializes the error into a string for JSON consumption
 func (iem IndexErrMap) MarshalJSON() ([]byte, error) {
 	tmp := make(map[string]string, len(iem))
 	for k, v := range iem {
@@ -445,7 +445,7 @@ func (iem IndexErrMap) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// SearchStatus is a secion in the SearchResult reporting how many
+// SearchStatus is a section in the SearchResult reporting how many
 // underlying indexes were queried, how many were successful/failed
 // and a map of any errors that were encountered
 type SearchStatus struct {
@@ -480,7 +480,7 @@ func (ss *SearchStatus) Merge(other *SearchStatus) {
 // scores, score explanation, location info and so on.
 // Total - The total number of documents that matched the query.
 // Cost - indicates how expensive was the query with respect to bytes read
-// from the mmaped index files.
+// from the mapped index files.
 // MaxScore - The maximum score seen across all document hits seen for this query.
 // Took - The time taken to execute the search.
 // Facets - The facet results for the search.

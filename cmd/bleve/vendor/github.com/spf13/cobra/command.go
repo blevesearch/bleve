@@ -62,7 +62,7 @@ type Command struct {
 	Annotations map[string]string
 	// Full set of flags
 	flags *flag.FlagSet
-	// Set of flags childrens of this command will inherit
+	// Set of flags children of this command will inherit
 	pflags *flag.FlagSet
 	// Flags that are declared specifically by this command (not inherited).
 	lflags *flag.FlagSet
@@ -1073,7 +1073,7 @@ func (c *Command) HasAvailableSubCommands() bool {
 		}
 	}
 
-	// the command either has no sub comamnds, or no available (non deprecated/help/hidden)
+	// the command either has no sub commands, or no available (non deprecated/help/hidden)
 	// sub commands
 	return false
 }

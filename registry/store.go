@@ -30,7 +30,7 @@ func RegisterKVStore(name string, constructor KVStoreConstructor) error {
 }
 
 // KVStoreConstructor is used to build a KVStore of a specific type when
-// specificied by the index configuration. In addition to meeting the
+// specified by the index configuration. In addition to meeting the
 // store.KVStore interface, KVStores must also support this constructor.
 // Note that currently the values of config must
 // be able to be marshaled and unmarshaled using the encoding/json library (used

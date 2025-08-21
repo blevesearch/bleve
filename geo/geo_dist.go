@@ -83,7 +83,7 @@ func ParseDistanceUnit(u string) (float64, error) {
 }
 
 // Haversin computes the distance between two points.
-// This implemenation uses the sloppy math implemenations which trade off
+// This implementation uses the sloppy math implementations which trade off
 // accuracy for performance.  The distance returned is in kilometers.
 func Haversin(lon1, lat1, lon2, lat2 float64) float64 {
 	x1 := lat1 * degreesToRadian

@@ -2170,7 +2170,7 @@ func TestSearchTimeout(t *testing.T) {
 	req.Query = sq
 	_, err = index.SearchInContext(ctx, req)
 	if err != context.DeadlineExceeded {
-		t.Fatalf("exected %v, got: %v", context.DeadlineExceeded, err)
+		t.Fatalf("expected %v, got: %v", context.DeadlineExceeded, err)
 	}
 
 	// now run a search with a long timeout, but with a long query, and cancel it
@@ -2183,7 +2183,7 @@ func TestSearchTimeout(t *testing.T) {
 	cancel()
 	_, err = index.SearchInContext(ctx, req)
 	if err != context.Canceled {
-		t.Fatalf("exected %v, got: %v", context.Canceled, err)
+		t.Fatalf("expected %v, got: %v", context.Canceled, err)
 	}
 }
 

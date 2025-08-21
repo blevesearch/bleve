@@ -185,7 +185,7 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 				err := cbF(sumVectorIndexSize)
 				if err != nil {
 					// it's important to invoke the end callback at this point since
-					// if the earlier searchers of this optimze struct were successful
+					// if the earlier searchers of this optimize struct were successful
 					// the cost corresponding to it would be incremented and if the
 					// current searcher fails the check then we end up erroring out
 					// the overall optimized searcher creation, the cost needs to be

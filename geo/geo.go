@@ -114,7 +114,7 @@ func DegreesToRadians(d float64) float64 {
 	return d * degreesToRadian
 }
 
-// RadiansToDegrees converts an angle in radians to degress
+// RadiansToDegrees converts an angle in radians to degrees
 func RadiansToDegrees(r float64) float64 {
 	return r * radiansToDegrees
 }

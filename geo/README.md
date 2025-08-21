@@ -308,5 +308,5 @@ First, all of this geo code is a Go adaptation of the [Lucene 5.3.2 sandbox geo 
 - LineStrings and MultiLineStrings may only contain Points and MultiPoints.
 - Polygons or MultiPolygons intersecting Polygons and MultiPolygons may return arbitrary results when the overlap is only an edge or a vertex.
 - Circles containing polygon will return a false positive result if all of the vertices of the polygon are within the circle, but the orientation of those points are clock-wise.
-- The edges of an Envelope follows the latitude and logitude lines instead of the shortest path on a globe.
+- The edges of an Envelope follows the latitude and longitude lines instead of the shortest path on a globe.
 - Envelope intersecting queries with LineStrings, MultiLineStrings, Polygons and MultiPolygons implicitly converts the Envelope into a Polygon which changes the curvature of the edges causing inaccurate results for few edge cases.

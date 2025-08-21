@@ -24,7 +24,7 @@ import (
 
 // DisjunctionMaxClauseCount is a compile time setting that applications can
 // adjust to non-zero value to cause the DisjunctionSearcher to return an
-// error instead of exeucting searches when the size exceeds this value.
+// error instead of executing searches when the size exceeds this value.
 var DisjunctionMaxClauseCount = 0
 
 // DisjunctionHeapTakeover is a compile time setting that applications can

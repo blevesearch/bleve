@@ -37,7 +37,7 @@
 aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distance)
 ```
 
-* Multi kNN searches are supported - the `knn` object within the search request accepts an array of requests. These sub objects are unioned by default but this behavior can be overriden by setting `knn_operator` to `"and"`.
+* Multi kNN searches are supported - the `knn` object within the search request accepts an array of requests. These sub objects are unioned by default but this behavior can be overridden by setting `knn_operator` to `"and"`.
 * Previously supported pagination settings will work as they were, with size/limit being applied over the top-K hits combined with any exact search hits.
 * Pre-filtered vector and hybrid search (v2.4.3+): Apply any Bleve filter query first to narrow down candidates before running kNN search, making vector and hybrid searches faster and more relevant.
 
