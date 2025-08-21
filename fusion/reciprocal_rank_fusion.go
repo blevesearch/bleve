@@ -1,4 +1,4 @@
-//  Copyright (c) 2024 Couchbase, Inc.
+//  Copyright (c) 2025 Couchbase, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ func formatRRFMessage(weight float64, rank int, rankConstant int) string {
 }
 
 // ReciprocalRankFusion performs a reciprocal rank fusion on the search results.
-func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64, rank_constant int, window_size int, numKNNQueries int, explain bool) FusionResult {
+func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64, rankConstant int, windowSize int, numKNNQueries int, explain bool) FusionResult {
 	if len(hits) == 0 {
 		return FusionResult{
 			Hits:     hits,
@@ -55,7 +55,7 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 			docRanks[hit.ID] = ranks
 		}
 
-		if i == window_size-1 {
+		if i == windowSize-1 {
 			// No need to calculate ranks from here
 			break
 		}
@@ -86,7 +86,7 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 				docRanks[hit.ID][i+1] = j + 1
 			}
 
-			if j == window_size-1 {
+			if j == windowSize-1 {
 				// No need to calculate ranks from here
 				break
 			}
@@ -104,13 +104,13 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 		if ranks, ok := docRanks[hit.ID]; ok {
 			for i, rank := range ranks {
 				if rank > 0 {
-					partialRrfScore := weights[i] * 1.0 / float64(rank_constant+rank)
+					partialRrfScore := weights[i] * 1.0 / float64(rankConstant+rank)
 					if explain {
 						expl := getFusionExplAt(
 							hit,
 							i,
 							partialRrfScore,
-							formatRRFMessage(weights[i], rank, rank_constant),
+							formatRRFMessage(weights[i], rank, rankConstant),
 						)
 						explChildren = append(explChildren, expl)
 					}
@@ -130,8 +130,8 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 	}
 
 	sort.Sort(hits)
-	if len(hits) > window_size {
-		hits = hits[:window_size]
+	if len(hits) > windowSize {
+		hits = hits[:windowSize]
 	}
 	return FusionResult{
 		Hits:     hits,
