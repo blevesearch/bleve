@@ -368,8 +368,8 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
 			prevBytesReadTotal := cumulateBytesRead(segmentsToMerge)
 
-			trainingSampleSize := math.Ceil(4 * math.Sqrt(float64(1000000)) * 39)
-			if len(ourSnapshot.trainData) < int(trainingSampleSize) {
+			trainingSampleSize := math.Ceil(4 * math.Sqrt(float64(1000000)) * 50)
+			if len(ourSnapshot.trainData)/768 < int(trainingSampleSize) {
 				s.segmentConfig["collectTrainDataCallback"] = collectTrainData
 			} else {
 				s.segmentConfig["trainData"] = ourSnapshot.trainData
@@ -534,7 +534,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 	var trainingSample []float32
 	collectTrainData := func(segTrainData []float32) {
 		// append a clone of the training sample
-		trainingSample = append(trainingSample, slices.Clone(segTrainData)...)
+		trainingSample = append(trainingSample, segTrainData...)
 	}
 
 	// numDocs, err := snapshot.DocCount()
@@ -544,10 +544,10 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 
 	// harcoding the total docs for now, need to get it from CB level
 	numDocs := 1000000
-	trainingSampleSize := math.Ceil(4 * math.Sqrt(float64(numDocs)) * 39)
+	trainingSampleSize := math.Ceil(4 * math.Sqrt(float64(numDocs)) * 50)
 
 	// collect train data only if needed
-	if len(snapshot.trainData) < int(trainingSampleSize) {
+	if len(snapshot.trainData)/768 < int(trainingSampleSize) {
 		s.segmentConfig["collectTrainDataCallback"] = collectTrainData
 	} else {
 		s.segmentConfig["trainData"] = snapshot.trainData
