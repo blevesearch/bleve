@@ -17,7 +17,9 @@ package scorch
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -351,6 +353,11 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 		var seg segment.Segment
 		var filename string
+		var trainingSample []float32
+		collectTrainData := func(segTrainData []float32) {
+			// append a clone of the training sample
+			trainingSample = append(trainingSample, slices.Clone(segTrainData)...)
+		}
 		if len(segmentsToMerge) > 0 {
 			filename = zapFileName(newSegmentID)
 			s.markIneligibleForRemoval(filename)
@@ -360,8 +367,15 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
 			prevBytesReadTotal := cumulateBytesRead(segmentsToMerge)
-			newDocNums, _, err := s.segPlugin.Merge(segmentsToMerge, docsToDrop, path,
-				cw.cancelCh, s)
+
+			trainingSampleSize := math.Ceil(4 * math.Sqrt(float64(1000000)) * 50)
+			if len(ourSnapshot.trainData)/768 < int(trainingSampleSize) {
+				s.segmentConfig["collectTrainDataCallback"] = collectTrainData
+			} else {
+				s.segmentConfig["trainData"] = ourSnapshot.trainData
+			}
+			newDocNums, _, err := s.segPlugin.MergeEx(segmentsToMerge, docsToDrop, path,
+				cw.cancelCh, s, s.segmentConfig)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
 
 			fileMergeZapTime := uint64(time.Since(fileMergeZapStartTime))
@@ -379,7 +393,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 				return fmt.Errorf("merging failed: %v", err)
 			}
 
-			seg, err = s.segPlugin.Open(path)
+			seg, err = s.segPlugin.OpenEx(path, s.segmentConfig)
 			if err != nil {
 				s.unmarkIneligibleForRemoval(filename)
 				atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
@@ -405,6 +419,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			newCount:         seg.Count(),
 			notifyCh:         make(chan *mergeTaskIntroStatus),
 			mmaped:           1,
+			trainData:        trainingSample,
 		}
 
 		s.fireEvent(EventKindMergeTaskIntroductionStart, 0)
@@ -469,6 +484,7 @@ type mergedSegmentHistory struct {
 type segmentMerge struct {
 	id               []uint64
 	new              []segment.Segment
+	trainData        []float32
 	mergedSegHistory map[uint64]*mergedSegmentHistory
 	notifyCh         chan *mergeTaskIntroStatus
 	mmaped           uint32
@@ -515,6 +531,28 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 	var em sync.Mutex
 	var errs []error
 
+	var trainingSample []float32
+	collectTrainData := func(segTrainData []float32) {
+		// append a clone of the training sample
+		trainingSample = append(trainingSample, segTrainData...)
+	}
+
+	// numDocs, err := snapshot.DocCount()
+	// if err != nil {
+	// 	return nil, nil, err
+	// }
+
+	// harcoding the total docs for now, need to get it from CB level
+	numDocs := 1000000
+	trainingSampleSize := math.Ceil(4 * math.Sqrt(float64(numDocs)) * 50)
+
+	// collect train data only if needed
+	if len(snapshot.trainData)/768 < int(trainingSampleSize) {
+		s.segmentConfig["collectTrainDataCallback"] = collectTrainData
+	} else {
+		s.segmentConfig["trainData"] = snapshot.trainData
+	}
+
 	// deploy the workers to merge and flush the batches of segments concurrently
 	// and create a new file segment
 	for i := 0; i < numFlushes; i++ {
@@ -528,7 +566,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			// the newly merged segment is already flushed out to disk, just needs
 			// to be opened using mmap.
 			newDocIDs, _, err :=
-				s.segPlugin.Merge(segsBatch, dropsBatch, path, s.closeCh, s)
+				s.segPlugin.MergeEx(segsBatch, dropsBatch, path, s.closeCh, s, s.segmentConfig)
 			if err != nil {
 				em.Lock()
 				errs = append(errs, err)
@@ -543,7 +581,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			s.markIneligibleForRemoval(filename)
 			newMergedSegmentIDs[id] = newSegmentID
 			newDocIDsSet[id] = newDocIDs
-			newMergedSegments[id], err = s.segPlugin.Open(path)
+			newMergedSegments[id], err = s.segPlugin.OpenEx(path, s.segmentConfig)
 			if err != nil {
 				em.Lock()
 				errs = append(errs, err)
@@ -589,6 +627,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 		mergedSegHistory: make(map[uint64]*mergedSegmentHistory, numSegments),
 		notifyCh:         make(chan *mergeTaskIntroStatus),
 		newCount:         newMergedCount,
+		trainData:        trainingSample,
 	}
 
 	// create a history map which maps the old in-memory segments with the specific
