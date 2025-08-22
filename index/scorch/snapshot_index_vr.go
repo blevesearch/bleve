@@ -179,7 +179,7 @@ func (i *IndexSnapshot) CentroidCardinalities(field string, limit int, descendin
 		return nil, fmt.Errorf("limit must be positive")
 	}
 
-	rvCentroids := make([]index.CentroidCardinality, limit)
+	rvCentroids := make([]index.CentroidCardinality, 0, limit)
 
 	for _, segment := range i.segment {
 		if sv, ok := segment.segment.(segment_api.VectorSegment); ok {
@@ -200,7 +200,7 @@ func (i *IndexSnapshot) CentroidCardinalities(field string, limit int, descendin
 
 			centroidCardinalities = append(centroidCardinalities, rvCentroids...)
 			if descending {
-			sort.Slice(centroidCardinalities, func(i, j int) bool {
+				sort.Slice(centroidCardinalities, func(i, j int) bool {
 					return centroidCardinalities[i].Cardinality > centroidCardinalities[j].Cardinality
 				})
 			} else {

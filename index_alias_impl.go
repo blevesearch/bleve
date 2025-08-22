@@ -1141,9 +1141,9 @@ func (f *indexAliasImplFieldDict) Cardinality() int {
 // -----------------------------------------------------------------------------
 
 type asyncInsightsResult struct {
-	Name                              string
-	TermFrequenciesResult             []index.TermFreq
-	CentroidCardinalitiesResult       []index.CentroidCardinality
+	Name                        string
+	TermFrequenciesResult       []index.TermFreq
+	CentroidCardinalitiesResult []index.CentroidCardinality
 }
 
 func (i *indexAliasImpl) TermFrequencies(field string, limit int, descending bool) (

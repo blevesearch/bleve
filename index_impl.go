@@ -745,7 +745,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	if !contextScoreFusionKeyExists {
 		setKnnHitsInCollector(knnHits, req, coll)
 	}
-	
 
 	if fts != nil {
 		if is, ok := indexReader.(*scorch.IndexSnapshot); ok {

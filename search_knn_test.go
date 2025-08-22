@@ -2023,7 +2023,7 @@ func TestIndexInsightsTermFrequencies(t *testing.T) {
 	}
 	if len(res4.Hits) != 0 {
 		t.Fatalf("Expected 0 hits, got %d\n", len(res4.Hits))
-    }
+	}
 	if !reflect.DeepEqual(termFreqs, expectTermFreqs) {
 		t.Fatalf("term freqs do not match: got: %v, expected: %v", termFreqs, expectTermFreqs)
 	}
