@@ -1912,7 +1912,7 @@ func TestIndexUpdateVector(t *testing.T) {
 	}
 }
 
-func TestIndexInsightsHighestFrequencyTerms(t *testing.T) {
+func TestIndexInsightsTermFrequencies(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
@@ -1983,7 +1983,7 @@ func TestIndexInsightsHighestFrequencyTerms(t *testing.T) {
 		t.Fatal("index does not support insights")
 	}
 
-	termFreqs, err := insightsIdx.HighestFrequencyTerms("text", 5)
+	termFreqs, err := insightsIdx.TermFrequencies("text", 5, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2029,7 +2029,7 @@ func TestIndexInsightsHighestFrequencyTerms(t *testing.T) {
 	}
 }
 
-func TestIndexInsightsHighestCardinalityCentroids(t *testing.T) {
+func TestIndexInsightsCentroidCardinalities(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
@@ -2092,7 +2092,7 @@ func TestIndexInsightsHighestCardinalityCentroids(t *testing.T) {
 		t.Fatal("index does not support insights")
 	}
 
-	centroids, err := insightsIdx.HighestCardinalityCentroids("vec", 5)
+	centroids, err := insightsIdx.CentroidCardinalities("vec", 5, true)
 	if err != nil {
 		t.Fatal(err)
 	}

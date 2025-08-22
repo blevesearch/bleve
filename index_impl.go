@@ -1391,7 +1391,8 @@ func (i *indexImpl) FireIndexEvent() {
 
 // -----------------------------------------------------------------------------
 
-func (i *indexImpl) HighestFrequencyTerms(field string, limit int) ([]index.TermFreq, error) {
+func (i *indexImpl) TermFrequencies(field string, limit int, descending bool) (
+	[]index.TermFreq, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -1411,13 +1412,14 @@ func (i *indexImpl) HighestFrequencyTerms(field string, limit int) ([]index.Term
 
 	insightsReader, ok := reader.(index.IndexInsightsReader)
 	if !ok {
-		return nil, fmt.Errorf("index reader does not support HighestFrequencyTerms")
+		return nil, fmt.Errorf("index reader does not support TermFrequencies")
 	}
 
-	return insightsReader.HighestFrequencyTerms(field, limit)
+	return insightsReader.TermFrequencies(field, limit, descending)
 }
 
-func (i *indexImpl) HighestCardinalityCentroids(field string, limit int) ([]index.CentroidCardinality, error) {
+func (i *indexImpl) CentroidCardinalities(field string, limit int, descending bool) (
+	[]index.CentroidCardinality, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -1437,8 +1439,8 @@ func (i *indexImpl) HighestCardinalityCentroids(field string, limit int) ([]inde
 
 	insightsReader, ok := reader.(index.IndexInsightsReader)
 	if !ok {
-		return nil, fmt.Errorf("index reader does not support HighestCardinalityCentroids")
+		return nil, fmt.Errorf("index reader does not support CentroidCardinalities")
 	}
 
-	return insightsReader.HighestCardinalityCentroids(field, limit)
+	return insightsReader.CentroidCardinalities(field, limit, descending)
 }

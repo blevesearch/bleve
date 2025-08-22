@@ -1142,11 +1142,11 @@ func (f *indexAliasImplFieldDict) Cardinality() int {
 
 type asyncInsightsResult struct {
 	Name                              string
-	HighestFrequencyTermsResult       []index.TermFreq
-	HighestCardinalityCentroidsResult []index.CentroidCardinality
+	TermFrequenciesResult             []index.TermFreq
+	CentroidCardinalitiesResult       []index.CentroidCardinality
 }
 
-func (i *indexAliasImpl) HighestFrequencyTerms(field string, limit int) (
+func (i *indexAliasImpl) TermFrequencies(field string, limit int, descending bool) (
 	[]index.TermFreq, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -1162,7 +1162,7 @@ func (i *indexAliasImpl) HighestFrequencyTerms(field string, limit int) (
 	// short circuit the simple case
 	if len(i.indexes) == 1 {
 		if idx, ok := i.indexes[0].(InsightsIndex); ok {
-			return idx.HighestFrequencyTerms(field, limit)
+			return idx.TermFrequencies(field, limit, descending)
 		}
 		return nil, nil
 	}
@@ -1171,10 +1171,10 @@ func (i *indexAliasImpl) HighestFrequencyTerms(field string, limit int) (
 	var waitGroup sync.WaitGroup
 	asyncResults := make(chan *asyncInsightsResult, len(i.indexes))
 
-	searchChildIndex := func(in Index, field string, limit int) {
+	searchChildIndex := func(in Index, field string, limit int, descending bool) {
 		rv := asyncInsightsResult{Name: in.Name()}
 		if idx, ok := in.(InsightsIndex); ok {
-			rv.HighestFrequencyTermsResult, _ = idx.HighestFrequencyTerms(field, limit)
+			rv.TermFrequenciesResult, _ = idx.TermFrequencies(field, limit, descending)
 		}
 		asyncResults <- &rv
 		waitGroup.Done()
@@ -1182,7 +1182,7 @@ func (i *indexAliasImpl) HighestFrequencyTerms(field string, limit int) (
 
 	waitGroup.Add(len(i.indexes))
 	for _, in := range i.indexes {
-		go searchChildIndex(in, field, limit)
+		go searchChildIndex(in, field, limit, descending)
 	}
 
 	// on another go routine, close after finished
@@ -1191,20 +1191,26 @@ func (i *indexAliasImpl) HighestFrequencyTerms(field string, limit int) (
 		close(asyncResults)
 	}()
 
-	rvhighestFrequencyTermsResult := make([]index.TermFreq, limit)
+	rvTermFrequenciesResult := make([]index.TermFreq, limit)
 	for asr := range asyncResults {
-		asr.HighestFrequencyTermsResult = append(
-			asr.HighestFrequencyTermsResult, rvhighestFrequencyTermsResult...)
-		sort.Slice(asr.HighestFrequencyTermsResult, func(i, j int) bool {
-			return asr.HighestFrequencyTermsResult[i].Frequency > asr.HighestFrequencyTermsResult[j].Frequency
-		})
-		rvhighestFrequencyTermsResult = asr.HighestFrequencyTermsResult[:limit]
+		asr.TermFrequenciesResult = append(
+			asr.TermFrequenciesResult, rvTermFrequenciesResult...)
+		if descending {
+			sort.Slice(asr.TermFrequenciesResult, func(i, j int) bool {
+				return asr.TermFrequenciesResult[i].Frequency > asr.TermFrequenciesResult[j].Frequency
+			})
+		} else {
+			sort.Slice(asr.TermFrequenciesResult, func(i, j int) bool {
+				return asr.TermFrequenciesResult[i].Frequency < asr.TermFrequenciesResult[j].Frequency
+			})
+		}
+		rvTermFrequenciesResult = asr.TermFrequenciesResult[:limit]
 	}
 
-	return rvhighestFrequencyTermsResult, nil
+	return rvTermFrequenciesResult, nil
 }
 
-func (i *indexAliasImpl) HighestCardinalityCentroids(field string, limit int) (
+func (i *indexAliasImpl) CentroidCardinalities(field string, limit int, descending bool) (
 	[]index.CentroidCardinality, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -1220,7 +1226,7 @@ func (i *indexAliasImpl) HighestCardinalityCentroids(field string, limit int) (
 	// short circuit the simple case
 	if len(i.indexes) == 1 {
 		if idx, ok := i.indexes[0].(InsightsIndex); ok {
-			return idx.HighestCardinalityCentroids(field, limit)
+			return idx.CentroidCardinalities(field, limit, descending)
 		}
 		return nil, nil
 	}
@@ -1229,10 +1235,10 @@ func (i *indexAliasImpl) HighestCardinalityCentroids(field string, limit int) (
 	var waitGroup sync.WaitGroup
 	asyncResults := make(chan *asyncInsightsResult, len(i.indexes))
 
-	searchChildIndex := func(in Index, field string, limit int) {
+	searchChildIndex := func(in Index, field string, limit int, descending bool) {
 		rv := asyncInsightsResult{Name: in.Name()}
 		if idx, ok := in.(InsightsIndex); ok {
-			rv.HighestCardinalityCentroidsResult, _ = idx.HighestCardinalityCentroids(field, limit)
+			rv.CentroidCardinalitiesResult, _ = idx.CentroidCardinalities(field, limit, descending)
 		}
 		asyncResults <- &rv
 		waitGroup.Done()
@@ -1240,7 +1246,7 @@ func (i *indexAliasImpl) HighestCardinalityCentroids(field string, limit int) (
 
 	waitGroup.Add(len(i.indexes))
 	for _, in := range i.indexes {
-		go searchChildIndex(in, field, limit)
+		go searchChildIndex(in, field, limit, descending)
 	}
 
 	// on another go routine, close after finished
@@ -1249,15 +1255,21 @@ func (i *indexAliasImpl) HighestCardinalityCentroids(field string, limit int) (
 		close(asyncResults)
 	}()
 
-	rvhighestCardinalityCentroidsResult := make([]index.CentroidCardinality, limit)
+	rvCentroidCardinalitiesResult := make([]index.CentroidCardinality, limit)
 	for asr := range asyncResults {
-		asr.HighestCardinalityCentroidsResult = append(
-			asr.HighestCardinalityCentroidsResult, rvhighestCardinalityCentroidsResult...)
-		sort.Slice(asr.HighestCardinalityCentroidsResult, func(i, j int) bool {
-			return asr.HighestCardinalityCentroidsResult[i].Cardinality > asr.HighestCardinalityCentroidsResult[j].Cardinality
-		})
-		rvhighestCardinalityCentroidsResult = asr.HighestCardinalityCentroidsResult[:limit]
+		asr.CentroidCardinalitiesResult = append(
+			asr.CentroidCardinalitiesResult, rvCentroidCardinalitiesResult...)
+		if descending {
+			sort.Slice(asr.CentroidCardinalitiesResult, func(i, j int) bool {
+				return asr.CentroidCardinalitiesResult[i].Cardinality > asr.CentroidCardinalitiesResult[j].Cardinality
+			})
+		} else {
+			sort.Slice(asr.CentroidCardinalitiesResult, func(i, j int) bool {
+				return asr.CentroidCardinalitiesResult[i].Cardinality < asr.CentroidCardinalitiesResult[j].Cardinality
+			})
+		}
+		rvCentroidCardinalitiesResult = asr.CentroidCardinalitiesResult[:limit]
 	}
 
-	return rvhighestCardinalityCentroidsResult, nil
+	return rvCentroidCardinalitiesResult, nil
 }

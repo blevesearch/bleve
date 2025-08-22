@@ -169,7 +169,7 @@ func (i *IndexSnapshotVectorReader) Close() error {
 	return nil
 }
 
-func (i *IndexSnapshot) HighestCardinalityCentroids(field string, limit int) (
+func (i *IndexSnapshot) CentroidCardinalities(field string, limit int, descending bool) (
 	centroids []index.CentroidCardinality, err error) {
 	if len(i.segment) == 0 {
 		return nil, fmt.Errorf("no segments available")
@@ -189,7 +189,7 @@ func (i *IndexSnapshot) HighestCardinalityCentroids(field string, limit int) (
 				return nil, fmt.Errorf("failed to interpret vector index for field %s in segment: %v", field, err)
 			}
 
-			centroidCardinalities, err := vecIndex.ObtainTopKCentroidCardinalitiesFromIVFIndex(limit)
+			centroidCardinalities, err := vecIndex.ObtainKCentroidCardinalitiesFromIVFIndex(limit, descending)
 			if err != nil {
 				return nil, fmt.Errorf("failed to obtain top k centroid cardinalities for field %s in segment: %v", field, err)
 			}
@@ -199,9 +199,15 @@ func (i *IndexSnapshot) HighestCardinalityCentroids(field string, limit int) (
 			}
 
 			centroidCardinalities = append(centroidCardinalities, rvCentroids...)
+			if descending {
 			sort.Slice(centroidCardinalities, func(i, j int) bool {
-				return centroidCardinalities[i].Cardinality > centroidCardinalities[j].Cardinality
-			})
+					return centroidCardinalities[i].Cardinality > centroidCardinalities[j].Cardinality
+				})
+			} else {
+				sort.Slice(centroidCardinalities, func(i, j int) bool {
+					return centroidCardinalities[i].Cardinality < centroidCardinalities[j].Cardinality
+				})
+			}
 
 			rvCentroids = centroidCardinalities[:limit]
 		}

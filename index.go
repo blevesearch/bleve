@@ -391,9 +391,8 @@ type SynonymIndex interface {
 
 type InsightsIndex interface {
 	Index
-	// HighestFrequencyTerms returns the tokens with the highest frequencies for the field index.
-	HighestFrequencyTerms(field string, limit int) ([]index.TermFreq, error)
-	// HighestCardinalityCentroids returns the centrods from IVF indexes whose clusters hold the
-	// largest number of data points.
-	HighestCardinalityCentroids(field string, limit int) ([]index.CentroidCardinality, error)
+	// TermFrequencies returns the tokens ordered by frequencies for the field index.
+	TermFrequencies(field string, limit int, descending bool) ([]index.TermFreq, error)
+	// CentroidCardinalities returns the centroids (clusters) from IVF indexes ordered by data density.
+	CentroidCardinalities(field string, limit int, desceding bool) ([]index.CentroidCardinality, error)
 }

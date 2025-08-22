@@ -1236,10 +1236,9 @@ func (is *IndexSnapshot) MergeUpdateFieldsInfo(updatedFields map[string]*index.U
 	}
 }
 
-// HighestFrequencyTerms returns the top N terms with the highest frequencies
+// TermFrequencies returns the top N terms ordered by the frequencies
 // for a given field across all segments in the index snapshot.
-// Returns a slice of term-frequency pairs sorted by frequency (descending).
-func (is *IndexSnapshot) HighestFrequencyTerms(field string, limit int) (
+func (is *IndexSnapshot) TermFrequencies(field string, limit int, descending bool) (
 	termsFreqs []index.TermFreq, err error) {
 	if len(is.segment) == 0 {
 		return nil, fmt.Errorf("no segments available")
@@ -1299,14 +1298,24 @@ func (is *IndexSnapshot) HighestFrequencyTerms(field string, limit int) (
 		})
 	}
 
-	// Sort by frequency (descending)
-	sort.Slice(termFreqList, func(i, j int) bool {
-		if termFreqList[i].Frequency == termFreqList[j].Frequency {
-			// If frequencies are equal, sort by term lexicographically
-			return strings.Compare(termFreqList[i].Term, termFreqList[j].Term) < 0
-		}
-		return termFreqList[i].Frequency > termFreqList[j].Frequency
-	})
+	// Sort by frequency (descending or ascending)
+	if descending {
+		sort.Slice(termFreqList, func(i, j int) bool {
+			if termFreqList[i].Frequency == termFreqList[j].Frequency {
+				// If frequencies are equal, sort by term lexicographically
+				return strings.Compare(termFreqList[i].Term, termFreqList[j].Term) < 0
+			}
+			return termFreqList[i].Frequency > termFreqList[j].Frequency
+		})
+	} else {
+		sort.Slice(termFreqList, func(i, j int) bool {
+			if termFreqList[i].Frequency == termFreqList[j].Frequency {
+				// If frequencies are equal, sort by term lexicographically
+				return strings.Compare(termFreqList[i].Term, termFreqList[j].Term) < 0
+			}
+			return termFreqList[i].Frequency < termFreqList[j].Frequency
+		})
+	}
 
 	// Limit results
 	if limit > len(termFreqList) {
