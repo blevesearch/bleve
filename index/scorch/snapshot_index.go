@@ -1161,3 +1161,25 @@ func (is *IndexSnapshot) ThesaurusKeysRegexp(name string,
 func (is *IndexSnapshot) UpdateSynonymSearchCount(delta uint64) {
 	atomic.AddUint64(&is.parent.stats.TotSynonymSearches, delta)
 }
+
+func (i *IndexSnapshot) Ancestors(ID index.IndexInternalID) ([]index.IndexInternalID, error) {
+	seg, ldoc, err := i.segmentIndexAndLocalDocNum(ID)
+	if err != nil {
+		return nil, err
+	}
+
+	ancestors := i.segment[seg].Ancestors(ldoc)
+
+	// allocate space: +1 for the doc itself
+	rv := make([]index.IndexInternalID, len(ancestors)+1)
+	globalOffset := i.offsets[seg]
+
+	// first element is the doc itself
+	rv[0] = docNumberToBytes(nil, ldoc+globalOffset)
+
+	// then all ancestors shifted by +1
+	for j := 1; j < len(ancestors)+1; j++ {
+		rv[j] = docNumberToBytes(nil, ancestors[j-1]+globalOffset)
+	}
+	return rv, nil
+}

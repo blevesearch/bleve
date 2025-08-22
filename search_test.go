@@ -4943,3 +4943,195 @@ func TestSearchRequestValidatePagination(t *testing.T) {
 		})
 	}
 }
+
+func TestNestedMapping(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	docs := []string{
+		`{
+			"title": "Tech Insights",
+			"posts": [
+				{
+					"title": "AI Trends",
+					"published_date": "2025-04-22",
+					"comments": [
+						{
+							"author": "Jane",
+							"text": "Very informative!",
+							"likes": 1
+						},
+						{
+							"author": "Tom",
+							"text": "Needs more detail.",
+							"likes": 3
+						}
+					]
+				},
+				{
+					"title": "Quantum Computing",
+					"published_date": "2024-11-15",
+					"comments": [
+						{
+							"author": "Jane",
+							"text": "Mind-blowing!",
+							"likes": 5
+						}
+					]
+				}
+			]
+		}`,
+		`{
+			"title": "Science Digest",
+			"posts": [
+				{
+					"title": "CRISPR and Gene Editing",
+					"published_date": "2025-06-10",
+					"comments": [
+						{
+							"author": "Alex",
+							"text": "Fascinating potential.",
+							"likes": 1
+						}
+					]
+				}
+			]
+		}`,
+		`{
+			"title": "Future Scope",
+			"posts": [
+				{
+					"title": "SpaceX Mars Plans",
+					"published_date": "2025-01-05",
+					"comments": []
+				},
+				{
+					"title": "Brain-Computer Interfaces",
+					"published_date": "2024-12-12",
+					"comments": [
+						{
+							"author": "Lina",
+							"text": "A bit scary, honestly.",
+							"likes": 0
+						},
+						{
+							"author": "Ken",
+							"text": "The future is now.",
+							"likes": 4
+						}
+					]
+				},
+				{
+					"title": "Fusion Energy Breakthroughs",
+					"published_date": "2025-07-01",
+					"comments": [
+						{
+							"author": "Sam",
+							"text": "Finally!",
+							"likes": 6
+						}
+					]
+				}
+			]
+		}`,
+	}
+
+	imap := mapping.NewIndexMapping()
+
+	keywordMapping := NewTextFieldMapping()
+	keywordMapping.Analyzer = keyword.Name
+	keywordMapping.IncludeInAll = false
+	keywordMapping.IncludeTermVectors = false
+
+	englishMapping := NewTextFieldMapping()
+	englishMapping.Analyzer = en.AnalyzerName
+	englishMapping.IncludeInAll = false
+	englishMapping.IncludeTermVectors = false
+
+	numericMapping := NewNumericFieldMapping()
+	numericMapping.IncludeInAll = false
+	numericMapping.IncludeTermVectors = false
+
+	dateTimeMapping := NewDateTimeFieldMapping()
+	dateTimeMapping.IncludeInAll = false
+	dateTimeMapping.IncludeTermVectors = false
+
+	commentMapping := NewDocumentMapping()
+	commentMapping.AddFieldMappingsAt("author", englishMapping)
+	commentMapping.AddFieldMappingsAt("text", englishMapping)
+	commentMapping.AddFieldMappingsAt("likes", numericMapping)
+	commentMapping.Nested = true
+
+	postsMapping := NewDocumentMapping()
+	postsMapping.AddFieldMappingsAt("title", englishMapping)
+	postsMapping.AddFieldMappingsAt("published_date", dateTimeMapping)
+	postsMapping.AddSubDocumentMapping("comments", commentMapping)
+	postsMapping.Nested = true
+
+	imap.DefaultMapping.AddFieldMappingsAt("title", englishMapping)
+	imap.DefaultMapping.AddSubDocumentMapping("posts", postsMapping)
+
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch := idx.NewBatch()
+	for id, doc := range docs {
+		var document map[string]interface{}
+		err = json.Unmarshal([]byte(doc), &document)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = batch.Index(fmt.Sprintf("%d", id), document)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Return all blogs with titles containing the word "Tech".
+	mq := query.NewMatchQuery("Tech")
+	mq.SetField("title")
+	req := NewSearchRequest(mq)
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+
+	// Return posts with likes between 2-100 and published in 2025.
+	min := 2.0
+	max := 100.0
+	q1 := query.NewNumericRangeQuery(&min, &max)
+	q1.SetField("posts.comments.likes")
+	q2 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
+	q2.SetField("posts.published_date")
+	cq := query.NewConjunctionQuery([]query.Query{q2, q1})
+	cq.Nested = true
+
+	req = NewSearchRequest(cq)
+	req.Explain = true
+	req.Fields = []string{"*"}
+	req.Highlight = NewHighlightWithStyle(ansi.Name)
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println("Search Results:")
+	fmt.Println(res)
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+}

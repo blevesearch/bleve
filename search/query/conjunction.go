@@ -28,6 +28,7 @@ import (
 type ConjunctionQuery struct {
 	Conjuncts       []Query `json:"conjuncts"`
 	BoostVal        *Boost  `json:"boost,omitempty"`
+	Nested          bool    `json:"nested"`
 	queryStringMode bool
 }
 
@@ -42,6 +43,10 @@ func NewConjunctionQuery(conjuncts []Query) *ConjunctionQuery {
 func (q *ConjunctionQuery) SetBoost(b float64) {
 	boost := Boost(b)
 	q.BoostVal = &boost
+}
+
+func (q *ConjunctionQuery) SetNested(n bool) {
+	q.Nested = n
 }
 
 func (q *ConjunctionQuery) Boost() float64 {
@@ -75,6 +80,10 @@ func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		return searcher.NewMatchNoneSearcher(i)
 	}
 
+	if q.Nested {
+		return searcher.NewNestedConjunctionSearcher(ctx, i, ss, options)
+	}
+
 	return searcher.NewConjunctionSearcher(ctx, i, ss, options)
 }
 
@@ -94,6 +103,7 @@ func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
 		Conjuncts []json.RawMessage `json:"conjuncts"`
 		Boost     *Boost            `json:"boost,omitempty"`
+		Nested    bool              `json:"nested"`
 	}{}
 	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {
@@ -108,5 +118,6 @@ func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 		q.Conjuncts[i] = query
 	}
 	q.BoostVal = tmp.Boost
+	q.Nested = tmp.Nested
 	return nil
 }
