@@ -80,46 +80,7 @@ func notSpace(r rune) bool {
 
 **Use case**: Basic search, word-level indexing
 
-### 3.3 Regular Expression Method
-
-```go
-// analysis/tokenizer/regexp/regexp.go
-func (rt *RegexpTokenizer) Tokenize(input []byte) analysis.TokenStream {
-    matches := rt.r.FindAllIndex(input, -1)  // Find all regex matches
-    rv := make(analysis.TokenStream, 0, len(matches))
-    
-    for i, match := range matches {
-        matchBytes := input[match[0]:match[1]]
-        if match[1]-match[0] > 0 {
-            token := analysis.Token{
-                Term:     matchBytes,
-                Position: i + 1,
-                // ... other fields
-            }
-            rv = append(rv, &token)
-        }
-    }
-    return rv
-}
-```
-
-**How it works**: Uses regular expressions to define token boundaries.
-
-**Example**: With `\w+` regex, "JavaScript-Programming!" → [`"JavaScript"`, `"Programming"`]
-
-**Pros**: 
-- Flexible and customizable
-- Can handle complex tokenization rules
-- Good for specialized text formats
-
-**Cons**: 
-- More complex to configure
-- Still limited to prefix matching for autocomplete
-- Performance depends on regex complexity
-
-**Use case**: Complex text parsing, specialized formats
-
-### 3.4 N-gram Method
+### 3.3 N-gram Method
 
 ```go
 // analysis/token/ngram/ngram.go
@@ -152,7 +113,7 @@ func (s *NgramFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
 
 **Use case**: Full-text substring search (not ideal for autocomplete)
 
-### 3.5 Edge N-gram Method (preferred for autocomplete)
+### 3.4 Edge N-gram Method (preferred for autocomplete)
 
 ```go
 // analysis/token/edgengram/edgengram.go
@@ -204,288 +165,138 @@ Result: Instant match, then retrieve documents containing this term
 3. **Better caching**: Exact term queries cache better than prefix queries
 4. **Consistent performance**: Query time doesn't increase with index size
 
-## 5. On low level implementation sample:
+## 5. Step-by-Step Implementation: Building Search Autocomplete
 
-How edge n-gram would look like at low level:
+Now let's see how to implement this in practice using our exact configuration. We'll build a complete autocomplete system step by step.
 
-### Step 1: Setup Analyzer
+### Step 1: Create Custom Edge N-gram Token Filter
 
-```go
-func createAutocompleteMapping() *mapping.IndexMappingImpl {
-    indexMapping := bleve.NewIndexMapping()
-    
-    // Add edge n-gram analyzer
-    err := indexMapping.AddCustomAnalyzer("autocomplete", map[string]interface{}{
-        "type": "custom",
-        "tokenizer": "unicode",
-        "token_filters": []interface{}{
-            "to_lower",
-            map[string]interface{}{
-                "type": "edge_ngram",
-                "side": "front",
-                "min":  1,
-                "max":  15,
-            },
-        },
-    })
-    
-    return indexMapping
-}
-```
-
-### Step 2: Tokenization Process
-
-When we index "JavaScript Programming":
-
-```
-1. Original: "JavaScript Programming"
-2. Tokenize: ["JavaScript", "Programming"]  
-3. Lowercase: ["javascript", "programming"]
-4. Edge n-grams: ["j", "ja", "jav", "java", "javas"] + ["p", "pr", "pro", "prog"]
-```
-
-### Step 3: Simple Search Function
-
-```go
-func autocompleteSearch(index bleve.Index, userInput string) ([]string, error) {
-    // Use exact term query (faster than prefix queries)
-    query := bleve.NewTermQuery(strings.ToLower(userInput))
-    
-    searchRequest := bleve.NewSearchRequest(query)
-    searchRequest.Size = 10
-    searchRequest.Fields = []string{"title"}
-    
-    searchResult, err := index.Search(searchRequest)
-    if err != nil {
-        return nil, err
-    }
-    
-    // Extract suggestions
-    var suggestions []string
-    for _, hit := range searchResult.Hits {
-        if title, exists := hit.Fields["title"]; exists {
-            suggestions = append(suggestions, title.(string))
-        }
-    }
-    
-    return suggestions, nil
-}
-```
-
-### Step 4: JSON Configuration Example
-
-Here's what the edge n-gram configuration looks like in JSON format:
+First, we need to create a custom token filter for edge n-grams. Here's how it looks in our configuration:
 
 ```json
 {
-  "analysis": {
-    "analyzers": {
-      "autocomplete": {
-        "type": "custom",
-        "tokenizer": "standard",
-        "filters": [
-          "lowercase",
-          "edge_ngram_filter"
-        ]
-      }
-    },
-    "filters": {
-      "edge_ngram_filter": {
-        "type": "edge_ngram",
-        "min_gram": 1,
-        "max_gram": 15,
-        "side": "front"
-      }
+  "token_filters": {
+    "Engram": {
+      "type": "edge_ngram",
+      "min": 2,
+      "max": 4,
+      "back": "false"
     }
   }
 }
 ```
 
-**What each part does:**
-- `"tokenizer": "standard"` - Splits text into words
-- `"lowercase"` - Makes everything lowercase so "Java" and "java" match
-- `"edge_ngram_filter"` - Creates prefixes from each word
-- `"min_gram": 1` - Shortest prefix is 1 character ("j")
-- `"max_gram": 15` - Longest prefix is 15 characters ("javascriptprogr")
-- `"side": "front"` - Create prefixes from the beginning, not the end
+**What each setting does:**
+- `"type": "edge_ngram"` - Tells Bleve to use the edge n-gram filter
+- `"min": 2` - Start creating tokens from 2 characters ("ja", "sc", etc.)
+- `"max": 4` - Stop at 4 characters ("java", "scri", etc.)
+- `"back": "false"` - Create tokens from the front (beginning) of words
 
-### Step 5: Complete Mapping JSON
+![Edge N-gram Token Filter Configuration](/docs/custom_token_filter.png "Custom token filter setup showing edge_ngram configuration")
 
-Here's a full index mapping that includes edge n-gram for autocomplete:
+### Step 2: Build the Complete Analyzer Pipeline
+
+Next, we create an analyzer that uses our custom token filter along with other helpful filters:
 
 ```json
 {
-  "mappings": {
+  "analyzers": {
+    "search_autocomplete_feature": {
+      "type": "custom",
+      "tokenizer": "unicode",
+      "char_filters": [
+        "zero_width_spaces"
+      ],
+      "token_filters": [
+        "Engram",
+        "to_lower", 
+        "stop_en"
+      ]
+    }
+  }
+}
+```
+
+**The pipeline works like this:**
+
+1. **Input Text**: "Schaumbergfest Event"
+
+2. **Tokenizer** (`unicode`): Splits into words
+   ```
+   ["Schaumbergfest", "Event"]
+   ```
+
+3. **Character Filter** (`zero_width_spaces`): Removes invisible characters
+   ```
+   ["Schaumbergfest", "Event"] (cleaned)
+   ```
+
+4. **Token Filter 1** (`Engram`): Creates edge n-grams (2-4 chars)
+   ```
+   ["Sc", "Sch", "Scha", "Ev", "Eve", "Even"]
+   ```
+
+5. **Token Filter 2** (`to_lower`): Makes everything lowercase
+   ```
+   ["sc", "sch", "scha", "ev", "eve", "even"]
+   ```
+
+6. **Token Filter 3** (`stop_en`): Removes common words (none in this case)
+   ```
+   ["sc", "sch", "scha", "ev", "eve", "even"] (final tokens)
+   ```
+
+### Step 3: Configure Field Mapping
+
+Now we tell Bleve which fields to apply our autocomplete analyzer to:
+
+```json
+{
+  "default_mapping": {
     "properties": {
-      "title": {
-        "type": "text",
-        "analyzer": "standard",
-        "fields": {
-          "autocomplete": {
+      "name": {
+        "fields": [
+          {
+            "name": "name",
             "type": "text",
-            "analyzer": "autocomplete",
-            "search_analyzer": "standard"
+            "analyzer": "search_autocomplete_feature",
+            "store": true,
+            "index": true,
+            "include_in_all": true,
+            "include_term_vectors": true,
+            "docvalues": true
           }
+        ]
+            }
         }
-      },
-      "description": {
-        "type": "text",
-        "analyzer": "standard"
-      },
-      "category": {
-        "type": "keyword"
-      }
     }
-  }
 }
 ```
 
-**Why this mapping is smart:**
-- `title` field uses standard analyzer for normal search
-- `title.autocomplete` field uses edge n-gram analyzer for autocomplete
-- `search_analyzer: standard` means we search with whole words, not edge n-grams
-- This gives us the best of both worlds!
+**Field configuration explained:**
+- `"analyzer": "search_autocomplete_feature"` - Use our custom analyzer
+- `"store": true` - Keep original text for display
+- `"index": true` - Make it searchable
+- `"include_in_all": true` - Include in default search field
 
-### Step 6: How autocomplete suggestion looks in real-time
+![Index Mapping Configuration](/docs/name_filed_searchable_search_autocomplete_analyzer.png "Index mapping showing how the name field is configured with the custom analyzer")
 
-As user types progressively:
+### Step 4: How It Works in Real Search
 
-- **"j"** → ["JavaScript: The Good Parts", "Java Complete Guide", "JavaFX Desktop Apps"]
-- **"ja"** → ["JavaScript: The Good Parts", "Java Complete Guide", "JavaFX Desktop Apps"]  
-- **"jav"** → ["JavaScript: The Good Parts", "JavaFX Desktop Apps"]
-- **"java"** → ["JavaScript: The Good Parts", "JavaFX Desktop Apps"]
+When someone searches for "sc", here's what happens:
 
-### Step 7: What happens behind the scenes
-
-**During indexing:**
+**Index contains these tokens:**
 ```
-Document: "JavaScript Programming"
-↓
-Tokenize: ["JavaScript", "Programming"]
-↓
-Lowercase: ["javascript", "programming"] 
-↓
-Edge n-grams: ["j", "ja", "jav", "java", "javas", "javasc", "javascr", "javascript"]
-              ["p", "pr", "pro", "prog", "progr", "program", "programm", "programmi", "programmin", "programming"]
+"sc" → [document1: "Schaumbergfest", document2: "Script", ...]
+"sch" → [document1: "Schaumbergfest", ...]  
+"scha" → [document1: "Schaumbergfest", ...]
 ```
 
-**During search:**
-```
-User types: "jav"
-↓
-Search for exact term: "jav"
-↓
-Find documents containing token "jav"
-↓
-Return: Documents with "JavaScript" in title
-```
+**User types "sc":**
+1. Query: `name:sc`
+2. Bleve looks up exact term "sc" in the index
+3. Finds document with "Schaumbergfest" 
+4. Returns suggestion instantly
 
-## 6. Discussion: Why This Approach Works So Well
+![Search Results](/docs/index_search_using_prefix.png "Search results showing 'Schaumbergfest' highlighted when searching for 'sc'")
 
-**The Problem with Other Methods:**
-- **Prefix queries**: Must scan through ALL terms to find matches → slow
-- **Full n-grams**: Create too many useless tokens like "vas", "ascr" → huge index
-- **Simple tokenization**: Can't match partial words → limited autocomplete
-
-**The Edge N-gram Solution:**
-- **Pre-computes** all useful prefixes during indexing
-- **Direct lookup** during search - no scanning needed
-- **Only useful tokens** - prefixes people actually type
-- **Scales perfectly** - search time stays constant even with millions of documents
-
-**Real-world Benefits:**
-- **Fast response**: Autocomplete shows up in < 50ms
-- **Predictable performance**: Doesn't slow down as data grows  
-- **User-friendly**: Matches exactly what people expect
-- **Resource efficient**: Uses memory wisely compared to full n-grams
-
-**Trade-offs to Consider:**
-- **Index size**: 3-5x larger than basic tokenization
-- **Memory usage**: More RAM needed for larger indexes
-- **Prefix-only**: Can't match middle or end of words (but that's usually fine for autocomplete)
-
-This is why major search platforms like Elasticsearch and modern applications use edge n-grams for autocomplete - it's the sweet spot between performance and functionality!
-
-## 7. Best Practices & Production Tips
-
-### Configuration Recommendations
-
-**For Most Use Cases:**
-```json
-{
-  "min_gram": 2,
-  "max_gram": 15
-}
-```
-- Start from 2 characters (avoids single-letter noise)
-- Stop at 15 characters (covers most search terms)
-
-**For Product Names/Brands:**
-```json
-{
-  "min_gram": 1,
-  "max_gram": 20  
-}
-```
-- Include single characters for brand initials
-- Longer max for product model numbers
-
-### Memory Management
-
-**Index Size Guidelines:**
-- **Small dataset** (< 100K docs): Edge n-grams are perfect
-- **Medium dataset** (100K - 1M docs): Monitor memory usage
-- **Large dataset** (> 1M docs): Consider shorter max_gram or dedicated autocomplete fields
-
-**Optimization Tips:**
-1. **Use separate autocomplete fields** - don't apply edge n-grams to all text fields
-2. **Limit field length** - truncate very long text before indexing
-3. **Choose selective fields** - only apply to titles, names, key phrases
-
-### Query Performance
-
-**Do:**
-```go
-// Use exact term queries (fast)
-query := bleve.NewTermQuery("javascript")
-```
-
-**Don't:**
-```go
-// Avoid prefix queries with edge n-grams (slow)
-query := bleve.NewPrefixQuery("javascript")
-```
-
-### Real-world Implementation
-
-**E-commerce Example:**
-```json
-{
-  "product_name": {
-    "type": "text",
-    "fields": {
-      "autocomplete": {
-        "analyzer": "edge_ngram_analyzer",
-        "min_gram": 2,
-        "max_gram": 12
-      }
-    }
-  }
-}
-```
-
-**Content Search Example:**
-```json
-{
-  "article_title": {
-    "type": "text", 
-    "fields": {
-      "autocomplete": {
-        "analyzer": "edge_ngram_analyzer",
-        "min_gram": 3,
-        "max_gram": 20
-      }
-    }
-  }
-}
-```
