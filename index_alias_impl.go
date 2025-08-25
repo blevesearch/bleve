@@ -290,7 +290,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// if the request is satisfied by the preSearch result, then we can
 		// directly return the preSearch result as the final result
 		if requestSatisfiedByPreSearch(req, flags) {
-			sr = finalizeSearchResult(req, preSearchResult, doHybridSearch, rescorer)
+			sr = finalizeSearchResult(ctx, req, preSearchResult, doHybridSearch, rescorer)
 			// no need to run the 2nd phase MultiSearch(..)
 		} else {
 			preSearchData, err = constructPreSearchData(req, flags, preSearchResult, i.indexes)
@@ -682,7 +682,7 @@ func preSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, i
 // if the request is satisfied by just the preSearch result,
 // finalize the result and return it directly without
 // performing multi search
-func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult, doHybridSearch bool, rescorer rescorer) *SearchResult {
+func finalizeSearchResult(ctx context.Context, req *SearchRequest, preSearchResult *SearchResult, doHybridSearch bool, rescorer rescorer) *SearchResult {
 	if preSearchResult == nil {
 		return nil
 	}
@@ -718,7 +718,21 @@ func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult, doH
 		rescorer.restoreSearchRequest()
 	}
 
-	preSearchResult.Hits = hitsInCurrentPage(req, preSearchResult.Hits)
+	if _, ok := ctx.Value(search.HybridSearchKey).(bool); !ok {
+		// Not hybrid search, default pagination
+		preSearchResult.Hits = hitsInCurrentPage(req, preSearchResult.Hits)
+	} else {
+		if doHybridSearch {
+			// Hybrid search with fusion already done, do default pagination
+			preSearchResult.Hits = hitsInCurrentPage(req, preSearchResult.Hits)
+		} else {
+			// Hybrid search but fusion has not happened yet. All knn hits
+			// must be preserved. This is executed in an internal node in
+			// the index tree.
+			preSearchResult.Hits = hitsInCurrentPageWithKNN(req, preSearchResult.Hits)
+		}
+	}
+
 	if reverseQueryExecution {
 		// reverse the sort back to the original
 		req.Sort.Reverse()
@@ -926,6 +940,55 @@ func finalizePreSearchResult(req *SearchRequest, flags *preSearchFlags, preSearc
 	}
 }
 
+func hitsInCurrentPageWithKNN(req *SearchRequest, hits []*search.DocumentMatch) []*search.DocumentMatch {
+	sortFunc := req.SortFunc()
+	// sort all hits with the requested order
+	if len(req.Sort) > 0 {
+		sorter := newSearchHitSorter(req.Sort, hits)
+		sortFunc(sorter)
+	}
+
+	// Create a map of KNN hits by document ID
+	knnHitMap := make(map[string]*search.DocumentMatch)
+	for _, hit := range hits {
+		if len(hit.ScoreBreakdown) > 0 {
+			knnHitMap[hit.ID] = hit
+		}
+	}
+
+	// Apply normal pagination to get the current page
+	pageHits := hits
+	
+	// Apply From (skip)
+	if req.From > 0 && len(pageHits) > req.From {
+		pageHits = pageHits[req.From:]
+	} else if req.From > 0 {
+		pageHits = search.DocumentMatchCollection{}
+	}
+	
+	// Apply Size (limit)  
+	if req.Size > 0 && len(pageHits) > req.Size {
+		pageHits = pageHits[0:req.Size]
+	}
+
+	// Track which KNN hits are already in the current page
+	pageHitIDs := make(map[string]bool)
+	for _, hit := range pageHits {
+		pageHitIDs[hit.ID] = true
+	}
+
+	// Add missing KNN hits with Score set to 0
+	for docID, knnHit := range knnHitMap {
+		if !pageHitIDs[docID] {
+			// Set the FTS score to 0 for KNN hits not in the page
+			knnHit.Score = 0.0
+			pageHits = append(pageHits, knnHit)
+		}
+	}
+
+	return pageHits
+}
+
 // hitsInCurrentPage returns the hits in the current page
 // using the From and Size parameters in the request
 func hitsInCurrentPage(req *SearchRequest, hits []*search.DocumentMatch) []*search.DocumentMatch {
@@ -1022,7 +1085,19 @@ func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[stri
 		rescorer.restoreSearchRequest()
 	}
 
-	sr.Hits = hitsInCurrentPage(req, sr.Hits)
+	if _, ok := ctx.Value(search.HybridSearchKey).(bool); !ok {
+		// Not hybrid search, default pagination
+		sr.Hits = hitsInCurrentPage(req, sr.Hits)
+	} else {
+		if doHybridSearch {
+			// Hybrid search with fusion already done, do default pagination
+			sr.Hits = hitsInCurrentPage(req, sr.Hits)
+		} else {
+			// Hybrid search but fusion has not happened yet. All knn hits
+			// must be preserved.
+			sr.Hits = hitsInCurrentPageWithKNN(req, sr.Hits)
+		}
+	}
 
 	// fix up facets
 	for name, fr := range req.Facets {

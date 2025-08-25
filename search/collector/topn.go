@@ -271,7 +271,13 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		hc.sort.UpdateVisitor(field, term)
 	}
 
-	dmHandlerMaker := MakeTopNDocumentMatchHandler
+	var dmHandlerMaker func(ctx *search.SearchContext) (search.DocumentMatchHandler, bool, error)
+	if hybridSearch {
+		dmHandlerMaker = MakeTopNHybridSearchDocumentMatchHandler
+	} else {
+		dmHandlerMaker = MakeTopNDocumentMatchHandler
+	}
+
 	if cv := ctx.Value(search.MakeDocumentMatchHandlerKey); cv != nil {
 		dmHandlerMaker = cv.(search.MakeDocumentMatchHandler)
 	}
@@ -328,9 +334,13 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			if err != nil {
 				return err
 			}
-			err = dmHandler(knnDoc)
-			if err != nil {
-				return err
+
+			if !hybridSearch {
+				// If hybrid search, knn hits are handled later.
+				err = dmHandler(knnDoc)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -356,7 +366,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	hc.took = time.Since(startTime)
 
 	// finalize actual results
-	err = hc.finalizeResults(reader)
+	err = hc.finalizeResults(reader, hybridSearch)
 	if err != nil {
 		return err
 	}
@@ -376,10 +386,10 @@ func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 			// if hybrid search, adds the knn ScoreBreakdown field to the
 			// query doc. Query doc now contains the query score (Score field)
 			// as well as the individual knn scores (ScoreBreakdown)
+			d.Score, d.Expl = hc.computeNewScoreExpl(d, knnHit)
 			if ctx.HybridSearch {
 				d.ScoreBreakdown = knnHit.ScoreBreakdown
-			} 
-			d.Score, d.Expl = hc.computeNewScoreExpl(d, knnHit)
+			}
 			delete(hc.knnHits, d.ID)
 		}
 	}
@@ -498,6 +508,66 @@ func MakeTopNDocumentMatchHandler(
 	return nil, false, nil
 }
 
+func MakeTopNHybridSearchDocumentMatchHandler(
+	ctx *search.SearchContext) (search.DocumentMatchHandler, bool, error) {
+	var hc *TopNCollector
+	var ok bool
+	if hc, ok = ctx.Collector.(*TopNCollector); ok {
+		// Code adapted from MakeTopNDocumentMatchHandler. The main
+		// difference comes from how knnHits are handled; if the store
+		// cannot accomodate a knnHit because it's Score is too low, its
+		// Score is set to 0 and placed back in knnHits. This way, store
+		// accumulates only the top documents as per query. knnHits will
+		// be added later.
+		return func(d *search.DocumentMatch) error {
+			if d == nil {
+				return nil
+			}
+
+			// No search after pagination, since it's disabled in hybrid search
+
+			if hc.lowestMatchOutsideResults != nil {
+				cmp := hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, d,
+					hc.lowestMatchOutsideResults)
+				if cmp >= 0 {
+					if len(d.ScoreBreakdown) > 0 {
+						// knnHit, shouldn't be discarded!
+						hc.knnHits[d.ID] = d
+					} else {
+						ctx.DocumentMatchPool.Put(d)
+					}
+					return nil
+				}
+			}
+
+			removed := hc.store.AddNotExceedingSize(d, hc.size+hc.skip)
+			if removed != nil {
+				if len(removed.ScoreBreakdown) > 0 {
+					// not ignoring a knnHit
+					hc.knnHits[removed.ID] = removed
+				}
+				if hc.lowestMatchOutsideResults == nil {
+					hc.lowestMatchOutsideResults = removed
+				} else {
+					cmp := hc.sort.Compare(hc.cachedScoring, hc.cachedDesc,
+						removed, hc.lowestMatchOutsideResults)
+					if cmp < 0 {
+						tmp := hc.lowestMatchOutsideResults
+						hc.lowestMatchOutsideResults = removed
+						if len(tmp.ScoreBreakdown) == 0 {
+							// returning a doc to pool iff not knnHit
+							ctx.DocumentMatchPool.Put(tmp)
+						}
+					}
+				}
+			}
+
+			return nil
+		}, false, nil
+	}
+	return nil, false, nil
+}
+
 // visitFieldTerms is responsible for visiting the field terms of the
 // search hit, and passing visited terms to the sort and facet builder
 func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.DocumentMatch, v index.DocValueVisitor) error {
@@ -546,9 +616,9 @@ func (hc *TopNCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
 // finalizeResults starts with the heap containing the final top size+skip
 // it now throws away the results to be skipped
 // and does final doc id lookup (if necessary)
-func (hc *TopNCollector) finalizeResults(r index.IndexReader) error {
+func (hc *TopNCollector) finalizeResults(r index.IndexReader, hybridSearch bool) error {
 	var err error
-	hc.results, err = hc.store.Final(hc.skip, func(doc *search.DocumentMatch) error {
+	fixupFunc := func(doc *search.DocumentMatch) error {
 		if doc.ID == "" {
 			// look up the id since we need it for lookup
 			var err error
@@ -559,9 +629,25 @@ func (hc *TopNCollector) finalizeResults(r index.IndexReader) error {
 		}
 		doc.Complete(nil)
 		return nil
-	})
+	} 
 
-	return err
+	hc.results, err = hc.store.Final(hc.skip, fixupFunc)
+	if err != nil {
+		return err
+	}
+
+	if hybridSearch {
+		for _, v := range hc.knnHits {
+			v.Score = 0.0
+			err := fixupFunc(v)
+			if err != nil {
+				return err
+			}
+			hc.results = append(hc.results, v)
+		}
+	}
+	
+	return nil
 }
 
 // Results returns the collected hits
