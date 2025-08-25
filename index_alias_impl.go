@@ -719,20 +719,7 @@ func finalizeSearchResult(ctx context.Context, req *SearchRequest, preSearchResu
 		rescorer.restoreSearchRequest()
 	}
 
-	if _, ok := ctx.Value(search.HybridSearchKey).(bool); !ok {
-		// Not hybrid search, default pagination
-		preSearchResult.Hits = hitsInCurrentPage(req, preSearchResult.Hits)
-	} else {
-		if doHybridSearch {
-			// Hybrid search with fusion already done, do default pagination
-			preSearchResult.Hits = hitsInCurrentPage(req, preSearchResult.Hits)
-		} else {
-			// Hybrid search but fusion has not happened yet. All knn hits
-			// must be preserved. This is executed in an internal node in
-			// the index tree.
-			preSearchResult.Hits = hitsInCurrentPageWithKNN(req, preSearchResult.Hits)
-		}
-	}
+	preSearchResult.Hits = hitsInCurrentPage(req, preSearchResult.Hits)
 
 	if reverseQueryExecution {
 		// reverse the sort back to the original
