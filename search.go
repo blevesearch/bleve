@@ -722,5 +722,5 @@ func validateScore(r *SearchRequest) error {
 		return nil
 	}
 
-	return fmt.Errorf("score field must be one of \"\", \"none\", \"%s\"", ReciprocalRankFusionStrategy)
+	return fmt.Errorf("invalid score field \"%s\": must be one of \"\", \"none\", \"%s\"", r.Score, ReciprocalRankFusionStrategy)
 }

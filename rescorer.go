@@ -29,7 +29,7 @@ type rescorer interface {
 }
 
 const (
-	ReciprocalRankFusionStrategy string = "rrf"
+	ReciprocalRankFusionStrategy = "rrf"
 )
 
 // Concrete implementation of rescorer for hybrid search. Makes use of

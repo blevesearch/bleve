@@ -303,7 +303,8 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 
 	// check if search result was generated as part of preSearch itself
 	if sr == nil {
-		sr, err = MultiSearch(ctx, req, preSearchData, doHybridSearch, rescorer, i.indexes...)
+		multiSearchParams := multiSearchParams{preSearchData, doHybridSearch, rescorer}
+		sr, err = MultiSearch(ctx, req, multiSearchParams, i.indexes...)
 		if err != nil {
 			return nil, err
 		}
@@ -958,15 +959,15 @@ func hitsInCurrentPageWithKNN(req *SearchRequest, hits []*search.DocumentMatch) 
 
 	// Apply normal pagination to get the current page
 	pageHits := hits
-	
+
 	// Apply From (skip)
 	if req.From > 0 && len(pageHits) > req.From {
 		pageHits = pageHits[req.From:]
 	} else if req.From > 0 {
 		pageHits = search.DocumentMatchCollection{}
 	}
-	
-	// Apply Size (limit)  
+
+	// Apply Size (limit)
 	if req.Size > 0 && len(pageHits) > req.Size {
 		pageHits = pageHits[0:req.Size]
 	}
@@ -1011,9 +1012,16 @@ func hitsInCurrentPage(req *SearchRequest, hits []*search.DocumentMatch) []*sear
 	return hits
 }
 
+// Extra parameters for MultiSearch
+type multiSearchParams struct {
+	preSearchData  map[string]map[string]interface{}
+	doHybridSearch bool
+	rescorer       rescorer
+}
+
 // MultiSearch executes a SearchRequest across multiple Index objects,
 // then merges the results.  The indexes must honor any ctx deadline.
-func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[string]map[string]interface{}, doHybridSearch bool, rescorer rescorer, indexes ...Index) (*SearchResult, error) {
+func MultiSearch(ctx context.Context, req *SearchRequest, params multiSearchParams, indexes ...Index) (*SearchResult, error) {
 	searchStart := time.Now()
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
 
@@ -1038,8 +1046,8 @@ func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[stri
 	waitGroup.Add(len(indexes))
 	for _, in := range indexes {
 		var payload map[string]interface{}
-		if preSearchData != nil {
-			payload = preSearchData[in.Name()]
+		if params.preSearchData != nil {
+			payload = params.preSearchData[in.Name()]
 		}
 		go searchChildIndex(in, createChildSearchRequest(req, payload))
 	}
@@ -1080,16 +1088,16 @@ func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[stri
 	}
 
 	// rescore if hybrid search flag is set
-	if doHybridSearch {
-		rescorer.rescore(sr)
-		rescorer.restoreSearchRequest()
+	if params.doHybridSearch {
+		params.rescorer.rescore(sr)
+		params.rescorer.restoreSearchRequest()
 	}
 
 	if _, ok := ctx.Value(search.HybridSearchKey).(bool); !ok {
 		// Not hybrid search, default pagination
 		sr.Hits = hitsInCurrentPage(req, sr.Hits)
 	} else {
-		if doHybridSearch {
+		if params.doHybridSearch {
 			// Hybrid search with fusion already done, do default pagination
 			sr.Hits = hitsInCurrentPage(req, sr.Hits)
 		} else {
