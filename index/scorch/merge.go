@@ -52,6 +52,7 @@ func (s *Scorch) mergerLoop() {
 		options: mergePlannerOptions,
 		doneCh:  nil}
 
+	var errBackoff time.Duration
 OUTER:
 	for {
 		atomic.AddUint64(&s.stats.TotFileMergeLoopBeg, 1)
@@ -110,9 +111,21 @@ OUTER:
 						ctrlMsg = nil
 						break OUTER
 					}
-					s.fireAsyncError(fmt.Errorf("merging err: %v", err))
 					_ = ourSnapshot.DecRef()
 					atomic.AddUint64(&s.stats.TotFileMergeLoopErr, 1)
+
+					if errBackoff == 0 {
+						errBackoff = backoffMinimum
+					} else if errBackoff < backoffMaximum {
+						errBackoff *= 2
+					}
+					s.fireAsyncError(fmt.Errorf("merging err: %v (waiting %v to try again)", err, errBackoff))
+					select {
+					case <-s.closeCh:
+						break OUTER
+					case <-time.After(errBackoff):
+					}
+
 					continue OUTER
 				}
 
@@ -122,6 +135,7 @@ OUTER:
 				ctrlMsg = nil
 
 				lastEpochMergePlanned = ourSnapshot.epoch
+				errBackoff = 0
 
 				atomic.StoreUint64(&s.stats.LastMergedEpoch, ourSnapshot.epoch)
 
