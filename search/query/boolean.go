@@ -15,6 +15,7 @@
 package query
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -30,6 +31,7 @@ type BooleanQuery struct {
 	Must            Query  `json:"must,omitempty"`
 	Should          Query  `json:"should,omitempty"`
 	MustNot         Query  `json:"must_not,omitempty"`
+	Filter          Query  `json:"filter,omitempty"`
 	BoostVal        *Boost `json:"boost,omitempty"`
 	queryStringMode bool
 }
@@ -115,6 +117,13 @@ func (q *BooleanQuery) AddMustNot(m ...Query) {
 	}
 }
 
+func (q *BooleanQuery) AddFilter(m Query) {
+	if m == nil {
+		return
+	}
+	q.Filter = m
+}
+
 func (q *BooleanQuery) SetBoost(b float64) {
 	boost := Boost(b)
 	q.BoostVal = &boost
@@ -162,9 +171,59 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 		}
 	}
 
-	// if all 3 are nil, return MatchNone
-	if mustSearcher == nil && shouldSearcher == nil && mustNotSearcher == nil {
+	var filterFunc searcher.FilterFunc
+	if q.Filter != nil {
+		// create a new searcher options with disabled scoring, since filter should not affect scoring
+		// and we don't want to pay the cost of scoring if we don't need it, also disable term vectors
+		// and explain, since we don't need them for filters
+		filterOptions := search.SearcherOptions{
+			Explain:            false,
+			IncludeTermVectors: false,
+			Score:              "none",
+		}
+		filterSearcher, err := q.Filter.Searcher(ctx, i, m, filterOptions)
+		if err != nil {
+			return nil, err
+		}
+		filterFunc = func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
+			// Attempt to advance the filter searcher to the document identified by
+			// the base searcher's (unfiltered boolean) current result (d.IndexInternalID).
+			//
+			// If the filter searcher successfully finds a document with the same
+			// internal ID, it means the document satisfies the filter and should be kept.
+			//
+			// If the filter searcher returns an error, does not find a matching document,
+			// or finds a document with a different internal ID, the document should be discarded.
+			dm, err := filterSearcher.Advance(sctx, d.IndexInternalID)
+			return err == nil && dm != nil && bytes.Equal(dm.IndexInternalID, d.IndexInternalID)
+		}
+	}
+
+	// if all 4 are nil, return MatchNone
+	if mustSearcher == nil && shouldSearcher == nil && mustNotSearcher == nil && filterFunc == nil {
 		return searcher.NewMatchNoneSearcher(i)
+	}
+
+	// optimization, if only must searcher, just return it instead
+	if mustSearcher != nil && shouldSearcher == nil && mustNotSearcher == nil && filterFunc == nil {
+		return mustSearcher, nil
+	}
+
+	// optimization, if only should searcher, just return it instead
+	if mustSearcher == nil && shouldSearcher != nil && mustNotSearcher == nil && filterFunc == nil {
+		return shouldSearcher, nil
+	}
+
+	// optimization, if only filter searcher, wrap around a MatchAllSearcher
+	if mustSearcher == nil && shouldSearcher == nil && mustNotSearcher == nil && filterFunc != nil {
+		mustSearcher, err = searcher.NewMatchAllSearcher(ctx, i, 1.0, options)
+		if err != nil {
+			return nil, err
+		}
+		return searcher.NewFilteringSearcher(ctx,
+			mustSearcher,
+			filterFunc,
+		), nil
 	}
 
 	// if only mustNotSearcher, start with MatchAll
@@ -175,12 +234,15 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 		}
 	}
 
-	// optimization, if only should searcher, just return it instead
-	if mustSearcher == nil && shouldSearcher != nil && mustNotSearcher == nil {
-		return shouldSearcher, nil
+	bs, err := searcher.NewBooleanSearcher(ctx, i, mustSearcher, shouldSearcher, mustNotSearcher, options)
+	if err != nil {
+		return nil, err
 	}
 
-	return searcher.NewBooleanSearcher(ctx, i, mustSearcher, shouldSearcher, mustNotSearcher, options)
+	if filterFunc != nil {
+		return searcher.NewFilteringSearcher(ctx, bs, filterFunc), nil
+	}
+	return bs, nil
 }
 
 func (q *BooleanQuery) Validate() error {
@@ -202,8 +264,14 @@ func (q *BooleanQuery) Validate() error {
 			return err
 		}
 	}
-	if q.Must == nil && q.Should == nil && q.MustNot == nil {
-		return fmt.Errorf("boolean query must contain at least one must or should or not must clause")
+	if qf, ok := q.Filter.(ValidatableQuery); ok {
+		err := qf.Validate()
+		if err != nil {
+			return err
+		}
+	}
+	if q.Must == nil && q.Should == nil && q.MustNot == nil && q.Filter == nil {
+		return fmt.Errorf("boolean query must contain at least one must or should or not must or filter clause")
 	}
 	return nil
 }
@@ -213,6 +281,7 @@ func (q *BooleanQuery) UnmarshalJSON(data []byte) error {
 		Must    json.RawMessage `json:"must,omitempty"`
 		Should  json.RawMessage `json:"should,omitempty"`
 		MustNot json.RawMessage `json:"must_not,omitempty"`
+		Filter  json.RawMessage `json:"filter,omitempty"`
 		Boost   *Boost          `json:"boost,omitempty"`
 	}{}
 	err := util.UnmarshalJSON(data, &tmp)
@@ -250,6 +319,13 @@ func (q *BooleanQuery) UnmarshalJSON(data []byte) error {
 		_, isDisjunctionQuery := q.MustNot.(*DisjunctionQuery)
 		if !isDisjunctionQuery {
 			return fmt.Errorf("must not clause must be disjunction")
+		}
+	}
+
+	if tmp.Filter != nil {
+		q.Filter, err = ParseQuery(tmp.Filter)
+		if err != nil {
+			return err
 		}
 	}
 
