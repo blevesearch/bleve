@@ -171,19 +171,6 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 		}
 	}
 
-	// if all 3 are nil, return MatchNone
-	if mustSearcher == nil && shouldSearcher == nil && mustNotSearcher == nil {
-		return searcher.NewMatchNoneSearcher(i)
-	}
-
-	// if only mustNotSearcher, start with MatchAll
-	if mustSearcher == nil && shouldSearcher == nil && mustNotSearcher != nil {
-		mustSearcher, err = searcher.NewMatchAllSearcher(ctx, i, 1.0, options)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	var filterFunc searcher.FilterFunc
 	if q.Filter != nil {
 		// create a new searcher options with disabled scoring, since filter should not affect scoring
@@ -211,9 +198,40 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 			return err == nil && dm != nil && bytes.Equal(dm.IndexInternalID, d.IndexInternalID)
 		}
 	}
+
+	// if all 4 are nil, return MatchNone
+	if mustSearcher == nil && shouldSearcher == nil && mustNotSearcher == nil && filterFunc == nil {
+		return searcher.NewMatchNoneSearcher(i)
+	}
+
+	// optimization, if only must searcher, just return it instead
+	if mustSearcher != nil && shouldSearcher == nil && mustNotSearcher == nil && filterFunc == nil {
+		return mustSearcher, nil
+	}
+
 	// optimization, if only should searcher, just return it instead
 	if mustSearcher == nil && shouldSearcher != nil && mustNotSearcher == nil && filterFunc == nil {
 		return shouldSearcher, nil
+	}
+
+	// optimization, if only filter searcher, wrap around a MatchAllSearcher
+	if mustSearcher == nil && shouldSearcher == nil && mustNotSearcher == nil && filterFunc != nil {
+		mustSearcher, err = searcher.NewMatchAllSearcher(ctx, i, 1.0, options)
+		if err != nil {
+			return nil, err
+		}
+		return searcher.NewFilteringSearcher(ctx,
+			mustSearcher,
+			filterFunc,
+		), nil
+	}
+
+	// if only mustNotSearcher, start with MatchAll
+	if mustSearcher == nil && shouldSearcher == nil && mustNotSearcher != nil {
+		mustSearcher, err = searcher.NewMatchAllSearcher(ctx, i, 1.0, options)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	bs, err := searcher.NewBooleanSearcher(ctx, i, mustSearcher, shouldSearcher, mustNotSearcher, options)
@@ -252,8 +270,8 @@ func (q *BooleanQuery) Validate() error {
 			return err
 		}
 	}
-	if q.Must == nil && q.Should == nil && q.MustNot == nil {
-		return fmt.Errorf("boolean query must contain at least one must or should or not must clause")
+	if q.Must == nil && q.Should == nil && q.MustNot == nil && q.Filter == nil {
+		return fmt.Errorf("boolean query must contain at least one must or should or not must or filter clause")
 	}
 	return nil
 }
