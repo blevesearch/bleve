@@ -562,6 +562,25 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}()
 
+	var doFusionRescoring bool
+	var rescorer rescorer
+	if _, ok := ctx.Value(search.FusionRescoringKey).(bool); !ok {
+		// Since fusion rescoring key is not set, check if it is a hybrid search.
+		// If it is, then set doFusionRescoring. This indicates that the rescoring
+		// must happen locally within this index, and there are no other
+		// indexes/aliases involved.
+		doFusionRescoring = IsFusionRescoringRequired(req)
+
+		// new context will be used in internal functions to collect data
+		// as suitable for hybrid search. Rescorer is used for rescoring
+		// using fusion algorithms.
+		if doFusionRescoring {
+			ctx = context.WithValue(ctx, search.FusionRescoringKey, true)
+			rescorer = newFusionRescorer(req)
+			rescorer.prepareSearchRequest()
+		}
+	}
+
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
 		preSearchResult, err := i.preSearch(ctx, req, indexReader)
 		if err != nil {
@@ -857,6 +876,13 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		MaxScore: coll.MaxScore(),
 		Took:     searchDuration,
 		Facets:   coll.FacetResults(),
+	}
+
+	// rescore if fusion flag is set
+	if doFusionRescoring {
+		rescorer.rescore(rv)
+		rescorer.restoreSearchRequest()
+		rv.Hits = hitsInCurrentPage(req, rv.Hits)
 	}
 
 	if req.Explain {

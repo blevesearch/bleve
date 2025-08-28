@@ -186,6 +186,25 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	if len(i.indexes) < 1 {
 		return nil, ErrorAliasEmpty
 	}
+
+	var doFusionRescoring bool
+	var rescorer rescorer
+	if _, ok := ctx.Value(search.FusionRescoringKey).(bool); !ok {
+		// Since fusion rescoring key is not set, check if it is a hybrid search.
+		// If it is, then set doFusionRescoring. This indicates that score
+		// combination must happen at this alias.
+		doFusionRescoring = IsFusionRescoringRequired(req)
+
+		// new context will be used in internal functions to collect data
+		// as suitable for fusion. Rescorer is used for rescoring
+		// using fusion algorithms.
+		if doFusionRescoring {
+			ctx = context.WithValue(ctx, search.FusionRescoringKey, true)
+			rescorer = newFusionRescorer(req)
+			rescorer.prepareSearchRequest()
+		}
+	}
+
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
 		// since preSearchKey is set, it means that the request
 		// is being executed as part of a preSearch, which
@@ -224,7 +243,18 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		if preSearchData != nil {
 			req.PreSearchData = preSearchData[i.indexes[0].Name()]
 		}
-		return i.indexes[0].SearchInContext(ctx, req)
+		sr, err := i.indexes[0].SearchInContext(ctx, req)
+		if err != nil {
+			return sr, err
+		}
+
+		if doFusionRescoring {
+			rescorer.rescore(sr)
+			rescorer.restoreSearchRequest()
+			sr.Hits = hitsInCurrentPage(req, sr.Hits)
+		}
+
+		return sr, nil
 	}
 
 	// at this stage we know we have multiple indexes
@@ -261,7 +291,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// if the request is satisfied by the preSearch result, then we can
 		// directly return the preSearch result as the final result
 		if requestSatisfiedByPreSearch(req, flags) {
-			sr = finalizeSearchResult(req, preSearchResult)
+			sr = finalizeSearchResult(ctx, req, preSearchResult, doFusionRescoring, rescorer)
 			// no need to run the 2nd phase MultiSearch(..)
 		} else {
 			preSearchData, err = constructPreSearchData(req, flags, preSearchResult, i.indexes)
@@ -274,7 +304,8 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 
 	// check if search result was generated as part of preSearch itself
 	if sr == nil {
-		sr, err = MultiSearch(ctx, req, preSearchData, i.indexes...)
+		multiSearchParams := multiSearchParams{preSearchData, doFusionRescoring, rescorer}
+		sr, err = MultiSearch(ctx, req, multiSearchParams, i.indexes...)
 		if err != nil {
 			return nil, err
 		}
@@ -653,7 +684,7 @@ func preSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, i
 // if the request is satisfied by just the preSearch result,
 // finalize the result and return it directly without
 // performing multi search
-func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult) *SearchResult {
+func finalizeSearchResult(ctx context.Context, req *SearchRequest, preSearchResult *SearchResult, doFusionRescoring bool, rescorer rescorer) *SearchResult {
 	if preSearchResult == nil {
 		return nil
 	}
@@ -682,7 +713,15 @@ func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult) *Se
 	if req.SearchAfter != nil {
 		preSearchResult.Hits = collector.FilterHitsBySearchAfter(preSearchResult.Hits, req.Sort, req.SearchAfter)
 	}
+
+	// rescore if fusion flag is set
+	if doFusionRescoring {
+		rescorer.rescore(preSearchResult)
+		rescorer.restoreSearchRequest()
+	}
+
 	preSearchResult.Hits = hitsInCurrentPage(req, preSearchResult.Hits)
+
 	if reverseQueryExecution {
 		// reverse the sort back to the original
 		req.Sort.Reverse()
@@ -890,6 +929,55 @@ func finalizePreSearchResult(req *SearchRequest, flags *preSearchFlags, preSearc
 	}
 }
 
+func hitsInCurrentPageWithKNN(req *SearchRequest, hits []*search.DocumentMatch) []*search.DocumentMatch {
+	sortFunc := req.SortFunc()
+	// sort all hits with the requested order
+	if len(req.Sort) > 0 {
+		sorter := newSearchHitSorter(req.Sort, hits)
+		sortFunc(sorter)
+	}
+
+	// Create a map of KNN hits by document ID
+	knnHitMap := make(map[string]*search.DocumentMatch)
+	for _, hit := range hits {
+		if len(hit.ScoreBreakdown) > 0 {
+			knnHitMap[hit.ID] = hit
+		}
+	}
+
+	// Apply normal pagination to get the current page
+	pageHits := hits
+
+	// Apply From (skip)
+	if req.From > 0 && len(pageHits) > req.From {
+		pageHits = pageHits[req.From:]
+	} else if req.From > 0 {
+		pageHits = search.DocumentMatchCollection{}
+	}
+
+	// Apply Size (limit)
+	if req.Size > 0 && len(pageHits) > req.Size {
+		pageHits = pageHits[0:req.Size]
+	}
+
+	// Track which KNN hits are already in the current page
+	pageHitIDs := make(map[string]bool)
+	for _, hit := range pageHits {
+		pageHitIDs[hit.ID] = true
+	}
+
+	// Add missing KNN hits with Score set to 0
+	for docID, knnHit := range knnHitMap {
+		if !pageHitIDs[docID] {
+			// Set the FTS score to 0 for KNN hits not in the page
+			knnHit.Score = 0.0
+			pageHits = append(pageHits, knnHit)
+		}
+	}
+
+	return pageHits
+}
+
 // hitsInCurrentPage returns the hits in the current page
 // using the From and Size parameters in the request
 func hitsInCurrentPage(req *SearchRequest, hits []*search.DocumentMatch) []*search.DocumentMatch {
@@ -912,9 +1000,16 @@ func hitsInCurrentPage(req *SearchRequest, hits []*search.DocumentMatch) []*sear
 	return hits
 }
 
+// Extra parameters for MultiSearch
+type multiSearchParams struct {
+	preSearchData  map[string]map[string]interface{}
+	doFusionRescoring bool
+	rescorer       rescorer
+}
+
 // MultiSearch executes a SearchRequest across multiple Index objects,
 // then merges the results.  The indexes must honor any ctx deadline.
-func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[string]map[string]interface{}, indexes ...Index) (*SearchResult, error) {
+func MultiSearch(ctx context.Context, req *SearchRequest, params multiSearchParams, indexes ...Index) (*SearchResult, error) {
 	searchStart := time.Now()
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
 
@@ -939,8 +1034,8 @@ func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[stri
 	waitGroup.Add(len(indexes))
 	for _, in := range indexes {
 		var payload map[string]interface{}
-		if preSearchData != nil {
-			payload = preSearchData[in.Name()]
+		if params.preSearchData != nil {
+			payload = params.preSearchData[in.Name()]
 		}
 		go searchChildIndex(in, createChildSearchRequest(req, payload))
 	}
@@ -980,7 +1075,25 @@ func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[stri
 		}
 	}
 
-	sr.Hits = hitsInCurrentPage(req, sr.Hits)
+	// rescore if fusion flag is set
+	if params.doFusionRescoring {
+		params.rescorer.rescore(sr)
+		params.rescorer.restoreSearchRequest()
+	}
+
+	if _, ok := ctx.Value(search.FusionRescoringKey).(bool); !ok {
+		// Not fusion, default pagination
+		sr.Hits = hitsInCurrentPage(req, sr.Hits)
+	} else {
+		if params.doFusionRescoring {
+			// Hybrid search with fusion already done, do default pagination
+			sr.Hits = hitsInCurrentPage(req, sr.Hits)
+		} else {
+			// Hybrid search but fusion has not happened yet. All knn hits
+			// must be preserved.
+			sr.Hits = hitsInCurrentPageWithKNN(req, sr.Hits)
+		}
+	}
 
 	// fix up facets
 	for name, fr := range req.Facets {
