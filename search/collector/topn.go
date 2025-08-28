@@ -246,17 +246,17 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	if hc.size+hc.skip > PreAllocSizeSkipCap {
 		backingSize = PreAllocSizeSkipCap + 1
 	}
-	
-	var hybridSearch bool
-	if _, ok := ctx.Value(search.HybridSearchKey).(bool); ok {
-		hybridSearch = true
+
+	var fusionRescoring bool
+	if _, ok := ctx.Value(search.FusionRescoringKey).(bool); ok {
+		fusionRescoring = true
 	}
 
 	searchContext := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(backingSize+searcher.DocumentMatchPoolSize(), len(hc.sort)),
 		Collector:         hc,
 		IndexReader:       reader,
-		HybridSearch:	   hybridSearch,
+		FusionRescoring:   fusionRescoring,
 	}
 
 	hc.dvReader, err = reader.DocValueReader(hc.neededFields)
@@ -272,8 +272,8 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 
 	var dmHandlerMaker func(ctx *search.SearchContext) (search.DocumentMatchHandler, bool, error)
-	if hybridSearch {
-		dmHandlerMaker = MakeTopNHybridSearchDocumentMatchHandler
+	if fusionRescoring {
+		dmHandlerMaker = MakeTopNFusionRescoringDocumentMatchHandler
 	} else {
 		dmHandlerMaker = MakeTopNDocumentMatchHandler
 	}
@@ -335,8 +335,8 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 				return err
 			}
 
-			if !hybridSearch {
-				// If hybrid search, knn hits are handled later.
+			if !fusionRescoring {
+				// If rescoring required, knn hits are handled later.
 				err = dmHandler(knnDoc)
 				if err != nil {
 					return err
@@ -366,7 +366,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	hc.took = time.Since(startTime)
 
 	// finalize actual results
-	err = hc.finalizeResults(reader, hybridSearch)
+	err = hc.finalizeResults(reader, fusionRescoring)
 	if err != nil {
 		return err
 	}
@@ -383,11 +383,11 @@ func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 			return err
 		}
 		if knnHit, ok := hc.knnHits[d.ID]; ok {
-			// if hybrid search, adds the knn ScoreBreakdown field to the
+			// if rescoring needed, adds the knn ScoreBreakdown field to the
 			// query doc. Query doc now contains the query score (Score field)
 			// as well as the individual knn scores (ScoreBreakdown)
 			d.Score, d.Expl = hc.computeNewScoreExpl(d, knnHit)
-			if ctx.HybridSearch {
+			if ctx.FusionRescoring {
 				d.ScoreBreakdown = knnHit.ScoreBreakdown
 			}
 			delete(hc.knnHits, d.ID)
@@ -508,7 +508,7 @@ func MakeTopNDocumentMatchHandler(
 	return nil, false, nil
 }
 
-func MakeTopNHybridSearchDocumentMatchHandler(
+func MakeTopNFusionRescoringDocumentMatchHandler(
 	ctx *search.SearchContext) (search.DocumentMatchHandler, bool, error) {
 	var hc *TopNCollector
 	var ok bool
@@ -524,7 +524,7 @@ func MakeTopNHybridSearchDocumentMatchHandler(
 				return nil
 			}
 
-			// No search after pagination, since it's disabled in hybrid search
+			// No search after pagination, since it's disabled in fusion
 
 			if hc.lowestMatchOutsideResults != nil {
 				cmp := hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, d,
@@ -616,7 +616,7 @@ func (hc *TopNCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
 // finalizeResults starts with the heap containing the final top size+skip
 // it now throws away the results to be skipped
 // and does final doc id lookup (if necessary)
-func (hc *TopNCollector) finalizeResults(r index.IndexReader, hybridSearch bool) error {
+func (hc *TopNCollector) finalizeResults(r index.IndexReader, fusionRescoring bool) error {
 	var err error
 	fixupFunc := func(doc *search.DocumentMatch) error {
 		if doc.ID == "" {
@@ -629,14 +629,14 @@ func (hc *TopNCollector) finalizeResults(r index.IndexReader, hybridSearch bool)
 		}
 		doc.Complete(nil)
 		return nil
-	} 
+	}
 
 	hc.results, err = hc.store.Final(hc.skip, fixupFunc)
 	if err != nil {
 		return err
 	}
 
-	if hybridSearch {
+	if fusionRescoring {
 		for _, v := range hc.knnHits {
 			v.Score = 0.0
 			err := fixupFunc(v)
@@ -646,7 +646,7 @@ func (hc *TopNCollector) finalizeResults(r index.IndexReader, hybridSearch bool)
 			hc.results = append(hc.results, v)
 		}
 	}
-	
+
 	return nil
 }
 

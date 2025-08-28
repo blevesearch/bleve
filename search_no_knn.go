@@ -142,19 +142,19 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	}
 
 	if temp.Params == nil {
-		if isHybridSearch(r) {
-			// If params is not present and it is hybrid search, assign
-			// default values
+		if IsFusionRescoringRequired(r) {
+			// If params is not present and it requires rescoring, assign
+			// def values
 			src := 60
 			sws := r.Size
 			params := Params{ScoreRankConstant: &src, ScoreWindowSize: &sws}
 			r.Params = params
 		}
 	} else {
-		// if it is a hybrid search request, validate the hybrid search
+		// if it is a request that requires rescoring, validate the rescoring
 		// parameters. Return errors if they are not valid.
-		if isHybridSearch(r) {
-			params, err := parseParams(r, temp.Params)
+		if IsFusionRescoringRequired(r) {
+			params, err := ParseParams(r, temp.Params)
 			if err != nil {
 				return err
 			}

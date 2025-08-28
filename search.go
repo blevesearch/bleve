@@ -322,11 +322,11 @@ func (r *SearchRequest) Validate() error {
 		return err
 	}
 
-	if isHybridSearch(r) {
+	if IsFusionRescoringRequired(r) {
 		if r.SearchAfter != nil || r.SearchBefore != nil {
-			return fmt.Errorf("cannot use search after or search before with hybrid search")
+			return fmt.Errorf("cannot use search after or search before with score fusion")
 		} else if so := (search.SortOrder{&search.SortScore{Desc: true}}); r.Sort != nil && !reflect.DeepEqual(r.Sort, so) {
-			return fmt.Errorf("sort must be empty or descending order of score for hybrid search")
+			return fmt.Errorf("sort must be empty or descending order of score for score fusion")
 		}
 	}
 
@@ -669,7 +669,7 @@ func isMatchAllQuery(q query.Query) bool {
 }
 
 // Checks if the request is hybrid search. Currently supports: RRF.
-func isHybridSearch(req *SearchRequest) bool {
+func IsFusionRescoringRequired(req *SearchRequest) bool {
 	switch req.Score {
 	case ReciprocalRankFusionStrategy:
 		return true
@@ -678,14 +678,14 @@ func isHybridSearch(req *SearchRequest) bool {
 	}
 }
 
-// Additional parameters in the search request. Currently only being 
+// Additional parameters in the search request. Currently only being
 // used for hybrid search parameters.
 type Params struct {
 	ScoreRankConstant *int `json:"score_rank_constant,omitempty"`
 	ScoreWindowSize   *int `json:"score_window_size,omitempty"`
 }
 
-func parseParams(r *SearchRequest, input []byte) (*Params, error) {
+func ParseParams(r *SearchRequest, input []byte) (*Params, error) {
 	if len(input) == 0 {
 		src := 60
 		sws := r.Size
@@ -718,7 +718,7 @@ func parseParams(r *SearchRequest, input []byte) (*Params, error) {
 }
 
 func validateScore(r *SearchRequest) error {
-	if r.Score == "" || r.Score == "none" || isHybridSearch(r) {
+	if r.Score == "" || r.Score == "none" || IsFusionRescoringRequired(r) {
 		return nil
 	}
 
