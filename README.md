@@ -4,7 +4,6 @@
 [![Coverage Status](https://coveralls.io/repos/github/blevesearch/bleve/badge.svg?branch=master)](https://coveralls.io/github/blevesearch/bleve?branch=master)
 [![Go Reference](https://pkg.go.dev/badge/github.com/blevesearch/bleve/v2.svg)](https://pkg.go.dev/github.com/blevesearch/bleve/v2)
 [![Join the chat](https://badges.gitter.im/join_chat.svg)](https://app.gitter.im/#/room/#blevesearch_bleve:gitter.im)
-[![codebeat](https://codebeat.co/badges/38a7cbc9-9cf5-41c0-a315-0746178230f4)](https://codebeat.co/projects/github-com-blevesearch-bleve)
 [![Go Report Card](https://goreportcard.com/badge/github.com/blevesearch/bleve/v2)](https://goreportcard.com/report/github.com/blevesearch/bleve/v2)
 [![Sourcegraph](https://sourcegraph.com/github.com/blevesearch/bleve/-/badge.svg)](https://sourcegraph.com/github.com/blevesearch/bleve?badge)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -27,6 +26,7 @@ A modern indexing + search library in GO
   * [synonym search](https://github.com/blevesearch/bleve/blob/master/docs/synonyms.md)
 * [tf-idf](https://github.com/blevesearch/bleve/blob/master/docs/scoring.md#tf-idf) / [bm25](https://github.com/blevesearch/bleve/blob/master/docs/scoring.md#bm25) scoring models
 * Hybrid search: exact + semantic
+* [Result pagination](https://github.com/blevesearch/bleve/blob/master/docs/pagination.md)
 * Query time boosting
 * Search result match highlighting with document fragments
 * Aggregations/faceting support:
