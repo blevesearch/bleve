@@ -38,8 +38,12 @@ type OptimizeVR struct {
 	requiresFiltering bool
 }
 
-// This setting _MUST_ only be changed during init and not after.
-var BleveMaxKNNConcurrency = 10
+// These settings _MUST_ only be changed during init and not after.
+var (
+	BleveMaxKNNConcurrency               = 10
+	BleveVectorSearchBatchExecution      = false
+	BleveVectorSearchBatchExecutionDelay = segment_api.DefaultBatchExecutionDelay
+)
 
 func (o *OptimizeVR) invokeSearcherEndCallback() {
 	if o.ctx != nil {
@@ -66,6 +70,14 @@ func (o *OptimizeVR) Finish() error {
 
 	defer o.invokeSearcherEndCallback()
 
+	var interpretVectorIndexOptions *segment_api.InterpretVectorIndexOptions
+	if BleveVectorSearchBatchExecution {
+		interpretVectorIndexOptions = &segment_api.InterpretVectorIndexOptions{
+			Batch:               BleveVectorSearchBatchExecution,
+			BatchExecutionDelay: BleveVectorSearchBatchExecutionDelay,
+		}
+	}
+
 	wg := sync.WaitGroup{}
 	semaphore := make(chan struct{}, BleveMaxKNNConcurrency)
 	// Launch goroutines to get vector index for each segment
@@ -80,7 +92,7 @@ func (o *OptimizeVR) Finish() error {
 				}()
 				for field, vrs := range o.vrs {
 					vecIndex, err := segment.InterpretVectorIndex(field,
-						o.requiresFiltering, origSeg.deleted)
+						o.requiresFiltering, origSeg.deleted, interpretVectorIndexOptions)
 					if err != nil {
 						errorsM.Lock()
 						errors = append(errors, err)
