@@ -6,65 +6,67 @@ A simple how-to example using Bleve in Go to create an index, add documents, and
 package main
 
 import (
-	"fmt"
-	"log"
+    "fmt"
+    "log"
 
-	bleve "github.com/blevesearch/bleve/v2"
+    bleve "github.com/blevesearch/bleve/v2"
 )
 
 type Document struct {
-	ID      string `json:"id"`
-	Title   string `json:"title"`
-	Content string `json:"content"`
+    ID      string `json:"id"`
+    Title   string `json:"title"`
+    Content string `json:"content"`
 }
 
 func main() {
-	indexPath := "example.bleve"
-	// Create a new index
-	mapping := bleve.NewIndexMapping()
-	index, err := bleve.New(indexPath, mapping)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer index.Close()
+    indexPath := "example.bleve"
+    // Create a new index
+    mapping := bleve.NewIndexMapping()
+    index, err := bleve.New(indexPath, mapping)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer index.Close()
 
-	// Add documents
-	documents := []Document{
-		{
-			ID:      "doc",
-			Title:   "Bleve documentation",
-			Content: "Bleve provides full-text search capabilities.",
-		},
-		{
-			ID:      "doc1",
-			Title:   "Elasticsearch documentation",
-			Content: "Elasticsearch provides full-text search capabilities as well.",
-		},
-	}
+    // Add documents
+    documents := []Document{
+        {
+            ID:      "doc",
+            Title:   "Bleve documentation",
+            Content: "Bleve provides full-text search capabilities.",
+        },
+        {
+            ID:      "doc1",
+            Title:   "Elasticsearch documentation",
+            Content: "Elasticsearch provides full-text search capabilities as well.",
+        },
+    }
 
-	// Iterate and index the documents
-	batch := index.NewBatch()
-	for _, doc := range documents {
-		batch.Index(doc.ID, doc)
-	}
-	if err := index.Batch(batch); err != nil {
-		log.Fatal(err)
-	}
+    // Iterate and index the documents
+    batch := index.NewBatch()
+    for _, doc := range documents {
+        batch.Index(doc.ID, doc)
+    }
+    if err := index.Batch(batch); err != nil {
+        log.Fatal(err)
+    }
 
-	// Search the created index
-	query := bleve.NewQueryStringQuery("bleve")
-	searchRequest := bleve.NewSearchRequest(query)
-	searchRequest.Explain = true
-	searchRequest.Fields = []string{"title", "content"}
-	searchResult, err := index.Search(searchRequest)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(searchResult)
+    // Search the created index
+    query := bleve.NewQueryStringQuery("bleve")
+    searchRequest := bleve.NewSearchRequest(query)
+    searchRequest.Explain = true
+    searchRequest.Fields = []string{"title", "content"}
+    searchResult, err := index.Search(searchRequest)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(searchResult)
 }
 
 ```
-## Output:
+
+## Output
+
 ```bash
 $ go run main.go
 
@@ -75,6 +77,7 @@ $ go run main.go
         content
                 Bleve provides full-text search capabilities.
 ```
+
 ## Step-by-Step Breakdown
 
 ### 1. Index Creation
@@ -87,6 +90,7 @@ index, err := bleve.New(indexPath, mapping)
 ```
 
 **What happens:**
+
 - Creates an index mapping with default settings
 - Creates a new index directory `example.bleve/`
 - Sets up the underlying storage (Scorch engine by default)
@@ -103,6 +107,7 @@ err := index.Index("doc", map[string]interface{}{
 ```
 
 **What happens:**
+
 - Document gets a unique ID (`doc`)
 - Fields are automatically mapped based on their Go types
 - Text fields are analyzed (tokenized, lowercased, etc.) based on the mapping chosen (here, the default one)
@@ -120,6 +125,7 @@ results, err := index.Search(request)
 ```
 
 **What happens:**
+
 - Query string is parsed and analyzed
 - Index is searched for matching documents
 - Results are scored and ranked by relevance by the algorithm used
@@ -141,17 +147,20 @@ defer index.Close()
 ## Different Query Types
 
 ### 1. Query String Query (Simple)
+
 ```go
 query := bleve.NewQueryStringQuery("golang programming")
 ```
 
 ### 2. Match Query (Exact Field)
+
 ```go
 query := bleve.NewMatchQuery("bleve")
 query.SetField("title")  // Search only in title field
 ```
 
 ### 3. Boolean Query (Complex)
+
 ```go
 mustQuery := bleve.NewMatchQuery("golang")
 shouldQuery := bleve.NewMatchQuery("programming")
@@ -162,6 +171,7 @@ boolQuery.AddShould(shouldQuery)
 ```
 
 ### 4. Range Query (Numeric/Date)
+
 ```go
 minPrice := 20.50
 maxPrice := 40.75
@@ -214,4 +224,3 @@ for _, doc := range documents {
 // Execute batch
 err := index.Batch(batch)
 ```
-

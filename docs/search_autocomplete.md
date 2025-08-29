@@ -41,12 +41,14 @@ func (t *SingleTokenTokenizer) Tokenize(input []byte) analysis.TokenStream {
 
 **Example**: "JavaScript Programming" → [`"JavaScript Programming"`]
 
-**Pros**: 
+**Pros**:
+
 - Simple and fast
 - Perfect for exact phrase matching
 - Minimal index size
 
-**Cons**: 
+**Cons**:
+
 - No autocomplete support (can't match partial text)
 - Not flexible for search
 
@@ -69,11 +71,13 @@ func notSpace(r rune) bool {
 
 **Example**: "JavaScript Programming" → [`"JavaScript"`, `"Programming"`]
 
-**Pros**: 
+**Pros**:
+
 - Simple word-based tokenization
 - Works well for basic prefix search
 
-**Cons**: 
+**Cons**:
+
 - Only matches from word beginnings
 - No support for partial word matching
 - Limited autocomplete capabilities
@@ -101,11 +105,13 @@ func (s *NgramFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
 
 **Example**: "java" with 2-3 grams → [`"ja"`, `"av"`, `"va"`, `"jav"`, `"ava"`]
 
-**Pros**: 
+**Pros**:
+
 - Supports partial matching anywhere in the text
 - Coverage of all possible substrings
 
-**Cons**: 
+**Cons**:
+
 - **MASSIVE index size** (exponential growth)
 - Brings more noise as irrelevant matches (e.g., "av" matching "java")
 - Poor performance for autocomplete
@@ -133,14 +139,16 @@ func (s *EdgeNgramFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
 
 **Example**: "javascript" with front edge n-grams (1-5) → [`"j"`, `"ja"`, `"jav"`, `"java"`, `"javas"`]
 
-**Pros**: 
+**Pros**:
+
 - Perfect for autocomplete (matches prefixes naturally)
 - Efficient index size (linear growth vs exponential)  
 - Fast queries (direct term matching, no complex processing)
 - Intuitive results (matches what users expect)
 - Highly scalable for large datasets
 
-**Cons**: 
+**Cons**:
+
 - Only supports prefix matching (but that's preferred for autocomplete!)
 - Slightly larger index than basic tokenization
 
@@ -150,7 +158,7 @@ func (s *EdgeNgramFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
 
 Let's see what happens when a user types "java" with edge_ngram tokenizer:
 
-```
+```text
 Index contains: ["j", "ja", "jav", "java", "javas", "javasc", "javascr", ...]
 User types: "java"  
 Query: ExactTermQuery("java")
@@ -179,19 +187,20 @@ indexMapping := mapping.NewIndexMapping()
 
 // 1. Define the edgeGram token filter
 edgeGramFilter := map[string]interface{}{
-"type": edgengram.Name,
-"min":  2.0,
-"max":  4.0,
-"back": false,
+    "type": edgengram.Name,
+    "min":  2.0,
+    "max":  4.0,
+    "back": false,
 }
 
 // Register the token filter
 if err := indexMapping.AddCustomTokenFilter("Engram", edgeGramFilter); err != nil {
-log.Fatal(err)
+    log.Fatal(err)
 }
 ```
 
 **What each setting does:**
+
 - `"type": "edge_ngram"` - Tells Bleve to use the edge n-gram filter
 - `"min": 2` - Start creating tokens from 2 characters ("ja", "sc", etc.)
 - `"max": 4` - Stop at 4 characters ("java", "scri", etc.)
@@ -226,27 +235,32 @@ if err := indexMapping.AddCustomAnalyzer("edgeGramAnalyzer", customAnalyzer); er
 1. **Input Text**: "Schaumbergfest Event"
 
 2. **Tokenizer** (`unicode`): Splits into words
-   ```
+
+   ```text
    ["Schaumbergfest", "Event"]
    ```
 
 3. **Character Filter** (`zero_width_spaces`): Removes invisible characters
-   ```
+
+   ```text
    ["Schaumbergfest", "Event"] (cleaned)
    ```
 
 4. **Token Filter 1** (`Engram`): Creates edge n-grams (2-4 chars)
-   ```
+
+   ```text
    ["Sc", "Sch", "Scha", "Ev", "Eve", "Even"]
    ```
 
 5. **Token Filter 2** (`to_lower`): Makes everything lowercase
-   ```
+
+   ```text
    ["sc", "sch", "scha", "ev", "eve", "even"]
    ```
 
 6. **Token Filter 3** (`stop_en`): Removes common words (none in this case)
-   ```
+
+   ```text
    ["sc", "sch", "scha", "ev", "eve", "even"] (final tokens)
    ```
 
@@ -273,56 +287,61 @@ Now we tell Bleve which fields to apply our autocomplete analyzer to:
 When someone searches for "sc", here's what happens:
 
 **Index contains these tokens:**
-```
+
+```text
 "sc" → [document1: "Schaumbergfest", document2: "Script", ...]
 "sch" → [document1: "Schaumbergfest", ...]  
 "scha" → [document1: "Schaumbergfest", ...]
 ```
 
 **User types "sc":**
+
 1. Query: `name:sc`
 2. Bleve looks up exact term "sc" in the index
 3. Finds document with "Schaumbergfest" and "Script"
 4. Returns suggestion instantly
 
 ```go
-	type Document struct {
-		ID    string `json:"id"`
-		Title string `json:"title"`
-	}
-	// 4. Index Documents
-	documents := []Document{
-		{
-			ID:    "doc1",
-			Title: "Schaumbergfest",
-		},
-		{
-			ID:    "doc2",
-			Title: "Script",
-		},
-	}
 
-	batch := index.NewBatch()
-	for _, doc := range documents {
-		batch.Index(doc.ID, doc)
-	}
-	if err := index.Batch(batch); err != nil {
-		log.Fatal(err)
-	}
+type Document struct {
+  ID    string `json:"id"`
+  Title string `json:"title"`
+}
+// 4. Index Documents
+documents := []Document{
+  {
+    ID:    "doc1",
+    Title: "Schaumbergfest",
+  },
+  {
+    ID:    "doc2",
+    Title: "Script",
+  },
+}
 
-	// 5. Search the created index
-	query := bleve.NewMatchQuery("sc")
-	query.SetField("title")
-	searchRequest := bleve.NewSearchRequest(query)
-	searchRequest.Explain = true
-	searchRequest.Fields = []string{"title"}
-	searchResult, err := index.Search(searchRequest)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(searchResult)
+batch := index.NewBatch()
+for _, doc := range documents {
+  batch.Index(doc.ID, doc)
+}
+if err := index.Batch(batch); err != nil {
+  log.Fatal(err)
+}
+
+// 5. Search the created index
+query := bleve.NewMatchQuery("sc")
+query.SetField("title")
+searchRequest := bleve.NewSearchRequest(query)
+searchRequest.Explain = true
+searchRequest.Fields = []string{"title"}
+searchResult, err := index.Search(searchRequest)
+if err != nil {
+  log.Fatal(err)
+}
+fmt.Println(searchResult)
 ```
+
 Output:
+
 ```bash
 
 $ go run main.go
@@ -335,4 +354,5 @@ $ go run main.go
         title
                 Schaumbergfest
 ```
+
 Note: To run code, enclose code starting from Step 1 in func main.
