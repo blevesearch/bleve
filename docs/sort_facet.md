@@ -758,8 +758,8 @@ Document Format used for the test scenario:
 		<th>Bleve index size growth with increase in indexed documents</th>
 		<th>Total query time for 1000 queries with increase in number of indexed documents</th>
 	</tr>
-		<td><img src = "sort_facet_supporting_docs/indexSizeVsNumDocs.png" alt = "indexSizeVsNumDocs.png"/></td>
-		<td><img src = "sort_facet_supporting_docs/queryTimevsNumDocs.png" alt = "queryTimevsNumDocs.png"/></td>
+		<td><img src = "images/indexSizeVsNumDocs.png" alt = "indexSizeVsNumDocs.png"/></td>
+		<td><img src = "images/queryTimevsNumDocs.png" alt = "queryTimevsNumDocs.png"/></td>
 	</tr>
 </table>
 </div>
