@@ -1,6 +1,6 @@
-# Create and Search Index
+# Creating a Bleve Index
 
-Demonstration of creating an index on Documents and making it searchable.
+A simple how-to example using Bleve in Go to create an index, add documents, and run search queries with results.
 
 ```go
 package main
@@ -8,7 +8,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 
 	bleve "github.com/blevesearch/bleve/v2"
 )
@@ -17,12 +16,10 @@ type Document struct {
 	ID      string `json:"id"`
 	Title   string `json:"title"`
 	Content string `json:"content"`
-	Author  string `json:"author"`
 }
 
 func main() {
 	indexPath := "example.bleve"
-
 	// Create a new index
 	mapping := bleve.NewIndexMapping()
 	index, err := bleve.New(indexPath, mapping)
@@ -46,47 +43,46 @@ func main() {
 	}
 
 	// Iterate and index the documents
+	batch := index.NewBatch()
 	for _, doc := range documents {
-		err := index.Index(doc.ID, doc)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("Indexed: %s\n", doc.Title)
+		batch.Index(doc.ID, doc)
+	}
+	if err := index.Batch(batch); err != nil {
+		log.Fatal(err)
 	}
 
 	// Search the created index
 	query := bleve.NewQueryStringQuery("bleve")
 	searchRequest := bleve.NewSearchRequest(query)
-	searchRequest.Size = 10
+	searchRequest.Explain = true
+	searchRequest.Fields = []string{"title", "content"}
 	searchResult, err := index.Search(searchRequest)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	for i, hit := range searchResult.Hits {
-		fmt.Printf("%d. Document: %s (Score: %.2f)\n", i+1, hit.ID, hit.Score)
-		if len(hit.Fragments) > 0 {
-			for field, fragments := range hit.Fragments {
-				fmt.Printf("   %s: %s\n", field, fragments[0])
-			}
-		}
-		fmt.Println()
-	}
+	fmt.Println(searchResult)
 }
+
 ```
-### Output:
+## Output:
 ```go
-rohitp.kumar@L6HG4T90JF test % go run test.go
+$ go run main.go
+
 Indexed: Bleve documentation
 Indexed: Elasticsearch documentation
-1. Document: doc (Score: 0.47)
+1 matches, showing 1 through 1, took 4.4515ms
+1. doc (0.471405)
+title
+Bleve documentation
+content
+Bleve provides full-text search capabilities
 ```
 ## Step-by-Step Breakdown
 
 ### 1. Index Creation
 
 ```go
-// Create a new index
+// Create a new index mapping
 mapping := bleve.NewIndexMapping()
 // Create a new index (this creates a directory on disk)
 index, err := bleve.New(indexPath, mapping)
@@ -111,7 +107,7 @@ err := index.Index("doc", map[string]interface{}{
 **What happens:**
 - Document gets a unique ID (`doc`)
 - Fields are automatically mapped based on their Go types
-- Text fields are analyzed (tokenized, lowercased, etc.) based on mapping we chose(here we chose default one)
+- Text fields are analyzed (tokenized, lowercased, etc.) based on the mapping chosen (here, the default one)
 - Document is stored in the search index
 
 ### 3. Searching
@@ -169,7 +165,9 @@ boolQuery.AddShould(shouldQuery)
 
 ### 4. Range Query (Numeric/Date)
 ```go
-query := bleve.NewNumericRangeQuery(nil, &maxPrice)
+minPrice := 20.50
+maxPrice := 40.75
+query := bleve.NewNumericRangeQuery(&minPrice, &maxPrice)
 query.SetField("price")
 ```
 

@@ -2,9 +2,9 @@
 
 Search autocomplete is a feature which we see in search boxes when suggestions appear while we type.
 So when we type `jav`, we see suggestions like: `java` `javascript` `javascript programming` etc.
-How this is helpful, it actually saves time for user to find what they are looking for!
+This is helpful because it saves users time in finding what they are looking for.
 
-![Alt Text](/docs/search_autocomplete.png "search autocomplete suggestion")
+![Alt Text](/docs/images/search_autocomplete.png "search autocomplete suggestion")
 
 ## 2. How Does It Work?
 
@@ -20,7 +20,7 @@ But before we jump into the flow, let's understand different methods to achieve 
 
 There are several tokenization approaches, each with its own strengths and weaknesses:
 
-### 3.1 Single Token Method
+### 3.1 Single Token Tokenizer
 
 ```go
 // analysis/tokenizer/single/single.go
@@ -52,7 +52,7 @@ func (t *SingleTokenTokenizer) Tokenize(input []byte) analysis.TokenStream {
 
 **Use case**: Keyword fields, IDs, exact phrase matching
 
-### 3.2 Whitespace Token Method
+### 3.2 Whitespace Token Tokenizer
 
 ```go
 // analysis/tokenizer/whitespace/whitespace.go  
@@ -174,15 +174,20 @@ Now let's see how to implement this in practice using our exact configuration. W
 First, we need to create a custom token filter for edge n-grams. Here's how it looks in our configuration:
 
 ```json
-{
-  "token_filters": {
-    "Engram": {
-      "type": "edge_ngram",
-      "min": 2,
-      "max": 4,
-      "back": "false"
-    }
-  }
+// Create a new index mapping
+indexMapping := mapping.NewIndexMapping()
+
+// 1. Define the edgeGram token filter
+edgeGramFilter := map[string]interface{}{
+"type": edgengram.Name,
+"min":  2.0,
+"max":  4.0,
+"back": false,
+}
+
+// Register the token filter
+if err := indexMapping.AddCustomTokenFilter("Engram", edgeGramFilter); err != nil {
+log.Fatal(err)
 }
 ```
 
@@ -192,28 +197,27 @@ First, we need to create a custom token filter for edge n-grams. Here's how it l
 - `"max": 4` - Stop at 4 characters ("java", "scri", etc.)
 - `"back": "false"` - Create tokens from the front (beginning) of words
 
-![Edge N-gram Token Filter Configuration](/docs/custom_token_filter.png "Custom token filter setup showing edge_ngram configuration")
-
-### Step 2: Build the Complete Analyzer Pipeline
+### Step 2: Create Custom Analyzer
 
 Next, we create an analyzer that uses our custom token filter along with other helpful filters:
 
 ```json
-{
-  "analyzers": {
-    "search_autocomplete_feature": {
-      "type": "custom",
-      "tokenizer": "unicode",
-      "char_filters": [
-        "zero_width_spaces"
-      ],
-      "token_filters": [
-        "Engram",
-        "to_lower", 
-        "stop_en"
-      ]
-    }
-  }
+// 2. Define a custom analyzer that uses it
+customAnalyzer := map[string]interface{}{
+    "type":      custom.Name,
+    "tokenizer": "unicode",
+    "char_filters": []string{
+         zerowidthnonjoiner.Name,
+    },
+    "token_filters": []string{
+        "Engram", // our custom edge_ngram filter
+        "to_lower",
+        "stop_en",
+    },
+}
+
+if err := indexMapping.AddCustomAnalyzer("edgeGramAnalyzer", customAnalyzer); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -251,35 +255,18 @@ Next, we create an analyzer that uses our custom token filter along with other h
 Now we tell Bleve which fields to apply our autocomplete analyzer to:
 
 ```json
-{
-  "default_mapping": {
-    "properties": {
-      "name": {
-        "fields": [
-          {
-            "name": "name",
-            "type": "text",
-            "analyzer": "search_autocomplete_feature",
-            "store": true,
-            "index": true,
-            "include_in_all": true,
-            "include_term_vectors": true,
-            "docvalues": true
-          }
-        ]
-            }
-        }
+    // 3. Assign analyzer to a field mapping
+    fieldMapping := mapping.NewTextFieldMapping()
+    fieldMapping.Analyzer = "edgeGramAnalyzer"
+    
+    indexMapping.DefaultMapping.AddFieldMappingsAt("title", fieldMapping)
+    
+    indexPath := "example.bleve"
+    index, err := bleve.New(indexPath, indexMapping)
+    if err != nil {
+        log.Fatal(err)
     }
-}
 ```
-
-**Field configuration explained:**
-- `"analyzer": "search_autocomplete_feature"` - Use our custom analyzer
-- `"store": true` - Keep original text for display
-- `"index": true` - Make it searchable
-- `"include_in_all": true` - Include in default search field
-
-![Index Mapping Configuration](/docs/name_filed_searchable_search_autocomplete_analyzer.png "Index mapping showing how the name field is configured with the custom analyzer")
 
 ### Step 4: How It Works in Real Search
 
@@ -295,8 +282,57 @@ When someone searches for "sc", here's what happens:
 **User types "sc":**
 1. Query: `name:sc`
 2. Bleve looks up exact term "sc" in the index
-3. Finds document with "Schaumbergfest" 
+3. Finds document with "Schaumbergfest" and "Script"
 4. Returns suggestion instantly
 
-![Search Results](/docs/index_search_using_prefix.png "Search results showing 'Schaumbergfest' highlighted when searching for 'sc'")
+```go
+	type Document struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+	}
+	// 4. Index Documents
+	documents := []Document{
+		{
+			ID:    "doc1",
+			Title: "Schaumbergfest",
+		},
+		{
+			ID:    "doc2",
+			Title: "Script",
+		},
+	}
 
+	batch := index.NewBatch()
+	for _, doc := range documents {
+		batch.Index(doc.ID, doc)
+	}
+	if err := index.Batch(batch); err != nil {
+		log.Fatal(err)
+	}
+
+	// 5. Search the created index
+	query := bleve.NewMatchQuery("sc")
+	query.SetField("title")
+	searchRequest := bleve.NewSearchRequest(query)
+	searchRequest.Explain = true
+	searchRequest.Fields = []string{"title"}
+	searchResult, err := index.Search(searchRequest)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(searchResult)
+```
+Output:
+```json
+
+$ go run main.go
+
+2 matches, showing 1 through 2, took 146.709µs
+1. doc2 (0.343255)
+title
+Script
+2. doc1 (0.343255)
+title
+Schaumbergfest
+```
+Note: To run code, enclose code starting from Step 1 in func main.
