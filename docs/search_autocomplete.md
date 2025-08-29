@@ -173,7 +173,7 @@ Now let's see how to implement this in practice using our exact configuration. W
 
 First, we need to create a custom token filter for edge n-grams. Here's how it looks in our configuration:
 
-```json
+```go
 // Create a new index mapping
 indexMapping := mapping.NewIndexMapping()
 
@@ -201,7 +201,7 @@ log.Fatal(err)
 
 Next, we create an analyzer that uses our custom token filter along with other helpful filters:
 
-```json
+```go
 // 2. Define a custom analyzer that uses it
 customAnalyzer := map[string]interface{}{
     "type":      custom.Name,
@@ -254,7 +254,7 @@ if err := indexMapping.AddCustomAnalyzer("edgeGramAnalyzer", customAnalyzer); er
 
 Now we tell Bleve which fields to apply our autocomplete analyzer to:
 
-```json
+```go
     // 3. Assign analyzer to a field mapping
     fieldMapping := mapping.NewTextFieldMapping()
     fieldMapping.Analyzer = "edgeGramAnalyzer"
@@ -323,16 +323,16 @@ When someone searches for "sc", here's what happens:
 	fmt.Println(searchResult)
 ```
 Output:
-```json
+```bash
 
 $ go run main.go
 
-2 matches, showing 1 through 2, took 146.709µs
-1. doc2 (0.343255)
-title
-Script
-2. doc1 (0.343255)
-title
-Schaumbergfest
+2 matches, showing 1 through 2, took 189.041µs
+    1. doc2 (0.343255)
+        title
+                Script
+    2. doc1 (0.343255)
+        title
+                Schaumbergfest
 ```
 Note: To run code, enclose code starting from Step 1 in func main.

@@ -65,17 +65,15 @@ func main() {
 
 ```
 ## Output:
-```go
+```bash
 $ go run main.go
 
-Indexed: Bleve documentation
-Indexed: Elasticsearch documentation
-1 matches, showing 1 through 1, took 4.4515ms
-1. doc (0.471405)
-title
-Bleve documentation
-content
-Bleve provides full-text search capabilities
+1 matches, showing 1 through 1, took 262.333µs
+    1. doc (0.471405)
+        title
+                Bleve documentation
+        content
+                Bleve provides full-text search capabilities.
 ```
 ## Step-by-Step Breakdown
 
