@@ -17,6 +17,7 @@ package bleve
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -1064,4 +1065,140 @@ func (f *indexAliasImplFieldDict) Close() error {
 
 func (f *indexAliasImplFieldDict) Cardinality() int {
 	return f.fieldDict.Cardinality()
+}
+
+// -----------------------------------------------------------------------------
+
+type asyncInsightsResult struct {
+	Name                        string
+	TermFrequenciesResult       []index.TermFreq
+	CentroidCardinalitiesResult []index.CentroidCardinality
+}
+
+func (i *indexAliasImpl) TermFrequencies(field string, limit int, descending bool) (
+	[]index.TermFreq, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
+	if len(i.indexes) < 1 {
+		return nil, ErrorAliasEmpty
+	}
+
+	// short circuit the simple case
+	if len(i.indexes) == 1 {
+		if idx, ok := i.indexes[0].(InsightsIndex); ok {
+			return idx.TermFrequencies(field, limit, descending)
+		}
+		return nil, nil
+	}
+
+	// run search on each index in separate go routine
+	var waitGroup sync.WaitGroup
+	asyncResults := make(chan *asyncInsightsResult, len(i.indexes))
+
+	searchChildIndex := func(in Index, field string, limit int, descending bool) {
+		rv := asyncInsightsResult{Name: in.Name()}
+		if idx, ok := in.(InsightsIndex); ok {
+			rv.TermFrequenciesResult, _ = idx.TermFrequencies(field, limit, descending)
+		}
+		asyncResults <- &rv
+		waitGroup.Done()
+	}
+
+	waitGroup.Add(len(i.indexes))
+	for _, in := range i.indexes {
+		go searchChildIndex(in, field, limit, descending)
+	}
+
+	// on another go routine, close after finished
+	go func() {
+		waitGroup.Wait()
+		close(asyncResults)
+	}()
+
+	rvTermFrequenciesResult := make([]index.TermFreq, limit)
+	for asr := range asyncResults {
+		asr.TermFrequenciesResult = append(
+			asr.TermFrequenciesResult, rvTermFrequenciesResult...)
+		if descending {
+			sort.Slice(asr.TermFrequenciesResult, func(i, j int) bool {
+				return asr.TermFrequenciesResult[i].Frequency > asr.TermFrequenciesResult[j].Frequency
+			})
+		} else {
+			sort.Slice(asr.TermFrequenciesResult, func(i, j int) bool {
+				return asr.TermFrequenciesResult[i].Frequency < asr.TermFrequenciesResult[j].Frequency
+			})
+		}
+		rvTermFrequenciesResult = asr.TermFrequenciesResult[:limit]
+	}
+
+	return rvTermFrequenciesResult, nil
+}
+
+func (i *indexAliasImpl) CentroidCardinalities(field string, limit int, descending bool) (
+	[]index.CentroidCardinality, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
+	if len(i.indexes) < 1 {
+		return nil, ErrorAliasEmpty
+	}
+
+	// short circuit the simple case
+	if len(i.indexes) == 1 {
+		if idx, ok := i.indexes[0].(InsightsIndex); ok {
+			return idx.CentroidCardinalities(field, limit, descending)
+		}
+		return nil, nil
+	}
+
+	// run search on each index in separate go routine
+	var waitGroup sync.WaitGroup
+	asyncResults := make(chan *asyncInsightsResult, len(i.indexes))
+
+	searchChildIndex := func(in Index, field string, limit int, descending bool) {
+		rv := asyncInsightsResult{Name: in.Name()}
+		if idx, ok := in.(InsightsIndex); ok {
+			rv.CentroidCardinalitiesResult, _ = idx.CentroidCardinalities(field, limit, descending)
+		}
+		asyncResults <- &rv
+		waitGroup.Done()
+	}
+
+	waitGroup.Add(len(i.indexes))
+	for _, in := range i.indexes {
+		go searchChildIndex(in, field, limit, descending)
+	}
+
+	// on another go routine, close after finished
+	go func() {
+		waitGroup.Wait()
+		close(asyncResults)
+	}()
+
+	rvCentroidCardinalitiesResult := make([]index.CentroidCardinality, limit)
+	for asr := range asyncResults {
+		asr.CentroidCardinalitiesResult = append(
+			asr.CentroidCardinalitiesResult, rvCentroidCardinalitiesResult...)
+		if descending {
+			sort.Slice(asr.CentroidCardinalitiesResult, func(i, j int) bool {
+				return asr.CentroidCardinalitiesResult[i].Cardinality > asr.CentroidCardinalitiesResult[j].Cardinality
+			})
+		} else {
+			sort.Slice(asr.CentroidCardinalitiesResult, func(i, j int) bool {
+				return asr.CentroidCardinalitiesResult[i].Cardinality < asr.CentroidCardinalitiesResult[j].Cardinality
+			})
+		}
+		rvCentroidCardinalitiesResult = asr.CentroidCardinalitiesResult[:limit]
+	}
+
+	return rvCentroidCardinalitiesResult, nil
 }
