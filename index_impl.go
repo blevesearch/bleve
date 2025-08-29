@@ -589,10 +589,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	var coll *collector.TopNCollector
-	if req.SearchAfter != nil {
-		coll = collector.NewTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter)
-	} else {
-		coll = collector.NewTopNCollector(req.Size, req.From, req.Sort)
+	if nm, ok := i.m.(mapping.NestedMapping); ok && Target(req.Query) {
+		if req.SearchAfter != nil {
+			coll = collector.NewTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter)
+		} else {
+			coll = collector.NewTopNCollector(req.Size, req.From, req.Sort)
+		}
 	}
 
 	var knnHits []*search.DocumentMatch
@@ -864,6 +866,15 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	return rv, nil
+}
+
+func targetsNested(nm mapping.NestedMapping, q query.Query) bool {
+	fs := make(query.FieldSet)
+	fs, err := query.ExtractFields(q, nm, fs)
+	if err != nil {
+		return false
+	}
+	return false
 }
 
 func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,

@@ -93,7 +93,7 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 			// make segment number into global number by adding offset
 			globalOffset := i.snapshot.offsets[i.segmentOffset]
 			nnum := next.Number()
-			rv.ID = docNumberToBytes(rv.ID, nnum+globalOffset)
+			rv.ID = index.NewIndexInternalID(rv.ID, nnum+globalOffset)
 			i.postingToTermFieldDoc(next, rv)
 
 			i.currID = rv.ID
@@ -170,7 +170,7 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 			}
 		}
 	}
-	num, err := docInternalToNumber(ID)
+	num, err := ID.Value()
 	if err != nil {
 		return nil, fmt.Errorf("error converting to doc number % x - %v", ID, err)
 	}
@@ -195,7 +195,7 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 	if preAlloced == nil {
 		preAlloced = &index.TermFieldDoc{}
 	}
-	preAlloced.ID = docNumberToBytes(preAlloced.ID, next.Number()+
+	preAlloced.ID = index.NewIndexInternalID(preAlloced.ID, next.Number()+
 		i.snapshot.offsets[segIndex])
 	i.postingToTermFieldDoc(next, preAlloced)
 	i.currID = preAlloced.ID

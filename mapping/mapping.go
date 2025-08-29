@@ -74,3 +74,9 @@ type SynonymMapping interface {
 
 	SynonymSourceVisitor(visitor analysis.SynonymSourceVisitor) error
 }
+
+type NestedMapping interface {
+	IndexMapping
+
+	MatchesNested() []string
+}

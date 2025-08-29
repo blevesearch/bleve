@@ -571,3 +571,23 @@ func (im *IndexMappingImpl) SynonymSourceVisitor(visitor analysis.SynonymSourceV
 	}
 	return nil
 }
+
+func (im *IndexMappingImpl) NestedFields() []string {
+	var rv []string
+
+	var nestedFieldsFunc func(dm *DocumentMapping)
+	nestedFieldsFunc = func(dm *DocumentMapping) {
+		for name, docMapping := range dm.Properties {
+			if docMapping.Nested {
+				rv = append(rv, name)
+			}
+			nestedFieldsFunc(docMapping)
+		}
+	}
+
+	nestedFieldsFunc(im.DefaultMapping)
+	for _, docMapping := range im.TypeMapping {
+		nestedFieldsFunc(docMapping)
+	}
+	return rv
+}

@@ -88,24 +88,46 @@ const CheckDoneEvery = uint64(1024)
 // skipping over the first 'skip' hits
 // ordering hits by the provided sort order
 func NewTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector {
-	return newTopNCollector(size, skip, sort)
+	return newTopNCollector(size, skip, sort, false)
 }
 
 // NewTopNCollectorAfter builds a collector to find the top 'size' hits
 // skipping over the first 'skip' hits
 // ordering hits by the provided sort order
+// starting after the provided 'after' sort values
 func NewTopNCollectorAfter(size int, sort search.SortOrder, after []string) *TopNCollector {
-	rv := newTopNCollector(size, 0, sort)
+	rv := newTopNCollector(size, 0, sort, false)
 	rv.searchAfter = createSearchAfterDocument(sort, after)
 	return rv
 }
 
-func newTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector {
+// NewNestedTopNCollector builds a collector to find the top 'size' hits
+// skipping over the first 'skip' hits
+// ordering hits by the provided sort order
+// while ensuring the nested documents are handled correctly
+// (i.e. parent document is returned instead of nested document)
+func NewNestedTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector {
+	return newTopNCollector(size, skip, sort, true)
+}
+
+// NewNestedTopNCollectorAfter builds a collector to find the top 'size' hits
+// skipping over the first 'skip' hits
+// ordering hits by the provided sort order
+// starting after the provided 'after' sort values
+// while ensuring the nested documents are handled correctly
+// (i.e. parent document is returned instead of nested document)
+func NewNestedTopNCollectorAfter(size int, sort search.SortOrder, after []string) *TopNCollector {
+	rv := newTopNCollector(size, 0, sort, true)
+	rv.searchAfter = createSearchAfterDocument(sort, after)
+	return rv
+}
+
+func newTopNCollector(size int, skip int, sort search.SortOrder, nested bool) *TopNCollector {
 	hc := &TopNCollector{size: size, skip: skip, sort: sort}
 
 	hc.store = getOptimalCollectorStore(size, skip, func(i, j *search.DocumentMatch) int {
 		return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
-	})
+	}, nested)
 
 	// these lookups traverse an interface, so do once up-front
 	if sort.RequiresDocID() {
@@ -201,7 +223,7 @@ func FilterHitsBySearchAfter(hits []*search.DocumentMatch, sort search.SortOrder
 	return hits[:idx]
 }
 
-func getOptimalCollectorStore(size, skip int, comparator collectorCompare) collectorStore {
+func getOptimalCollectorStore(size, skip int, comparator collectorCompare, nested bool) collectorStore {
 	// pre-allocate space on the store to avoid reslicing
 	// unless the size + skip is too large, then cap it
 	// everything should still work, just reslices as necessary
@@ -209,12 +231,17 @@ func getOptimalCollectorStore(size, skip int, comparator collectorCompare) colle
 	if size+skip > PreAllocSizeSkipCap {
 		backingSize = PreAllocSizeSkipCap + 1
 	}
+	var rv collectorStore
 
 	if size+skip > 10 {
-		return newStoreHeap(backingSize, comparator)
+		rv = newStoreHeap(backingSize, comparator)
 	} else {
-		return newStoreSlice(backingSize, comparator)
+		rv = newStoreSlice(backingSize, comparator)
 	}
+	if nested {
+		rv = newStoreNested(rv)
+	}
+	return rv
 }
 
 func (hc *TopNCollector) Size() int {

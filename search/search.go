@@ -20,6 +20,7 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -178,6 +179,10 @@ type DocumentMatch struct {
 	// of the index that this match came from
 	// of the current alias view, used in alias of aliases scenario
 	IndexNames []string `json:"index_names,omitempty"`
+
+	// ChildMatches holds any nested/child matches that contributed
+	// to this root (or intermediate LCA) DocumentMatch.
+	Children []*DocumentMatch `json:"children,omitempty"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
@@ -221,6 +226,8 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	dm.DecodedSort = dm.DecodedSort[:0]
 	// reuse the FieldTermLocations already allocated (and reset len to 0)
 	dm.FieldTermLocations = ftls[:0]
+	// reuse the children slice already allocated (and reset len to 0)
+	dm.Children = dm.Children[:0]
 	return dm
 }
 
@@ -267,80 +274,39 @@ func (dm *DocumentMatch) Size() int {
 			size.SizeOfPtr
 	}
 
+	for _, child := range dm.Children {
+		sizeInBytes += child.Size()
+	}
+
 	return sizeInBytes
 }
 
-// Complete performs final preparation & transformation of the
-// DocumentMatch at the end of search processing, also allowing the
-// caller to provide an optional preallocated locations slice
-func (dm *DocumentMatch) Complete(prealloc []Location) []Location {
-	// transform the FieldTermLocations slice into the Locations map
-	nlocs := len(dm.FieldTermLocations)
-	if nlocs > 0 {
-		if cap(prealloc) < nlocs {
-			prealloc = make([]Location, nlocs)
-		}
-		prealloc = prealloc[:nlocs]
-
-		var lastField string
-		var tlm TermLocationMap
-		var needsDedupe bool
-
-		for i, ftl := range dm.FieldTermLocations {
-			if i == 0 || lastField != ftl.Field {
-				lastField = ftl.Field
-
-				if dm.Locations == nil {
-					dm.Locations = make(FieldTermLocationMap)
-				}
-
-				tlm = dm.Locations[ftl.Field]
-				if tlm == nil {
-					tlm = make(TermLocationMap)
-					dm.Locations[ftl.Field] = tlm
-				}
-			}
-
-			loc := &prealloc[i]
-			*loc = ftl.Location
-
-			if len(loc.ArrayPositions) > 0 { // copy
-				loc.ArrayPositions = append(ArrayPositions(nil), loc.ArrayPositions...)
-			}
-
-			locs := tlm[ftl.Term]
-
-			// if the loc is before or at the last location, then there
-			// might be duplicates that need to be deduplicated
-			if !needsDedupe && len(locs) > 0 {
-				last := locs[len(locs)-1]
-				cmp := loc.ArrayPositions.Compare(last.ArrayPositions)
-				if cmp < 0 || (cmp == 0 && loc.Pos <= last.Pos) {
-					needsDedupe = true
-				}
-			}
-
-			tlm[ftl.Term] = append(locs, loc)
-
-			dm.FieldTermLocations[i] = FieldTermLocation{ // recycle
-				Location: Location{
-					ArrayPositions: ftl.Location.ArrayPositions[:0],
-				},
-			}
-		}
-
-		if needsDedupe {
-			for _, tlm := range dm.Locations {
-				for term, locs := range tlm {
-					tlm[term] = locs.Dedupe()
-				}
-			}
-		}
+// MergeChildren merges all child DocumentMatch data into the parent
+// and clears the children slice afterwards.
+func (dm *DocumentMatch) MergeChildren() {
+	if len(dm.Children) == 0 {
+		return
+	}
+	var newExpl *Explanation
+	var childrenExplanations []*Explanation
+	if dm.Expl != nil {
+		childrenExplanations = make([]*Explanation, 0, len(dm.Children))
 	}
 
-	dm.FieldTermLocations = dm.FieldTermLocations[:0] // recycle
-
-	return prealloc
+	for i, child := range dm.Children {
+		// Recurse to flatten grandchildren too
+		child.MergeChildren()
+		// Merge child's score into parent
+		dm.Score += child.Score
+		// if parent has an explanation, collect child's explanation
+		if dm.Expl != nil {
+			childrenExplanations[i] = child.Expl
+		}
+	}
+	if dm.Expl != nil {
+		childrenExplanations[len(dm.Children)] = dm.Expl
+		newExpl = &Explanation{Value: dm.Score, Message: "sum of:", Children: childrenExplanations}
+	}
 }
 
 func (dm *DocumentMatch) String() string {

@@ -40,7 +40,7 @@ type NestedConjunctionSearcher struct {
 	currs         []*search.DocumentMatch
 	currAncestors [][]index.IndexInternalID
 	maxIDIdx      int
-	scorer        *scorer.ConjunctionQueryScorer
+	scorer        *scorer.NestedConjunctionQueryScorer
 	initialized   bool
 	options       search.SearcherOptions
 }
@@ -61,7 +61,7 @@ func NewNestedConjunctionSearcher(ctx context.Context, indexReader index.IndexRe
 		searchers:     searchers,
 		currs:         make([]*search.DocumentMatch, len(searchers)),
 		currAncestors: make([][]index.IndexInternalID, len(searchers)),
-		scorer:        scorer.NewConjunctionQueryScorer(options),
+		scorer:        scorer.NewNestedConjunctionQueryScorer(options),
 	}
 	rv.computeQueryNorm()
 
@@ -229,26 +229,13 @@ OUTER:
 		// and then we Next() all searchers except the one at maxIDIdx and return
 		// the LCA as the document match
 
-		// Step 1: find the shortest ancestor path
-		lcaPath := s.currAncestors[0]
-		for i := 1; i < len(s.currAncestors); i++ {
-			if len(s.currAncestors[i]) < len(lcaPath) {
-				lcaPath = s.currAncestors[i]
-			}
-		}
-
-		// Step 2: LCA is the leftmost element in the shortest path
-		lca := lcaPath[0]
-
-		rv := s.scorer.Score(ctx, s.currs)
-		// set the correct ID to be the LCA
-		rv.IndexInternalID = lca
-		// Step 4: advance all searchers except the one at maxIDIdx
+		rv := s.scorer.Score(ctx, s.currs, s.currAncestors)
+		// advance all searchers except the one at maxIDIdx
 		for i := 0; i < len(s.currs); i++ {
 			if i == s.maxIDIdx {
 				continue
 			}
-			if s.currs[i] != nil {
+			if s.currs[i] != rv {
 				ctx.DocumentMatchPool.Put(s.currs[i])
 			}
 			var err error

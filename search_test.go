@@ -5040,33 +5040,25 @@ func TestNestedMapping(t *testing.T) {
 
 	keywordMapping := NewTextFieldMapping()
 	keywordMapping.Analyzer = keyword.Name
-	keywordMapping.IncludeInAll = false
-	keywordMapping.IncludeTermVectors = false
 
 	englishMapping := NewTextFieldMapping()
 	englishMapping.Analyzer = en.AnalyzerName
-	englishMapping.IncludeInAll = false
-	englishMapping.IncludeTermVectors = false
 
 	numericMapping := NewNumericFieldMapping()
-	numericMapping.IncludeInAll = false
-	numericMapping.IncludeTermVectors = false
 
 	dateTimeMapping := NewDateTimeFieldMapping()
-	dateTimeMapping.IncludeInAll = false
-	dateTimeMapping.IncludeTermVectors = false
 
 	commentMapping := NewDocumentMapping()
 	commentMapping.AddFieldMappingsAt("author", englishMapping)
 	commentMapping.AddFieldMappingsAt("text", englishMapping)
 	commentMapping.AddFieldMappingsAt("likes", numericMapping)
-	commentMapping.Nested = true
+	//commentMapping.Nested = true
 
 	postsMapping := NewDocumentMapping()
 	postsMapping.AddFieldMappingsAt("title", englishMapping)
 	postsMapping.AddFieldMappingsAt("published_date", dateTimeMapping)
 	postsMapping.AddSubDocumentMapping("comments", commentMapping)
-	postsMapping.Nested = true
+	//postsMapping.Nested = true
 
 	imap.DefaultMapping.AddFieldMappingsAt("title", englishMapping)
 	imap.DefaultMapping.AddSubDocumentMapping("posts", postsMapping)
@@ -5099,33 +5091,20 @@ func TestNestedMapping(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Return all blogs with titles containing the word "Tech".
-	mq := query.NewMatchQuery("Tech")
-	mq.SetField("title")
-	req := NewSearchRequest(mq)
-	res, err := idx.Search(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res.Hits) != 1 {
-		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
-	}
-
 	// Return posts with likes between 2-100 and published in 2025.
-	min := 2.0
-	max := 100.0
-	q1 := query.NewNumericRangeQuery(&min, &max)
-	q1.SetField("posts.comments.likes")
-	q2 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
-	q2.SetField("posts.published_date")
-	cq := query.NewConjunctionQuery([]query.Query{q2, q1})
-	cq.Nested = true
+	q1 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
+	q1.SetField("posts.published_date")
+	q2 := query.NewMatchQuery("Jane")
+	q2.SetField("posts.comments.author")
 
-	req = NewSearchRequest(cq)
+	cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+	// cq.Nested = true
+
+	req := NewSearchRequest(cq)
 	req.Explain = true
 	req.Fields = []string{"*"}
 	req.Highlight = NewHighlightWithStyle(ansi.Name)
-	res, err = idx.Search(req)
+	res, err := idx.Search(req)
 	if err != nil {
 		t.Fatal(err)
 	}

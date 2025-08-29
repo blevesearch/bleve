@@ -123,7 +123,7 @@ func GetNewKNNCollectorStore(kArray []int64) *collectStoreKNN {
 				return 1
 			}
 			return -1
-		})
+		}, false)
 	}
 	return newStoreKNN(internalHeaps, kArray)
 }
