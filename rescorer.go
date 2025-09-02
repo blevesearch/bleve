@@ -90,11 +90,11 @@ func (r *fusionRescorer) restoreSearchRequest() {
 }
 
 func (r *fusionRescorer) rescore(sr *SearchResult) {
-	var fusionResult fusion.FusionResult
+	var fusionResult *fusion.FusionResult
 
 	switch r.req.Score {
 	case ReciprocalRankFusionStrategy:
-		fusionResult = fusion.ReciprocalRankFusion(
+		res := fusion.ReciprocalRankFusion(
 			sr.Hits,
 			r.origBoosts,
 			*r.req.Params.ScoreRankConstant,
@@ -102,6 +102,7 @@ func (r *fusionRescorer) rescore(sr *SearchResult) {
 			numKNNQueries(r.req),
 			r.req.Explain,
 		)
+		fusionResult = &res
 	}
 
 	sr.Hits = fusionResult.Hits
