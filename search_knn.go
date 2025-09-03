@@ -668,7 +668,7 @@ func newKnnPreSearchResultProcessor(req *SearchRequest) *knnPreSearchResultProce
 }
 
 // Replace knn boost values for fusion rescoring queries
-func (r *fusionRescorer) prepareKnnRequest() {
+func (r *rescorer) prepareKnnRequest() {
 	for i := range r.req.KNN {
 		b := r.req.KNN[i].Boost
 		if b != nil {
@@ -682,7 +682,7 @@ func (r *fusionRescorer) prepareKnnRequest() {
 }
 
 // Restore knn boost values for fusion rescoring queries
-func (r *fusionRescorer) restoreKnnRequest() {
+func (r *rescorer) restoreKnnRequest() {
 	for i := range r.req.KNN {
 		b := query.Boost(r.origBoosts[i+1])
 		r.req.KNN[i].Boost = &b

@@ -19,22 +19,15 @@ import (
 	"github.com/blevesearch/bleve/v2/search/query"
 )
 
-// Rescorer is applied after all the query and knn results are obtained.
-// The main use of Rescorer is in hybrid search; all the individual scores
-// for query and knn are combined using Rescorer
-type rescorer interface {
-	prepareSearchRequest()
-	restoreSearchRequest()
-	rescore(*SearchResult)
-}
-
 const (
 	ReciprocalRankFusionStrategy = "rrf"
 )
 
-// Concrete implementation of rescorer for hybrid search. Makes use of
-// algorithms defined in `fusion`.
-type fusionRescorer struct {
+// Rescorer is applied after all the query and knn results are obtained.
+// The main use of Rescorer is in hybrid search; all the individual scores
+// for query and knn are combined using Rescorer. Makes use of algorithms
+// defined in `fusion`
+type rescorer struct {
 	req        *SearchRequest
 	origFrom   int
 	origSize   int
@@ -45,7 +38,7 @@ type fusionRescorer struct {
 // Also mutates the SearchRequest by:
 // - Setting boosts to 1: top level boosts only used for rescoring
 // - Setting From and Size to 0 and ScoreWindowSize
-func (r *fusionRescorer) prepareSearchRequest() {
+func (r *rescorer) prepareSearchRequest() {
 	if r.req.Params.ScoreRankConstant == nil {
 		src := 60
 		r.req.Params.ScoreRankConstant = &src
@@ -77,7 +70,7 @@ func (r *fusionRescorer) prepareSearchRequest() {
 	r.prepareKnnRequest()
 }
 
-func (r *fusionRescorer) restoreSearchRequest() {
+func (r *rescorer) restoreSearchRequest() {
 	r.req.From = r.origFrom
 	r.req.Size = r.origSize
 
@@ -89,7 +82,7 @@ func (r *fusionRescorer) restoreSearchRequest() {
 	r.restoreKnnRequest()
 }
 
-func (r *fusionRescorer) rescore(sr *SearchResult) {
+func (r *rescorer) rescore(sr *SearchResult) {
 	var fusionResult *fusion.FusionResult
 
 	switch r.req.Score {
@@ -110,8 +103,8 @@ func (r *fusionRescorer) rescore(sr *SearchResult) {
 	sr.MaxScore = fusionResult.MaxScore
 }
 
-func newFusionRescorer(req *SearchRequest) rescorer {
-	return &fusionRescorer{
+func newFusionRescorer(req *SearchRequest) *rescorer {
+	return &rescorer{
 		req: req,
 	}
 }

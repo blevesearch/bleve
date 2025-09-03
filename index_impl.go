@@ -563,7 +563,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}()
 
 	var doFusionRescoring bool
-	var rescorer rescorer
+	var rescorer *rescorer
 	if _, ok := ctx.Value(search.FusionRescoringKey).(bool); !ok {
 		// Since fusion rescoring key is not set, check if it is a hybrid search.
 		// If it is, then set doFusionRescoring. This indicates that the rescoring

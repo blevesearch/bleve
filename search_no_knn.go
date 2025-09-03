@@ -237,8 +237,8 @@ func newKnnPreSearchResultProcessor(req *SearchRequest) *knnPreSearchResultProce
 	return &knnPreSearchResultProcessor{} // equivalent to nil
 }
 
-func (r *fusionRescorer) prepareKnnRequest() {
+func (r *rescorer) prepareKnnRequest() {
 }
 
-func (r *fusionRescorer) restoreKnnRequest() {
+func (r *rescorer) restoreKnnRequest() {
 }

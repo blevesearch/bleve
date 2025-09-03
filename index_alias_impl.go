@@ -188,7 +188,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	}
 
 	var doFusionRescoring bool
-	var rescorer rescorer
+	var rescorer *rescorer
 	if _, ok := ctx.Value(search.FusionRescoringKey).(bool); !ok {
 		// Since fusion rescoring key is not set, check if it is a hybrid search.
 		// If it is, then set doFusionRescoring. This indicates that score
@@ -684,7 +684,7 @@ func preSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, i
 // if the request is satisfied by just the preSearch result,
 // finalize the result and return it directly without
 // performing multi search
-func finalizeSearchResult(ctx context.Context, req *SearchRequest, preSearchResult *SearchResult, doFusionRescoring bool, rescorer rescorer) *SearchResult {
+func finalizeSearchResult(ctx context.Context, req *SearchRequest, preSearchResult *SearchResult, doFusionRescoring bool, rescorer *rescorer) *SearchResult {
 	if preSearchResult == nil {
 		return nil
 	}
@@ -1002,9 +1002,9 @@ func hitsInCurrentPage(req *SearchRequest, hits []*search.DocumentMatch) []*sear
 
 // Extra parameters for MultiSearch
 type multiSearchParams struct {
-	preSearchData  map[string]map[string]interface{}
+	preSearchData     map[string]map[string]interface{}
 	doFusionRescoring bool
-	rescorer       rescorer
+	rescorer          *rescorer
 }
 
 // MultiSearch executes a SearchRequest across multiple Index objects,
