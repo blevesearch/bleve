@@ -208,7 +208,7 @@ func buildIsIndexedFunc(ctx context.Context, indexReader index.IndexReader, fiel
 func buildRectFilter(ctx context.Context, dvReader index.DocValueReader, field string,
 	minLon, minLat, maxLon, maxLat float64,
 ) FilterFunc {
-	return func(d *search.DocumentMatch) bool {
+	return func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
 		// check geo matches against all numeric type terms indexed
 		var lons, lats []float64
 		var found bool

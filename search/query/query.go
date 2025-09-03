@@ -196,7 +196,8 @@ func ParseQuery(input []byte) (Query, error) {
 	_, hasMust := tmp["must"]
 	_, hasShould := tmp["should"]
 	_, hasMustNot := tmp["must_not"]
-	if hasMust || hasShould || hasMustNot {
+	_, hasFilter := tmp["filter"]
+	if hasMust || hasShould || hasMustNot || hasFilter {
 		var rv BooleanQuery
 		err := util.UnmarshalJSON(input, &rv)
 		if err != nil {

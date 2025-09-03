@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -4539,6 +4540,235 @@ func TestGeoDistanceInSort(t *testing.T) {
 		}
 		if math.Abs(hitDist-docs[i].distance) > 1 {
 			t.Fatalf("distance error greater than 1 meter, expected distance - %v, got - %v", docs[i].distance, hitDist)
+		}
+	}
+}
+
+func TestFilteredBooleanQuery(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+
+	imap := mapping.NewIndexMapping()
+
+	genreMapping := mapping.NewTextFieldMapping()
+	genreMapping.Analyzer = keyword.Name
+
+	authorMapping := mapping.NewTextFieldMapping()
+	authorMapping.Analyzer = keyword.Name
+
+	titleMapping := mapping.NewTextFieldMapping()
+	titleMapping.Analyzer = en.AnalyzerName
+
+	priceMapping := mapping.NewNumericFieldMapping()
+	imap.DefaultMapping.AddFieldMappingsAt("genre", genreMapping)
+	imap.DefaultMapping.AddFieldMappingsAt("author", authorMapping)
+	imap.DefaultMapping.AddFieldMappingsAt("title", titleMapping)
+	imap.DefaultMapping.AddFieldMappingsAt("price", priceMapping)
+
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err := os.RemoveAll(tmpIndexPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Book dataset
+	var docs = []map[string]interface{}{
+		{
+			"title":  "The Catcher in the Rye",
+			"author": "J.D. Salinger",
+			"genre":  "fiction",
+			"price":  9.99,
+		},
+		{
+			"title":  "Sapiens",
+			"author": "Yuval Noah Harari",
+			"genre":  "non-fiction",
+			"price":  14.29,
+		},
+		{
+			"title":  "To Kill a Mockingbird",
+			"author": "Harper Lee",
+			"genre":  "fiction",
+			"price":  12,
+		},
+		{
+			"title":  "The Power of Habit",
+			"author": "Charles Duhigg",
+			"genre":  "self-help",
+			"price":  26,
+		},
+		{
+			"title":  "The Great Gatsby",
+			"author": "F. Scott Fitzgerald",
+			"genre":  "fiction",
+			"price":  22,
+		},
+		{
+			"title":  "Atomic Habits",
+			"author": "James Clear",
+			"genre":  "self-help",
+			"price":  15,
+		},
+		{
+			"title":  "Educated",
+			"author": "Tara Westover",
+			"genre":  "non-fiction",
+			"price":  18,
+		},
+		{
+			"title":  "1984",
+			"author": "George Orwell",
+			"genre":  "fiction",
+			"price":  20,
+		},
+	}
+
+	b := idx.NewBatch()
+	for i, doc := range docs {
+		err := b.Index(strconv.Itoa(i), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	// execute the batch
+	err = idx.Batch(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Suppose the user is interested in books in the fiction genre
+	// and is only interested in books within their budget of 20
+	fictionQuery := NewTermQuery("fiction")
+	fictionQuery.SetField("genre")
+
+	// A numeric range query for books with a price less than or equal to 20
+	max := float64(20)
+	maxInclusive := true
+	priceFilterQuery := NewNumericRangeQuery(nil, &max)
+	priceFilterQuery.InclusiveMax = &maxInclusive
+	priceFilterQuery.SetField("price")
+
+	// An unfiltered boolean query requesting all books in the fiction genre
+	// All 4 books in the fiction genre should be returned with the
+	// same score as they are all in the same genre
+	q := NewBooleanQuery()
+	q.AddMust(fictionQuery)
+
+	req := NewSearchRequest(q)
+	req.Explain = true
+	req.Fields = []string{"title"}
+	// sort by book titles in ascending order
+	req.Sort = make(search.SortOrder, 0)
+	titleSort := &search.SortField{
+		Field: "price",
+		Desc:  false,
+	}
+	req.Sort = append(req.Sort, titleSort)
+
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Hits) != 4 {
+		t.Fatalf("expected 4 hits, got %d", len(res.Hits))
+	}
+	// Verify the results are in the correct order
+	expectedTitleOrder := []string{
+		"The Catcher in the Rye",
+		"To Kill a Mockingbird",
+		"1984",
+		"The Great Gatsby",
+	}
+	for i, doc := range res.Hits {
+		if doc.Fields["title"] != expectedTitleOrder[i] {
+			t.Fatalf("expected title %s, got %s", expectedTitleOrder[i], doc.Fields["title"])
+		}
+	}
+	// Ensure that the scores are the same for all documents
+	unfilteredScore := res.Hits[0].Score
+	for i := 1; i < len(res.Hits); i++ {
+		if res.Hits[i].Score != unfilteredScore {
+			t.Fatalf("expected score %f, got %f", unfilteredScore, res.Hits[i].Score)
+		}
+	}
+	// A filtered boolean query requesting all books satisfying the
+	// filterQuery and the priceFilterQuery
+	// But the filter query is in the Must clause
+	q = NewBooleanQuery()
+	q.AddMust(fictionQuery)
+	q.AddMust(priceFilterQuery)
+	req = NewSearchRequest(q)
+	req.Explain = true
+	req.Fields = []string{"title"}
+	// sort by book titles in ascending order
+	req.Sort = make(search.SortOrder, 0)
+	req.Sort = append(req.Sort, titleSort)
+
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// here the score must not be the same for all documents
+	// as the price filter is applied in the Must clause
+	// and the score is different compared to the previous unfiltered boolean query
+	if len(res.Hits) != 3 {
+		t.Fatalf("expected 3 hits, got %d", len(res.Hits))
+	}
+	// Verify the results are in the correct order
+	expectedTitleOrder = []string{
+		"The Catcher in the Rye",
+		"To Kill a Mockingbird",
+		"1984",
+	}
+	for i, doc := range res.Hits {
+		if doc.Fields["title"] != expectedTitleOrder[i] {
+			t.Fatalf("expected title %s, got %s", expectedTitleOrder[i], doc.Fields["title"])
+		}
+	}
+	// Ensure that the scores are different for all documents
+	for i := 0; i < len(res.Hits); i++ {
+		if res.Hits[i].Score == unfilteredScore {
+			t.Fatalf("expected different score, got %f", res.Hits[i].Score)
+		}
+	}
+	// A filtered boolean query requesting all books satisfying the
+	// filterQuery and the priceFilterQuery
+	// But the filter query is in the Filter clause
+	q = NewBooleanQuery()
+	q.AddMust(fictionQuery)
+	q.AddFilter(priceFilterQuery)
+
+	req = NewSearchRequest(q)
+	req.Explain = true
+	req.Fields = []string{"title"}
+	req.Sort = make(search.SortOrder, 0)
+	req.Sort = append(req.Sort, titleSort)
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 3 {
+		t.Fatalf("expected 3 hits, got %d", len(res.Hits))
+	}
+	// Verify the results are in the correct order
+	for i, doc := range res.Hits {
+		if doc.Fields["title"] != expectedTitleOrder[i] {
+			t.Fatalf("expected title %s, got %s", expectedTitleOrder[i], doc.Fields["title"])
+		}
+	}
+	// Ensure that the scores are the same for all documents
+	for i := 0; i < len(res.Hits); i++ {
+		if res.Hits[i].Score != unfilteredScore {
+			t.Fatalf("expected score %f, got %f", unfilteredScore, res.Hits[i].Score)
 		}
 	}
 }
