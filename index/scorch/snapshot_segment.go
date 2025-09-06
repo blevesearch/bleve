@@ -112,6 +112,14 @@ func (s *SegmentSnapshot) Count() uint64 {
 	return rv
 }
 
+func (s *SegmentSnapshot) Ancestors(docID uint64) []uint64 {
+	nsb, ok := s.segment.(segment.NestedSegment)
+	if !ok {
+		return nil
+	}
+	return nsb.Ancestors(docID)
+}
+
 func (s *SegmentSnapshot) DocNumbers(docIDs []string) (*roaring.Bitmap, error) {
 	rv, err := s.segment.DocNumbers(docIDs)
 	if err != nil {

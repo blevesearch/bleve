@@ -23,6 +23,7 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -570,4 +571,35 @@ func (im *IndexMappingImpl) SynonymSourceVisitor(visitor analysis.SynonymSourceV
 		return err
 	}
 	return nil
+}
+
+// NestedPrefixes returns a set of all the field prefixes that are marked as nested
+// in this mapping. If there are no nested fields, it returns nil.
+func (im *IndexMappingImpl) NestedPrefixes() search.FieldSet {
+	var rv search.FieldSet
+	var collectNestedFields func(dm *DocumentMapping)
+	collectNestedFields = func(dm *DocumentMapping) {
+		for name, docMapping := range dm.Properties {
+			if docMapping.Nested {
+				if rv == nil {
+					rv = search.NewFieldSet()
+				}
+				rv[name] = struct{}{}
+			}
+			collectNestedFields(docMapping)
+		}
+	}
+
+	// Traverse default mapping if enabled
+	if im.DefaultMapping != nil && im.DefaultMapping.Enabled {
+		collectNestedFields(im.DefaultMapping)
+	}
+
+	// Traverse all type mappings if enabled
+	for _, docMapping := range im.TypeMapping {
+		if docMapping.Enabled {
+			collectNestedFields(docMapping)
+		}
+	}
+	return rv
 }

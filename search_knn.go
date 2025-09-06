@@ -24,6 +24,7 @@ import (
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
@@ -351,7 +352,7 @@ func addSortAndFieldsToKNNHits(req *SearchRequest, knnHits []*search.DocumentMat
 			}
 		}
 		req.Sort.Value(hit)
-		err, _ = LoadAndHighlightFields(hit, req, "", reader, nil)
+		err, _ = LoadAndHighlightAllFields(hit, req, "", reader, nil)
 		if err != nil {
 			return err
 		}
@@ -389,7 +390,10 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 		if err != nil {
 			return nil, err
 		}
-		filterColl := collector.NewEligibleCollector(int(indexDocCount))
+		filterColl, err := i.buildEligibleCollector(filterQ, reader, int(indexDocCount))
+		if err != nil {
+			return nil, err
+		}
 		err = filterColl.Collect(ctx, filterSearcher, reader)
 		if err != nil {
 			return nil, err
@@ -408,7 +412,10 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	if err != nil {
 		return nil, err
 	}
-	knnCollector := collector.NewKNNCollector(kArray, sumOfK)
+	knnCollector, err := i.buildKNNCollector(KNNQuery, reader, kArray, sumOfK)
+	if err != nil {
+		return nil, err
+	}
 	err = knnCollector.Collect(ctx, knnSearcher, reader)
 	if err != nil {
 		return nil, err
@@ -607,4 +614,40 @@ func newKnnPreSearchResultProcessor(req *SearchRequest) *knnPreSearchResultProce
 			sr.Hits, _ = knnStore.Final(nil)
 		},
 	}
+}
+
+func (i *indexImpl) buildKNNCollector(KNNQuery query.Query, reader index.IndexReader, kArray []int64, somOfK int64) (*collector.KNNCollector, error) {
+	if nm, ok := i.m.(mapping.NestedMapping); ok {
+		if nr, ok := reader.(index.NestedReader); ok {
+			if nestedPrefixes := nm.NestedPrefixes(); nestedPrefixes != nil {
+				fs, err := query.ExtractFields(KNNQuery, i.m, search.NewFieldSet())
+				if err != nil {
+					return nil, err
+				}
+				if fs.IntersectsPrefix(nestedPrefixes) {
+					return collector.NewNestedKNNCollector(nr, kArray, somOfK), nil
+				}
+			}
+		}
+	}
+
+	return collector.NewKNNCollector(kArray, somOfK), nil
+}
+
+func (i *indexImpl) buildEligibleCollector(filterQuery query.Query, reader index.IndexReader, size int) (*collector.EligibleCollector, error) {
+	if nm, ok := i.m.(mapping.NestedMapping); ok {
+		if nr, ok := reader.(index.NestedReader); ok {
+			if nestedPrefixes := nm.NestedPrefixes(); nestedPrefixes != nil {
+				fs, err := query.ExtractFields(filterQuery, i.m, search.NewFieldSet())
+				if err != nil {
+					return nil, err
+				}
+				if fs.IntersectsPrefix(nestedPrefixes) {
+					return collector.NewNestedEligibleCollector(nr, size), nil
+				}
+			}
+		}
+	}
+
+	return collector.NewEligibleCollector(size), nil
 }

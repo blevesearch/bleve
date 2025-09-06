@@ -54,3 +54,47 @@ func (expl *Explanation) Size() int {
 
 	return sizeInBytes
 }
+
+const MergedExplMessage = "sum of merged explanations:"
+
+func MergeExpl(first, second *Explanation) *Explanation {
+	if first == nil {
+		return second
+	}
+	if second == nil {
+		return first
+	}
+	if first.Message == MergedExplMessage {
+		// reuse first explanation as the merged one
+		first.Value += second.Value
+		first.Children = append(first.Children, second)
+		return first
+	}
+	if second.Message == MergedExplMessage {
+		// reuse second explanation as the merged one
+		second.Value += first.Value
+		second.Children = append(second.Children, first)
+		return second
+	}
+	// create a new explanation to hold the merged one
+	rv := &Explanation{
+		Value:    first.Value + second.Value,
+		Message:  MergedExplMessage,
+		Children: []*Explanation{first, second},
+	}
+	return rv
+}
+
+func MergeScoreBreakdown(first, second map[int]float64) map[int]float64 {
+	if first == nil {
+		return second
+	}
+	if second == nil {
+		return first
+	}
+	// reuse first to store the union of both
+	for k, v := range second {
+		first[k] += v
+	}
+	return first
+}
