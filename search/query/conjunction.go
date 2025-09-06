@@ -28,7 +28,7 @@ import (
 type ConjunctionQuery struct {
 	Conjuncts       []Query `json:"conjuncts"`
 	BoostVal        *Boost  `json:"boost,omitempty"`
-	Nested          bool    `json:"nested"`
+	Nested          bool    `json:"nested,omitempty"`
 	queryStringMode bool
 }
 
@@ -103,7 +103,7 @@ func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
 		Conjuncts []json.RawMessage `json:"conjuncts"`
 		Boost     *Boost            `json:"boost,omitempty"`
-		Nested    bool              `json:"nested"`
+		Nested    bool              `json:"nested,omitempty"`
 	}{}
 	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {
