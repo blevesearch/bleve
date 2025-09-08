@@ -1340,5 +1340,14 @@ func (i *indexImpl) CentroidCardinalities(field string, limit int, descending bo
 		return nil, fmt.Errorf("index reader does not support CentroidCardinalities")
 	}
 
-	return insightsReader.CentroidCardinalities(field, limit, descending)
+	centroidCardinalities, err := insightsReader.CentroidCardinalities(field, limit, descending)
+	if err != nil {
+		return nil, err
+	}
+
+	for j := 0; j < len(centroidCardinalities); j++ {
+		centroidCardinalities[j].Index = i.name
+	}
+
+	return centroidCardinalities, nil
 }

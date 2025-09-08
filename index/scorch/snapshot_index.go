@@ -1244,7 +1244,6 @@ func (is *IndexSnapshot) TermFrequencies(field string, limit int, descending boo
 		})
 	}
 
-	// Limit results
 	if limit > len(termFreqList) {
 		limit = len(termFreqList)
 	}
