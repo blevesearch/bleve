@@ -2100,4 +2100,10 @@ func TestIndexInsightsCentroidCardinalities(t *testing.T) {
 	if len(centroids) != 5 {
 		t.Fatalf("expected 5 centroids, got %d", len(centroids))
 	}
+
+	for _, entry := range centroids {
+		if len(entry.Index) == 0 {
+			t.Fatal("expected index name for each centroid")
+		}
+	}
 }

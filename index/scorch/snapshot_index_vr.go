@@ -209,6 +209,10 @@ func (i *IndexSnapshot) CentroidCardinalities(field string, limit int, descendin
 				})
 			}
 
+			if limit > len(centroidCardinalities) {
+				limit = len(centroidCardinalities)
+			}
+
 			rvCentroids = centroidCardinalities[:limit]
 		}
 	}

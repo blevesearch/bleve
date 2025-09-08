@@ -1141,12 +1141,6 @@ func (f *indexAliasImplFieldDict) Cardinality() int {
 
 // -----------------------------------------------------------------------------
 
-type asyncInsightsResult struct {
-	Name                        string
-	TermFrequenciesResult       []index.TermFreq
-	CentroidCardinalitiesResult []index.CentroidCardinality
-}
-
 func (i *indexAliasImpl) TermFrequencies(field string, limit int, descending bool) (
 	[]index.TermFreq, error) {
 	i.mutex.RLock()
@@ -1170,15 +1164,15 @@ func (i *indexAliasImpl) TermFrequencies(field string, limit int, descending boo
 
 	// run search on each index in separate go routine
 	var waitGroup sync.WaitGroup
-	asyncResults := make(chan *asyncInsightsResult, len(i.indexes))
+	asyncResults := make(chan []index.TermFreq, len(i.indexes))
 
 	searchChildIndex := func(in Index, field string, limit int, descending bool) {
-		rv := asyncInsightsResult{Name: in.Name()}
+		var rv []index.TermFreq
 		if idx, ok := in.(InsightsIndex); ok {
 			// over sample for higher accuracy
-			rv.TermFrequenciesResult, _ = idx.TermFrequencies(field, limit*5, descending)
+			rv, _ = idx.TermFrequencies(field, limit*5, descending)
 		}
-		asyncResults <- &rv
+		asyncResults <- rv
 		waitGroup.Done()
 	}
 
@@ -1195,7 +1189,7 @@ func (i *indexAliasImpl) TermFrequencies(field string, limit int, descending boo
 
 	rvTermFreqsMap := make(map[string]uint64)
 	for asr := range asyncResults {
-		for _, entry := range asr.TermFrequenciesResult {
+		for _, entry := range asr {
 			rvTermFreqsMap[entry.Term] += entry.Frequency
 		}
 	}
@@ -1256,14 +1250,14 @@ func (i *indexAliasImpl) CentroidCardinalities(field string, limit int, descendi
 
 	// run search on each index in separate go routine
 	var waitGroup sync.WaitGroup
-	asyncResults := make(chan *asyncInsightsResult, len(i.indexes))
+	asyncResults := make(chan []index.CentroidCardinality, len(i.indexes))
 
 	searchChildIndex := func(in Index, field string, limit int, descending bool) {
-		rv := asyncInsightsResult{Name: in.Name()}
+		var rv []index.CentroidCardinality
 		if idx, ok := in.(InsightsIndex); ok {
-			rv.CentroidCardinalitiesResult, _ = idx.CentroidCardinalities(field, limit, descending)
+			rv, _ = idx.CentroidCardinalities(field, limit, descending)
 		}
-		asyncResults <- &rv
+		asyncResults <- rv
 		waitGroup.Done()
 	}
 
@@ -1280,18 +1274,22 @@ func (i *indexAliasImpl) CentroidCardinalities(field string, limit int, descendi
 
 	rvCentroidCardinalitiesResult := make([]index.CentroidCardinality, 0, limit)
 	for asr := range asyncResults {
-		asr.CentroidCardinalitiesResult = append(
-			asr.CentroidCardinalitiesResult, rvCentroidCardinalitiesResult...)
+		asr = append(asr, rvCentroidCardinalitiesResult...)
 		if descending {
-			sort.Slice(asr.CentroidCardinalitiesResult, func(i, j int) bool {
-				return asr.CentroidCardinalitiesResult[i].Cardinality > asr.CentroidCardinalitiesResult[j].Cardinality
+			sort.Slice(asr, func(i, j int) bool {
+				return asr[i].Cardinality > asr[j].Cardinality
 			})
 		} else {
-			sort.Slice(asr.CentroidCardinalitiesResult, func(i, j int) bool {
-				return asr.CentroidCardinalitiesResult[i].Cardinality < asr.CentroidCardinalitiesResult[j].Cardinality
+			sort.Slice(asr, func(i, j int) bool {
+				return asr[i].Cardinality < asr[j].Cardinality
 			})
 		}
-		rvCentroidCardinalitiesResult = asr.CentroidCardinalitiesResult[:limit]
+
+		if limit > len(asr) {
+			limit = len(asr)
+		}
+
+		rvCentroidCardinalitiesResult = asr[:limit]
 	}
 
 	return rvCentroidCardinalitiesResult, nil
