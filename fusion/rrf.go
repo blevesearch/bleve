@@ -41,6 +41,11 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 	// and the subsequent elements are the ranks from the KNN searches.
 	docRanks := make(map[string][]int)
 
+	// Pre-assign rank lists to each candidate document
+	for _, hit := range hits {
+		docRanks[hit.ID] = make([]int, numKNNQueries+1)
+	}
+
 	// Only a max of `window_size` elements need to be counted for. Stop
 	// calculating rank once this threshold is hit.
 	sort.Slice(hits, func(a, b int) bool {
@@ -50,9 +55,7 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 		if hit.Score != 0.0 {
 			// Skip if Score is 0, since that means the document was not
 			// found as part of FTS, and only in KNN.
-			ranks := make([]int, numKNNQueries+1)
-			ranks[0] = i + 1
-			docRanks[hit.ID] = ranks
+			docRanks[hit.ID][0] = i + 1
 		}
 
 		if i == windowSize-1 {
@@ -61,10 +64,13 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 		}
 	}
 
+	// Allocate knnDocs and reuse it within the loop
+	knnDocs := make([]*search.DocumentMatch, 0, len(hits))
+
 	// For each KNN query, rank the documents based on their KNN score.
 	for i := range numKNNQueries {
-		// Create a slice of documents that have a score for this KNN query.
-		knnDocs := make([]*search.DocumentMatch, 0, len(hits))
+		knnDocs = knnDocs[:0]
+
 		for _, hit := range hits {
 			if _, ok := hit.ScoreBreakdown[i]; ok {
 				knnDocs = append(knnDocs, hit)
@@ -78,13 +84,7 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 
 		// Update the ranks of the documents in the docRanks map.
 		for j, hit := range knnDocs {
-			if ranks, ok := docRanks[hit.ID]; ok {
-				ranks[i+1] = j + 1
-			} else {
-				// If document doesn't exist yet in docRanks, create it
-				docRanks[hit.ID] = make([]int, numKNNQueries+1)
-				docRanks[hit.ID][i+1] = j + 1
-			}
+			docRanks[hit.ID][i+1] = j + 1
 
 			if j == windowSize-1 {
 				// No need to calculate ranks from here
@@ -101,21 +101,19 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 		if explain {
 			explChildren = make([]*search.Explanation, 0, numKNNQueries+1)
 		}
-		if ranks, ok := docRanks[hit.ID]; ok {
-			for i, rank := range ranks {
-				if rank > 0 {
-					partialRrfScore := weights[i] * 1.0 / float64(rankConstant+rank)
-					if explain {
-						expl := getFusionExplAt(
-							hit,
-							i,
-							partialRrfScore,
-							formatRRFMessage(weights[i], rank, rankConstant),
-						)
-						explChildren = append(explChildren, expl)
-					}
-					rrfScore += partialRrfScore
+		for i, rank := range docRanks[hit.ID] {
+			if rank > 0 {
+				partialRrfScore := weights[i] * 1.0 / float64(rankConstant+rank)
+				if explain {
+					expl := getFusionExplAt(
+						hit,
+						i,
+						partialRrfScore,
+						formatRRFMessage(weights[i], rank, rankConstant),
+					)
+					explChildren = append(explChildren, expl)
 				}
+				rrfScore += partialRrfScore
 			}
 		}
 		hit.Score = rrfScore
