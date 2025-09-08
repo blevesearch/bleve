@@ -1290,7 +1290,7 @@ func (is *IndexSnapshot) TermFrequencies(field string, limit int, descending boo
 		return nil, fmt.Errorf("no terms found for field %s", field)
 	}
 
-	var termFreqList []index.TermFreq
+	termFreqList := make([]index.TermFreq, 0, len(termFreqs))
 	for termStr, freq := range termFreqs {
 		termFreqList = append(termFreqList, index.TermFreq{
 			Term:      termStr,

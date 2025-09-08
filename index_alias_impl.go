@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -1174,7 +1175,8 @@ func (i *indexAliasImpl) TermFrequencies(field string, limit int, descending boo
 	searchChildIndex := func(in Index, field string, limit int, descending bool) {
 		rv := asyncInsightsResult{Name: in.Name()}
 		if idx, ok := in.(InsightsIndex); ok {
-			rv.TermFrequenciesResult, _ = idx.TermFrequencies(field, limit, descending)
+			// over sample for higher accuracy
+			rv.TermFrequenciesResult, _ = idx.TermFrequencies(field, limit*5, descending)
 		}
 		asyncResults <- &rv
 		waitGroup.Done()
@@ -1191,23 +1193,44 @@ func (i *indexAliasImpl) TermFrequencies(field string, limit int, descending boo
 		close(asyncResults)
 	}()
 
-	rvTermFrequenciesResult := make([]index.TermFreq, limit)
+	rvTermFreqsMap := make(map[string]uint64)
 	for asr := range asyncResults {
-		asr.TermFrequenciesResult = append(
-			asr.TermFrequenciesResult, rvTermFrequenciesResult...)
-		if descending {
-			sort.Slice(asr.TermFrequenciesResult, func(i, j int) bool {
-				return asr.TermFrequenciesResult[i].Frequency > asr.TermFrequenciesResult[j].Frequency
-			})
-		} else {
-			sort.Slice(asr.TermFrequenciesResult, func(i, j int) bool {
-				return asr.TermFrequenciesResult[i].Frequency < asr.TermFrequenciesResult[j].Frequency
-			})
+		for _, entry := range asr.TermFrequenciesResult {
+			rvTermFreqsMap[entry.Term] += entry.Frequency
 		}
-		rvTermFrequenciesResult = asr.TermFrequenciesResult[:limit]
 	}
 
-	return rvTermFrequenciesResult, nil
+	rvTermFreqs := make([]index.TermFreq, 0, len(rvTermFreqsMap))
+	for term, freq := range rvTermFreqsMap {
+		rvTermFreqs = append(rvTermFreqs, index.TermFreq{
+			Term:      term,
+			Frequency: freq,
+		})
+	}
+
+	if descending {
+		sort.Slice(rvTermFreqs, func(i, j int) bool {
+			if rvTermFreqs[i].Frequency == rvTermFreqs[j].Frequency {
+				// If frequencies are equal, sort by term lexicographically
+				return strings.Compare(rvTermFreqs[i].Term, rvTermFreqs[j].Term) < 0
+			}
+			return rvTermFreqs[i].Frequency > rvTermFreqs[j].Frequency
+		})
+	} else {
+		sort.Slice(rvTermFreqs, func(i, j int) bool {
+			if rvTermFreqs[i].Frequency == rvTermFreqs[j].Frequency {
+				// If frequencies are equal, sort by term lexicographically
+				return strings.Compare(rvTermFreqs[i].Term, rvTermFreqs[j].Term) < 0
+			}
+			return rvTermFreqs[i].Frequency < rvTermFreqs[j].Frequency
+		})
+	}
+
+	if limit > len(rvTermFreqs) {
+		limit = len(rvTermFreqs)
+	}
+
+	return rvTermFreqs[:limit], nil
 }
 
 func (i *indexAliasImpl) CentroidCardinalities(field string, limit int, descending bool) (
@@ -1255,7 +1278,7 @@ func (i *indexAliasImpl) CentroidCardinalities(field string, limit int, descendi
 		close(asyncResults)
 	}()
 
-	rvCentroidCardinalitiesResult := make([]index.CentroidCardinality, limit)
+	rvCentroidCardinalitiesResult := make([]index.CentroidCardinality, 0, limit)
 	for asr := range asyncResults {
 		asr.CentroidCardinalitiesResult = append(
 			asr.CentroidCardinalitiesResult, rvCentroidCardinalitiesResult...)
