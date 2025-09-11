@@ -103,7 +103,7 @@ func (r *rescorer) rescore(sr *SearchResult) {
 	sr.MaxScore = fusionResult.MaxScore
 }
 
-func newFusionRescorer(req *SearchRequest) *rescorer {
+func newRescorer(req *SearchRequest) *rescorer {
 	return &rescorer{
 		req: req,
 	}

@@ -562,21 +562,21 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}()
 
-	var doFusionRescoring bool
+	var doScoreFusion bool
 	var rescorer *rescorer
-	if _, ok := ctx.Value(search.FusionRescoringKey).(bool); !ok {
-		// Since fusion rescoring key is not set, check if it is a hybrid search.
-		// If it is, then set doFusionRescoring. This indicates that the rescoring
+	if _, ok := ctx.Value(search.ScoreFusionKey).(bool); !ok {
+		// Since the score fusion key is not set, check if it is a hybrid search.
+		// If it is, then set doScoreFusion. This indicates that the rescoring
 		// must happen locally within this index, and there are no other
 		// indexes/aliases involved.
-		doFusionRescoring = IsFusionRescoringRequired(req)
+		doScoreFusion = IsScoreFusionRequired(req)
 
 		// new context will be used in internal functions to collect data
 		// as suitable for hybrid search. Rescorer is used for rescoring
 		// using fusion algorithms.
-		if doFusionRescoring {
-			ctx = context.WithValue(ctx, search.FusionRescoringKey, true)
-			rescorer = newFusionRescorer(req)
+		if doScoreFusion {
+			ctx = context.WithValue(ctx, search.ScoreFusionKey, true)
+			rescorer = newRescorer(req)
 			rescorer.prepareSearchRequest()
 		}
 	}
@@ -879,7 +879,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	// rescore if fusion flag is set
-	if doFusionRescoring {
+	if doScoreFusion {
 		rescorer.rescore(rv)
 		rescorer.restoreSearchRequest()
 		rv.Hits = hitsInCurrentPage(req, rv.Hits)

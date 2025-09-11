@@ -187,20 +187,20 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		return nil, ErrorAliasEmpty
 	}
 
-	var doFusionRescoring bool
+	var doScoreFusion bool
 	var rescorer *rescorer
-	if _, ok := ctx.Value(search.FusionRescoringKey).(bool); !ok {
-		// Since fusion rescoring key is not set, check if it is a hybrid search.
-		// If it is, then set doFusionRescoring. This indicates that score
+	if _, ok := ctx.Value(search.ScoreFusionKey).(bool); !ok {
+		// Since the score fusion key is not set, check if it is a hybrid search.
+		// If it is, then set doScoreFusion. This indicates that score
 		// combination must happen at this alias.
-		doFusionRescoring = IsFusionRescoringRequired(req)
+		doScoreFusion = IsScoreFusionRequired(req)
 
 		// new context will be used in internal functions to collect data
 		// as suitable for fusion. Rescorer is used for rescoring
 		// using fusion algorithms.
-		if doFusionRescoring {
-			ctx = context.WithValue(ctx, search.FusionRescoringKey, true)
-			rescorer = newFusionRescorer(req)
+		if doScoreFusion {
+			ctx = context.WithValue(ctx, search.ScoreFusionKey, true)
+			rescorer = newRescorer(req)
 			rescorer.prepareSearchRequest()
 		}
 	}
@@ -248,7 +248,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 			return sr, err
 		}
 
-		if doFusionRescoring {
+		if doScoreFusion {
 			rescorer.rescore(sr)
 			rescorer.restoreSearchRequest()
 			sr.Hits = hitsInCurrentPage(req, sr.Hits)
@@ -291,7 +291,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// if the request is satisfied by the preSearch result, then we can
 		// directly return the preSearch result as the final result
 		if requestSatisfiedByPreSearch(req, flags) {
-			sr = finalizeSearchResult(ctx, req, preSearchResult, doFusionRescoring, rescorer)
+			sr = finalizeSearchResult(ctx, req, preSearchResult, doScoreFusion, rescorer)
 			// no need to run the 2nd phase MultiSearch(..)
 		} else {
 			preSearchData, err = constructPreSearchData(req, flags, preSearchResult, i.indexes)
@@ -304,7 +304,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 
 	// check if search result was generated as part of preSearch itself
 	if sr == nil {
-		multiSearchParams := multiSearchParams{preSearchData, doFusionRescoring, rescorer}
+		multiSearchParams := multiSearchParams{preSearchData, doScoreFusion, rescorer}
 		sr, err = MultiSearch(ctx, req, multiSearchParams, i.indexes...)
 		if err != nil {
 			return nil, err
@@ -684,7 +684,7 @@ func preSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, i
 // if the request is satisfied by just the preSearch result,
 // finalize the result and return it directly without
 // performing multi search
-func finalizeSearchResult(ctx context.Context, req *SearchRequest, preSearchResult *SearchResult, doFusionRescoring bool, rescorer *rescorer) *SearchResult {
+func finalizeSearchResult(ctx context.Context, req *SearchRequest, preSearchResult *SearchResult, doScoreFusion bool, rescorer *rescorer) *SearchResult {
 	if preSearchResult == nil {
 		return nil
 	}
@@ -715,7 +715,7 @@ func finalizeSearchResult(ctx context.Context, req *SearchRequest, preSearchResu
 	}
 
 	// rescore if fusion flag is set
-	if doFusionRescoring {
+	if doScoreFusion {
 		rescorer.rescore(preSearchResult)
 		rescorer.restoreSearchRequest()
 	}
@@ -1002,9 +1002,9 @@ func hitsInCurrentPage(req *SearchRequest, hits []*search.DocumentMatch) []*sear
 
 // Extra parameters for MultiSearch
 type multiSearchParams struct {
-	preSearchData     map[string]map[string]interface{}
-	doFusionRescoring bool
-	rescorer          *rescorer
+	preSearchData map[string]map[string]interface{}
+	doScoreFusion bool
+	rescorer      *rescorer
 }
 
 // MultiSearch executes a SearchRequest across multiple Index objects,
@@ -1076,16 +1076,16 @@ func MultiSearch(ctx context.Context, req *SearchRequest, params multiSearchPara
 	}
 
 	// rescore if fusion flag is set
-	if params.doFusionRescoring {
+	if params.doScoreFusion {
 		params.rescorer.rescore(sr)
 		params.rescorer.restoreSearchRequest()
 	}
 
-	if _, ok := ctx.Value(search.FusionRescoringKey).(bool); !ok {
+	if _, ok := ctx.Value(search.ScoreFusionKey).(bool); !ok {
 		// Not fusion, default pagination
 		sr.Hits = hitsInCurrentPage(req, sr.Hits)
 	} else {
-		if params.doFusionRescoring {
+		if params.doScoreFusion {
 			// Hybrid search with fusion already done, do default pagination
 			sr.Hits = hitsInCurrentPage(req, sr.Hits)
 		} else {

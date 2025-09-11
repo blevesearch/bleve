@@ -193,7 +193,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	}
 
 	if temp.Params == nil {
-		if IsFusionRescoringRequired(r) {
+		if IsScoreFusionRequired(r) {
 			// If params is not present and it is requires rescoring, assign
 			// default values
 			src := 60
@@ -204,7 +204,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	} else {
 		// if it is a request that requires rescoring, parse the rescoring
 		// parameters.
-		if IsFusionRescoringRequired(r) {
+		if IsScoreFusionRequired(r) {
 			params, err := ParseParams(r, temp.Params)
 			if err != nil {
 				return err
@@ -237,7 +237,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.KNNOperator = knnOperatorOr
 	}
 
-	if IsFusionRescoringRequired(r) {
+	if IsScoreFusionRequired(r) {
 		if r.KNNOperator == knnOperatorAnd {
 			return fmt.Errorf("knn operator 'and' is not compatible with score fusion")
 		}
@@ -475,15 +475,15 @@ func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, 
 
 		// This function is in case of score fusion. Score field is just the query score, no changes here. KNN scores are preserved in ScoreBreakdown.
 		// Store explanations as Children for query + all KNNs with dummy Value, Message. Proper explanations will be computed in fusion code.
-		fusionRescorerScoreExplComputer := func(queryMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) (float64, *search.Explanation) {
+		scoreFusionScoreExplComputer := func(queryMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) (float64, *search.Explanation) {
 			if !req.Explain {
 				return queryMatch.Score, nil
 			}
 			return queryMatch.Score, &search.Explanation{Value: 0.0, Message: "", Children: append([]*search.Explanation{queryMatch.Expl}, knnMatch.Expl.Children...)}
 		}
 
-		if IsFusionRescoringRequired(req) {
-			coll.SetKNNHits(knnHits, search.ScoreExplCorrectionCallbackFunc(fusionRescorerScoreExplComputer))
+		if IsScoreFusionRequired(req) {
+			coll.SetKNNHits(knnHits, search.ScoreExplCorrectionCallbackFunc(scoreFusionScoreExplComputer))
 		} else {
 			coll.SetKNNHits(knnHits, search.ScoreExplCorrectionCallbackFunc(newScoreExplComputer))
 		}
@@ -493,7 +493,7 @@ func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, 
 func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*search.DocumentMatch {
 	// If the request is hybrid search, do not use any operator. Individual scores are preserved
 	// for fusion. This is equivalent to doing knnOperatorOr, but without combining score results.
-	if IsFusionRescoringRequired(req) {
+	if IsScoreFusionRequired(req) {
 		for _, hit := range knnHits {
 			hit.Score = 0.0
 		}

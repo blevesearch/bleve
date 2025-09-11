@@ -247,16 +247,16 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		backingSize = PreAllocSizeSkipCap + 1
 	}
 
-	var fusionRescoring bool
-	if _, ok := ctx.Value(search.FusionRescoringKey).(bool); ok {
-		fusionRescoring = true
+	var scoreFusion bool
+	if _, ok := ctx.Value(search.ScoreFusionKey).(bool); ok {
+		scoreFusion = true
 	}
 
 	searchContext := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(backingSize+searcher.DocumentMatchPoolSize(), len(hc.sort)),
 		Collector:         hc,
 		IndexReader:       reader,
-		FusionRescoring:   fusionRescoring,
+		ScoreFusion:       scoreFusion,
 	}
 
 	hc.dvReader, err = reader.DocValueReader(hc.neededFields)
@@ -272,8 +272,8 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 
 	var dmHandlerMaker func(ctx *search.SearchContext) (search.DocumentMatchHandler, bool, error)
-	if fusionRescoring {
-		dmHandlerMaker = MakeTopNFusionRescoringDocumentMatchHandler
+	if scoreFusion {
+		dmHandlerMaker = MakeTopNScoreFusionDocumentMatchHandler
 	} else {
 		dmHandlerMaker = MakeTopNDocumentMatchHandler
 	}
@@ -335,7 +335,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 				return err
 			}
 
-			if !fusionRescoring {
+			if !scoreFusion {
 				// If rescoring required, knn hits are handled later.
 				err = dmHandler(knnDoc)
 				if err != nil {
@@ -366,7 +366,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	hc.took = time.Since(startTime)
 
 	// finalize actual results
-	err = hc.finalizeResults(reader, fusionRescoring)
+	err = hc.finalizeResults(reader, scoreFusion)
 	if err != nil {
 		return err
 	}
@@ -387,7 +387,7 @@ func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 			// query doc. Query doc now contains the query score (Score field)
 			// as well as the individual knn scores (ScoreBreakdown)
 			d.Score, d.Expl = hc.computeNewScoreExpl(d, knnHit)
-			if ctx.FusionRescoring {
+			if ctx.ScoreFusion {
 				d.ScoreBreakdown = knnHit.ScoreBreakdown
 			}
 			delete(hc.knnHits, d.ID)
@@ -508,7 +508,7 @@ func MakeTopNDocumentMatchHandler(
 	return nil, false, nil
 }
 
-func MakeTopNFusionRescoringDocumentMatchHandler(
+func MakeTopNScoreFusionDocumentMatchHandler(
 	ctx *search.SearchContext) (search.DocumentMatchHandler, bool, error) {
 	var hc *TopNCollector
 	var ok bool
@@ -616,7 +616,7 @@ func (hc *TopNCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
 // finalizeResults starts with the heap containing the final top size+skip
 // it now throws away the results to be skipped
 // and does final doc id lookup (if necessary)
-func (hc *TopNCollector) finalizeResults(r index.IndexReader, fusionRescoring bool) error {
+func (hc *TopNCollector) finalizeResults(r index.IndexReader, scoreFusion bool) error {
 	var err error
 	fixupFunc := func(doc *search.DocumentMatch) error {
 		if doc.ID == "" {
@@ -636,7 +636,7 @@ func (hc *TopNCollector) finalizeResults(r index.IndexReader, fusionRescoring bo
 		return err
 	}
 
-	if fusionRescoring {
+	if scoreFusion {
 		for _, v := range hc.knnHits {
 			v.Score = 0.0
 			err := fixupFunc(v)

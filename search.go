@@ -322,7 +322,7 @@ func (r *SearchRequest) Validate() error {
 		return err
 	}
 
-	if IsFusionRescoringRequired(r) {
+	if IsScoreFusionRequired(r) {
 		if r.SearchAfter != nil || r.SearchBefore != nil {
 			return fmt.Errorf("cannot use search after or search before with score fusion")
 		} else if so := (search.SortOrder{&search.SortScore{Desc: true}}); r.Sort != nil && !reflect.DeepEqual(r.Sort, so) {
@@ -669,7 +669,7 @@ func isMatchAllQuery(q query.Query) bool {
 }
 
 // Checks if the request is hybrid search. Currently supports: RRF.
-func IsFusionRescoringRequired(req *SearchRequest) bool {
+func IsScoreFusionRequired(req *SearchRequest) bool {
 	switch req.Score {
 	case ReciprocalRankFusionStrategy:
 		return true
@@ -718,7 +718,7 @@ func ParseParams(r *SearchRequest, input []byte) (*Params, error) {
 }
 
 func validateScore(r *SearchRequest) error {
-	if r.Score == "" || r.Score == "none" || IsFusionRescoringRequired(r) {
+	if r.Score == "" || r.Score == "none" || IsScoreFusionRequired(r) {
 		return nil
 	}
 
