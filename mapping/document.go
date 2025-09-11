@@ -318,6 +318,11 @@ func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
+		case "nested":
+			err := util.UnmarshalJSON(v, &dm.Nested)
+			if err != nil {
+				return err
+			}
 		case "default_analyzer":
 			err := util.UnmarshalJSON(v, &dm.DefaultAnalyzer)
 			if err != nil {
