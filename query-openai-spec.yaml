@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Bleve Query JSON Language
+  title: Bleve JSON Query Language
   description: |
     A comprehensive specification for the Bleve Query JSON Language.
 
@@ -65,10 +65,6 @@ info:
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
-
-servers:
-  - url: https://api.example.com
-    description: Example Bleve API server
 
 tags:
   - name: Basic Queries
