@@ -165,7 +165,7 @@ func (s *SegmentSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.Updat
 	}
 
 	if segment, ok := s.segment.(segment.UpdatableSegment); ok {
-		segment.PutUpdatedFields(s.updatedFields)
+		segment.SetUpdatedFields(s.updatedFields)
 	}
 }
 
