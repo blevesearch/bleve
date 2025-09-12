@@ -682,7 +682,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 
 		// tests for escaping
 
-		// escape : as field delimeter
+		// escape : as field delimiter
 		{
 			input:   `name\:marty`,
 			mapping: mapping.NewIndexMapping(),
@@ -708,7 +708,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				},
 				nil),
 		},
-		// escape space, single arguemnt to match query
+		// escape space, single argument to match query
 		{
 			input:   `marty\ couchbase`,
 			mapping: mapping.NewIndexMapping(),

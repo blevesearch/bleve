@@ -149,7 +149,7 @@ func (b *Batch) String() string {
 }
 
 // Reset returns a Batch to the empty state so that it can
-// be re-used in the future.
+// be reused in the future.
 func (b *Batch) Reset() {
 	b.internal.Reset()
 	b.lastDocSize = 0

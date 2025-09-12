@@ -160,7 +160,7 @@ func TestTermRangeSearch(t *testing.T) {
 			inclusiveMax: true,
 			want:         nil,
 		},
-		// min and max same (and term exists), both exlusive
+		// min and max same (and term exists), both exclusive
 		{
 			min:          []byte("marty"),
 			max:          []byte("marty"),

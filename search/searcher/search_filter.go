@@ -33,7 +33,7 @@ func init() {
 // FilterFunc defines a function which can filter documents
 // returning true means keep the document
 // returning false means do not keep the document
-type FilterFunc func(d *search.DocumentMatch) bool
+type FilterFunc func(sctx *search.SearchContext, d *search.DocumentMatch) bool
 
 // FilteringSearcher wraps any other searcher, but checks any Next/Advance
 // call against the supplied FilterFunc
@@ -57,7 +57,7 @@ func (f *FilteringSearcher) Size() int {
 func (f *FilteringSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	next, err := f.child.Next(ctx)
 	for next != nil && err == nil {
-		if f.accept(next) {
+		if f.accept(ctx, next) {
 			return next, nil
 		}
 		next, err = f.child.Next(ctx)
@@ -73,7 +73,7 @@ func (f *FilteringSearcher) Advance(ctx *search.SearchContext, ID index.IndexInt
 	if adv == nil {
 		return nil, nil
 	}
-	if f.accept(adv) {
+	if f.accept(ctx, adv) {
 		return adv, nil
 	}
 	return f.Next(ctx)

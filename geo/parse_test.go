@@ -103,7 +103,7 @@ func TestExtractGeoPoint(t *testing.T) {
 			lat:     7.5,
 			success: true,
 		},
-		// test going throug interface
+		// test going through interface
 		{
 			in: &s11{
 				lon: 4.0,
@@ -113,7 +113,7 @@ func TestExtractGeoPoint(t *testing.T) {
 			lat:     6.9,
 			success: true,
 		},
-		// test going throug interface with lng variant
+		// test going through interface with lng variant
 		{
 			in: &s12{
 				lng: 4.0,
@@ -294,7 +294,7 @@ func TestExtractGeoShape(t *testing.T) {
 			coordinates: nil,
 			success:     false,
 		},
-		// invalid linestring slice with wrong paranthesis
+		// invalid linestring slice with wrong parenthesis
 		{
 			in: map[string]interface{}{
 				"coordinates": [][][]interface{}{{{3.4, 4.4}, {8.4, 9.4}}},

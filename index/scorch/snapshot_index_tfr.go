@@ -163,7 +163,7 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 			// unadorned composite optimization
 			// we need to reset all the iterators
 			// back to the beginning, which effectively
-			// achives the same thing as the above
+			// achieves the same thing as the above
 			for _, iter := range i.iterators {
 				if optimizedIterator, ok := iter.(ResetablePostingsIterator); ok {
 					optimizedIterator.ResetIterator()

@@ -115,7 +115,7 @@ func boxSearcher(ctx context.Context, indexReader index.IndexReader,
 
 func buildDistFilter(ctx context.Context, dvReader index.DocValueReader, field string,
 	centerLon, centerLat, maxDist float64) FilterFunc {
-	return func(d *search.DocumentMatch) bool {
+	return func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
 		// check geo matches against all numeric type terms indexed
 		var lons, lats []float64
 		var found bool

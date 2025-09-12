@@ -228,7 +228,7 @@ func TestGeoJsonMultiPointWithInQuery(t *testing.T) {
 			"geometry", nil,
 		},
 
-		// test multipoint with all inside the hole witin the polygonWithHole1.
+		// test multipoint with all inside the hole within the polygonWithHole1.
 		{
 			[][]float64{
 				{77.59656429290771, 12.981767710239714},
@@ -383,7 +383,7 @@ func TestGeoJsonMultiPointIntersectsQuery(t *testing.T) {
 			[]string{"polygonWithHole1"},
 		},
 
-		// test multipoint with all inside the hole witin the polygonWithHole1.
+		// test multipoint with all inside the hole within the polygonWithHole1.
 		{
 			[][]float64{
 				{77.60244369506836, 12.976247607394027},
