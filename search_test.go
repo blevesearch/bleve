@@ -5328,7 +5328,6 @@ func TestNestedMapping(t *testing.T) {
 		q2.SetField("posts.comments.author")
 
 		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-		cq.Nested = true
 
 		req := NewSearchRequest(cq)
 		res, err := idx.Search(req)
@@ -5353,7 +5352,6 @@ func TestNestedMapping(t *testing.T) {
 
 		// This should match documents where the same post has comments by both Jane AND Tom
 		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-		cq.Nested = true
 
 		req := NewSearchRequest(cq)
 		res, err := idx.Search(req)
@@ -5375,7 +5373,6 @@ func TestNestedMapping(t *testing.T) {
 		q2.SetField("posts.comments.author")
 
 		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-		cq.Nested = true
 
 		req := NewSearchRequest(cq)
 		res, err := idx.Search(req)
@@ -5403,7 +5400,6 @@ func TestNestedMapping(t *testing.T) {
 		q3.SetField("posts.comments.likes")
 
 		cq := query.NewConjunctionQuery([]query.Query{q1, q2, q3})
-		cq.Nested = true
 
 		req := NewSearchRequest(cq)
 		res, err := idx.Search(req)
@@ -5428,7 +5424,6 @@ func TestNestedMapping(t *testing.T) {
 		q2.SetField("posts.comments.author")
 
 		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-		cq.Nested = true
 
 		req := NewSearchRequest(cq)
 		res, err := idx.Search(req)
@@ -5449,7 +5444,6 @@ func TestNestedMapping(t *testing.T) {
 		q2.SetField("posts.comments.author")
 
 		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-		cq.Nested = true
 
 		req := NewSearchRequest(cq)
 		res, err := idx.Search(req)
@@ -5474,7 +5468,6 @@ func TestNestedMapping(t *testing.T) {
 		q2.SetField("posts.comments.author")
 
 		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-		cq.Nested = true
 
 		req := NewSearchRequest(cq)
 		res, err := idx.Search(req)
@@ -5501,7 +5494,6 @@ func TestNestedMapping(t *testing.T) {
 		authorDisjunction := query.NewDisjunctionQuery([]query.Query{janeQuery, tomQuery})
 
 		cq := query.NewConjunctionQuery([]query.Query{q1, authorDisjunction})
-		cq.Nested = true
 
 		req := NewSearchRequest(cq)
 		res, err := idx.Search(req)
@@ -5538,7 +5530,6 @@ func TestNestedMapping(t *testing.T) {
 		q4.SetField("posts.title")
 
 		cq := query.NewConjunctionQuery([]query.Query{q1, q2, q3, q4})
-		cq.Nested = true
 
 		req := NewSearchRequest(cq)
 		res, err := idx.Search(req)
@@ -5569,7 +5560,6 @@ func TestNestedMapping(t *testing.T) {
 		q3.SetField("posts.published_date")
 
 		cq := query.NewConjunctionQuery([]query.Query{q1, q2, q3})
-		cq.Nested = true
 
 		req := NewSearchRequest(cq)
 		res, err := idx.Search(req)
@@ -5596,7 +5586,6 @@ func TestNestedMapping(t *testing.T) {
 		q2.SetField("posts.comments.author")
 
 		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-		cq.Nested = true
 
 		req := NewSearchRequest(cq)
 		res, err := idx.Search(req)
@@ -5621,7 +5610,6 @@ func TestNestedMapping(t *testing.T) {
 		q2.SetField("posts.comments.likes")
 
 		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-		cq.Nested = true
 
 		req := NewSearchRequest(cq)
 		res, err := idx.Search(req)
@@ -5656,7 +5644,6 @@ func TestNestedMapping(t *testing.T) {
 		dateQuery.SetField("posts.published_date")
 
 		mainConjunction := query.NewConjunctionQuery([]query.Query{authorDisjunction, likesQuery, dateQuery})
-		mainConjunction.Nested = true
 
 		req := NewSearchRequest(mainConjunction)
 		res, err := idx.Search(req)
@@ -5685,7 +5672,6 @@ func TestNestedMapping(t *testing.T) {
 
 		// Combine both
 		cq := query.NewConjunctionQuery([]query.Query{rootQuery, nestedQuery})
-		cq.Nested = true
 
 		req := NewSearchRequest(cq)
 		res, err := idx.Search(req)
