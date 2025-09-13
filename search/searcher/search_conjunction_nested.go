@@ -234,7 +234,9 @@ OUTER:
 		}
 		// advance all searchers except the one at maxIDIdx
 		for i := 0; i < len(s.currs); i++ {
-			if i == s.maxIDIdx {
+			// dont advance the maxIDIdx searcher
+			// advance it only if its the only searcher
+			if i == s.maxIDIdx && len(s.currs) > 1 {
 				continue
 			}
 			if s.currs[i] != rv {

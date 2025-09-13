@@ -1142,6 +1142,14 @@ func (is *IndexSnapshot) UpdateSynonymSearchCount(delta uint64) {
 	atomic.AddUint64(&is.parent.stats.TotSynonymSearches, delta)
 }
 
+// Ancestors returns the ancestral chain for a given document ID in the index.
+// For nested documents, this method retrieves all parent documents in the hierarchy
+// leading up to the specified document ID. The returned slice contains:
+//   - [0]: The document itself (with global ID)
+//   - [1:]: All ancestor documents in the hierarchy (with global IDs)
+//
+// The method handles the translation from segment-local document numbers to
+// global index internal IDs by applying the appropriate segment offset.
 func (i *IndexSnapshot) Ancestors(ID index.IndexInternalID) ([]index.IndexInternalID, error) {
 	seg, ldoc, err := i.segmentIndexAndLocalDocNum(ID)
 	if err != nil {
