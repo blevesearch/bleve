@@ -113,14 +113,6 @@ func (s *SegmentSnapshot) Count() uint64 {
 	return rv
 }
 
-func (s *SegmentSnapshot) Ancestors(docID uint64) []uint64 {
-	nsb, ok := s.segment.(segment.NestedSegment)
-	if !ok {
-		return nil
-	}
-	return nsb.Ancestors(docID)
-}
-
 func (s *SegmentSnapshot) DocNumbers(docIDs []string) (*roaring.Bitmap, error) {
 	rv, err := s.segment.DocNumbers(docIDs)
 	if err != nil {
@@ -368,4 +360,20 @@ func (c *cachedMeta) fetchMeta(field string) (rv interface{}) {
 	rv = c.meta[field]
 	c.m.RUnlock()
 	return rv
+}
+
+func (s *SegmentSnapshot) Ancestors(docID uint64) []uint64 {
+	nsb, ok := s.segment.(segment.NestedSegment)
+	if !ok {
+		return nil
+	}
+	return nsb.Ancestors(docID)
+}
+
+func (s *SegmentSnapshot) Descendants(docID uint64) []uint64 {
+	nsb, ok := s.segment.(segment.NestedSegment)
+	if !ok {
+		return nil
+	}
+	return nsb.Descendants(docID)
 }
