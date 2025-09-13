@@ -73,18 +73,21 @@ func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 			}
 		}
 	}
+	// set of fields used in this query
+	var qfs search.FieldSet
+	var err error
 	for _, conjunct := range q.Conjuncts {
 		// if we haven't already determined we need a nested searcher,
 		// and we have nested prefixes to check against, do so now
 		if !useNestedSearcher && nestedPrefixes != nil {
 			// once we know we need a nested searcher, no need to keep checking
 			// the rest of the queries
-			fs, err := ExtractFields(conjunct, m, nil)
+			qfs, err = ExtractFields(conjunct, m, qfs)
 			if err != nil {
 				cleanup()
 				return nil, err
 			}
-			if fs != nil && fs.IntersectsPrefix(nestedPrefixes) {
+			if qfs != nil && qfs.IntersectsPrefix(nestedPrefixes) {
 				useNestedSearcher = true
 			}
 		}

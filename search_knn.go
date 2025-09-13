@@ -673,11 +673,13 @@ func (i *indexImpl) buildKNNCollector(KNNQuery query.Query, reader index.IndexRe
 	if nm, ok := i.m.(mapping.NestedMapping); ok {
 		if nr, ok := reader.(index.NestedReader); ok {
 			if nestedPrefixes := nm.NestedPrefixes(); nestedPrefixes != nil {
-				fs, err := query.ExtractFields(KNNQuery, i.m, search.NewFieldSet())
+				var fs search.FieldSet
+				var err error
+				fs, err = query.ExtractFields(KNNQuery, i.m, fs)
 				if err != nil {
 					return nil, err
 				}
-				if fs.IntersectsPrefix(nestedPrefixes) {
+				if fs != nil && fs.IntersectsPrefix(nestedPrefixes) {
 					return collector.NewNestedKNNCollector(nr, kArray, somOfK), nil
 				}
 			}
@@ -691,11 +693,13 @@ func (i *indexImpl) buildEligibleCollector(filterQuery query.Query, reader index
 	if nm, ok := i.m.(mapping.NestedMapping); ok {
 		if nr, ok := reader.(index.NestedReader); ok {
 			if nestedPrefixes := nm.NestedPrefixes(); nestedPrefixes != nil {
-				fs, err := query.ExtractFields(filterQuery, i.m, search.NewFieldSet())
+				var fs search.FieldSet
+				var err error
+				fs, err = query.ExtractFields(filterQuery, i.m, fs)
 				if err != nil {
 					return nil, err
 				}
-				if fs.IntersectsPrefix(nestedPrefixes) {
+				if fs != nil && fs.IntersectsPrefix(nestedPrefixes) {
 					return collector.NewNestedEligibleCollector(nr, size), nil
 				}
 			}

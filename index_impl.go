@@ -1449,11 +1449,13 @@ func (i *indexImpl) buildTopNCollector(req *SearchRequest, reader index.IndexRea
 	if nm, ok := i.m.(mapping.NestedMapping); ok {
 		if nestedPrefixes := nm.NestedPrefixes(); nestedPrefixes != nil {
 			if nr, ok := reader.(index.NestedReader); ok {
-				fs, err := query.ExtractFields(req.Query, i.m, search.NewFieldSet())
+				var fs search.FieldSet
+				var err error
+				fs, err = query.ExtractFields(req.Query, i.m, fs)
 				if err != nil {
 					return nil, err
 				}
-				if fs.IntersectsPrefix(nestedPrefixes) {
+				if fs != nil && fs.IntersectsPrefix(nestedPrefixes) {
 					return newNestedCollector(nr), nil
 				}
 			}
