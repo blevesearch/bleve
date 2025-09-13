@@ -17,6 +17,7 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
@@ -577,28 +578,30 @@ func (im *IndexMappingImpl) SynonymSourceVisitor(visitor analysis.SynonymSourceV
 // in this mapping. If there are no nested fields, it returns nil.
 func (im *IndexMappingImpl) NestedPrefixes() search.FieldSet {
 	var rv search.FieldSet
-	var collectNestedFields func(dm *DocumentMapping)
-	collectNestedFields = func(dm *DocumentMapping) {
+	var collectNestedFields func(dm *DocumentMapping, pathComponents []string)
+	collectNestedFields = func(dm *DocumentMapping, pathComponents []string) {
 		for name, docMapping := range dm.Properties {
+			newPathComponents := append(pathComponents, name)
 			if docMapping.Nested {
 				if rv == nil {
 					rv = search.NewFieldSet()
 				}
-				rv[name] = struct{}{}
+				rv[strings.Join(newPathComponents, pathSeparator)] = struct{}{}
+			} else {
+				collectNestedFields(docMapping, newPathComponents)
 			}
-			collectNestedFields(docMapping)
 		}
 	}
 
 	// Traverse default mapping if enabled
 	if im.DefaultMapping != nil && im.DefaultMapping.Enabled {
-		collectNestedFields(im.DefaultMapping)
+		collectNestedFields(im.DefaultMapping, []string{})
 	}
 
 	// Traverse all type mappings if enabled
 	for _, docMapping := range im.TypeMapping {
 		if docMapping.Enabled {
-			collectNestedFields(docMapping)
+			collectNestedFields(docMapping, []string{})
 		}
 	}
 	return rv
