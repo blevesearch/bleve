@@ -264,3 +264,12 @@ func (fs FieldSet) IntersectsPrefix(other FieldSet) bool {
 	}
 	return false
 }
+
+// Slice returns the fields in this set as a slice of strings.
+func (fs FieldSet) Slice() []string {
+	rv := make([]string, 0, len(fs))
+	for field := range fs {
+		rv = append(rv, field)
+	}
+	return rv
+}
