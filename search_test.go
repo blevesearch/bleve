@@ -5698,3 +5698,257 @@ func TestNestedMapping(t *testing.T) {
 		}
 	})
 }
+
+func TestNestedPrefixes(t *testing.T) {
+	t.Run("NoNestedFields", func(t *testing.T) {
+		imap := mapping.NewIndexMapping()
+
+		// Add some regular field mappings
+		englishMapping := NewTextFieldMapping()
+		englishMapping.Analyzer = en.AnalyzerName
+		imap.DefaultMapping.AddFieldMappingsAt("title", englishMapping)
+		imap.DefaultMapping.AddFieldMappingsAt("description", englishMapping)
+
+		prefixes := imap.NestedPrefixes()
+		if prefixes != nil {
+			t.Fatal("expected nil for mapping with no nested fields")
+		}
+	})
+
+	t.Run("SingleNestedField", func(t *testing.T) {
+		imap := mapping.NewIndexMapping()
+
+		englishMapping := NewTextFieldMapping()
+		englishMapping.Analyzer = en.AnalyzerName
+
+		// Create a nested mapping
+		userMapping := NewDocumentMapping()
+		userMapping.AddFieldMappingsAt("name", englishMapping)
+		userMapping.AddFieldMappingsAt("email", englishMapping)
+		userMapping.Nested = true
+
+		imap.DefaultMapping.AddSubDocumentMapping("user", userMapping)
+
+		prefixes := imap.NestedPrefixes()
+		if prefixes == nil {
+			t.Fatal("expected non-nil result for mapping with nested fields")
+		}
+
+		// Should contain "user" prefix
+		if _, exists := prefixes["user"]; !exists {
+			t.Errorf("expected 'user' in nested prefixes, got %v", prefixes)
+		}
+
+		if len(prefixes) != 1 {
+			t.Errorf("expected 1 nested prefix, got %d: %v", len(prefixes), prefixes)
+		}
+	})
+
+	t.Run("MultipleNestedFields", func(t *testing.T) {
+		imap := mapping.NewIndexMapping()
+
+		englishMapping := NewTextFieldMapping()
+		englishMapping.Analyzer = en.AnalyzerName
+		numericMapping := NewNumericFieldMapping()
+
+		// Create multiple nested mappings
+		userMapping := NewDocumentMapping()
+		userMapping.AddFieldMappingsAt("name", englishMapping)
+		userMapping.Nested = true
+
+		productMapping := NewDocumentMapping()
+		productMapping.AddFieldMappingsAt("title", englishMapping)
+		productMapping.AddFieldMappingsAt("price", numericMapping)
+		productMapping.Nested = true
+
+		imap.DefaultMapping.AddSubDocumentMapping("user", userMapping)
+		imap.DefaultMapping.AddSubDocumentMapping("products", productMapping)
+
+		prefixes := imap.NestedPrefixes()
+		if prefixes == nil {
+			t.Fatal("expected non-nil result for mapping with nested fields")
+		}
+
+		expectedPrefixes := map[string]struct{}{
+			"user":     {},
+			"products": {},
+		}
+
+		if len(prefixes) != len(expectedPrefixes) {
+			t.Errorf("expected %d nested prefixes, got %d: %v", len(expectedPrefixes), len(prefixes), prefixes)
+		}
+
+		for prefix := range expectedPrefixes {
+			if _, exists := prefixes[prefix]; !exists {
+				t.Errorf("expected '%s' in nested prefixes, got %v", prefix, prefixes)
+			}
+		}
+	})
+
+	t.Run("DeeplyNestedFields", func(t *testing.T) {
+		imap := mapping.NewIndexMapping()
+
+		englishMapping := NewTextFieldMapping()
+		englishMapping.Analyzer = en.AnalyzerName
+		numericMapping := NewNumericFieldMapping()
+		dateTimeMapping := NewDateTimeFieldMapping()
+
+		// Create deeply nested structure: posts -> comments
+		commentMapping := NewDocumentMapping()
+		commentMapping.AddFieldMappingsAt("author", englishMapping)
+		commentMapping.AddFieldMappingsAt("text", englishMapping)
+		commentMapping.AddFieldMappingsAt("likes", numericMapping)
+		commentMapping.Nested = true
+
+		postsMapping := NewDocumentMapping()
+		postsMapping.AddFieldMappingsAt("title", englishMapping)
+		postsMapping.AddFieldMappingsAt("published_date", dateTimeMapping)
+		postsMapping.AddSubDocumentMapping("comments", commentMapping)
+		postsMapping.Nested = true
+
+		imap.DefaultMapping.AddFieldMappingsAt("title", englishMapping)
+		imap.DefaultMapping.AddSubDocumentMapping("posts", postsMapping)
+
+		prefixes := imap.NestedPrefixes()
+		if prefixes == nil {
+			t.Fatal("expected non-nil result for mapping with nested fields")
+		}
+
+		// With correct logic, we should only get "posts" as prefix
+		// because posts.* fields are covered by the "posts" prefix
+		expectedPrefixes := map[string]struct{}{
+			"posts": {},
+		}
+
+		if len(prefixes) != len(expectedPrefixes) {
+			t.Errorf("expected %d nested prefixes, got %d: %v", len(expectedPrefixes), len(prefixes), prefixes)
+		}
+
+		for prefix := range expectedPrefixes {
+			if _, exists := prefixes[prefix]; !exists {
+				t.Errorf("expected '%s' in nested prefixes, got %v", prefix, prefixes)
+			}
+		}
+
+		// Test that we can find the right prefixes for field matching
+		testFields := []string{
+			"posts.title",
+			"posts.comments.author",
+			"posts.comments.text",
+			"posts.comments.likes",
+		}
+
+		// Check that our prefixes work with IntersectsPrefix
+		fieldSet := search.NewFieldSet()
+		for _, field := range testFields {
+			fieldSet.Add(field)
+		}
+
+		if !fieldSet.IntersectsPrefix(prefixes) {
+			t.Errorf("expected field set %v to intersect with nested prefixes %v", testFields, prefixes)
+		}
+	})
+
+	t.Run("TypeMappingNestedFields", func(t *testing.T) {
+		imap := mapping.NewIndexMapping()
+
+		englishMapping := NewTextFieldMapping()
+		englishMapping.Analyzer = en.AnalyzerName
+
+		// Create nested mapping in type mapping
+		userMapping := NewDocumentMapping()
+		nestedAddressMapping := NewDocumentMapping()
+		nestedAddressMapping.AddFieldMappingsAt("street", englishMapping)
+		nestedAddressMapping.AddFieldMappingsAt("city", englishMapping)
+		nestedAddressMapping.Nested = true
+
+		userMapping.AddFieldMappingsAt("name", englishMapping)
+		userMapping.AddSubDocumentMapping("address", nestedAddressMapping)
+
+		imap.AddDocumentMapping("user", userMapping)
+
+		prefixes := imap.NestedPrefixes()
+		if prefixes == nil {
+			t.Fatal("expected non-nil result for type mapping with nested fields")
+		}
+
+		// Should contain "address" prefix
+		if _, exists := prefixes["address"]; !exists {
+			t.Errorf("expected 'address' in nested prefixes, got %v", prefixes)
+		}
+	})
+
+	t.Run("DisabledMappingsIgnored", func(t *testing.T) {
+		imap := mapping.NewIndexMapping()
+
+		englishMapping := NewTextFieldMapping()
+		englishMapping.Analyzer = en.AnalyzerName
+
+		// Create nested mapping but disable it
+		disabledMapping := NewDocumentMapping()
+		disabledMapping.AddFieldMappingsAt("name", englishMapping)
+		disabledMapping.Nested = true
+		disabledMapping.Enabled = false
+
+		// Create enabled nested mapping
+		enabledMapping := NewDocumentMapping()
+		enabledMapping.AddFieldMappingsAt("title", englishMapping)
+		enabledMapping.Nested = true
+		enabledMapping.Enabled = true
+
+		imap.AddDocumentMapping("disabled", disabledMapping)
+		imap.DefaultMapping.AddSubDocumentMapping("enabled", enabledMapping)
+
+		prefixes := imap.NestedPrefixes()
+		if prefixes == nil {
+			t.Fatal("expected non-nil result for mapping with enabled nested fields")
+		}
+
+		// Should only contain "enabled" prefix, not "disabled"
+		if _, exists := prefixes["disabled"]; exists {
+			t.Errorf("expected disabled mapping to be ignored, but found 'disabled' in %v", prefixes)
+		}
+
+		if _, exists := prefixes["enabled"]; !exists {
+			t.Errorf("expected 'enabled' in nested prefixes, got %v", prefixes)
+		}
+	})
+
+	t.Run("MixedNestedAndRegularFields", func(t *testing.T) {
+		imap := mapping.NewIndexMapping()
+
+		englishMapping := NewTextFieldMapping()
+		englishMapping.Analyzer = en.AnalyzerName
+
+		// Mix of nested and regular fields
+		regularMapping := NewDocumentMapping()
+		regularMapping.AddFieldMappingsAt("description", englishMapping)
+		regularMapping.Nested = false // explicitly not nested
+
+		nestedMapping := NewDocumentMapping()
+		nestedMapping.AddFieldMappingsAt("content", englishMapping)
+		nestedMapping.Nested = true
+
+		imap.DefaultMapping.AddFieldMappingsAt("title", englishMapping)
+		imap.DefaultMapping.AddSubDocumentMapping("regular", regularMapping)
+		imap.DefaultMapping.AddSubDocumentMapping("nested", nestedMapping)
+
+		prefixes := imap.NestedPrefixes()
+		if prefixes == nil {
+			t.Fatal("expected non-nil result for mapping with nested fields")
+		}
+
+		// Should only contain "nested" prefix
+		if len(prefixes) != 1 {
+			t.Errorf("expected 1 nested prefix, got %d: %v", len(prefixes), prefixes)
+		}
+
+		if _, exists := prefixes["nested"]; !exists {
+			t.Errorf("expected 'nested' in nested prefixes, got %v", prefixes)
+		}
+
+		if _, exists := prefixes["regular"]; exists {
+			t.Errorf("expected regular mapping to not be included, but found 'regular' in %v", prefixes)
+		}
+	})
+}
