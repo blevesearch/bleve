@@ -452,7 +452,7 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 				fieldVal := val.Index(i).Interface()
 				if nestedSubObjects {
 					nestedDocument := document.NewDocument(fmt.Sprintf("%s_%s_%d", context.doc.ID(), encodePath(path), i))
-					nestedContext := context.im.newWalkContext(nestedDocument, dm)
+					nestedContext := context.im.newWalkContextExclude(nestedDocument, dm, context.excludedFromAll)
 					dm.processProperty(fieldVal, path, append(indexes, uint64(i)), nestedContext)
 					context.doc.AddNestedDocument(nestedDocument)
 					continue

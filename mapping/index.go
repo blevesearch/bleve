@@ -408,6 +408,15 @@ func (im *IndexMappingImpl) newWalkContext(doc *document.Document, dm *DocumentM
 	}
 }
 
+func (im *IndexMappingImpl) newWalkContextExclude(doc *document.Document, dm *DocumentMapping, excludedFromAll []string) *walkContext {
+	return &walkContext{
+		doc:             doc,
+		im:              im,
+		dm:              dm,
+		excludedFromAll: excludedFromAll,
+	}
+}
+
 // AnalyzerNameForPath attempts to find the best analyzer to use with only a
 // field name will walk all the document types, look for field mappings at the
 // provided path, if one exists and it has an explicit analyzer that is
