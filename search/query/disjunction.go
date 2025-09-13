@@ -90,10 +90,6 @@ func (q *DisjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		return searcher.NewMatchNoneSearcher(i)
 	}
 
-	if len(ss) == 1 {
-		return ss[0], nil
-	}
-
 	nctx := context.WithValue(ctx, search.IncludeScoreBreakdownKey, q.retrieveScoreBreakdown)
 
 	return searcher.NewDisjunctionSearcher(nctx, i, ss, q.Min, options)
