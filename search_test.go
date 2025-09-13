@@ -5320,23 +5320,381 @@ func TestNestedMapping(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	q1 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
-	q1.SetField("posts.published_date")
-	q2 := query.NewMatchQuery("Jane")
-	q2.SetField("posts.comments.author")
+	// Test 1: Date range + Author conjunction
+	t.Run("DateRangeAndAuthor", func(t *testing.T) {
+		q1 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
+		q1.SetField("posts.published_date")
+		q2 := query.NewMatchQuery("Jane")
+		q2.SetField("posts.comments.author")
 
-	cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-	cq.Nested = true
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+		cq.Nested = true
 
-	req := NewSearchRequest(cq)
-	req.Explain = true
-	req.Fields = []string{"*"}
-	req.Highlight = NewHighlightWithStyle(ansi.Name)
-	res, err := idx.Search(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res.Hits) != 1 {
-		t.Fatalf("expected 1 hits, got %d", len(res.Hits))
-	}
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "0" // "Tech Insights" has posts in 2025 with comments by Jane
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 2: Multiple author conjunction
+	t.Run("MultipleAuthors", func(t *testing.T) {
+		q1 := query.NewMatchQuery("Jane")
+		q1.SetField("posts.comments.author")
+		q2 := query.NewMatchQuery("Tom")
+		q2.SetField("posts.comments.author")
+
+		// This should match documents where the same post has comments by both Jane AND Tom
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+		cq.Nested = true
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// No post has a comment written by both both Jane and Tom
+		if len(res.Hits) != 0 {
+			t.Fatalf("expected 0 hits, got %d", len(res.Hits))
+		}
+	})
+
+	// Test 3: Likes range + Author conjunction
+	t.Run("LikesRangeAndAuthor", func(t *testing.T) {
+		minLikes := 3.0
+		q1 := query.NewNumericRangeQuery(&minLikes, nil)
+		q1.SetField("posts.comments.likes")
+		q2 := query.NewMatchQuery("Jane")
+		q2.SetField("posts.comments.author")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+		cq.Nested = true
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find posts where Jane has comments with >= 3 likes
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "0" // "Tech Insights" has a post with comments by Jane with 5 likes
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 4: Triple conjunction (date + author + likes)
+	t.Run("TripleConjunction", func(t *testing.T) {
+		q1 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
+		q1.SetField("posts.published_date")
+		q2 := query.NewMatchQuery("Jane")
+		q2.SetField("posts.comments.author")
+		minLikes := 1.0
+		q3 := query.NewNumericRangeQuery(&minLikes, nil)
+		q3.SetField("posts.comments.likes")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2, q3})
+		cq.Nested = true
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find posts from 2025 where Jane has comments with >= 1 likes
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "0" // "Tech Insights" has posts in 2025 with comments by Jane with >= 1 likes
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 5: Text search + Author conjunction
+	t.Run("TextSearchAndAuthor", func(t *testing.T) {
+		q1 := query.NewMatchQuery("informative")
+		q1.SetField("posts.comments.text")
+		q2 := query.NewMatchQuery("Jane")
+		q2.SetField("posts.comments.author")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+		cq.Nested = true
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find posts where Jane wrote "informative" in comments
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+	})
+
+	// Test 6: Post title + Comment author conjunction (cross-level)
+	t.Run("PostTitleAndCommentAuthor", func(t *testing.T) {
+		q1 := query.NewMatchQuery("AI")
+		q1.SetField("posts.title")
+		q2 := query.NewMatchQuery("Jane")
+		q2.SetField("posts.comments.author")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+		cq.Nested = true
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find posts with "AI" in title AND Jane in comments
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "0" // "Tech Insights" has a post titled "AI Trends" with comments by Jane
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 7: Empty results conjunction
+	t.Run("EmptyResults", func(t *testing.T) {
+		q1 := query.NewMatchQuery("NonexistentAuthor")
+		q1.SetField("posts.comments.author")
+		q2 := query.NewMatchQuery("Jane")
+		q2.SetField("posts.comments.author")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+		cq.Nested = true
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find no results (impossible for same comment to be by both authors)
+		if len(res.Hits) != 0 {
+			t.Fatalf("expected 0 hits, got %d", len(res.Hits))
+		}
+	})
+
+	// Test 8: Disjunction within conjunction for more complex scenarios
+	t.Run("DisjunctionWithinConjunction", func(t *testing.T) {
+		// Find posts from 2025 with comments by either Jane OR Tom
+		q1 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
+		q1.SetField("posts.published_date")
+
+		janeQuery := query.NewMatchQuery("Jane")
+		janeQuery.SetField("posts.comments.author")
+		tomQuery := query.NewMatchQuery("Tom")
+		tomQuery.SetField("posts.comments.author")
+
+		authorDisjunction := query.NewDisjunctionQuery([]query.Query{janeQuery, tomQuery})
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, authorDisjunction})
+		cq.Nested = true
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find posts from 2025 with comments by Jane OR Tom
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "0" // "Tech Insights" has posts in 2025 with comments by Jane and Tom
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+	// Test 9: Advanced Nested Conjunction - Multi-level constraints
+	t.Run("AdvancedNestedMultiLevel", func(t *testing.T) {
+		// Find documents with:
+		// 1. Posts from specific month (April 2025)
+		// 2. Comments by Jane
+		// 3. Those comments have >= 1 like
+		// 4. Post title contains "AI"
+		q1 := query.NewDateRangeStringQuery("2025-04-01", "2025-04-30")
+		q1.SetField("posts.published_date")
+
+		q2 := query.NewMatchQuery("Jane")
+		q2.SetField("posts.comments.author")
+
+		minLikes := 1.0
+		q3 := query.NewNumericRangeQuery(&minLikes, nil)
+		q3.SetField("posts.comments.likes")
+
+		q4 := query.NewMatchQuery("AI")
+		q4.SetField("posts.title")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2, q3, q4})
+		cq.Nested = true
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Tech Insights has AI post in April 2025 with Jane comment having 1 like
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "0"
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 10: Nested Conjunction with Text Analysis
+	t.Run("NestedTextAnalysis", func(t *testing.T) {
+		// Find posts where specific text appears in comments by specific authors
+		q1 := query.NewMatchQuery("scary")
+		q1.SetField("posts.comments.text")
+
+		q2 := query.NewMatchQuery("Lina")
+		q2.SetField("posts.comments.author")
+
+		// Also ensure it's from a 2024 post
+		q3 := query.NewDateRangeStringQuery("2024-01-01", "2024-12-31")
+		q3.SetField("posts.published_date")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2, q3})
+		cq.Nested = true
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Future Scope has 2024 post with Lina's "scary" comment
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "2"
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 11: Cross-document comparison - Multiple documents matching different criteria
+	t.Run("CrossDocumentComparison", func(t *testing.T) {
+		// Find all documents with 2025 posts that have any comments
+		q1 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
+		q1.SetField("posts.published_date")
+
+		q2 := query.NewWildcardQuery("*") // Any author (wildcard-like behavior)
+		q2.SetField("posts.comments.author")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+		cq.Nested = true
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// All 3 documents have posts from 2025
+		if len(res.Hits) != 3 {
+			t.Fatalf("expected 3 hits, got %d", len(res.Hits))
+		}
+	})
+
+	// Test 12: Nested Conjunction with Range Queries
+	t.Run("NestedRangeQueries", func(t *testing.T) {
+		// Find documents with posts from July 2025 AND comments with likes between 5-10
+		q1 := query.NewDateRangeStringQuery("2025-07-01", "2025-07-31")
+		q1.SetField("posts.published_date")
+
+		minLikes := 5.0
+		maxLikes := 10.0
+		q2 := query.NewNumericRangeQuery(&minLikes, &maxLikes)
+		q2.SetField("posts.comments.likes")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+		cq.Nested = true
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Future Scope has July 2025 post (Fusion Energy) with Sam's comment having 6 likes
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "2"
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 13: Complex Boolean Logic within Nested Context
+	t.Run("ComplexBooleanNested", func(t *testing.T) {
+		// Find documents where:
+		// (Author is Jane OR Tom) AND (likes >= 3) AND (post from 2025)
+		janeQuery := query.NewMatchQuery("Jane")
+		janeQuery.SetField("posts.comments.author")
+		tomQuery := query.NewMatchQuery("Tom")
+		tomQuery.SetField("posts.comments.author")
+		authorDisjunction := query.NewDisjunctionQuery([]query.Query{janeQuery, tomQuery})
+
+		minLikes := 3.0
+		likesQuery := query.NewNumericRangeQuery(&minLikes, nil)
+		likesQuery.SetField("posts.comments.likes")
+
+		dateQuery := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
+		dateQuery.SetField("posts.published_date")
+
+		mainConjunction := query.NewConjunctionQuery([]query.Query{authorDisjunction, likesQuery, dateQuery})
+		mainConjunction.Nested = true
+
+		req := NewSearchRequest(mainConjunction)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find Tech Insights (Jane with 5 likes and Tom with 3 likes in 2025 posts)
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "0"
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 14: Test combining nested query with non-nested root field query
+	t.Run("NestedWithRootField", func(t *testing.T) {
+		// Root field query (non-nested)
+		rootQuery := query.NewMatchQuery("Tech")
+		rootQuery.SetField("title")
+
+		// Nested field query
+		nestedQuery := query.NewMatchQuery("Jane")
+		nestedQuery.SetField("posts.comments.author")
+
+		// Combine both
+		cq := query.NewConjunctionQuery([]query.Query{rootQuery, nestedQuery})
+		cq.Nested = true
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find "Tech Insights" document with Jane's comments
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits for mixed nested/root query, got %d", len(res.Hits))
+		}
+	})
 }

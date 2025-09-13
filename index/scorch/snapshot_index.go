@@ -1215,6 +1215,44 @@ func (is *IndexSnapshot) MergeUpdateFieldsInfo(updatedFields map[string]*index.U
 	}
 }
 
+// Update current snapshot updated field data as well as pass it on to all segments and segment bases
+func (is *IndexSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
+	is.m.Lock()
+	defer is.m.Unlock()
+
+	is.MergeUpdateFieldsInfo(updatedFields)
+
+	for _, segmentSnapshot := range is.segment {
+		segmentSnapshot.UpdateFieldsInfo(is.updatedFields)
+	}
+}
+
+// Merge given updated field information with existing updated field information
+func (is *IndexSnapshot) MergeUpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
+	if is.updatedFields == nil {
+		is.updatedFields = updatedFields
+	} else {
+		for fieldName, info := range updatedFields {
+			if val, ok := is.updatedFields[fieldName]; ok {
+				val.Deleted = val.Deleted || info.Deleted
+				val.Index = val.Index || info.Index
+				val.DocValues = val.DocValues || info.DocValues
+				val.Store = val.Store || info.Store
+			} else {
+				is.updatedFields[fieldName] = info
+			}
+		}
+	}
+}
+
+// Ancestors returns the ancestral chain for a given document ID in the index.
+// For nested documents, this method retrieves all parent documents in the hierarchy
+// leading up to the specified document ID. The returned slice contains:
+//   - [0]: The document itself (with global ID)
+//   - [1:]: All ancestor documents in the hierarchy (with global IDs)
+//
+// The method handles the translation from segment-local document numbers to
+// global index internal IDs by applying the appropriate segment offset.
 func (i *IndexSnapshot) Ancestors(ID index.IndexInternalID) ([]index.IndexInternalID, error) {
 	seg, ldoc, err := i.segmentIndexAndLocalDocNum(ID)
 	if err != nil {

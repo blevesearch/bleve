@@ -80,6 +80,10 @@ func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		return searcher.NewMatchNoneSearcher(i)
 	}
 
+	if len(ss) == 1 {
+		return ss[0], nil
+	}
+
 	if q.Nested {
 		return searcher.NewNestedConjunctionSearcher(ctx, i, ss, options)
 	}
