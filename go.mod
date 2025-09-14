@@ -15,7 +15,6 @@ require (
 	github.com/blevesearch/goleveldb v1.0.1
 	github.com/blevesearch/gtreap v0.1.1
 	github.com/blevesearch/scorch_segment_api/v2 v2.3.10
-	github.com/blevesearch/segment v0.9.1
 	github.com/blevesearch/snowball v0.6.1
 	github.com/blevesearch/snowballstem v0.9.0
 	github.com/blevesearch/stempel v0.2.0
@@ -27,6 +26,7 @@ require (
 	github.com/blevesearch/zapx/v14 v14.4.2
 	github.com/blevesearch/zapx/v15 v15.4.2
 	github.com/blevesearch/zapx/v16 v16.2.4
+	github.com/clipperhouse/uax29/v2 v2.2.0
 	github.com/couchbase/moss v0.2.0
 	github.com/spf13/cobra v1.8.1
 	go.etcd.io/bbolt v1.4.0
