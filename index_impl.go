@@ -970,7 +970,7 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 }
 
 // LoadAndHighlightAllFields loads stored fields + highlights for root and its descendants.
-// All descendant fields are merged into the root DocumentMatch.
+// All descendant documents are collected into a _$nested array in the root DocumentMatch.
 func LoadAndHighlightAllFields(
 	root *search.DocumentMatch,
 	req *SearchRequest,
@@ -985,33 +985,37 @@ func LoadAndHighlightAllFields(
 	if err != nil {
 		return err, totalStoredFieldsBytes
 	}
-	// load descendants
+	// collect all descendant documents
+	nestedDocs := make([]*search.NestedDocumentMatch, 0)
+	// create a dummy desc DocumentMatch to reuse LoadAndHighlightFields
+	desc := &search.DocumentMatch{}
 	err = root.Children.IterateDescendants(func(descID index.IndexInternalID) error {
 		extID, err := r.ExternalID(descID)
 		if err != nil {
 			return err
 		}
-		desc := &search.DocumentMatch{
-			ID:              extID,
-			IndexInternalID: descID,
-			Locations:       root.Locations,
-		}
+		// reset desc for reuse
+		desc.ID = extID
+		desc.IndexInternalID = descID
+		desc.Locations = root.Locations
 		err, bytes := LoadAndHighlightFields(desc, req, indexName, r, highlighter)
 		totalStoredFieldsBytes += bytes
 		if err != nil {
 			return err
 		}
-		// merge descendant fields into root
-		for fname, val := range desc.Fields {
-			root.AddFieldValue(fname, val)
-		}
-		// merge descendant highlights into root
-		for fname, fr := range desc.Fragments {
-			root.AddFragments(fname, fr)
-		}
+		// copy fields to nested doc and append
+		nestedDocs = append(nestedDocs, search.NewNestedDocumentMatch(desc.Fields, desc.Fragments))
+		desc.Reset()
 		return nil
 	})
-	return err, totalStoredFieldsBytes
+	if err != nil {
+		return err, totalStoredFieldsBytes
+	}
+	// add nested documents to root under _$nested key
+	if len(nestedDocs) > 0 {
+		root.AddFieldValue("_$nested", nestedDocs)
+	}
+	return nil, totalStoredFieldsBytes
 }
 
 // Fields returns the name of all the fields this
