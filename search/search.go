@@ -181,7 +181,7 @@ type DocumentMatch struct {
 
 	// Children holds any descendant/child matches that contributed
 	// to this root (or intermediate LCA) DocumentMatch.
-	Children DescendantStore
+	Children DescendantStore `json:"-"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
@@ -209,7 +209,15 @@ func (dm *DocumentMatch) AddFragments(field string, fragments []string) {
 	if dm.Fragments == nil {
 		dm.Fragments = make(FieldFragmentMap)
 	}
-	dm.Fragments[field] = append(dm.Fragments[field], fragments...)
+OUTER:
+	for _, newFrag := range fragments {
+		for _, existingFrag := range dm.Fragments[field] {
+			if existingFrag == newFrag {
+				continue OUTER // no duplicates allowed
+			}
+		}
+		dm.Fragments[field] = append(dm.Fragments[field], newFrag)
+	}
 }
 
 // Reset allows an already allocated DocumentMatch to be reused
@@ -232,8 +240,6 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	dm.DecodedSort = dm.DecodedSort[:0]
 	// reuse the FieldTermLocations already allocated (and reset len to 0)
 	dm.FieldTermLocations = ftls[:0]
-	// reuse the children slice already allocated (and reset len to 0)
-	dm.Children.Reset()
 	return dm
 }
 
@@ -478,8 +484,19 @@ func (ds DescendantStore) Size() int {
 	return sizeInBytes
 }
 
-func (ds DescendantStore) Reset() {
-	for k := range ds {
-		delete(ds, k)
+// A NestedDocumentMatch is like a DocumentMatch but used for nested documents
+// and does not have score or locations, or a score and is mainly used to
+// hold field values and fragments, to be embedded in the parent DocumentMatch
+type NestedDocumentMatch struct {
+	Fields    map[string]interface{} `json:"fields,omitempty"`
+	Fragments FieldFragmentMap       `json:"fragments,omitempty"`
+}
+
+// NewNestedDocumentMatch creates a new NestedDocumentMatch instance
+// with the given fields and fragments
+func NewNestedDocumentMatch(fields map[string]interface{}, fragments FieldFragmentMap) *NestedDocumentMatch {
+	return &NestedDocumentMatch{
+		Fields:    fields,
+		Fragments: fragments,
 	}
 }
