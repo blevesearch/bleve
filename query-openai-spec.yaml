@@ -82,80 +82,6 @@ tags:
   - name: Network Queries
     description: Network and IP address queries
 
-paths:
-  /validate-query:
-    post:
-      tags:
-        - Basic Queries
-      summary: Validate a Bleve query
-      description: Validates a Bleve query JSON structure
-      requestBody:
-        description: Bleve query to validate
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Query'
-            examples:
-              term_query:
-                summary: Term Query Example
-                value:
-                  term: "search"
-                  field: "title"
-                  boost: 2.0
-              match_query:
-                summary: Match Query Example
-                value:
-                  match: "full text search"
-                  field: "content"
-                  operator: "and"
-                  fuzziness: 1
-              boolean_query:
-                summary: Boolean Query Example
-                value:
-                  must:
-                    term: "important"
-                    field: "status"
-                  should:
-                    - match: "urgent"
-                      field: "title"
-                    - match: "critical"
-                      field: "content"
-                  must_not:
-                    term: "archived"
-                    field: "status"
-                  boost: 1.5
-      responses:
-        '200':
-          description: Query is valid
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  valid:
-                    type: boolean
-                    example: true
-                  query_type:
-                    type: string
-                    example: "term"
-                  message:
-                    type: string
-                    example: "Query is valid"
-        '400':
-          description: Invalid query
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  valid:
-                    type: boolean
-                    example: false
-                  error:
-                    type: string
-                    example: "unknown query type"
-
 components:
   schemas:
     # Base Query Schema
@@ -179,7 +105,6 @@ components:
     # Basic Queries
     TermQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             term:
@@ -195,7 +120,6 @@ components:
 
     MatchQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             match:
@@ -235,7 +159,6 @@ components:
 
     MatchPhraseQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             match_phrase:
@@ -262,7 +185,6 @@ components:
 
     PrefixQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             prefix:
@@ -277,7 +199,6 @@ components:
 
     WildcardQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             wildcard:
@@ -292,7 +213,6 @@ components:
 
     RegexpQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             regexp:
@@ -307,7 +227,6 @@ components:
 
     FuzzyQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             term:
@@ -336,7 +255,6 @@ components:
 
     QueryStringQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             query:
@@ -351,7 +269,6 @@ components:
     # Range Queries
     NumericRangeQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             min:
@@ -379,7 +296,6 @@ components:
 
     DateRangeQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             start:
@@ -407,7 +323,6 @@ components:
 
     TermRangeQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             min:
@@ -434,36 +349,23 @@ components:
     # Boolean Queries
     BooleanQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             must:
               oneOf:
-                - $ref: '#/components/schemas/Query'
                 - type: array
-                  items:
-                    $ref: '#/components/schemas/Query'
               description: Queries that must match
             should:
               oneOf:
-                - $ref: '#/components/schemas/Query'
                 - type: array
-                  items:
-                    $ref: '#/components/schemas/Query'
               description: Queries that should match (boost score)
             must_not:
               oneOf:
-                - $ref: '#/components/schemas/Query'
                 - type: array
-                  items:
-                    $ref: '#/components/schemas/Query'
               description: Queries that must not match
             filter:
               oneOf:
-                - $ref: '#/components/schemas/Query'
                 - type: array
-                  items:
-                    $ref: '#/components/schemas/Query'
               description: Queries that filter results (no score impact)
             min_should:
               type: integer
@@ -485,13 +387,10 @@ components:
 
     ConjunctionQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             conjuncts:
               type: array
-              items:
-                $ref: '#/components/schemas/Query'
               description: Array of queries that must all match
               minItems: 1
           required:
@@ -505,13 +404,10 @@ components:
 
     DisjunctionQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             disjuncts:
               type: array
-              items:
-                $ref: '#/components/schemas/Query'
               description: Array of queries where at least one must match
               minItems: 1
             min:
@@ -533,7 +429,6 @@ components:
     # Special Queries
     MatchAllQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             match_all:
@@ -545,7 +440,6 @@ components:
 
     MatchNoneQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             match_none:
@@ -556,7 +450,6 @@ components:
 
     BoolFieldQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             bool:
@@ -570,7 +463,6 @@ components:
 
     DocIDQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             ids:
@@ -587,7 +479,6 @@ components:
     # Geographic Queries
     GeoDistanceQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             location:
@@ -620,7 +511,6 @@ components:
 
     GeoBoundingBoxQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             top_left:
@@ -665,7 +555,6 @@ components:
 
     GeoBoundingPolygonQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             polygon_points:
@@ -700,7 +589,6 @@ components:
 
     GeoShapeQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             geometry:
@@ -727,7 +615,6 @@ components:
     # Vector Queries
     KNNQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             field:
@@ -762,7 +649,6 @@ components:
     # Network Queries
     IPRangeQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             cidr:
@@ -777,7 +663,6 @@ components:
     # Phrase Query (internal use)
     PhraseQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             terms:
@@ -793,7 +678,6 @@ components:
 
     MultiPhraseQuery:
       allOf:
-        - $ref: '#/components/schemas/Query'
         - type: object
           properties:
             terms:
