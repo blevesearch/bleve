@@ -1241,7 +1241,7 @@ func (is *IndexSnapshot) MergeUpdateFieldsInfo(updatedFields map[string]*index.U
 func (is *IndexSnapshot) TermFrequencies(field string, limit int, descending bool) (
 	termsFreqs []index.TermFreq, err error) {
 	if len(is.segment) == 0 {
-		return nil, fmt.Errorf("no segments available")
+		return nil, nil
 	}
 
 	if limit <= 0 {
@@ -1287,7 +1287,7 @@ func (is *IndexSnapshot) TermFrequencies(field string, limit int, descending boo
 	}
 
 	if len(termFreqs) == 0 {
-		return nil, fmt.Errorf("no terms found for field %s", field)
+		return nil, nil
 	}
 
 	termFreqList := make([]index.TermFreq, 0, len(termFreqs))
@@ -1299,26 +1299,19 @@ func (is *IndexSnapshot) TermFrequencies(field string, limit int, descending boo
 	}
 
 	// Sort by frequency (descending or ascending)
-	if descending {
-		sort.Slice(termFreqList, func(i, j int) bool {
-			if termFreqList[i].Frequency == termFreqList[j].Frequency {
-				// If frequencies are equal, sort by term lexicographically
-				return strings.Compare(termFreqList[i].Term, termFreqList[j].Term) < 0
-			}
+	sort.Slice(termFreqList, func(i, j int) bool {
+		if termFreqList[i].Frequency == termFreqList[j].Frequency {
+			// If frequencies are equal, sort by term lexicographically
+			return strings.Compare(termFreqList[i].Term, termFreqList[j].Term) < 0
+		}
+		if descending {
 			return termFreqList[i].Frequency > termFreqList[j].Frequency
-		})
-	} else {
-		sort.Slice(termFreqList, func(i, j int) bool {
-			if termFreqList[i].Frequency == termFreqList[j].Frequency {
-				// If frequencies are equal, sort by term lexicographically
-				return strings.Compare(termFreqList[i].Term, termFreqList[j].Term) < 0
-			}
-			return termFreqList[i].Frequency < termFreqList[j].Frequency
-		})
-	}
+		}
+		return termFreqList[i].Frequency < termFreqList[j].Frequency
+	})
 
-	if limit > len(termFreqList) {
-		limit = len(termFreqList)
+	if limit >= len(termFreqList) {
+		return termFreqList, nil
 	}
 
 	return termFreqList[:limit], nil

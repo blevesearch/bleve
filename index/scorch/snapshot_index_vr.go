@@ -170,16 +170,16 @@ func (i *IndexSnapshotVectorReader) Close() error {
 }
 
 func (i *IndexSnapshot) CentroidCardinalities(field string, limit int, descending bool) (
-	centroids []index.CentroidCardinality, err error) {
+	[]index.CentroidCardinality, error) {
 	if len(i.segment) == 0 {
-		return nil, fmt.Errorf("no segments available")
+		return nil, nil
 	}
 
 	if limit <= 0 {
 		return nil, fmt.Errorf("limit must be positive")
 	}
 
-	rvCentroids := make([]index.CentroidCardinality, 0, limit)
+	centroids := make([]index.CentroidCardinality, 0, limit*len(i.segment))
 
 	for _, segment := range i.segment {
 		if sv, ok := segment.segment.(segment_api.VectorSegment); ok {
@@ -194,28 +194,26 @@ func (i *IndexSnapshot) CentroidCardinalities(field string, limit int, descendin
 				return nil, fmt.Errorf("failed to obtain top k centroid cardinalities for field %s in segment: %v", field, err)
 			}
 
-			if len(centroidCardinalities) == 0 {
-				continue
+			if len(centroidCardinalities) > 0 {
+				centroids = append(centroids, centroidCardinalities...)
 			}
-
-			centroidCardinalities = append(centroidCardinalities, rvCentroids...)
-			if descending {
-				sort.Slice(centroidCardinalities, func(i, j int) bool {
-					return centroidCardinalities[i].Cardinality > centroidCardinalities[j].Cardinality
-				})
-			} else {
-				sort.Slice(centroidCardinalities, func(i, j int) bool {
-					return centroidCardinalities[i].Cardinality < centroidCardinalities[j].Cardinality
-				})
-			}
-
-			if limit > len(centroidCardinalities) {
-				limit = len(centroidCardinalities)
-			}
-
-			rvCentroids = centroidCardinalities[:limit]
 		}
 	}
 
-	return rvCentroids, nil
+	if len(centroids) == 0 {
+		return nil, nil
+	}
+
+	sort.Slice(centroids, func(i, j int) bool {
+		if descending {
+			return centroids[i].Cardinality > centroids[j].Cardinality
+		}
+		return centroids[i].Cardinality < centroids[j].Cardinality
+	})
+
+	if limit >= len(centroids) {
+		return centroids, nil
+	}
+
+	return centroids[:limit], nil
 }
