@@ -1286,3 +1286,68 @@ func (i *indexImpl) FireIndexEvent() {
 		internalEventIndex.FireIndexEvent()
 	}
 }
+
+// -----------------------------------------------------------------------------
+
+func (i *indexImpl) TermFrequencies(field string, limit int, descending bool) (
+	[]index.TermFreq, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
+	reader, err := i.i.Reader()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if cerr := reader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	insightsReader, ok := reader.(index.IndexInsightsReader)
+	if !ok {
+		return nil, fmt.Errorf("index reader does not support TermFrequencies")
+	}
+
+	return insightsReader.TermFrequencies(field, limit, descending)
+}
+
+func (i *indexImpl) CentroidCardinalities(field string, limit int, descending bool) (
+	[]index.CentroidCardinality, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
+	reader, err := i.i.Reader()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if cerr := reader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	insightsReader, ok := reader.(index.IndexInsightsReader)
+	if !ok {
+		return nil, fmt.Errorf("index reader does not support CentroidCardinalities")
+	}
+
+	centroidCardinalities, err := insightsReader.CentroidCardinalities(field, limit, descending)
+	if err != nil {
+		return nil, err
+	}
+
+	for j := 0; j < len(centroidCardinalities); j++ {
+		centroidCardinalities[j].Index = i.name
+	}
+
+	return centroidCardinalities, nil
+}
