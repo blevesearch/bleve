@@ -2486,6 +2486,12 @@ func TestIndexUpdateText(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	q1 := NewSearchRequest(NewQueryStringQuery("a:*"))
 	q1.Fields = append(q1.Fields, "a")
@@ -2658,6 +2664,12 @@ func TestIndexUpdateSynonym(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	q1 := NewSearchRequest(NewQueryStringQuery("a:devoted"))
 	res1, err := index.Search(q1)
@@ -2873,6 +2885,12 @@ func TestIndexUpdateMerge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	impl, ok := index.(*indexImpl)
 	if !ok {
@@ -3047,6 +3065,12 @@ func BenchmarkIndexUpdateText(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	b.ResetTimer()
 

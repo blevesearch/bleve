@@ -1882,7 +1882,7 @@ func TestIndexUpdateVector(t *testing.T) {
 		t.Fatalf("Expected 3 hits, got %d\n", len(res1.Hits))
 	}
 	q2 := NewSearchRequest(NewMatchNoneQuery())
-	q2.AddKNN("e", []float32{1, 2, 3, 4}, 3, 1.0)
+	q2.AddKNN("b", []float32{1, 2, 3, 4}, 3, 1.0)
 	res2, err := index.Search(q2)
 	if err != nil {
 		t.Fatal(err)
