@@ -16,6 +16,7 @@ package bleve
 
 import (
 	"github.com/blevesearch/bleve/v2/fusion"
+	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/query"
 )
 
@@ -83,6 +84,8 @@ func (r *rescorer) restoreSearchRequest() {
 }
 
 func (r *rescorer) rescore(sr *SearchResult) {
+	r.mergeDocs(sr)
+
 	var fusionResult *fusion.FusionResult
 
 	switch r.req.Score {
@@ -101,6 +104,36 @@ func (r *rescorer) rescore(sr *SearchResult) {
 	sr.Hits = fusionResult.Hits
 	sr.Total = fusionResult.Total
 	sr.MaxScore = fusionResult.MaxScore
+}
+
+func (r *rescorer) mergeDocs(sr *SearchResult) {
+	if len(sr.FusionKnnHits) == 0 {
+		return
+	}	
+
+	knnHitMap := make(map[string]*search.DocumentMatch, len(sr.FusionKnnHits))
+
+	for _, hit := range sr.FusionKnnHits {
+		hit.Score = 0.0
+		knnHitMap[hit.ID] = hit
+	}
+
+	for _, hit := range sr.Hits {
+		if knnHit, ok := knnHitMap[hit.ID]; ok {
+			hit.ScoreBreakdown = knnHit.ScoreBreakdown
+			if r.req.Explain {
+				hit.Expl = &search.Explanation{Value: 0.0, Message: "", Children: append([]*search.Explanation{hit.Expl}, knnHit.Expl.Children...)}
+			}
+			delete(knnHitMap, hit.ID)
+		}
+	}
+
+	for _, hit := range knnHitMap {
+		sr.Hits = append(sr.Hits, hit)
+		if r.req.Explain {
+			hit.Expl = &search.Explanation{Value: 0.0, Message: "", Children: append([]*search.Explanation{nil}, hit.Expl.Children...)}
+		}
+	}
 }
 
 func newRescorer(req *SearchRequest) *rescorer {

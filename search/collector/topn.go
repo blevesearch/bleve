@@ -247,16 +247,10 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		backingSize = PreAllocSizeSkipCap + 1
 	}
 
-	var scoreFusion bool
-	if _, ok := ctx.Value(search.ScoreFusionKey).(bool); ok {
-		scoreFusion = true
-	}
-
 	searchContext := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(backingSize+searcher.DocumentMatchPoolSize(), len(hc.sort)),
 		Collector:         hc,
 		IndexReader:       reader,
-		ScoreFusion:       scoreFusion,
 	}
 
 	hc.dvReader, err = reader.DocValueReader(hc.neededFields)
@@ -271,12 +265,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		hc.sort.UpdateVisitor(field, term)
 	}
 
-	var dmHandlerMaker func(ctx *search.SearchContext) (search.DocumentMatchHandler, bool, error)
-	if scoreFusion {
-		dmHandlerMaker = MakeTopNScoreFusionDocumentMatchHandler
-	} else {
-		dmHandlerMaker = MakeTopNDocumentMatchHandler
-	}
+	dmHandlerMaker := MakeTopNDocumentMatchHandler
 
 	if cv := ctx.Value(search.MakeDocumentMatchHandlerKey); cv != nil {
 		dmHandlerMaker = cv.(search.MakeDocumentMatchHandler)
@@ -334,13 +323,9 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			if err != nil {
 				return err
 			}
-
-			if !scoreFusion {
-				// If rescoring required, knn hits are handled later.
-				err = dmHandler(knnDoc)
-				if err != nil {
-					return err
-				}
+			err = dmHandler(knnDoc)
+			if err != nil {
+				return err
 			}
 		}
 	}
@@ -366,7 +351,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	hc.took = time.Since(startTime)
 
 	// finalize actual results
-	err = hc.finalizeResults(reader, scoreFusion)
+	err = hc.finalizeResults(reader)
 	if err != nil {
 		return err
 	}
@@ -383,13 +368,7 @@ func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 			return err
 		}
 		if knnHit, ok := hc.knnHits[d.ID]; ok {
-			// if rescoring needed, adds the knn ScoreBreakdown field to the
-			// query doc. Query doc now contains the query score (Score field)
-			// as well as the individual knn scores (ScoreBreakdown)
 			d.Score, d.Expl = hc.computeNewScoreExpl(d, knnHit)
-			if ctx.ScoreFusion {
-				d.ScoreBreakdown = knnHit.ScoreBreakdown
-			}
 			delete(hc.knnHits, d.ID)
 		}
 	}
@@ -508,66 +487,6 @@ func MakeTopNDocumentMatchHandler(
 	return nil, false, nil
 }
 
-func MakeTopNScoreFusionDocumentMatchHandler(
-	ctx *search.SearchContext) (search.DocumentMatchHandler, bool, error) {
-	var hc *TopNCollector
-	var ok bool
-	if hc, ok = ctx.Collector.(*TopNCollector); ok {
-		// Code adapted from MakeTopNDocumentMatchHandler. The main
-		// difference comes from how knnHits are handled; if the store
-		// cannot accomodate a knnHit because it's Score is too low, its
-		// Score is set to 0 and placed back in knnHits. This way, store
-		// accumulates only the top documents as per query. knnHits will
-		// be added later.
-		return func(d *search.DocumentMatch) error {
-			if d == nil {
-				return nil
-			}
-
-			// No search after pagination, since it's disabled in fusion
-
-			if hc.lowestMatchOutsideResults != nil {
-				cmp := hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, d,
-					hc.lowestMatchOutsideResults)
-				if cmp >= 0 {
-					if len(d.ScoreBreakdown) > 0 {
-						// knnHit, shouldn't be discarded!
-						hc.knnHits[d.ID] = d
-					} else {
-						ctx.DocumentMatchPool.Put(d)
-					}
-					return nil
-				}
-			}
-
-			removed := hc.store.AddNotExceedingSize(d, hc.size+hc.skip)
-			if removed != nil {
-				if len(removed.ScoreBreakdown) > 0 {
-					// not ignoring a knnHit
-					hc.knnHits[removed.ID] = removed
-				}
-				if hc.lowestMatchOutsideResults == nil {
-					hc.lowestMatchOutsideResults = removed
-				} else {
-					cmp := hc.sort.Compare(hc.cachedScoring, hc.cachedDesc,
-						removed, hc.lowestMatchOutsideResults)
-					if cmp < 0 {
-						tmp := hc.lowestMatchOutsideResults
-						hc.lowestMatchOutsideResults = removed
-						if len(tmp.ScoreBreakdown) == 0 {
-							// returning a doc to pool iff not knnHit
-							ctx.DocumentMatchPool.Put(tmp)
-						}
-					}
-				}
-			}
-
-			return nil
-		}, false, nil
-	}
-	return nil, false, nil
-}
-
 // visitFieldTerms is responsible for visiting the field terms of the
 // search hit, and passing visited terms to the sort and facet builder
 func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.DocumentMatch, v index.DocValueVisitor) error {
@@ -616,9 +535,9 @@ func (hc *TopNCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
 // finalizeResults starts with the heap containing the final top size+skip
 // it now throws away the results to be skipped
 // and does final doc id lookup (if necessary)
-func (hc *TopNCollector) finalizeResults(r index.IndexReader, scoreFusion bool) error {
+func (hc *TopNCollector) finalizeResults(r index.IndexReader) error {
 	var err error
-	fixupFunc := func(doc *search.DocumentMatch) error {
+	hc.results, err = hc.store.Final(hc.skip, func(doc *search.DocumentMatch) error {
 		if doc.ID == "" {
 			// look up the id since we need it for lookup
 			var err error
@@ -629,25 +548,9 @@ func (hc *TopNCollector) finalizeResults(r index.IndexReader, scoreFusion bool) 
 		}
 		doc.Complete(nil)
 		return nil
-	}
+	})
 
-	hc.results, err = hc.store.Final(hc.skip, fixupFunc)
-	if err != nil {
-		return err
-	}
-
-	if scoreFusion {
-		for _, v := range hc.knnHits {
-			v.Score = 0.0
-			err := fixupFunc(v)
-			if err != nil {
-				return err
-			}
-			hc.results = append(hc.results, v)
-		}
-	}
-
-	return nil
+	return err
 }
 
 // Results returns the collected hits
@@ -684,4 +587,19 @@ func (hc *TopNCollector) SetKNNHits(knnHits search.DocumentMatchCollection, newS
 		hc.knnHits[hit.ID] = hit
 	}
 	hc.computeNewScoreExpl = newScoreExplComputer
+}
+
+func (hc *TopNCollector) ProcessKNNHits(knnhits []*search.DocumentMatch, reader index.IndexReader) error {
+	// This function is used for faceting with KNN docs. This function is called
+	// when score fusion is used, since knn doc processing is done separately.
+	if hc.facetsBuilder != nil {
+		for _, hit := range knnhits {
+			err := hc.prepareDocumentMatch(nil, reader, hit, true)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	
+	return nil
 }

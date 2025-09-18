@@ -377,7 +377,6 @@ type SearchContext struct {
 	DocumentMatchPool *DocumentMatchPool
 	Collector         Collector
 	IndexReader       index.IndexReader
-	ScoreFusion       bool
 }
 
 func (sc *SearchContext) Size() int {

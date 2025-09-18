@@ -472,21 +472,7 @@ func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, 
 			}
 			return totalScore, &search.Explanation{Value: totalScore, Message: "sum of:", Children: []*search.Explanation{queryMatch.Expl, knnMatch.Expl}}
 		}
-
-		// This function is in case of score fusion. Score field is just the query score, no changes here. KNN scores are preserved in ScoreBreakdown.
-		// Store explanations as Children for query + all KNNs with dummy Value, Message. Proper explanations will be computed in fusion code.
-		scoreFusionScoreExplComputer := func(queryMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) (float64, *search.Explanation) {
-			if !req.Explain {
-				return queryMatch.Score, nil
-			}
-			return queryMatch.Score, &search.Explanation{Value: 0.0, Message: "", Children: append([]*search.Explanation{queryMatch.Expl}, knnMatch.Expl.Children...)}
-		}
-
-		if IsScoreFusionRequired(req) {
-			coll.SetKNNHits(knnHits, search.ScoreExplCorrectionCallbackFunc(scoreFusionScoreExplComputer))
-		} else {
-			coll.SetKNNHits(knnHits, search.ScoreExplCorrectionCallbackFunc(newScoreExplComputer))
-		}
+		coll.SetKNNHits(knnHits, search.ScoreExplCorrectionCallbackFunc(newScoreExplComputer))
 	}
 }
 

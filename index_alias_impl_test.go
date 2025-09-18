@@ -594,7 +594,7 @@ func TestMultiSearchNoError(t *testing.T) {
 		MaxScore: 2.0,
 	}
 
-	multiSearchParams := multiSearchParams{nil, false, nil}
+	multiSearchParams := multiSearchParams{nil, false, nil, nil}
 	results, err := MultiSearch(context.Background(), sr, multiSearchParams, ei1, ei2)
 	if err != nil {
 		t.Error(err)
@@ -626,7 +626,7 @@ func TestMultiSearchSomeError(t *testing.T) {
 	}}
 	ei2 := &stubIndex{name: "ei2", err: fmt.Errorf("deliberate error")}
 	sr := NewSearchRequest(NewTermQuery("test"))
-	multiSearchParams := multiSearchParams{nil, false, nil}
+	multiSearchParams := multiSearchParams{nil, false, nil, nil}
 	res, err := MultiSearch(context.Background(), sr, multiSearchParams, ei1, ei2)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -654,7 +654,7 @@ func TestMultiSearchAllError(t *testing.T) {
 	ei1 := &stubIndex{name: "ei1", err: fmt.Errorf("deliberate error")}
 	ei2 := &stubIndex{name: "ei2", err: fmt.Errorf("deliberate error")}
 	sr := NewSearchRequest(NewTermQuery("test"))
-	multiSearchParams := multiSearchParams{nil, false, nil}
+	multiSearchParams := multiSearchParams{nil, false, nil, nil}
 	res, err := MultiSearch(context.Background(), sr, multiSearchParams, ei1, ei2)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -711,7 +711,7 @@ func TestMultiSearchSecondPage(t *testing.T) {
 		checkRequest: checkRequest,
 	}
 	sr := NewSearchRequestOptions(NewTermQuery("test"), 10, 10, false)
-	multiSearchParams := multiSearchParams{nil, false, nil}
+	multiSearchParams := multiSearchParams{nil, false, nil, nil}
 	_, err := MultiSearch(context.Background(), sr, multiSearchParams, ei1, ei2)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
@@ -791,7 +791,7 @@ func TestMultiSearchTimeout(t *testing.T) {
 	defer cancel()
 	query := NewTermQuery("test")
 	sr := NewSearchRequest(query)
-	multiSearchParams := multiSearchParams{nil, false, nil}
+	multiSearchParams := multiSearchParams{nil, false, nil, nil}
 	res, err := MultiSearch(ctx, sr, multiSearchParams, ei1, ei2)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -974,7 +974,7 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 		MaxScore: 2.0,
 	}
 
-	multiSearchParams := multiSearchParams{nil, false, nil}
+	multiSearchParams := multiSearchParams{nil, false, nil, nil}
 	res, err := MultiSearch(ctx, sr, multiSearchParams, ei1, ei2, ei3)
 	if err != nil {
 		t.Fatalf("expected no err, got %v", err)
@@ -1233,7 +1233,7 @@ func TestMultiSearchCustomSort(t *testing.T) {
 		MaxScore: 3.0,
 	}
 
-	multiSearchParams := multiSearchParams{nil, false, nil}
+	multiSearchParams := multiSearchParams{nil, false, nil, nil}
 	results, err := MultiSearch(context.Background(), sr, multiSearchParams, ei1, ei2)
 	if err != nil {
 		t.Error(err)

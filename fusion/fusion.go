@@ -87,11 +87,6 @@ func scoreSortFunc() func(i, j *search.DocumentMatch) int {
 }
 
 func getFusionExplAt(hit *search.DocumentMatch, i int, value float64, message string) *search.Explanation {
-	if hit.Score == 0.0 {
-		// No query component here; explanation doesn't contain it, hence decrement i
-		i--
-	}
-
 	return &search.Explanation{
 		Value: value,
 		Message: message,
