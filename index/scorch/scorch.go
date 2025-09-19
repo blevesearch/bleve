@@ -962,6 +962,10 @@ func (s *Scorch) UpdateFields(fieldInfo map[string]*index.UpdateFieldInfo, mappi
 }
 
 func (s *Scorch) OpenMeta() error {
+	if s.loadedBolt {
+		return nil
+	}
+
 	err := s.openBolt()
 	if err != nil {
 		return err

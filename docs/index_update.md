@@ -1,6 +1,6 @@
 # Ability to reduce downtime during index mapping updates
 
-* *v2.5.0* (and after) will come with support to delete or modify any field mapping in the index mapping without requiring a full rebuild of the index
+* *v2.5.4* (and after) will come with support to delete or modify any field mapping in the index mapping without requiring a full rebuild of the index
 * We do this by storing which portions of the field has to be deleted within zap and then lazily executing the deletion during subsequent merging of the segments
 
 ## Usage
