@@ -209,11 +209,10 @@ func createFTSSearchRequest() *SearchRequest {
 	disjunctionQuery := query.NewDisjunctionQuery(queries)
 	searchRequest.Query = disjunctionQuery
 
-	src, sws := 1, 10
-	searchRequest.Params = Params{ScoreRankConstant: &src, ScoreWindowSize: &sws}
+	searchRequest.RequestParams = &Params{ScoreRankConstant: 1, ScoreWindowSize: 10}
 
 	searchRequest.Size = 10
-	searchRequest.Score = ReciprocalRankFusionStrategy
+	searchRequest.Score = ScoreRRF
 
 	searchRequest.Explain = false
 	return searchRequest

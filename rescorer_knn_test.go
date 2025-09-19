@@ -169,11 +169,10 @@ func createHybridSearchRequest() *SearchRequest {
 	queryVector_2 := []float32{0, 0, 250} // lighter blue
 	searchRequest.AddKNN("colorvect_l2", queryVector_2, 5, 1.0)
 
-	src, sws := 1, 10
-	searchRequest.Params = Params{ScoreRankConstant: &src, ScoreWindowSize: &sws}
+	searchRequest.RequestParams = &Params{ScoreRankConstant: 1, ScoreWindowSize: 10}
 
 	searchRequest.Size = 10
-	searchRequest.Score = ReciprocalRankFusionStrategy
+	searchRequest.Score = ScoreRRF
 
 	searchRequest.Explain = false
 	return searchRequest

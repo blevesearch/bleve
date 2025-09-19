@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	ReciprocalRankFusionStrategy = "rrf"
+	DefaultScoreRankConstant = 60
 )
 
 // Rescorer is applied after all the query and knn results are obtained.
@@ -39,21 +39,16 @@ type rescorer struct {
 // Also mutates the SearchRequest by:
 // - Setting boosts to 1: top level boosts only used for rescoring
 // - Setting From and Size to 0 and ScoreWindowSize
-func (r *rescorer) prepareSearchRequest() {
-	if r.req.Params.ScoreRankConstant == nil {
-		src := 60
-		r.req.Params.ScoreRankConstant = &src
+func (r *rescorer) prepareSearchRequest() error {
+	if r.req.RequestParams == nil {
+		r.req.RequestParams = NewDefaultParams(r.req.Size)
 	}
 
-	if r.req.Params.ScoreWindowSize == nil {
-		sws := r.req.Size
-		r.req.Params.ScoreWindowSize = &sws
-	}
 	r.origFrom = r.req.From
 	r.origSize = r.req.Size
 
 	r.req.From = 0
-	r.req.Size = *r.req.Params.ScoreWindowSize
+	r.req.Size = r.req.RequestParams.ScoreWindowSize
 
 	// req.Query's top level boost comes first, followed by the KNN queries
 	numQueries := numKNNQueries(r.req) + 1
@@ -69,6 +64,8 @@ func (r *rescorer) prepareSearchRequest() {
 
 	// for all the knn queries, replace boost values
 	r.prepareKnnRequest()
+
+	return nil
 }
 
 func (r *rescorer) restoreSearchRequest() {
@@ -89,12 +86,12 @@ func (r *rescorer) rescore(sr *SearchResult) {
 	var fusionResult *fusion.FusionResult
 
 	switch r.req.Score {
-	case ReciprocalRankFusionStrategy:
+	case ScoreRRF:
 		res := fusion.ReciprocalRankFusion(
 			sr.Hits,
 			r.origBoosts,
-			*r.req.Params.ScoreRankConstant,
-			*r.req.Params.ScoreWindowSize,
+			r.req.RequestParams.ScoreRankConstant,
+			r.req.RequestParams.ScoreWindowSize,
 			numKNNQueries(r.req),
 			r.req.Explain,
 		)
@@ -109,7 +106,7 @@ func (r *rescorer) rescore(sr *SearchResult) {
 func (r *rescorer) mergeDocs(sr *SearchResult) {
 	if len(sr.FusionKnnHits) == 0 {
 		return
-	}	
+	}
 
 	knnHitMap := make(map[string]*search.DocumentMatch, len(sr.FusionKnnHits))
 

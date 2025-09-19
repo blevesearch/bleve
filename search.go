@@ -48,6 +48,20 @@ var cache = registry.NewCache()
 
 const defaultDateTimeParser = optional.Name
 
+const (
+	ScoreDefault = ""
+	ScoreNone    = "none"
+	ScoreRRF     = "rrf"
+)
+
+var SupportedScoreValues = map[string]int{
+	ScoreDefault: 0,
+	ScoreNone:    1,
+	ScoreRRF:     2,
+}
+
+var AllowedFusionSort = search.SortOrder{&search.SortScore{Desc: true}}
+
 type dateTimeRange struct {
 	Name           string    `json:"name,omitempty"`
 	Start          time.Time `json:"start,omitempty"`
@@ -325,8 +339,12 @@ func (r *SearchRequest) Validate() error {
 	if IsScoreFusionRequired(r) {
 		if r.SearchAfter != nil || r.SearchBefore != nil {
 			return fmt.Errorf("cannot use search after or search before with score fusion")
-		} else if so := (search.SortOrder{&search.SortScore{Desc: true}}); r.Sort != nil && !reflect.DeepEqual(r.Sort, so) {
-			return fmt.Errorf("sort must be empty or descending order of score for score fusion")
+		}
+
+		if r.Sort != nil {
+			if !reflect.DeepEqual(r.Sort, AllowedFusionSort) {
+				return fmt.Errorf("sort must be empty or descending order of score for score fusion")
+			}
 		}
 	}
 
@@ -677,7 +695,7 @@ func isMatchAllQuery(q query.Query) bool {
 // Checks if the request is hybrid search. Currently supports: RRF.
 func IsScoreFusionRequired(req *SearchRequest) bool {
 	switch req.Score {
-	case ReciprocalRankFusionStrategy:
+	case ScoreRRF:
 		return true
 	default:
 		return false
@@ -687,46 +705,72 @@ func IsScoreFusionRequired(req *SearchRequest) bool {
 // Additional parameters in the search request. Currently only being
 // used for hybrid search parameters.
 type Params struct {
-	ScoreRankConstant *int `json:"score_rank_constant,omitempty"`
-	ScoreWindowSize   *int `json:"score_window_size,omitempty"`
+	ScoreRankConstant int `json:"score_rank_constant,omitempty"`
+	ScoreWindowSize   int `json:"score_window_size,omitempty"`
+}
+
+func NewDefaultParams(size int) *Params {
+	return &Params{
+		ScoreRankConstant: DefaultScoreRankConstant,
+		ScoreWindowSize:   size,
+	}
+}
+
+func (p *Params) UnmarshalJSON(input []byte) error {
+	var temp struct {
+		ScoreRankConstant *int `json:"score_rank_constant,omitempty"`
+		ScoreWindowSize   *int `json:"score_window_size,omitempty"`
+	}
+
+	if err := util.UnmarshalJSON(input, &temp); err != nil {
+		return err
+	}
+
+	if temp.ScoreRankConstant != nil {
+		p.ScoreRankConstant = *temp.ScoreRankConstant
+	}
+
+	if temp.ScoreWindowSize != nil {
+		p.ScoreWindowSize = *temp.ScoreWindowSize
+	}
+
+	return nil
+}
+
+func (p *Params) Validate(size int) error {
+	if p.ScoreWindowSize < 1 {
+		return fmt.Errorf("score window size must be greater than 0")
+	} else if p.ScoreWindowSize < size {
+		return fmt.Errorf("score window size must be greater than or equal to Size (%d)", size)
+	}
+
+	return nil
 }
 
 func ParseParams(r *SearchRequest, input []byte) (*Params, error) {
+	params := NewDefaultParams(r.Size)
 	if len(input) == 0 {
-		src := 60
-		sws := r.Size
-		return &Params{ScoreRankConstant: &src, ScoreWindowSize: &sws}, nil
+		return params, nil
 	}
 
-	var params Params
-	err := util.UnmarshalJSON(input, &params)
+	err := util.UnmarshalJSON(input, params)
 	if err != nil {
 		return nil, err
 	}
 
-	if params.ScoreRankConstant == nil {
-		src := 60
-		params.ScoreRankConstant = &src
+	// validate params
+	err = params.Validate(r.Size)
+	if err != nil {
+		return nil, err
 	}
 
-	if params.ScoreWindowSize != nil {
-		if *params.ScoreWindowSize < 1 {
-			return nil, fmt.Errorf("score window size must be greater than 0")
-		} else if *params.ScoreWindowSize < r.Size {
-			return nil, fmt.Errorf("score window size must be greater than or equal to Size (%d)", r.Size)
-		}
-	} else {
-		sws := r.Size
-		params.ScoreWindowSize = &sws
-	}
-
-	return &params, nil
+	return params, nil
 }
 
 func validateScore(r *SearchRequest) error {
-	if r.Score == "" || r.Score == "none" || IsScoreFusionRequired(r) {
-		return nil
+	if _, exists := SupportedScoreValues[r.Score]; !exists {
+		return fmt.Errorf("invalid score field \"%s\": must be one of \"\", \"none\", \"%s\"", r.Score, ScoreRRF)
 	}
 
-	return fmt.Errorf("invalid score field \"%s\": must be one of \"\", \"none\", \"%s\"", r.Score, ReciprocalRankFusionStrategy)
+	return nil
 }

@@ -77,7 +77,7 @@ type SearchRequest struct {
 
 	PreSearchData map[string]interface{} `json:"pre_search_data,omitempty"`
 
-	Params Params `json:"params,omitempty"`
+	RequestParams *Params `json:"params,omitempty"`
 
 	sortFunc func(sort.Interface)
 }
@@ -99,7 +99,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		SearchAfter      []string          `json:"search_after"`
 		SearchBefore     []string          `json:"search_before"`
 		PreSearchData    json.RawMessage   `json:"pre_search_data"`
-		Params           json.RawMessage   `json:"params"`
+		RequestParams    json.RawMessage   `json:"params"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -141,24 +141,21 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.From = 0
 	}
 
-	if temp.Params == nil {
+	if temp.RequestParams == nil {
 		if IsScoreFusionRequired(r) {
 			// If params is not present and it requires rescoring, assign
-			// def values
-			src := 60
-			sws := r.Size
-			params := Params{ScoreRankConstant: &src, ScoreWindowSize: &sws}
-			r.Params = params
+			// default values
+			r.RequestParams = NewDefaultParams(r.Size)
 		}
 	} else {
 		// if it is a request that requires rescoring, validate the rescoring
 		// parameters. Return errors if they are not valid.
 		if IsScoreFusionRequired(r) {
-			params, err := ParseParams(r, temp.Params)
+			params, err := ParseParams(r, temp.RequestParams)
 			if err != nil {
 				return err
 			}
-			r.Params = *params
+			r.RequestParams = params
 		}
 	}
 

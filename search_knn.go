@@ -67,7 +67,7 @@ type SearchRequest struct {
 
 	PreSearchData map[string]interface{} `json:"pre_search_data,omitempty"`
 
-	Params Params `json:"params,omitempty"`
+	RequestParams *Params `json:"params,omitempty"`
 
 	sortFunc func(sort.Interface)
 }
@@ -150,7 +150,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		KNN              []*tempKNNReq     `json:"knn"`
 		KNNOperator      knnOperator       `json:"knn_operator"`
 		PreSearchData    json.RawMessage   `json:"pre_search_data"`
-		Params           json.RawMessage   `json:"params"`
+		RequestParams    json.RawMessage   `json:"params"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -192,24 +192,21 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.From = 0
 	}
 
-	if temp.Params == nil {
+	if temp.RequestParams == nil {
 		if IsScoreFusionRequired(r) {
 			// If params is not present and it is requires rescoring, assign
 			// default values
-			src := 60
-			sws := r.Size
-			params := Params{ScoreRankConstant: &src, ScoreWindowSize: &sws}
-			r.Params = params
+			r.RequestParams = NewDefaultParams(r.Size)
 		}
 	} else {
 		// if it is a request that requires rescoring, parse the rescoring
 		// parameters.
 		if IsScoreFusionRequired(r) {
-			params, err := ParseParams(r, temp.Params)
+			params, err := ParseParams(r, temp.RequestParams)
 			if err != nil {
 				return err
 			}
-			r.Params = *params
+			r.RequestParams = params
 		}
 	}
 
@@ -235,12 +232,6 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.KNNOperator = temp.KNNOperator
 	if r.KNNOperator == "" {
 		r.KNNOperator = knnOperatorOr
-	}
-
-	if IsScoreFusionRequired(r) {
-		if r.KNNOperator == knnOperatorAnd {
-			return fmt.Errorf("knn operator 'and' is not compatible with score fusion")
-		}
 	}
 
 	if temp.PreSearchData != nil {
@@ -273,7 +264,7 @@ func copySearchRequest(req *SearchRequest, preSearchData map[string]interface{})
 		KNN:              req.KNN,
 		KNNOperator:      req.KNNOperator,
 		PreSearchData:    preSearchData,
-		Params:           req.Params,
+		RequestParams:    req.RequestParams,
 	}
 	return &rv
 
@@ -357,6 +348,12 @@ func validateKNN(req *SearchRequest) error {
 		// Valid cases, do nothing
 	default:
 		return fmt.Errorf("knn_operator must be either 'and' / 'or'")
+	}
+
+	if IsScoreFusionRequired(req) {
+		if req.KNNOperator == knnOperatorAnd {
+			return fmt.Errorf("knn operator 'and' is not compatible with score fusion")
+		}
 	}
 	return nil
 }
