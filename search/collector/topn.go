@@ -588,18 +588,3 @@ func (hc *TopNCollector) SetKNNHits(knnHits search.DocumentMatchCollection, newS
 	}
 	hc.computeNewScoreExpl = newScoreExplComputer
 }
-
-func (hc *TopNCollector) ProcessKNNHits(knnhits []*search.DocumentMatch, reader index.IndexReader) error {
-	// This function is used for faceting with KNN docs. This function is called
-	// when score fusion is used, since knn doc processing is done separately.
-	if hc.facetsBuilder != nil {
-		for _, hit := range knnhits {
-			err := hc.prepareDocumentMatch(nil, reader, hit, true)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	
-	return nil
-}
