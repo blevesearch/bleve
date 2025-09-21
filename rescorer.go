@@ -15,6 +15,8 @@
 package bleve
 
 import (
+	"fmt"
+
 	"github.com/blevesearch/bleve/v2/fusion"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/query"
@@ -85,6 +87,10 @@ func (r *rescorer) rescore(sr *SearchResult) {
 
 	var fusionResult *fusion.FusionResult
 
+	for _, hit := range sr.Hits {
+		fmt.Println(hit.ID, hit.Score)
+	}
+
 	switch r.req.Score {
 	case ScoreRRF:
 		res := fusion.ReciprocalRankFusion(
@@ -93,6 +99,26 @@ func (r *rescorer) rescore(sr *SearchResult) {
 			r.req.RequestParams.ScoreRankConstant,
 			r.req.RequestParams.ScoreWindowSize,
 			numKNNQueries(r.req),
+			r.req.Explain,
+		)
+		fusionResult = &res
+	case ScoreRSF:
+		res := fusion.ScoreFusion(
+			sr.Hits,
+			r.origBoosts,
+			r.req.RequestParams.ScoreWindowSize,
+			numKNNQueries(r.req),
+			false,
+			r.req.Explain,
+		)
+		fusionResult = &res
+	case ScoreDBSF:
+		res := fusion.ScoreFusion(
+			sr.Hits,
+			r.origBoosts,
+			r.req.RequestParams.ScoreWindowSize,
+			numKNNQueries(r.req),
+			true,
 			r.req.Explain,
 		)
 		fusionResult = &res
