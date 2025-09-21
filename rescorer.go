@@ -87,10 +87,6 @@ func (r *rescorer) rescore(sr *SearchResult) {
 
 	var fusionResult *fusion.FusionResult
 
-	for _, hit := range sr.Hits {
-		fmt.Println(hit.ID, hit.Score)
-	}
-
 	switch r.req.Score {
 	case ScoreRRF:
 		res := fusion.ReciprocalRankFusion(
