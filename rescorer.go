@@ -123,6 +123,8 @@ func (r *rescorer) rescore(sr *SearchResult) {
 	sr.MaxScore = fusionResult.MaxScore
 }
 
+// Merge all the FTS and KNN docs from sr.Hits
+// and sr.FusionKnnHits
 func (r *rescorer) mergeDocs(sr *SearchResult) {
 	if len(sr.FusionKnnHits) == 0 {
 		return

@@ -255,6 +255,13 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	//  - the request requires preSearch
 	var preSearchDuration time.Duration
 	var sr *SearchResult
+
+	// fusionKnnHits stores the KnnHits at the root alias.
+	// This is used with score fusion in case there is no need to
+	// send the knn hits to the leaf indexes in search phase.
+	// Refer to constructPreSearchDataAndFusionKnnHits for more info.
+	// This variable is left nil if we have to send the knn hits to leaf
+	// indexes again, else contains the knn hits if not required.
 	var fusionKnnHits search.DocumentMatchCollection
 	flags, err := preSearchRequired(ctx, req, i.mapping)
 	if err != nil {
@@ -706,7 +713,9 @@ func finalizeSearchResult(ctx context.Context, req *SearchRequest, preSearchResu
 
 	// rescore if fusion flag is set
 	if doScoreFusion {
+		// All hits here are only knn hits, so add in FusionKnnHits
 		preSearchResult.FusionKnnHits = preSearchResult.Hits
+		// Since no FTS hits, set Hits to nil
 		preSearchResult.Hits = nil
 		rescorer.rescore(preSearchResult)
 		rescorer.restoreSearchRequest()
@@ -790,6 +799,10 @@ func constructPreSearchData(req *SearchRequest, flags *preSearchFlags,
 	return mergedOut, nil
 }
 
+// Constructs the presearch data if required during the search phase.
+// Also if we need to store knn hits at alias.
+// If we need to store knn hits at alias: returns all the knn hits
+// If we should send it to leaf indexes: includes in presearch data
 func constructPreSearchDataAndFusionKnnHits(req *SearchRequest, flags *preSearchFlags,
 	preSearchResult *SearchResult, doScoreFusion bool, indexes []Index,
 ) (map[string]map[string]interface{}, search.DocumentMatchCollection, error) {
@@ -802,11 +815,6 @@ func constructPreSearchDataAndFusionKnnHits(req *SearchRequest, flags *preSearch
 	if doScoreFusion && flags.knn && req.Facets == nil {
 		fusionknnhits = preSearchResult.Hits
 		preSearchResult.Hits = nil
-		flags.knn = false
-		// reset flag to true if needed elsewhere
-		defer func() {
-			flags.knn = true
-		}()
 	}
 
 	preSearchData, err := constructPreSearchData(req, flags, preSearchResult, indexes)
@@ -1048,6 +1056,8 @@ func MultiSearch(ctx context.Context, req *SearchRequest, params multiSearchPara
 
 	// rescore if fusion flag is set
 	if params.doScoreFusion {
+		// If fusionKnnHits is there, add it to the search
+		// result for rescoring.
 		if len(params.fusionKnnHits) > 0 {
 			sr.FusionKnnHits = params.fusionKnnHits
 		}
