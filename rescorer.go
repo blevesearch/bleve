@@ -15,8 +15,6 @@
 package bleve
 
 import (
-	"fmt"
-
 	"github.com/blevesearch/bleve/v2/fusion"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/query"
