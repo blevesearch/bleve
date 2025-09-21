@@ -631,3 +631,131 @@ func TestRRFPagination(t *testing.T) {
 		})
 	}
 }
+
+
+// TestHybridRRFFaceting tests that facet results are identical whether using RRF or default scoring in hybrid search
+func TestRRFFaceting(t *testing.T) {
+	scenarios := []struct {
+		name  string
+		setup func(t *testing.T) (Index, func())
+	}{
+		{
+			name:  "SingleIndex",
+			setup: setupSingleIndex,
+		},
+		{
+			name:  "AliasWithSingleIndex",
+			setup: setupAliasWithSingleIndex,
+		},
+		{
+			name:  "AliasWithTwoIndexes",
+			setup: setupAliasWithTwoIndexes,
+		},
+		{
+			name:  "NestedAliases",
+			setup: setupNestedAliases,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			// Setup the index/alias configuration
+			index, cleanup := scenario.setup(t)
+			defer cleanup()
+
+			// Create search request with default scoring and facets
+			defaultRequest := createHybridSearchRequest()
+			defaultRequest.Score = ScoreDefault // Use default scoring
+			defaultRequest.Size = 10
+			// Add facet for color field with size 5
+			colorFacet := NewFacetRequest("color", 10)
+			defaultRequest.AddFacet("color", colorFacet)
+
+			// Create search request with RRF scoring and identical facets
+			rrfRequest := createHybridSearchRequest()
+			rrfRequest.Score = ScoreRRF // Use RRF scoring
+			rrfRequest.Size = 10
+			// Add identical facet for color field with size 5
+			colorFacetRRF := NewFacetRequest("color", 10)
+			rrfRequest.AddFacet("color", colorFacetRRF)
+
+			// Execute both searches
+			defaultResult, err := index.Search(defaultRequest)
+			if err != nil {
+				t.Fatalf("Default scoring search failed: %v", err)
+			}
+
+			rrfResult, err := index.Search(rrfRequest)
+			if err != nil {
+				t.Fatalf("RRF scoring search failed: %v", err)
+			}
+
+			// Verify both searches returned results
+			if len(defaultResult.Hits) == 0 {
+				t.Fatal("Expected search results with default scoring, got none")
+			}
+			if len(rrfResult.Hits) == 0 {
+				t.Fatal("Expected search results with RRF scoring, got none")
+			}
+
+			// Verify both searches returned facets
+			if defaultResult.Facets == nil {
+				t.Fatal("Expected facets with default scoring, got nil")
+			}
+			if rrfResult.Facets == nil {
+				t.Fatal("Expected facets with RRF scoring, got nil")
+			}
+
+			// Check that color facet exists in both results
+			defaultColorFacet, defaultExists := defaultResult.Facets["color"]
+			rrfColorFacet, rrfExists := rrfResult.Facets["color"]
+
+			if !defaultExists {
+				t.Fatal("Expected color facet in default scoring results")
+			}
+			if !rrfExists {
+				t.Fatal("Expected color facet in RRF scoring results")
+			}
+
+			// Compare the facet results - they should be identical
+			// Since facets are based on the document corpus and not scoring,
+			// they should not be affected by the scoring method (even with KNN)
+			if defaultColorFacet.Total != rrfColorFacet.Total {
+				t.Errorf("Facet totals differ: default=%d, RRF=%d",
+					defaultColorFacet.Total, rrfColorFacet.Total)
+			}
+
+			if defaultColorFacet.Missing != rrfColorFacet.Missing {
+				t.Errorf("Facet missing counts differ: default=%d, RRF=%d",
+					defaultColorFacet.Missing, rrfColorFacet.Missing)
+			}
+
+			if defaultColorFacet.Other != rrfColorFacet.Other {
+				t.Errorf("Facet other counts differ: default=%d, RRF=%d",
+					defaultColorFacet.Other, rrfColorFacet.Other)
+			}
+
+			// Compare the facet terms
+			defaultTerms := defaultColorFacet.Terms.Terms()
+			rrfTerms := rrfColorFacet.Terms.Terms()
+
+			if len(defaultTerms) != len(rrfTerms) {
+				t.Errorf("Facet terms count differs: default=%d, RRF=%d",
+					len(defaultTerms), len(rrfTerms))
+			} else {
+				// Compare each term
+				for i, defaultTerm := range defaultTerms {
+					rrfTerm := rrfTerms[i]
+					if defaultTerm.Term != rrfTerm.Term {
+						t.Errorf("Facet term differs at position %d: default=%s, RRF=%s",
+							i, defaultTerm.Term, rrfTerm.Term)
+					}
+					if defaultTerm.Count != rrfTerm.Count {
+						t.Errorf("Facet term count differs for %s: default=%d, RRF=%d",
+							defaultTerm.Term, defaultTerm.Count, rrfTerm.Count)
+					}
+				}
+			}
+		})
+	}
+}

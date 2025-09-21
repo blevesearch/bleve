@@ -459,17 +459,33 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	return knnHits, nil
 }
 
-func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector) {
+// if combineScore is true, performs score combination of fts and knn hits at collector.
+// else ignores knn hits (identity function)
+func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector, combineScores bool) {
 	if len(knnHits) > 0 {
-		newScoreExplComputer := func(queryMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) (float64, *search.Explanation) {
-			totalScore := queryMatch.Score + knnMatch.Score
-			if !req.Explain {
-				// exit early as we don't need to compute the explanation
-				return totalScore, nil
+		var newScoreExplComputer search.ScoreExplCorrectionCallbackFunc
+
+		if combineScores {
+			// Default combination of scores at collector; non-fusion method of hybrid search
+			newScoreExplComputer = func(queryMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) (float64, *search.Explanation) {
+				totalScore := queryMatch.Score + knnMatch.Score
+				if !req.Explain {
+					// exit early as we don't need to compute the explanation
+					return totalScore, nil
+				}
+				return totalScore, &search.Explanation{Value: totalScore, Message: "sum of:", Children: []*search.Explanation{queryMatch.Expl, knnMatch.Expl}}
 			}
-			return totalScore, &search.Explanation{Value: totalScore, Message: "sum of:", Children: []*search.Explanation{queryMatch.Expl, knnMatch.Expl}}
+		} else {
+			// Identity computer for fusion. Only returns queryMatch score and expl.
+			// Prevents KNN scores from being combined in collector. Instead, only facets are computed
+			newScoreExplComputer = func(queryMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) (float64, *search.Explanation) {
+				if !req.Explain {
+					return queryMatch.Score, nil
+				}
+				return queryMatch.Score, queryMatch.Expl
+			}
 		}
-		coll.SetKNNHits(knnHits, search.ScoreExplCorrectionCallbackFunc(newScoreExplComputer))
+		coll.SetKNNHits(knnHits, newScoreExplComputer)
 	}
 }
 
