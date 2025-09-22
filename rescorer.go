@@ -133,7 +133,6 @@ func (r *rescorer) mergeDocs(sr *SearchResult) {
 	knnHitMap := make(map[string]*search.DocumentMatch, len(sr.FusionKnnHits))
 
 	for _, hit := range sr.FusionKnnHits {
-		hit.Score = 0.0
 		knnHitMap[hit.ID] = hit
 	}
 
