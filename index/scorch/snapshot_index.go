@@ -91,6 +91,8 @@ type IndexSnapshot struct {
 	// UpdateFieldInfo.Index or .Store or .DocValues).
 	// Used to short circuit queries trying to read stale data
 	updatedFields map[string]*index.UpdateFieldInfo
+
+	writerId string
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
@@ -1018,7 +1020,7 @@ func (is *IndexSnapshot) CopyTo(d index.Directory) error {
 		return err
 	}
 
-	_, _, err = prepareBoltSnapshot(is, tx, "", is.parent.segPlugin, nil, d, nil)
+	_, _, err = prepareBoltSnapshot(is, tx, "", is.parent.segPlugin, nil, d)
 	if err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("error backing up index snapshot: %v", err)

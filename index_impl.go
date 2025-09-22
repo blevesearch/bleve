@@ -105,6 +105,7 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	rv.stats = &IndexStat{i: &rv}
 	// at this point there is hope that we can be successful, so save index meta
 	if path != "" {
+		kvconfig["callback_id"] = rv.writer.Id()
 		err = rv.meta.Save(path, rv.writer)
 		if err != nil {
 			return nil, err
@@ -112,7 +113,6 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 		kvconfig["create_if_missing"] = true
 		kvconfig["error_if_exists"] = true
 		kvconfig["path"] = indexStorePath(path)
-		kvconfig["callback_id"] = rv.writer.Id()
 	} else {
 		kvconfig["path"] = ""
 	}
@@ -167,6 +167,11 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		return nil, err
 	}
 
+	rv.writer, err = util.NewFileWriterWithId(rv.reader.Id())
+	if err != nil {
+		return nil, err
+	}
+
 	// backwards compatibility if index type is missing
 	if rv.meta.IndexType == "" {
 		rv.meta.IndexType = upsidedown.Name
@@ -183,7 +188,6 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	storeConfig["path"] = indexStorePath(path)
 	storeConfig["create_if_missing"] = false
 	storeConfig["error_if_exists"] = false
-	storeConfig["callback_id"] = rv.reader.Id()
 	for rck, rcv := range runtimeConfig {
 		storeConfig[rck] = rcv
 		if rck == "updated_mapping" {
@@ -488,6 +492,44 @@ func (i *indexImpl) DocCount() (count uint64, err error) {
 // Returns a SearchResult object or an error.
 func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 	return i.SearchInContext(context.Background(), req)
+}
+
+func (i *indexImpl) KeysInUse() (map[string]struct{}, error) {
+
+	keys := map[string]struct{}{}
+	keys[i.reader.Id()] = struct{}{}
+
+	if cidx, ok := i.i.(index.CustomizableIndex); ok {
+		cKeys, err := cidx.KeysInUse()
+		if err != nil {
+			return nil, err
+		}
+		for k := range cKeys {
+			keys[k] = struct{}{}
+		}
+	}
+
+	return keys, nil
+}
+
+func (i *indexImpl) DropKeys(keys map[string]struct{}) error {
+
+	if _, ok := keys[i.reader.Id()]; ok {
+		err := i.meta.UpdateWriter(i.path)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cidx, ok := i.i.(index.CustomizableIndex); ok {
+		return cidx.DropKeys(keys)
+	} else {
+		if _, ok := keys[""]; ok {
+			return fmt.Errorf("underlying index does not support DropKeys")
+		}
+	}
+
+	return nil
 }
 
 var (
