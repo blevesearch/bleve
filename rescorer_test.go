@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build vectors
-// +build vectors
+//go:build !vectors
+// +build !vectors
 
 package bleve
 
@@ -729,7 +729,7 @@ func TestFTSRRFFaceting(t *testing.T) {
 			// Create search request with RRF scoring and identical facets
 			rrfRequest := createFTSSearchRequest()
 			rrfRequest.Size = 10
-			rrfRequest.Score = ScoreDefault
+			rrfRequest.Score = ScoreRRF
 			// Add identical facet for color field with size 5
 			colorFacetRRF := NewFacetRequest("color", 10)
 			rrfRequest.AddFacet("color", colorFacetRRF)
