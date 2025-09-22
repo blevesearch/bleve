@@ -386,3 +386,9 @@ type SynonymIndex interface {
 	// IndexSynonym indexes a synonym definition, with the specified id and belonging to the specified collection.
 	IndexSynonym(id string, collection string, definition *SynonymDefinition) error
 }
+
+type CustomizableIndex interface {
+	Index
+	KeysInUse() (map[string]struct{}, error)
+	DropKeys(ids map[string]struct{}) error
+}

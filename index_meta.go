@@ -151,6 +151,55 @@ func (i *indexMeta) CopyTo(d index.Directory) (err error) {
 	return err
 }
 
+func (i *indexMeta) UpdateWriter(path string) error {
+	indexMetaPath := indexMetaPath(path)
+	metaBytes, err := os.ReadFile(indexMetaPath)
+	if err != nil {
+		return ErrorIndexMetaMissing
+	}
+
+	if len(metaBytes) < 4 {
+		return ErrorIndexMetaCorrupt
+	}
+
+	pos := len(metaBytes) - 4
+	writerIdLen := int(binary.BigEndian.Uint32(metaBytes[pos:]))
+	pos -= writerIdLen
+	if pos < 0 {
+		return ErrorIndexMetaCorrupt
+	}
+
+	writerId := metaBytes[pos : pos+writerIdLen]
+	fileReader, err := util.NewFileReader(string(writerId))
+	if err != nil {
+		return err
+	}
+
+	metaBytes, err = fileReader.Process(metaBytes[0:pos])
+	if err != nil {
+		return err
+	}
+
+	writer, err := util.NewFileWriter()
+	if err != nil {
+		return err
+	}
+
+	metaBytes, err = writer.Process(metaBytes)
+	if err != nil {
+		return err
+	}
+
+	metaBytes = append(metaBytes, []byte(writer.Id())...)
+	binary.BigEndian.PutUint32(metaBytes, uint32(len(writer.Id())))
+	err = os.WriteFile(indexMetaPath, metaBytes, 0666)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func indexMetaPath(path string) string {
 	return filepath.Join(path, metaFilename)
 }

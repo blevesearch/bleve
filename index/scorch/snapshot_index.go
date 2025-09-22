@@ -84,6 +84,8 @@ type IndexSnapshot struct {
 
 	m3               sync.RWMutex // bm25 metrics specific - not to interfere with TFR creation
 	fieldCardinality map[string]int
+
+	writerId string
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
@@ -975,7 +977,7 @@ func (is *IndexSnapshot) CopyTo(d index.Directory) error {
 		return err
 	}
 
-	_, _, err = prepareBoltSnapshot(is, tx, "", is.parent.segPlugin, nil, d, nil)
+	_, _, err = prepareBoltSnapshot(is, tx, "", is.parent.segPlugin, nil, d)
 	if err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("error backing up index snapshot: %v", err)

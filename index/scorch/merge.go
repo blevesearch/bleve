@@ -94,13 +94,16 @@ OUTER:
 				if ctrlMsg.plan == nil {
 					err = s.planMergeAtSnapshot(ctrlMsg.ctx, ctrlMsg.options,
 						ourSnapshot)
-				} else {
+				}
+
+				if err == nil {
 					cw := newCloseChWrapper(s.closeCh, ctrlMsg.ctx)
 					defer cw.close()
 					go cw.listen()
 
 					err = s.executePlanMergeAtSnapshot(ctrlMsg.plan, cw)
 				}
+
 				if err != nil {
 					atomic.StoreUint64(&s.iStats.mergeEpoch, 0)
 					if err == segment.ErrClosed {

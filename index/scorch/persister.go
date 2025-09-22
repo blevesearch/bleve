@@ -605,13 +605,8 @@ func persistToDirectory(seg segment.UnpersistedSegment, d index.Directory,
 	return err
 }
 
-func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
-	segPlugin SegmentPlugin, exclude map[uint64]struct{}, d index.Directory,
-	writer *util.FileWriter) (
-	[]string, map[uint64]string, error) {
-	if writer == nil {
-		writer = &util.FileWriter{}
-	}
+func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segPlugin SegmentPlugin,
+	exclude map[uint64]struct{}, d index.Directory) ([]string, map[uint64]string, error) {
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(boltSnapshotsBucket)
 	if err != nil {
 		return nil, nil, err
@@ -634,6 +629,15 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 	buf := make([]byte, binary.MaxVarintLen32)
 	binary.BigEndian.PutUint32(buf, segPlugin.Version())
 	err = metaBucket.Put(boltMetaDataSegmentVersionKey, buf)
+	if err != nil {
+		return nil, nil, err
+	}
+	writer, err := util.NewFileWriter()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = metaBucket.Put(boltMetaDataWriterIdKey, []byte(writer.Id()))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -772,7 +776,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot, exclude map[uint
 		}
 	}()
 
-	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin, exclude, nil, s.writer)
+	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin, exclude, nil)
 	if err != nil {
 		return err
 	}
@@ -857,6 +861,7 @@ var (
 	boltMetaDataSegmentTypeKey    = []byte("type")
 	boltMetaDataSegmentVersionKey = []byte("version")
 	boltMetaDataTimeStamp         = []byte("timeStamp")
+	boltMetaDataWriterIdKey       = []byte("writerId")
 	boltStatsKey                  = []byte("stats")
 	TotBytesWrittenKey            = []byte("TotBytesWritten")
 )
@@ -970,6 +975,13 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 		return nil, fmt.Errorf(
 			"unable to load correct segment wrapper: %v", err)
 	}
+	readerId := string(metaBucket.Get(boltMetaDataWriterIdKey))
+	reader, err := util.NewFileReader(readerId)
+	if err != nil {
+		_ = rv.DecRef()
+		return nil, fmt.Errorf("unable to load correct reader: %v", err)
+	}
+
 	var running uint64
 	c := snapshot.Cursor()
 	for k, _ := c.First(); k != nil; k, _ = c.Next() {
@@ -980,7 +992,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 				return nil, fmt.Errorf("internal bucket missing")
 			}
 			err := internalBucket.ForEach(func(key []byte, val []byte) error {
-				copiedVal, err := s.reader.Process(append([]byte(nil), val...))
+				copiedVal, err := reader.Process(append([]byte(nil), val...))
 				if err != nil {
 					return err
 				}
@@ -997,7 +1009,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 				_ = rv.DecRef()
 				return nil, fmt.Errorf("segment key, but bucket missing % x", k)
 			}
-			segmentSnapshot, err := s.loadSegment(segmentBucket)
+			segmentSnapshot, err := s.loadSegment(segmentBucket, reader)
 			if err != nil {
 				_ = rv.DecRef()
 				return nil, fmt.Errorf("failed to load segment: %v", err)
@@ -1015,7 +1027,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 	return rv, nil
 }
 
-func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, error) {
+func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket, reader *util.FileReader) (*SegmentSnapshot, error) {
 	pathBytes := segmentBucket.Get(boltPathKey)
 	if pathBytes == nil {
 		return nil, fmt.Errorf("segment path missing")
@@ -1033,7 +1045,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	}
 	deletedBytes := segmentBucket.Get(boltDeletedKey)
 	if deletedBytes != nil {
-		deletedBytes, err = s.reader.Process(deletedBytes)
+		deletedBytes, err = reader.Process(deletedBytes)
 		if err != nil {
 			_ = segment.Close()
 			return nil, err
@@ -1052,7 +1064,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	statBytes := segmentBucket.Get(boltStatsKey)
 	if statBytes != nil {
 		var statsMap map[string]map[string]uint64
-		statBytes, err = s.reader.Process(statBytes)
+		statBytes, err = reader.Process(statBytes)
 		if err != nil {
 			_ = segment.Close()
 			return nil, err
@@ -1067,6 +1079,150 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	}
 
 	return rv, nil
+}
+
+func (s *Scorch) boltKeysInUse() ([]string, error) {
+	keyMap := make(map[string]struct{})
+	err := s.rootBolt.View(func(tx *bolt.Tx) error {
+		snapshots := tx.Bucket(boltSnapshotsBucket)
+		if snapshots == nil {
+			return nil
+		}
+		c := snapshots.Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			snapshot := snapshots.Bucket(k)
+			if snapshot == nil {
+				continue
+			}
+			metaBucket := snapshot.Bucket(boltMetaDataKey)
+			if metaBucket == nil {
+				continue
+			}
+			keyId := string(metaBucket.Get(boltMetaDataWriterIdKey))
+			keyMap[keyId] = struct{}{}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	rv := make([]string, 0, len(keyMap))
+	for k := range keyMap {
+		rv = append(rv, k)
+	}
+
+	return rv, nil
+}
+
+func (s *Scorch) removeBoltKeys(ids []string) error {
+	keyMap := make(map[string]struct{})
+	for _, id := range ids {
+		keyMap[id] = struct{}{}
+	}
+	writer, err := util.NewFileWriter()
+	if err != nil {
+		return err
+	}
+
+	err = s.rootBolt.Update(func(tx *bolt.Tx) error {
+		snapshots := tx.Bucket(boltSnapshotsBucket)
+		if snapshots == nil {
+			return nil
+		}
+		c := snapshots.Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			snapshot := snapshots.Bucket(k)
+			if snapshot == nil {
+				continue
+			}
+			metaBucket := snapshot.Bucket(boltMetaDataKey)
+			if metaBucket == nil {
+				continue
+			}
+			readerId := string(metaBucket.Get(boltMetaDataWriterIdKey))
+			if _, ok := keyMap[readerId]; ok {
+				reader, err := util.NewFileReader(readerId)
+				if err != nil {
+					return fmt.Errorf("unable to load correct reader: %v", err)
+				}
+				c := snapshots.Cursor()
+				for kk, _ := c.First(); kk != nil; kk, _ = c.Next() {
+					if k[0] == boltInternalKey[0] {
+						internalBucket := snapshot.Bucket(kk)
+						if internalBucket == nil {
+							continue
+						}
+						// process all of the internal values and replace them with new values
+						err := internalBucket.ForEach(func(key []byte, val []byte) error {
+							buf, err := reader.Process(val)
+							if err != nil {
+								return err
+							}
+
+							newBuf, err := writer.Process(buf)
+							if err != nil {
+								return err
+							}
+							return internalBucket.Put(key, newBuf)
+						})
+						if err != nil {
+							return err
+						}
+					} else if kk[0] != boltMetaDataKey[0] {
+						segmentBucket := snapshot.Bucket(kk)
+						if segmentBucket == nil {
+							continue
+						}
+						// process the deleted key
+						deletedBytes := segmentBucket.Get(boltDeletedKey)
+						if deletedBytes != nil {
+							buf, err := reader.Process(deletedBytes)
+							if err != nil {
+								return err
+							}
+
+							newBuf, err := writer.Process(buf)
+							if err != nil {
+								return err
+							}
+							err = segmentBucket.Put(boltDeletedKey, newBuf)
+							if err != nil {
+								return err
+							}
+						}
+						// process the stats key
+						statsBytes := segmentBucket.Get(boltStatsKey)
+						if statsBytes != nil {
+							buf, err := reader.Process(statsBytes)
+							if err != nil {
+								return err
+							}
+
+							newBuf, err := writer.Process(buf)
+							if err != nil {
+								return err
+							}
+							err = segmentBucket.Put(boltStatsKey, newBuf)
+							if err != nil {
+								return err
+							}
+						}
+					}
+				}
+				err = metaBucket.Put(boltMetaDataWriterIdKey, []byte(writer.Id()))
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Scorch) removeOldData() {

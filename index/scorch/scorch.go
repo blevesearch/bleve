@@ -27,7 +27,6 @@ import (
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/index/scorch/mergeplan"
 	"github.com/blevesearch/bleve/v2/registry"
-	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	bolt "go.etcd.io/bbolt"
@@ -79,9 +78,6 @@ type Scorch struct {
 	persisterNotifier        chan *epochWatcher
 	rootBolt                 *bolt.DB
 	asyncTasks               sync.WaitGroup
-
-	writer *util.FileWriter
-	reader *util.FileReader
 
 	onEvent      func(event Event) bool
 	onAsyncError func(err error, path string)
@@ -166,23 +162,6 @@ func NewScorch(storeName string,
 	if ok {
 		rv.onAsyncError = RegistryAsyncErrorCallbacks[aecbName]
 	}
-	writerId, ok := config["writerId"].(string)
-	var writer *util.FileWriter
-	if ok {
-		writer, err = util.NewFileWriterWithId(writerId)
-	} else {
-		writer, err = util.NewFileWriter()
-	}
-	if err != nil {
-		return nil, err
-	}
-	rv.writer = writer
-
-	reader, err := util.NewFileReader(rv.writer.Id())
-	if err != nil {
-		return nil, err
-	}
-	rv.reader = reader
 
 	// validate any custom persistor options to
 	// prevent an async error in the persistor routine
@@ -965,36 +944,55 @@ func (s *Scorch) FireIndexEvent() {
 	s.fireEvent(EventKindIndexStart, 0)
 }
 
-// Used when a callback expires or is removed
-func (s *Scorch) RemoveCallback(cbId string) error {
+func (s *Scorch) KeysInUse() ([]string, error) {
+	s.rootLock.RLock()
+	defer s.rootLock.RUnlock()
+
+	keyMap := make(map[string]struct{})
+	for _, segmentSnapShot := range s.root.segment {
+		if seg, ok := segmentSnapShot.segment.(segment.CustomizableSegment); ok {
+			keyMap[seg.CallbackId()] = struct{}{}
+		}
+	}
+
+	boltKeys, err := s.boltKeysInUse()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, k := range boltKeys {
+		keyMap[k] = struct{}{}
+	}
+
+	rv := make([]string, 0, len(keyMap))
+	for k := range keyMap {
+		rv = append(rv, k)
+	}
+
+	return rv, nil
+}
+
+func (s *Scorch) DropKeys(ids []string) error {
+
+	keyMap := make(map[string]struct{})
+	for _, k := range ids {
+		keyMap[k] = struct{}{}
+	}
+
+	err := s.removeBoltKeys(ids)
+	if err != nil {
+		return err
+	}
+
 	s.rootLock.Lock()
 	defer s.rootLock.Unlock()
 
 	segsToCompact := make([]mergeplan.Segment, 0)
 	for _, segmentSnapShot := range s.root.segment {
 		if seg, ok := segmentSnapShot.segment.(segment.CustomizableSegment); ok {
-			if seg.CallbackId() == cbId {
+			if _, ok := keyMap[seg.CallbackId()]; ok {
 				segsToCompact = append(segsToCompact, segmentSnapShot)
 			}
-		}
-	}
-
-	if len(segsToCompact) > 0 {
-		return s.forceMergeSegs(segsToCompact)
-	}
-
-	return nil
-}
-
-// Used when all callbacks need to be removed
-func (s *Scorch) RemoveAllCallbacks() error {
-	s.rootLock.Lock()
-	defer s.rootLock.Unlock()
-
-	segsToCompact := make([]mergeplan.Segment, 0)
-	for _, segmentSnapShot := range s.root.segment {
-		if _, ok := segmentSnapShot.segment.(segment.CustomizableSegment); ok {
-			segsToCompact = append(segsToCompact, segmentSnapShot)
 		}
 	}
 
@@ -1058,23 +1056,4 @@ func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment) error {
 	}
 
 	return nil
-}
-
-// CBIDsInUse returns a map of all the callback IDs that are currently in use
-func (s *Scorch) CBIDsInUse() map[string]struct{} {
-	s.rootLock.RLock()
-	defer s.rootLock.RUnlock()
-
-	rv := make(map[string]struct{})
-	if s.root == nil {
-		return rv
-	}
-
-	for _, segmentSnapShot := range s.root.segment {
-		if seg, ok := segmentSnapShot.segment.(segment.CustomizableSegment); ok {
-			rv[seg.CallbackId()] = struct{}{}
-		}
-	}
-
-	return rv
 }
