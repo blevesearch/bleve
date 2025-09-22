@@ -94,9 +94,7 @@ OUTER:
 				if ctrlMsg.plan == nil {
 					err = s.planMergeAtSnapshot(ctrlMsg.ctx, ctrlMsg.options,
 						ourSnapshot)
-				}
-
-				if err == nil {
+				} else {
 					cw := newCloseChWrapper(s.closeCh, ctrlMsg.ctx)
 					defer cw.close()
 					go cw.listen()
