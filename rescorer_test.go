@@ -722,7 +722,7 @@ func TestFTSRRFFaceting(t *testing.T) {
 			defaultRequest := createFTSSearchRequest()
 			defaultRequest.Score = ScoreDefault // Use default scoring
 			defaultRequest.Size = 10
-			// Add facet for color field with size 5
+			// Add facet for color field with size 10
 			colorFacet := NewFacetRequest("color", 10)
 			defaultRequest.AddFacet("color", colorFacet)
 
@@ -730,7 +730,7 @@ func TestFTSRRFFaceting(t *testing.T) {
 			rrfRequest := createFTSSearchRequest()
 			rrfRequest.Size = 10
 			rrfRequest.Score = ScoreRRF
-			// Add identical facet for color field with size 5
+			// Add identical facet for color field with size 10
 			colorFacetRRF := NewFacetRequest("color", 10)
 			rrfRequest.AddFacet("color", colorFacetRRF)
 
