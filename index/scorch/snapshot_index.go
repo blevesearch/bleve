@@ -84,6 +84,8 @@ type IndexSnapshot struct {
 
 	m3               sync.RWMutex // bm25 metrics specific - not to interfere with TFR creation
 	fieldCardinality map[string]int
+
+	writerId string
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
