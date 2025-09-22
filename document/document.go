@@ -35,7 +35,6 @@ type Document struct {
 	CompositeFields  []*CompositeField
 	StoredFieldsSize uint64
 	indexed          bool
-	subdocs          []*Document
 }
 
 func (d *Document) StoredFieldsBytes() uint64 {
