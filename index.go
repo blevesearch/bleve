@@ -389,6 +389,12 @@ type SynonymIndex interface {
 	IndexSynonym(id string, collection string, definition *SynonymDefinition) error
 }
 
+type CustomizableIndex interface {
+	Index
+	KeysInUse() (map[string]struct{}, error)
+	DropKeys(ids map[string]struct{}) error
+}
+
 type InsightsIndex interface {
 	Index
 	// TermFrequencies returns the tokens ordered by frequencies for the field index.
