@@ -41,7 +41,7 @@ type rescorer struct {
 // - Setting From and Size to 0 and ScoreWindowSize
 func (r *rescorer) prepareSearchRequest() error {
 	if r.req.RequestParams == nil {
-		r.req.RequestParams = NewDefaultParams(r.req.Size)
+		r.req.RequestParams = NewDefaultParams(r.req.From, r.req.Size)
 	}
 
 	r.origFrom = r.req.From

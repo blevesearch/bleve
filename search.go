@@ -709,10 +709,10 @@ type Params struct {
 	ScoreWindowSize   int `json:"score_window_size,omitempty"`
 }
 
-func NewDefaultParams(size int) *Params {
+func NewDefaultParams(from, size int) *Params {
 	return &Params{
 		ScoreRankConstant: DefaultScoreRankConstant,
-		ScoreWindowSize:   size,
+		ScoreWindowSize:   from + size,
 	}
 }
 
@@ -748,7 +748,7 @@ func (p *Params) Validate(size int) error {
 }
 
 func ParseParams(r *SearchRequest, input []byte) (*Params, error) {
-	params := NewDefaultParams(r.Size)
+	params := NewDefaultParams(r.From, r.Size)
 	if len(input) == 0 {
 		return params, nil
 	}
