@@ -578,6 +578,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			ctx = context.WithValue(ctx, search.ScoreFusionKey, true)
 			rescorer = newRescorer(req)
 			rescorer.prepareSearchRequest()
+			defer rescorer.restoreSearchRequest()
 		}
 	}
 
@@ -681,9 +682,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}
 
-	// If FusionKeyExists: no score combination is performed at collector - combineScores false
-	// else default hybrid search without fusion - combineScores true
-	setKnnHitsInCollector(knnHits, req, coll, !contextScoreFusionKeyExists)
+	setKnnHitsInCollector(knnHits, req, coll, contextScoreFusionKeyExists)
 
 	if fts != nil {
 		if is, ok := indexReader.(*scorch.IndexSnapshot); ok {

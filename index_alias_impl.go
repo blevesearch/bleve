@@ -243,6 +243,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 			ctx = context.WithValue(ctx, search.ScoreFusionKey, true)
 			rescorer = newRescorer(req)
 			rescorer.prepareSearchRequest()
+			defer rescorer.restoreSearchRequest()
 		}
 	}
 

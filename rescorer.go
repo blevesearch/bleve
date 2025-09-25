@@ -29,10 +29,16 @@ const (
 // for query and knn are combined using Rescorer. Makes use of algorithms
 // defined in `fusion`
 type rescorer struct {
-	req        *SearchRequest
+	req *SearchRequest
+
+	// Stores the original From, Size and Boost parameters from the request
 	origFrom   int
 	origSize   int
 	origBoosts []float64
+
+	// Flag variable to make sure that restoreSearchRequest is only run once
+	// when it is deferred
+	restored bool
 }
 
 // Stores information about the hybrid search into FusionRescorer.
@@ -69,6 +75,12 @@ func (r *rescorer) prepareSearchRequest() error {
 }
 
 func (r *rescorer) restoreSearchRequest() {
+	// Skip if already restored
+	if r.restored {
+		return
+	}
+	r.restored = true
+
 	r.req.From = r.origFrom
 	r.req.Size = r.origSize
 
@@ -136,6 +148,7 @@ func (r *rescorer) mergeDocs(sr *SearchResult) {
 
 func newRescorer(req *SearchRequest) *rescorer {
 	return &rescorer{
-		req: req,
+		req:      req,
+		restored: false,
 	}
 }
