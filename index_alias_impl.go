@@ -234,7 +234,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// Since the score fusion key is not set, check if it is a hybrid search.
 		// If it is, then set doScoreFusion. This indicates that score
 		// combination must happen at this alias.
-		doScoreFusion = IsScoreFusionRequired(req)
+		doScoreFusion = IsScoreFusionRequested(req)
 
 		// new context will be used in internal functions to collect data
 		// as suitable for fusion. Rescorer is used for rescoring

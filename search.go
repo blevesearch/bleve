@@ -54,12 +54,6 @@ const (
 	ScoreRRF     = "rrf"
 )
 
-var SupportedScoreValues = map[string]int{
-	ScoreDefault: 0,
-	ScoreNone:    1,
-	ScoreRRF:     2,
-}
-
 var AllowedFusionSort = search.SortOrder{&search.SortScore{Desc: true}}
 
 type dateTimeRange struct {
@@ -331,12 +325,7 @@ func (r *SearchRequest) Validate() error {
 		return err
 	}
 
-	err = validateScore(r)
-	if err != nil {
-		return err
-	}
-
-	if IsScoreFusionRequired(r) {
+	if IsScoreFusionRequested(r) {
 		if r.SearchAfter != nil || r.SearchBefore != nil {
 			return fmt.Errorf("cannot use search after or search before with score fusion")
 		}
@@ -693,7 +682,7 @@ func isMatchAllQuery(q query.Query) bool {
 }
 
 // Checks if the request is hybrid search. Currently supports: RRF.
-func IsScoreFusionRequired(req *SearchRequest) bool {
+func IsScoreFusionRequested(req *SearchRequest) bool {
 	switch req.Score {
 	case ScoreRRF:
 		return true
@@ -765,12 +754,4 @@ func ParseParams(r *SearchRequest, input []byte) (*Params, error) {
 	}
 
 	return params, nil
-}
-
-func validateScore(r *SearchRequest) error {
-	if _, exists := SupportedScoreValues[r.Score]; !exists {
-		return fmt.Errorf("invalid score field \"%s\": must be one of \"\", \"none\", \"%s\"", r.Score, ScoreRRF)
-	}
-
-	return nil
 }

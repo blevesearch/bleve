@@ -148,7 +148,6 @@ func (r *rescorer) mergeDocs(sr *SearchResult) {
 
 func newRescorer(req *SearchRequest) *rescorer {
 	return &rescorer{
-		req:      req,
-		restored: false,
+		req: req,
 	}
 }

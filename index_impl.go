@@ -569,7 +569,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		// If it is, then set doScoreFusion. This indicates that the rescoring
 		// must happen locally within this index, and there are no other
 		// indexes/aliases involved.
-		doScoreFusion = IsScoreFusionRequired(req)
+		doScoreFusion = IsScoreFusionRequested(req)
 
 		// new context will be used in internal functions to collect data
 		// as suitable for hybrid search. Rescorer is used for rescoring

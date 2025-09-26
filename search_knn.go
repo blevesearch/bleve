@@ -193,7 +193,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	}
 
 	if temp.RequestParams == nil {
-		if IsScoreFusionRequired(r) {
+		if IsScoreFusionRequested(r) {
 			// If params is not present and it is requires rescoring, assign
 			// default values
 			r.RequestParams = NewDefaultParams(r.From, r.Size)
@@ -201,7 +201,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	} else {
 		// if it is a request that requires rescoring, parse the rescoring
 		// parameters.
-		if IsScoreFusionRequired(r) {
+		if IsScoreFusionRequested(r) {
 			params, err := ParseParams(r, temp.RequestParams)
 			if err != nil {
 				return err
@@ -350,7 +350,7 @@ func validateKNN(req *SearchRequest) error {
 		return fmt.Errorf("knn_operator must be either 'and' / 'or'")
 	}
 
-	if IsScoreFusionRequired(req) {
+	if IsScoreFusionRequested(req) {
 		if req.KNNOperator == knnOperatorAnd {
 			return fmt.Errorf("knn operator 'and' is not compatible with score fusion")
 		}
@@ -492,7 +492,7 @@ func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, 
 func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*search.DocumentMatch {
 	// If the request is hybrid search, do not use any operator. Individual scores are preserved
 	// for fusion. This is equivalent to doing knnOperatorOr, but without combining score results.
-	if IsScoreFusionRequired(req) {
+	if IsScoreFusionRequested(req) {
 		for _, hit := range knnHits {
 			hit.Score = 0.0
 		}
