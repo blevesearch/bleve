@@ -52,12 +52,16 @@ const (
 	ScoreDefault = ""
 	ScoreNone    = "none"
 	ScoreRRF     = "rrf"
+	ScoreRSF     = "rsf"
+	ScoreDBSF    = "dbsf"
 )
 
 var SupportedScoreValues = map[string]int{
 	ScoreDefault: 0,
 	ScoreNone:    1,
 	ScoreRRF:     2,
+	ScoreRSF:     3,
+	ScoreDBSF:    4,
 }
 
 var AllowedFusionSort = search.SortOrder{&search.SortScore{Desc: true}}
@@ -692,10 +696,10 @@ func isMatchAllQuery(q query.Query) bool {
 	return ok
 }
 
-// Checks if the request is hybrid search. Currently supports: RRF.
+// Checks if the request is hybrid search. Currently supports: RRF, RSF, DBSF
 func IsScoreFusionRequired(req *SearchRequest) bool {
 	switch req.Score {
-	case ScoreRRF:
+	case ScoreRRF, ScoreRSF, ScoreDBSF:
 		return true
 	default:
 		return false
@@ -769,7 +773,7 @@ func ParseParams(r *SearchRequest, input []byte) (*Params, error) {
 
 func validateScore(r *SearchRequest) error {
 	if _, exists := SupportedScoreValues[r.Score]; !exists {
-		return fmt.Errorf("invalid score field \"%s\": must be one of \"\", \"none\", \"%s\"", r.Score, ScoreRRF)
+		return fmt.Errorf("invalid score field \"%s\": must be one of \"\", \"none\", \"%s\", \"%s\", \"%s\"", r.Score, ScoreRRF, ScoreRSF, ScoreDBSF)
 	}
 
 	return nil
