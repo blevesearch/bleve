@@ -7,7 +7,7 @@ toolchain go1.23.9
 require (
 	github.com/RoaringBitmap/roaring/v2 v2.4.5
 	github.com/bits-and-blooms/bitset v1.22.0
-	github.com/blevesearch/bleve_index_api v1.2.8
+	github.com/blevesearch/bleve_index_api v1.2.10-0.20250929190209-86a7041523f6
 	github.com/blevesearch/geo v0.2.4
 	github.com/blevesearch/go-faiss v1.0.25
 	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475
