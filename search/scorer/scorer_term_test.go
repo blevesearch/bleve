@@ -58,7 +58,7 @@ func TestTermScorer(t *testing.T) {
 				Sort:            []string{},
 				Expl: &search.Explanation{
 					Value:   math.Sqrt(1.0) * idf,
-					Message: "fieldWeight(desc:beer in one), as per tfidf model, product of:",
+					Message: "fieldWeight(desc:beer in one), as per tf-idf model, product of:",
 					Children: []*search.Explanation{
 						{
 							Value:   1,
@@ -100,7 +100,7 @@ func TestTermScorer(t *testing.T) {
 				Sort:            []string{},
 				Expl: &search.Explanation{
 					Value:   math.Sqrt(1.0) * idf,
-					Message: "fieldWeight(desc:beer in one), as per tfidf model, product of:",
+					Message: "fieldWeight(desc:beer in one), as per tf-idf model, product of:",
 					Children: []*search.Explanation{
 						{
 							Value:   1,
@@ -131,7 +131,7 @@ func TestTermScorer(t *testing.T) {
 				Sort:            []string{},
 				Expl: &search.Explanation{
 					Value:   math.Sqrt(65) * idf,
-					Message: "fieldWeight(desc:beer in one), as per tfidf model, product of:",
+					Message: "fieldWeight(desc:beer in one), as per tf-idf model, product of:",
 					Children: []*search.Explanation{
 						{
 							Value:   math.Sqrt(65),
@@ -224,7 +224,7 @@ func TestTermScorerWithQueryNorm(t *testing.T) {
 						},
 						{
 							Value:   math.Sqrt(1.0) * idf,
-							Message: "fieldWeight(desc:beer in one), as per tfidf model, product of:",
+							Message: "fieldWeight(desc:beer in one), as per tf-idf model, product of:",
 							Children: []*search.Explanation{
 								{
 									Value:   1,
