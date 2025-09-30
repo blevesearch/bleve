@@ -1207,6 +1207,9 @@ func (is *IndexSnapshot) UpdateSynonymSearchCount(delta uint64) {
 
 // Update current snapshot updated field data as well as pass it on to all segments and segment bases
 func (is *IndexSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
+	is.m.Lock()
+	defer is.m.Unlock()
+
 	is.MergeUpdateFieldsInfo(updatedFields)
 
 	for _, segmentSnapshot := range is.segment {

@@ -955,9 +955,7 @@ func (s *Scorch) UpdateFields(fieldInfo map[string]*index.UpdateFieldInfo, mappi
 		return err
 	}
 	// Pass the update field info to all snapshots and segment bases
-	s.root.m.Lock()
 	s.root.UpdateFieldsInfo(fieldInfo)
-	s.root.m.Unlock()
 	return nil
 }
 
