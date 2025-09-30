@@ -35,12 +35,13 @@ type SegmentSnapshot struct {
 	// segment was mmaped recently, in which case
 	// we consider the loading cost of the metadata
 	// as part of IO stats.
-	mmaped  uint32
-	id      uint64
-	segment segment.Segment
-	deleted *roaring.Bitmap
-	creator string
-	stats   *fieldStats
+	mmaped        uint32
+	id            uint64
+	segment       segment.Segment
+	deleted       *roaring.Bitmap
+	creator       string
+	stats         *fieldStats
+	updatedFields map[string]*index.UpdateFieldInfo
 
 	cachedMeta *cachedMeta
 
@@ -144,6 +145,28 @@ func (s *SegmentSnapshot) Size() (rv int) {
 	}
 	rv += s.cachedDocs.Size()
 	return
+}
+
+// Merge given updated field information with existing and pass it on to the segment base
+func (s *SegmentSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
+	if s.updatedFields == nil {
+		s.updatedFields = updatedFields
+	} else {
+		for fieldName, info := range updatedFields {
+			if val, ok := s.updatedFields[fieldName]; ok {
+				val.Deleted = val.Deleted || info.Deleted
+				val.Index = val.Index || info.Index
+				val.DocValues = val.DocValues || info.DocValues
+				val.Store = val.Store || info.Store
+			} else {
+				s.updatedFields[fieldName] = info
+			}
+		}
+	}
+
+	if segment, ok := s.segment.(segment.UpdatableSegment); ok {
+		segment.SetUpdatedFields(s.updatedFields)
+	}
 }
 
 type cachedFieldDocs struct {

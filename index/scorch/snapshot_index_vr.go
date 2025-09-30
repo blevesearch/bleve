@@ -83,6 +83,10 @@ func (i *IndexSnapshotVectorReader) Next(preAlloced *index.VectorDoc) (
 	}
 
 	for i.segmentOffset < len(i.iterators) {
+		if i.iterators[i.segmentOffset] == nil {
+			i.segmentOffset++
+			continue
+		}
 		next, err := i.iterators[i.segmentOffset].Next()
 		if err != nil {
 			return nil, err
