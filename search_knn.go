@@ -67,6 +67,8 @@ type SearchRequest struct {
 
 	PreSearchData map[string]interface{} `json:"pre_search_data,omitempty"`
 
+	RequestParams *Params `json:"params,omitempty"`
+
 	sortFunc func(sort.Interface)
 }
 
@@ -148,6 +150,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		KNN              []*tempKNNReq     `json:"knn"`
 		KNNOperator      knnOperator       `json:"knn_operator"`
 		PreSearchData    json.RawMessage   `json:"pre_search_data"`
+		RequestParams    json.RawMessage   `json:"params"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -187,6 +190,24 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	}
 	if r.From < 0 {
 		r.From = 0
+	}
+
+	if temp.RequestParams == nil {
+		if IsScoreFusionRequested(r) {
+			// If params is not present and it is requires rescoring, assign
+			// default values
+			r.RequestParams = NewDefaultParams(r.From, r.Size)
+		}
+	} else {
+		// if it is a request that requires rescoring, parse the rescoring
+		// parameters.
+		if IsScoreFusionRequested(r) {
+			params, err := ParseParams(r, temp.RequestParams)
+			if err != nil {
+				return err
+			}
+			r.RequestParams = params
+		}
 	}
 
 	r.KNN = make([]*KNNRequest, len(temp.KNN))
@@ -243,6 +264,7 @@ func copySearchRequest(req *SearchRequest, preSearchData map[string]interface{})
 		KNN:              req.KNN,
 		KNNOperator:      req.KNNOperator,
 		PreSearchData:    preSearchData,
+		RequestParams:    req.RequestParams,
 	}
 	return &rv
 
@@ -326,6 +348,12 @@ func validateKNN(req *SearchRequest) error {
 		// Valid cases, do nothing
 	default:
 		return fmt.Errorf("knn_operator must be either 'and' / 'or'")
+	}
+
+	if IsScoreFusionRequested(req) {
+		if req.KNNOperator == knnOperatorAnd {
+			return fmt.Errorf("knn operator 'and' is not compatible with score fusion")
+		}
 	}
 	return nil
 }
@@ -431,21 +459,46 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	return knnHits, nil
 }
 
-func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector) {
+// if combineScore is true, performs score combination of fts and knn hits at collector.
+// else ignores knn hits (identity function)
+func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector, doScoreFusion bool) {
 	if len(knnHits) > 0 {
-		newScoreExplComputer := func(queryMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) (float64, *search.Explanation) {
-			totalScore := queryMatch.Score + knnMatch.Score
-			if !req.Explain {
-				// exit early as we don't need to compute the explanation
-				return totalScore, nil
+		var newScoreExplComputer search.ScoreExplCorrectionCallbackFunc
+
+		if doScoreFusion {
+			// Identity computer for fusion. Only returns queryMatch score and expl.
+			// Prevents KNN scores from being combined in collector. Instead, only facets are computed
+			newScoreExplComputer = func(queryMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) (float64, *search.Explanation) {
+				if !req.Explain {
+					return queryMatch.Score, nil
+				}
+				return queryMatch.Score, queryMatch.Expl
 			}
-			return totalScore, &search.Explanation{Value: totalScore, Message: "sum of:", Children: []*search.Explanation{queryMatch.Expl, knnMatch.Expl}}
+		} else {
+			// Default combination of scores at collector; non-fusion method of hybrid search
+			newScoreExplComputer = func(queryMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) (float64, *search.Explanation) {
+				totalScore := queryMatch.Score + knnMatch.Score
+				if !req.Explain {
+					// exit early as we don't need to compute the explanation
+					return totalScore, nil
+				}
+				return totalScore, &search.Explanation{Value: totalScore, Message: "sum of:", Children: []*search.Explanation{queryMatch.Expl, knnMatch.Expl}}
+			}
 		}
-		coll.SetKNNHits(knnHits, search.ScoreExplCorrectionCallbackFunc(newScoreExplComputer))
+		coll.SetKNNHits(knnHits, newScoreExplComputer)
 	}
 }
 
 func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*search.DocumentMatch {
+	// If the request is hybrid search, do not use any operator. Individual scores are preserved
+	// for fusion. This is equivalent to doing knnOperatorOr, but without combining score results.
+	if IsScoreFusionRequested(req) {
+		for _, hit := range knnHits {
+			hit.Score = 0.0
+		}
+
+		return knnHits
+	}
 	// if the KNN operator is AND, then we need to filter out the hits that
 	// do not have match the KNN queries.
 	if req.KNNOperator == knnOperatorAnd {
@@ -537,6 +590,10 @@ func requestHasKNN(req *SearchRequest) bool {
 	return len(req.KNN) > 0
 }
 
+func numKNNQueries(req *SearchRequest) int {
+	return len(req.KNN)
+}
+
 // returns true if the search request contains a KNN request that can be
 // satisfied by just performing a preSearch, completely bypassing the
 // actual search.
@@ -606,5 +663,27 @@ func newKnnPreSearchResultProcessor(req *SearchRequest) *knnPreSearchResultProce
 			// the merged knn hits are finalized and set in the search result.
 			sr.Hits, _ = knnStore.Final(nil)
 		},
+	}
+}
+
+// Replace knn boost values for fusion rescoring queries
+func (r *rescorer) prepareKnnRequest() {
+	for i := range r.req.KNN {
+		b := r.req.KNN[i].Boost
+		if b != nil {
+			r.origBoosts[i+1] = b.Value()
+			newB := query.Boost(1.0)
+			r.req.KNN[i].Boost = &newB
+		} else {
+			r.origBoosts[i+1] = 1.0
+		}
+	}
+}
+
+// Restore knn boost values for fusion rescoring queries
+func (r *rescorer) restoreKnnRequest() {
+	for i := range r.req.KNN {
+		b := query.Boost(r.origBoosts[i+1])
+		r.req.KNN[i].Boost = &b
 	}
 }

@@ -152,6 +152,10 @@ const (
 	// BM25StatsKey is used to store and transport the BM25 Data
 	// to the actual search phase which would use it to perform the search.
 	BM25StatsKey ContextKey = "_bm25_stats_key"
+
+	// ScoreFusionKey is used to communicate whether KNN hits need to be preserved for
+	// hybrid search algorithms (like RRF)
+	ScoreFusionKey ContextKey = "_fusion_rescoring_key"
 )
 
 func RecordSearchCost(ctx context.Context,
