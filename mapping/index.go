@@ -17,12 +17,14 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -363,7 +365,13 @@ func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}
 		// see if the _all field was disabled
 		allMapping, _ := docMapping.documentMappingForPath("_all")
 		if allMapping == nil || allMapping.Enabled {
-			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, index.IndexField|index.IncludeTermVectors)
+			excludedFromAll := walkContext.excludedFromAll
+			nf := doc.NestedFields()
+			if nf != nil {
+				// if the document has any nested fields, exclude them from _all
+				excludedFromAll = append(excludedFromAll, nf.Slice()...)
+			}
+			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, excludedFromAll, index.IndexField|index.IncludeTermVectors)
 			doc.AddField(field)
 		}
 		doc.SetIndexed()
@@ -570,4 +578,37 @@ func (im *IndexMappingImpl) SynonymSourceVisitor(visitor analysis.SynonymSourceV
 		return err
 	}
 	return nil
+}
+
+// NestedPrefixes returns a set of all the field prefixes that are marked as nested
+// in this mapping. If there are no nested fields, it returns nil.
+func (im *IndexMappingImpl) NestedPrefixes() search.FieldSet {
+	var rv search.FieldSet
+	var collectNestedFields func(dm *DocumentMapping, pathComponents []string)
+	collectNestedFields = func(dm *DocumentMapping, pathComponents []string) {
+		for name, docMapping := range dm.Properties {
+			newPathComponents := append(pathComponents, name)
+			if docMapping.Nested {
+				if rv == nil {
+					rv = search.NewFieldSet()
+				}
+				rv[strings.Join(newPathComponents, pathSeparator)] = struct{}{}
+			} else {
+				collectNestedFields(docMapping, newPathComponents)
+			}
+		}
+	}
+
+	// Traverse default mapping if enabled
+	if im.DefaultMapping != nil && im.DefaultMapping.Enabled {
+		collectNestedFields(im.DefaultMapping, []string{})
+	}
+
+	// Traverse all type mappings if enabled
+	for _, docMapping := range im.TypeMapping {
+		if docMapping.Enabled {
+			collectNestedFields(docMapping, []string{})
+		}
+	}
+	return rv
 }

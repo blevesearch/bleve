@@ -17,7 +17,6 @@ package scorch
 import (
 	"container/heap"
 	"context"
-	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -491,7 +490,7 @@ func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		return nil, nil
 	}
 
-	docNum, err := docInternalToNumber(next.ID)
+	docNum, err := next.ID.Value()
 	if err != nil {
 		return nil, err
 	}
@@ -554,7 +553,7 @@ func (is *IndexSnapshot) segmentIndexAndLocalDocNumFromGlobal(docNum uint64) (in
 }
 
 func (is *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
-	docNum, err := docInternalToNumber(id)
+	docNum, err := id.Value()
 	if err != nil {
 		return "", err
 	}
@@ -572,7 +571,7 @@ func (is *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
 }
 
 func (is *IndexSnapshot) segmentIndexAndLocalDocNum(id index.IndexInternalID) (int, uint64, error) {
-	docNum, err := docInternalToNumber(id)
+	docNum, err := id.Value()
 	if err != nil {
 		return 0, 0, err
 	}
@@ -747,25 +746,6 @@ func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReade
 	is.m2.Unlock()
 }
 
-func docNumberToBytes(buf []byte, in uint64) []byte {
-	if len(buf) != 8 {
-		if cap(buf) >= 8 {
-			buf = buf[0:8]
-		} else {
-			buf = make([]byte, 8)
-		}
-	}
-	binary.BigEndian.PutUint64(buf, in)
-	return buf
-}
-
-func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
-	if len(in) != 8 {
-		return 0, fmt.Errorf("wrong len for IndexInternalID: %q", in)
-	}
-	return binary.BigEndian.Uint64(in), nil
-}
-
 func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	segmentIndex int, localDocNum uint64, fields []string, cFields []string,
 	visitor index.DocValueVisitor, dvs segment.DocVisitState) (
@@ -851,7 +831,7 @@ func (dvr *DocValueReader) BytesRead() uint64 {
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
 	visitor index.DocValueVisitor,
 ) (err error) {
-	docNum, err := docInternalToNumber(id)
+	docNum, err := id.Value()
 	if err != nil {
 		return err
 	}
@@ -1160,4 +1140,34 @@ func (is *IndexSnapshot) ThesaurusKeysRegexp(name string,
 
 func (is *IndexSnapshot) UpdateSynonymSearchCount(delta uint64) {
 	atomic.AddUint64(&is.parent.stats.TotSynonymSearches, delta)
+}
+
+// Ancestors returns the ancestral chain for a given document ID in the index.
+// For nested documents, this method retrieves all parent documents in the hierarchy
+// leading up to the specified document ID. The returned slice contains:
+//   - [0]: The document itself (with global ID)
+//   - [1:]: All ancestor documents in the hierarchy (with global IDs)
+//
+// The method handles the translation from segment-local document numbers to
+// global index internal IDs by applying the appropriate segment offset.
+func (i *IndexSnapshot) Ancestors(ID index.IndexInternalID) ([]index.IndexInternalID, error) {
+	seg, ldoc, err := i.segmentIndexAndLocalDocNum(ID)
+	if err != nil {
+		return nil, err
+	}
+
+	ancestors := i.segment[seg].Ancestors(ldoc)
+
+	// allocate space: +1 for the doc itself
+	rv := make([]index.IndexInternalID, len(ancestors)+1)
+	globalOffset := i.offsets[seg]
+
+	// first element is the doc itself
+	rv[0] = index.NewIndexInternalID(nil, ldoc+globalOffset)
+
+	// then all ancestors shifted by +1
+	for j := 1; j < len(ancestors)+1; j++ {
+		rv[j] = index.NewIndexInternalID(nil, ancestors[j-1]+globalOffset)
+	}
+	return rv, nil
 }

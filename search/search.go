@@ -165,9 +165,9 @@ type DocumentMatch struct {
 
 	// used to indicate the sub-scores that combined to form the
 	// final score for this document match.  This is only populated
-	// when the search request's query is a DisjunctionQuery
-	// or a ConjunctionQuery. The map key is the index of the sub-query
-	// in the DisjunctionQuery or ConjunctionQuery. The map value is the
+	// when the search request's query is a DisjunctionQuery.
+	// The map key is the index of the sub-query
+	// in the DisjunctionQuery. The map value is the
 	// sub-score for that sub-query.
 	ScoreBreakdown map[int]float64 `json:"score_breakdown,omitempty"`
 
@@ -178,6 +178,10 @@ type DocumentMatch struct {
 	// of the index that this match came from
 	// of the current alias view, used in alias of aliases scenario
 	IndexNames []string `json:"index_names,omitempty"`
+
+	// Children holds any descendant/child matches that contributed
+	// to this root (or intermediate LCA) DocumentMatch.
+	Children DescendantStore `json:"-"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
@@ -199,6 +203,21 @@ func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
 		valSlice = []interface{}{existingVal, value}
 	}
 	dm.Fields[name] = valSlice
+}
+
+func (dm *DocumentMatch) AddFragments(field string, fragments []string) {
+	if dm.Fragments == nil {
+		dm.Fragments = make(FieldFragmentMap)
+	}
+OUTER:
+	for _, newFrag := range fragments {
+		for _, existingFrag := range dm.Fragments[field] {
+			if existingFrag == newFrag {
+				continue OUTER // no duplicates allowed
+			}
+		}
+		dm.Fragments[field] = append(dm.Fragments[field], newFrag)
+	}
 }
 
 // Reset allows an already allocated DocumentMatch to be reused
@@ -265,6 +284,10 @@ func (dm *DocumentMatch) Size() int {
 	for k := range dm.Fields {
 		sizeInBytes += size.SizeOfString + len(k) +
 			size.SizeOfPtr
+	}
+
+	if dm.Children != nil {
+		sizeInBytes += dm.Children.Size()
 	}
 
 	return sizeInBytes
@@ -347,6 +370,31 @@ func (dm *DocumentMatch) String() string {
 	return fmt.Sprintf("[%s-%f]", dm.ID, dm.Score)
 }
 
+func (dm *DocumentMatch) MergeWith(other *DocumentMatch) error {
+	// merge score
+	dm.Score += other.Score
+	// merge explanations
+	dm.Expl = MergeExpl(dm.Expl, other.Expl)
+	// merge field term locations
+	dm.FieldTermLocations = MergeFieldTermLocations(dm.FieldTermLocations, []*DocumentMatch{other})
+	// merge score breakdown
+	dm.ScoreBreakdown = MergeScoreBreakdown(dm.ScoreBreakdown, other.ScoreBreakdown)
+	// merge Descendants/Children
+	// if the base and other have the same ID, then we are merging the same
+	// document match (from different clauses), so we need to merge their children/descendants
+	if !dm.IndexInternalID.Equals(other.IndexInternalID) {
+		if dm.Children == nil {
+			dm.Children = make(DescendantStore)
+		}
+		err := dm.Children.AddDescendant(other.IndexInternalID)
+		if err != nil {
+			return err
+		}
+	}
+	dm.Children = MergeDescendants(dm.Children, other.Children)
+	return nil
+}
+
 type DocumentMatchCollection []*DocumentMatch
 
 func (c DocumentMatchCollection) Len() int           { return len(c) }
@@ -392,4 +440,63 @@ func (sc *SearchContext) Size() int {
 	}
 
 	return sizeInBytes
+}
+
+type DescendantStore map[uint64]index.IndexInternalID
+
+func MergeDescendants(first, second DescendantStore) DescendantStore {
+	if first == nil {
+		return second
+	}
+	if second == nil {
+		return first
+	}
+	for k, v := range second {
+		first[k] = v
+	}
+	return first
+}
+
+func (ds DescendantStore) AddDescendant(descendant index.IndexInternalID) error {
+	key, err := descendant.Value()
+	if err != nil {
+		return err
+	}
+	// use clone to keep the store stateless
+	ds[key] = slices.Clone(descendant)
+	return nil
+}
+
+func (ds DescendantStore) IterateDescendants(fn func(descendant index.IndexInternalID) error) error {
+	for _, descendant := range ds {
+		if err := fn(descendant); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (ds DescendantStore) Size() int {
+	sizeInBytes := size.SizeOfMap
+	for _, entry := range ds {
+		sizeInBytes += size.SizeOfPtr + len(entry)
+	}
+	return sizeInBytes
+}
+
+// A NestedDocumentMatch is like a DocumentMatch but used for nested documents
+// and does not have score or locations, or a score and is mainly used to
+// hold field values and fragments, to be embedded in the parent DocumentMatch
+type NestedDocumentMatch struct {
+	Fields    map[string]interface{} `json:"fields,omitempty"`
+	Fragments FieldFragmentMap       `json:"fragments,omitempty"`
+}
+
+// NewNestedDocumentMatch creates a new NestedDocumentMatch instance
+// with the given fields and fragments
+func NewNestedDocumentMatch(fields map[string]interface{}, fragments FieldFragmentMap) *NestedDocumentMatch {
+	return &NestedDocumentMatch{
+		Fields:    fields,
+		Fragments: fragments,
+	}
 }

@@ -20,6 +20,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/search"
 )
 
 // A Classifier is an interface describing any object which knows how to
@@ -73,4 +74,10 @@ type SynonymMapping interface {
 	SynonymCount() int
 
 	SynonymSourceVisitor(visitor analysis.SynonymSourceVisitor) error
+}
+
+type NestedMapping interface {
+	IndexMapping
+
+	NestedPrefixes() search.FieldSet
 }
