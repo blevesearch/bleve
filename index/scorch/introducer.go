@@ -126,6 +126,10 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		creator:  "introduceSegment",
 	}
 
+	if len(root.trainData) > 0 {
+		newSnapshot.trainData = root.trainData
+	}
+
 	// iterate through current segments
 	var running uint64
 	var docsToPersistCount, memSegments, fileSegments uint64
@@ -276,6 +280,10 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 		creator:  "introducePersist",
 	}
 
+	if len(root.trainData) > 0 {
+		newIndexSnapshot.trainData = root.trainData
+	}
+
 	var docsToPersistCount, memSegments, fileSegments uint64
 	for i, segmentSnapshot := range root.segment {
 		// see if this segment has been replaced
@@ -350,6 +358,10 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 		internal: root.internal,
 		refs:     1,
 		creator:  "introduceMerge",
+	}
+
+	if len(nextMerge.trainData) > 0 {
+		newSnapshot.trainData = nextMerge.trainData
 	}
 
 	var running, docsToPersistCount, memSegments, fileSegments uint64

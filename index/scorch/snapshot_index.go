@@ -68,7 +68,12 @@ func init() {
 }
 
 type IndexSnapshot struct {
-	parent   *Scorch
+	parent *Scorch
+
+	// POC: trainData is ephemeral and read-only just like []*SegmentSnapshot
+	trainData []float32
+	// trainSegments []*SegmentSnapshot // either store []float32 or []faissIndexes aka centroid indexes
+
 	segment  []*SegmentSnapshot
 	offsets  []uint64
 	internal map[string][]byte
