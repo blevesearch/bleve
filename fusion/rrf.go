@@ -51,16 +51,12 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 	sort.Slice(hits, func(a, b int) bool {
 		return scoreSortFunc()(hits[a], hits[b]) < 0
 	})
-	for i, hit := range hits {
-		if hit.Score != 0.0 {
+	// Only consider top windowSize docs for rescoring
+	for i := range min(windowSize, len(hits)) {
+		if hits[i].Score != 0.0 {
 			// Skip if Score is 0, since that means the document was not
 			// found as part of FTS, and only in KNN.
-			docRanks[hit.ID][0] = i + 1
-		}
-
-		if i == windowSize-1 {
-			// No need to calculate ranks from here
-			break
+			docRanks[hits[i].ID][0] = i + 1
 		}
 	}
 
@@ -83,13 +79,9 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 		})
 
 		// Update the ranks of the documents in the docRanks map.
-		for j, hit := range knnDocs {
-			docRanks[hit.ID][i+1] = j + 1
-
-			if j == windowSize-1 {
-				// No need to calculate ranks from here
-				break
-			}
+		// Only consider top windowSize docs for rescoring.
+		for j := range min(windowSize, len(knnDocs)) {
+			docRanks[knnDocs[j].ID][i+1] = j + 1
 		}
 	}
 
