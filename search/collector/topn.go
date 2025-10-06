@@ -246,7 +246,6 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	if hc.size+hc.skip > PreAllocSizeSkipCap {
 		backingSize = PreAllocSizeSkipCap + 1
 	}
-
 	searchContext := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(backingSize+searcher.DocumentMatchPoolSize(), len(hc.sort)),
 		Collector:         hc,
@@ -266,7 +265,6 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 
 	dmHandlerMaker := MakeTopNDocumentMatchHandler
-
 	if cv := ctx.Value(search.MakeDocumentMatchHandlerKey); cv != nil {
 		dmHandlerMaker = cv.(search.MakeDocumentMatchHandler)
 	}
