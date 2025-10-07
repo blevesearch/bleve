@@ -58,7 +58,6 @@ func (s *NestedConjunctionQueryScorer) Score(ctx *search.SearchContext, constitu
 	}
 	// take the lca document
 	lcaDocID := constituents[lcaIdx].IndexInternalID
-
 	// create a new DocumentMatch for the LCA
 	// we do this because we want to avoid modifying
 	// any of the constituents directly, as they may be
@@ -66,14 +65,12 @@ func (s *NestedConjunctionQueryScorer) Score(ctx *search.SearchContext, constitu
 	rv := &search.DocumentMatch{
 		IndexInternalID: slices.Clone(lcaDocID),
 	}
-
 	// merge all other constituents into it
 	for _, dm := range constituents {
 		err := rv.MergeWith(dm)
 		if err != nil {
 			return nil, err
 		}
-
 	}
 	return rv, nil
 }
