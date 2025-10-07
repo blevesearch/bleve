@@ -68,7 +68,7 @@ func NewNestedConjunctionSearcher(ctx context.Context, indexReader index.IndexRe
 	return &rv, nil
 }
 
-func (s *NestedConjunctionSearcher) initSearchers(ctx *search.SearchContext) error {
+func (s *NestedConjunctionSearcher) initSearchers(ctx *search.SearchContext) (bool, error) {
 	var err error
 	// get all searchers pointing at their first match
 	for i, searcher := range s.searchers {
@@ -77,16 +77,16 @@ func (s *NestedConjunctionSearcher) initSearchers(ctx *search.SearchContext) err
 		}
 		s.currs[i], err = searcher.Next(ctx)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if s.currs[i] == nil {
 			// one of the searchers is exhausted, so we are done
-			return nil
+			return true, nil
 		}
 		// get the ancestry chain for this match
 		s.currAncestors[i], err = s.nestedReader.Ancestors(s.currs[i].IndexInternalID)
 		if err != nil {
-			return err
+			return false, err
 		}
 	}
 	// scan the ancestry chains for all searchers to get the pivotIDx
@@ -107,7 +107,7 @@ func (s *NestedConjunctionSearcher) initSearchers(ctx *search.SearchContext) err
 		}
 	}
 	s.initialized = true
-	return nil
+	return false, nil
 }
 
 func (s *NestedConjunctionSearcher) computeQueryNorm() {
@@ -188,9 +188,12 @@ func (s *NestedConjunctionSearcher) DocumentMatchPoolSize() int {
 
 func (s *NestedConjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	if !s.initialized {
-		err := s.initSearchers(ctx)
+		exhausted, err := s.initSearchers(ctx)
 		if err != nil {
 			return nil, err
+		}
+		if exhausted {
+			return nil, nil
 		}
 	}
 	// we have the pivot searcher, now try to align all the others to it, using the racecar algorithm,
