@@ -39,7 +39,7 @@ type NestedConjunctionSearcher struct {
 	queryNorm     float64
 	currs         []*search.DocumentMatch
 	currAncestors [][]index.IndexInternalID
-	maxIDIdx      int
+	pivotIDx      int
 	scorer        *scorer.NestedConjunctionQueryScorer
 	initialized   bool
 	options       search.SearcherOptions
@@ -79,9 +79,34 @@ func (s *NestedConjunctionSearcher) initSearchers(ctx *search.SearchContext) err
 		if err != nil {
 			return err
 		}
+		if s.currs[i] == nil {
+			// one of the searchers is exhausted, so we are done
+			return nil
+		}
+		// get the ancestry chain for this match
+		s.currAncestors[i], err = s.nestedReader.Ancestors(s.currs[i].IndexInternalID)
+		if err != nil {
+			return err
+		}
+	}
+	// scan the ancestry chains for all searchers to get the pivotIDx
+	// the pivot will be the searcher with the longest ancestry chain
+	// if there are multiple with the same length, pick the one with
+	// the highest docID
+	s.pivotIDx = 0
+	pivotLength := len(s.currAncestors[0])
+	for i := 1; i < len(s.searchers); i++ {
+		if len(s.currAncestors[i]) > pivotLength {
+			s.pivotIDx = i
+			pivotLength = len(s.currAncestors[i])
+		} else if len(s.currAncestors[i]) == pivotLength {
+			// if same length, pick the one with the highest docID
+			if s.currs[i].IndexInternalID.Compare(s.currs[s.pivotIDx].IndexInternalID) > 0 {
+				s.pivotIDx = i
+			}
+		}
 	}
 	s.initialized = true
-
 	return nil
 }
 
@@ -168,87 +193,148 @@ func (s *NestedConjunctionSearcher) Next(ctx *search.SearchContext) (*search.Doc
 			return nil, err
 		}
 	}
-
-	var err error
-	// pick maxID among currs
-	s.maxIDIdx = 0
-	for i := 0; i < len(s.currs); i++ {
-		if s.currs[i] == nil {
+	// we have the pivot searcher, now try to align all the others to it, using the racecar algorithm,
+	// basically - the idea is simple - we first check if the pivot searcher's indexInternalID
+	// is behind any of the other searchers, and if so, we are sure that the pivot searcher
+	// cannot be part of a match, so we advance it to the maximum of the other searchers.
+	// Now once the pivot searcher is ahead of all the other searchers, we advance all the other
+	// searchers to the corresponding ancestor of the pivot searcher, if all of them align on the correct
+	// ancestor, we have a match, otherwise we repeat the process.
+	for {
+		pivotSearcher := s.searchers[s.pivotIDx]
+		pivotDM := s.currs[s.pivotIDx]
+		if pivotDM == nil {
+			// one of the searchers is exhausted, so we are done
 			return nil, nil
 		}
-		s.currAncestors[i], err = s.nestedReader.Ancestors(s.currs[i].IndexInternalID)
-		if err != nil {
-			return nil, err
-		}
-		if s.currs[i].IndexInternalID.Compare(s.currs[s.maxIDIdx].IndexInternalID) > 0 {
-			s.maxIDIdx = i
-		}
-	}
-OUTER:
-	for {
-		// try to align others
-		for i := 0; i < len(s.currs); i++ {
-			if i == s.maxIDIdx {
+		pivotAncestors := s.currAncestors[s.pivotIDx]
+		pivotID := pivotDM.IndexInternalID
+		// first, make sure the pivot is ahead of all the other searchers
+		// we do this by getting the max of all the other searchers' IDs
+		// and if the pivot is behind that, we advance it to that
+		maxID := pivotID
+		for i := 0; i < len(s.searchers); i++ {
+			if i == s.pivotIDx {
+				// skip the pivot itself
 				continue
 			}
-			for {
-				// case 1: suffix already matches → exit with matched
-				if s.suffixJoinOK(s.currAncestors[i], s.currAncestors[s.maxIDIdx]) {
-					break
-				}
-
-				// case 2: docID is already > max → overshoot, stop and rewind
-				if s.currs[i].IndexInternalID.Compare(s.currs[s.maxIDIdx].IndexInternalID) > 0 {
-					s.maxIDIdx = i
-					continue OUTER
-				}
-
-				// case 3: need to advance this searcher
+			curr := s.currs[i]
+			if curr == nil {
+				// one of the searchers is exhausted, so we are done
+				return nil, nil
+			}
+			if curr.IndexInternalID.Compare(maxID) > 0 {
+				maxID = curr.IndexInternalID
+			}
+		}
+		if maxID.Compare(pivotID) > 0 {
+			var err error
+			// pivot is behind, so advance it
+			ctx.DocumentMatchPool.Put(pivotDM)
+			s.currs[s.pivotIDx], err = pivotSearcher.Advance(ctx, maxID)
+			if err != nil {
+				return nil, err
+			}
+			if s.currs[s.pivotIDx] == nil {
+				// one of the searchers is exhausted, so we are done
+				return nil, nil
+			}
+			// recalc ancestors
+			s.currAncestors[s.pivotIDx], err = s.nestedReader.Ancestors(s.currs[s.pivotIDx].IndexInternalID)
+			if err != nil {
+				return nil, err
+			}
+			// now restart the whole process
+			continue
+		}
+		// at this point, we know the pivot is ahead of all the other searchers
+		// now try to align all the other searchers to the pivot's ancestry
+		// we do this by advancing each searcher to the corresponding ancestor
+		// of the pivot, once that is done we check if all the searchers are aligned
+		// if they are, we have a match, otherwise we have a scenario where one or more
+		// searchers have advanced beyond the pivot, so we need to restart the whole process
+		// where we have to find the new maxID and advance the pivot as done above
+		for i := 0; i < len(s.searchers); i++ {
+			if i == s.pivotIDx {
+				// skip the pivot itself
+				continue
+			}
+			curr := s.currs[i]
+			if curr == nil {
+				// one of the searchers is exhausted, so we are done
+				return nil, nil
+			}
+			// try to align curr to the pivot's ancestry by advancing the
+			// searcher to the corresponding ancestor of the pivot
+			targetAncestor := pivotAncestors[len(pivotAncestors)-len(s.currAncestors[i])]
+			if curr.IndexInternalID.Compare(targetAncestor) < 0 {
 				var err error
-				if s.currs[i] != nil {
-					ctx.DocumentMatchPool.Put(s.currs[i])
-				}
-				s.currs[i], err = s.searchers[i].Next(ctx)
+				ctx.DocumentMatchPool.Put(curr)
+				s.currs[i], err = s.searchers[i].Advance(ctx, targetAncestor)
 				if err != nil {
 					return nil, err
 				}
 				if s.currs[i] == nil {
-					return nil, nil // exhausted
+					// one of the searchers is exhausted, so we are done
+					return nil, nil
 				}
+				// recalc ancestors
 				s.currAncestors[i], err = s.nestedReader.Ancestors(s.currs[i].IndexInternalID)
 				if err != nil {
 					return nil, err
 				}
 			}
-			// now we have a guaranteed suffix match
-			// move on to next searcher
 		}
-		// reaching this point means that we have reached a case where we have
-		// all ancestry paths having the same suffix match, means we can emit out the
-		// LCA which is the left most element of the smallest Ancestor path
-		// and then we Next() all searchers except the one at maxIDIdx and return
-		// the LCA as the document match
-		rv, err := s.scorer.Score(ctx, s.currs, s.currAncestors)
-		if err != nil {
-			return nil, err
-		}
-		// advance all searchers except the one at maxIDIdx
-		for i := 0; i < len(s.currs); i++ {
-			// dont advance the maxIDIdx searcher
-			// advance it only if its the only searcher
-			if i == s.maxIDIdx && len(s.currs) > 1 {
+		// now we check if all the searchers are aligned with the pivot, which will happen
+		// when the pivot docID is >= all the other searchers' docIDs, if any searcher moved
+		// past the required pivot's ancestor it will naturally be ahead the pivot's docID
+		// which would mean there is no alignment and we need to restart the whole process
+		allAligned := true
+		for i := 0; i < len(s.searchers); i++ {
+			if i == s.pivotIDx {
+				// skip the pivot itself
 				continue
 			}
-			if s.currs[i] != rv {
-				ctx.DocumentMatchPool.Put(s.currs[i])
+			curr := s.currs[i]
+			if curr == nil {
+				// one of the searchers is exhausted, so we are done
+				return nil, nil
 			}
-			var err error
-			s.currs[i], err = s.searchers[i].Next(ctx)
+			if curr.IndexInternalID.Compare(pivotID) > 0 {
+				// this searcher has moved past the pivot, so no alignment
+				allAligned = false
+				break
+			}
+			// now check if the ancestry chains are compatible
+			if !s.suffixJoinOK(s.currAncestors[i], pivotAncestors) {
+				// ancestry chains are not compatible, so no alignment
+				allAligned = false
+				break
+			}
+		}
+		if allAligned {
+			// we have a match, so we can build the resulting DocumentMatch
+			// we do this by delegating to the scorer, which will pick the lowest
+			// common ancestor (LCA) and merge all the constituents into it
+			dm, err := s.scorer.Score(ctx, s.currs, s.currAncestors)
 			if err != nil {
 				return nil, err
 			}
+			// now advance the pivot searcher to get ready for the next call
+			ctx.DocumentMatchPool.Put(pivotDM)
+			s.currs[s.pivotIDx], err = pivotSearcher.Next(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if s.currs[s.pivotIDx] != nil {
+				s.currAncestors[s.pivotIDx], err = s.nestedReader.Ancestors(s.currs[s.pivotIDx].IndexInternalID)
+				if err != nil {
+					return nil, err
+				}
+			}
+			// return the match we have
+			return dm, nil
 		}
-		return rv, nil
 	}
 }
 
