@@ -53,15 +53,47 @@ func (q *ConjunctionQuery) AddQuery(aq ...Query) {
 }
 
 func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+	// check if the mapping has any nested prefixes
+	var nestedPrefixes search.FieldSet
+	if nm, ok := m.(mapping.NestedMapping); ok {
+		nestedPrefixes = nm.NestedPrefixes()
+	}
+	// if we have nested prefixes to check against, then we need to check
+	// each subquery to see if it has any of those fields
+	// if so, then we need to use a nested conjunction searcher
+	// if not, then we can use a regular conjunction searcher
+	// if there are no nested prefixes at all, then we can use a regular
+	// conjunction searcher
+	var useNestedSearcher bool
 	ss := make([]search.Searcher, 0, len(q.Conjuncts))
+	cleanup := func() {
+		for _, searcher := range ss {
+			if searcher != nil {
+				_ = searcher.Close()
+			}
+		}
+	}
+	// set of fields used in this query
+	var qfs search.FieldSet
+	var err error
 	for _, conjunct := range q.Conjuncts {
+		// if we haven't already determined we need a nested searcher,
+		// and we have nested prefixes to check against, do so now
+		if !useNestedSearcher && nestedPrefixes != nil {
+			// once we know we need a nested searcher, no need to keep checking
+			// the rest of the queries
+			qfs, err = ExtractFields(conjunct, m, qfs)
+			if err != nil {
+				cleanup()
+				return nil, err
+			}
+			if qfs != nil && qfs.IntersectsPrefix(nestedPrefixes) {
+				useNestedSearcher = true
+			}
+		}
 		sr, err := conjunct.Searcher(ctx, i, m, options)
 		if err != nil {
-			for _, searcher := range ss {
-				if searcher != nil {
-					_ = searcher.Close()
-				}
-			}
+			cleanup()
 			return nil, err
 		}
 		if _, ok := sr.(*searcher.MatchNoneSearcher); ok && q.queryStringMode {
@@ -73,6 +105,10 @@ func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 
 	if len(ss) < 1 {
 		return searcher.NewMatchNoneSearcher(i)
+	}
+
+	if useNestedSearcher {
+		return searcher.NewNestedConjunctionSearcher(ctx, i, ss, options)
 	}
 
 	return searcher.NewConjunctionSearcher(ctx, i, ss, options)
@@ -94,6 +130,7 @@ func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
 		Conjuncts []json.RawMessage `json:"conjuncts"`
 		Boost     *Boost            `json:"boost,omitempty"`
+		Nested    bool              `json:"nested,omitempty"`
 	}{}
 	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {

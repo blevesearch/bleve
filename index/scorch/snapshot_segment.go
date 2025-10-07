@@ -338,3 +338,19 @@ func (c *cachedMeta) fetchMeta(field string) (rv interface{}) {
 	c.m.RUnlock()
 	return rv
 }
+
+func (s *SegmentSnapshot) Ancestors(docID uint64) []uint64 {
+	nsb, ok := s.segment.(segment.NestedSegment)
+	if !ok {
+		return nil
+	}
+	return nsb.Ancestors(docID)
+}
+
+func (s *SegmentSnapshot) Descendants(docID uint64) []uint64 {
+	nsb, ok := s.segment.(segment.NestedSegment)
+	if !ok {
+		return nil
+	}
+	return nsb.Descendants(docID)
+}

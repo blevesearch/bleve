@@ -509,8 +509,7 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 				return nil, err
 			}
 
-			fs := make(query.FieldSet)
-			fs, err := query.ExtractFields(req.Query, i.m, fs)
+			fs, err := query.ExtractFields(req.Query, i.m, search.NewFieldSet())
 			if err != nil {
 				return nil, err
 			}
@@ -588,11 +587,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		req.SearchBefore = nil
 	}
 
-	var coll *collector.TopNCollector
-	if req.SearchAfter != nil {
-		coll = collector.NewTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter)
-	} else {
-		coll = collector.NewTopNCollector(req.Size, req.From, req.Sort)
+	coll, err := i.buildTopNCollector(req, indexReader)
+	if err != nil {
+		return nil, err
 	}
 
 	var knnHits []*search.DocumentMatch
@@ -811,7 +808,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if i.name != "" && hit.Index == "" {
 			hit.Index = i.name
 		}
-		err, storedFieldsBytes := LoadAndHighlightFields(hit, req, i.name, indexReader, highlighter)
+		err, storedFieldsBytes := LoadAndHighlightAllFields(hit, req, i.name, indexReader, highlighter)
 		if err != nil {
 			return nil, err
 		}
@@ -969,6 +966,55 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 		}
 	}
 
+	return nil, totalStoredFieldsBytes
+}
+
+// LoadAndHighlightAllFields loads stored fields + highlights for root and its descendants.
+// All descendant documents are collected into a _$nested array in the root DocumentMatch.
+func LoadAndHighlightAllFields(
+	root *search.DocumentMatch,
+	req *SearchRequest,
+	indexName string,
+	r index.IndexReader,
+	highlighter highlight.Highlighter,
+) (error, uint64) {
+	var totalStoredFieldsBytes uint64
+	// load root fields/highlights
+	err, bytes := LoadAndHighlightFields(root, req, indexName, r, highlighter)
+	totalStoredFieldsBytes += bytes
+	if err != nil {
+		return err, totalStoredFieldsBytes
+	}
+	// collect all descendant documents
+	nestedDocs := make([]*search.NestedDocumentMatch, 0)
+	// create a dummy desc DocumentMatch to reuse LoadAndHighlightFields
+	desc := &search.DocumentMatch{}
+	err = root.Children.IterateDescendants(func(descID index.IndexInternalID) error {
+		extID, err := r.ExternalID(descID)
+		if err != nil {
+			return err
+		}
+		// reset desc for reuse
+		desc.ID = extID
+		desc.IndexInternalID = descID
+		desc.Locations = root.Locations
+		err, bytes := LoadAndHighlightFields(desc, req, indexName, r, highlighter)
+		totalStoredFieldsBytes += bytes
+		if err != nil {
+			return err
+		}
+		// copy fields to nested doc and append
+		nestedDocs = append(nestedDocs, search.NewNestedDocumentMatch(desc.Fields, desc.Fragments))
+		desc.Reset()
+		return nil
+	})
+	if err != nil {
+		return err, totalStoredFieldsBytes
+	}
+	// add nested documents to root under _$nested key
+	if len(nestedDocs) > 0 {
+		root.AddFieldValue("_$nested", nestedDocs)
+	}
 	return nil, totalStoredFieldsBytes
 }
 
@@ -1285,4 +1331,38 @@ func (i *indexImpl) FireIndexEvent() {
 		// fire the Index() event
 		internalEventIndex.FireIndexEvent()
 	}
+}
+
+func (i *indexImpl) buildTopNCollector(req *SearchRequest, reader index.IndexReader) (*collector.TopNCollector, error) {
+	newCollector := func() *collector.TopNCollector {
+		if req.SearchAfter != nil {
+			return collector.NewTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter)
+		}
+		return collector.NewTopNCollector(req.Size, req.From, req.Sort)
+	}
+
+	newNestedCollector := func(nr index.NestedReader) *collector.TopNCollector {
+		if req.SearchAfter != nil {
+			return collector.NewNestedTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter, nr)
+		}
+		return collector.NewNestedTopNCollector(req.Size, req.From, req.Sort, nr)
+	}
+
+	if nm, ok := i.m.(mapping.NestedMapping); ok {
+		if nestedPrefixes := nm.NestedPrefixes(); nestedPrefixes != nil {
+			if nr, ok := reader.(index.NestedReader); ok {
+				var fs search.FieldSet
+				var err error
+				fs, err = query.ExtractFields(req.Query, i.m, fs)
+				if err != nil {
+					return nil, err
+				}
+				if fs != nil && fs.IntersectsPrefix(nestedPrefixes) {
+					return newNestedCollector(nr), nil
+				}
+			}
+		}
+	}
+
+	return newCollector(), nil
 }
