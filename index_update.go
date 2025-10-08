@@ -153,6 +153,13 @@ func compareMappings(ori, upd *mapping.IndexMappingImpl) error {
 		return fmt.Errorf("default datetime parser cannot be changed if index dynamic is true")
 	}
 
+	if ori.ScoringModel != upd.ScoringModel {
+		if ori.ScoringModel != "" && ori.ScoringModel != "tf-idf" && ori.ScoringModel != "bm25" ||
+			upd.ScoringModel != "" && upd.ScoringModel != "tf-idf" && upd.ScoringModel != "bm25" {
+			return fmt.Errorf("scoring model can only be changed between \"\", tf-idf and bm25")
+		}
+	}
+
 	return nil
 }
 

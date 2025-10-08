@@ -75,7 +75,6 @@ type Scorch struct {
 	merges                   chan *segmentMerge
 	introducerNotifier       chan *epochWatcher
 	persisterNotifier        chan *epochWatcher
-	loadedBolt               bool
 	rootBolt                 *bolt.DB
 	asyncTasks               sync.WaitGroup
 
@@ -124,7 +123,6 @@ func NewScorch(storeName string,
 		forceMergeRequestCh:  make(chan *mergerCtrl, 1),
 		segPlugin:            defaultSegmentPlugin,
 		copyScheduled:        map[string]int{},
-		loadedBolt:           false,
 	}
 
 	forcedSegmentType, forcedSegmentVersion, err := configForceSegmentTypeVersion(config)
@@ -220,7 +218,7 @@ func (s *Scorch) fireAsyncError(err error) {
 }
 
 func (s *Scorch) Open() error {
-	if !s.loadedBolt {
+	if s.rootBolt == nil {
 		err := s.openBolt()
 		if err != nil {
 			return err
@@ -376,6 +374,7 @@ func (s *Scorch) Close() (err error) {
 			}
 		}
 		s.root = nil
+		s.rootBolt = nil
 		s.rootLock.Unlock()
 	}
 
@@ -960,15 +959,13 @@ func (s *Scorch) UpdateFields(fieldInfo map[string]*index.UpdateFieldInfo, mappi
 }
 
 func (s *Scorch) OpenMeta() error {
-	if s.loadedBolt {
-		return nil
+	if s.rootBolt == nil {
+		err := s.openBolt()
+		if err != nil {
+			return err
+		}
 	}
 
-	err := s.openBolt()
-	if err != nil {
-		return err
-	}
-	s.loadedBolt = true
 	return nil
 }
 
