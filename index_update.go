@@ -154,9 +154,9 @@ func compareMappings(ori, upd *mapping.IndexMappingImpl) error {
 	}
 
 	if ori.ScoringModel != upd.ScoringModel {
-		if ori.ScoringModel != "" && ori.ScoringModel != "tf-idf" && ori.ScoringModel != "bm25" ||
-			upd.ScoringModel != "" && upd.ScoringModel != "tf-idf" && upd.ScoringModel != "bm25" {
-			return fmt.Errorf("scoring model can only be changed between \"\", tf-idf and bm25")
+		if ori.ScoringModel != "" && ori.ScoringModel != index.TFIDFScoring && ori.ScoringModel != index.BM25Scoring ||
+			upd.ScoringModel != "" && upd.ScoringModel != index.TFIDFScoring && upd.ScoringModel != index.BM25Scoring {
+			return fmt.Errorf("scoring model can only be changed between \"\", %q and %q", index.TFIDFScoring, index.BM25Scoring)
 		}
 	}
 
