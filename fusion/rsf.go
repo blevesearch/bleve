@@ -16,7 +16,6 @@ package fusion
 
 import (
 	"fmt"
-	"math"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -27,64 +26,8 @@ func formatRSFMessage(weight float64, normalizedScore float64, minScore float64,
 		weight, normalizedScore, minScore, maxScore)
 }
 
-func RSFMinMaxCalculator(hits search.DocumentMatchCollection, scoreBreakdownIndex *int) (float64, float64) {
-	if len(hits) > 0 {
-		if scoreBreakdownIndex == nil {
-			return hits[len(hits)-1].Score, hits[0].Score
-		} else {
-			return hits[len(hits)-1].ScoreBreakdown[*scoreBreakdownIndex], hits[0].ScoreBreakdown[*scoreBreakdownIndex]
-		}
-	}
-
-	return 0.0, 0.0
-}
-
-func DBSFMinMaxCalculator(hits search.DocumentMatchCollection, scoreBreakdownIndex *int) (float64, float64) {
-	var scores []float64
-	if scoreBreakdownIndex == nil {
-		for _, hit := range hits {
-			scores = append(scores, hit.Score)
-		}
-	} else {
-		for _, hit := range hits {
-			scores = append(scores, hit.ScoreBreakdown[*scoreBreakdownIndex])
-		}
-	}
-
-	if len(scores) == 0 {
-		return 0.0, 0.0
-	}
-
-	// Calculate mean; also check if scores are the same, in which case return 0, 0
-	equalScoresflag := true
-	var sum float64
-	for _, score := range scores {
-		if score != scores[0] {
-			equalScoresflag = false
-		}
-		sum += score
-	}
-	if equalScoresflag {
-		return 0.0, 0.0
-	}
-	mean := sum / float64(len(scores))
-
-	// Calculate standard deviation
-	var variance float64
-	for _, score := range scores {
-		variance += math.Pow(score-mean, 2)
-	}
-	variance = variance / float64(len(scores))
-	stdDev := math.Sqrt(variance)
-
-	min := mean - 3*stdDev
-	max := mean + 3*stdDev
-
-	return min, max
-}
-
-// ScoreFusion normalizes scores based on min/max values for FTS and each KNN query, then applies weights.
-func ScoreFusion(hits search.DocumentMatchCollection, weights []float64, windowSize int, numKNNQueries int, distributionBased bool, explain bool) FusionResult {
+// RelativeScoreFusion normalizes scores based on min/max values for FTS and each KNN query, then applies weights.
+func RelativeScoreFusion(hits search.DocumentMatchCollection, weights []float64, windowSize int, numKNNQueries int, explain bool) FusionResult {
 	if len(hits) == 0 {
 		return FusionResult{
 			Hits:     hits,
@@ -118,10 +61,8 @@ func ScoreFusion(hits search.DocumentMatchCollection, weights []float64, windowS
 	}
 
 	var min, max float64
-	if distributionBased {
-		min, max = DBSFMinMaxCalculator(scoringDocs, nil)
-	} else {
-		min, max = RSFMinMaxCalculator(scoringDocs, nil)
+	if len(scoringDocs) > 0 {
+		min, max = scoringDocs[len(scoringDocs)-1].Score, scoringDocs[0].Score
 	}
 
 	for _, hit := range scoringDocs {
@@ -162,10 +103,10 @@ func ScoreFusion(hits search.DocumentMatchCollection, weights []float64, windowS
 			scoringDocs = scoringDocs[:windowSize]
 		}
 
-		if distributionBased {
-			min, max = DBSFMinMaxCalculator(scoringDocs, &i)
+		if len(scoringDocs) > 0 {
+			min, max = scoringDocs[len(scoringDocs)-1].ScoreBreakdown[i], scoringDocs[0].ScoreBreakdown[i]
 		} else {
-			min, max = RSFMinMaxCalculator(scoringDocs, &i)
+			min, max = 0.0, 0.0
 		}
 
 		for _, hit := range scoringDocs {
