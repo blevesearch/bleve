@@ -108,6 +108,15 @@ func (r *rescorer) rescore(sr *SearchResult) {
 			r.req.Explain,
 		)
 		fusionResult = &res
+	case ScoreRSF:
+		res := fusion.RelativeScoreFusion(
+			sr.Hits,
+			r.origBoosts,
+			r.req.RequestParams.ScoreWindowSize,
+			numKNNQueries(r.req),
+			r.req.Explain,
+		)
+		fusionResult = &res
 	}
 
 	sr.Hits = fusionResult.Hits
