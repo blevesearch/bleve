@@ -53,7 +53,6 @@ const (
 	ScoreNone    = "none"
 	ScoreRRF     = "rrf"
 	ScoreRSF     = "rsf"
-	ScoreDBSF    = "dbsf"
 )
 
 var AllowedFusionSort = search.SortOrder{&search.SortScore{Desc: true}}
@@ -685,7 +684,7 @@ func isMatchAllQuery(q query.Query) bool {
 // Checks if the request is hybrid search. Currently supports: RRF, RSF.
 func IsScoreFusionRequested(req *SearchRequest) bool {
 	switch req.Score {
-	case ScoreRRF, ScoreRSF, ScoreDBSF:
+	case ScoreRRF, ScoreRSF:
 		return true
 	default:
 		return false
