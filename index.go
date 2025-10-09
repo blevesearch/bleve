@@ -325,6 +325,8 @@ func Open(path string) (Index, error) {
 // The mapping used when it was created will be used for all Index/Search operations.
 // The provided runtimeConfig can override settings
 // persisted when the kvstore was created.
+// If runtimeConfig has updated mapping, then an index update is attempted
+// Throws an error without any changes to the index if an unupdatable mapping is provided
 func OpenUsing(path string, runtimeConfig map[string]interface{}) (Index, error) {
 	return openIndexUsing(path, runtimeConfig)
 }
