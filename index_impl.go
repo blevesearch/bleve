@@ -626,6 +626,26 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}()
 
+	var doScoreFusion bool
+	var rescorer *rescorer
+	if _, ok := ctx.Value(search.ScoreFusionKey).(bool); !ok {
+		// Since the score fusion key is not set, check if it is a hybrid search.
+		// If it is, then set doScoreFusion. This indicates that the rescoring
+		// must happen locally within this index, and there are no other
+		// indexes/aliases involved.
+		doScoreFusion = IsScoreFusionRequested(req)
+
+		// new context will be used in internal functions to collect data
+		// as suitable for hybrid search. Rescorer is used for rescoring
+		// using fusion algorithms.
+		if doScoreFusion {
+			ctx = context.WithValue(ctx, search.ScoreFusionKey, true)
+			rescorer = newRescorer(req)
+			rescorer.prepareSearchRequest()
+			defer rescorer.restoreSearchRequest()
+		}
+	}
+
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
 		preSearchResult, err := i.preSearch(ctx, req, indexReader)
 		if err != nil {
@@ -696,10 +716,22 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			}
 		}
 	}
-	if !skipKNNCollector && requestHasKNN(req) {
-		knnHits, err = i.runKnnCollector(ctx, req, indexReader, false)
-		if err != nil {
-			return nil, err
+
+	_, contextScoreFusionKeyExists := ctx.Value(search.ScoreFusionKey).(bool)
+
+	if !contextScoreFusionKeyExists {
+		// if no score fusion, default behaviour
+		if !skipKNNCollector && requestHasKNN(req) {
+			knnHits, err = i.runKnnCollector(ctx, req, indexReader, false)
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		// if score fusion, run collect if doScoreFusion
+		// if not, then knn hits must come from presearchdata (may be nil too)
+		if doScoreFusion && requestHasKNN(req) {
+			knnHits, err = i.runKnnCollector(ctx, req, indexReader, false)
 		}
 	}
 
@@ -714,7 +746,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}
 
-	setKnnHitsInCollector(knnHits, req, coll)
+	setKnnHitsInCollector(knnHits, req, coll, contextScoreFusionKeyExists)
 
 	if fts != nil {
 		if is, ok := indexReader.(*scorch.IndexSnapshot); ok {
@@ -921,6 +953,17 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		MaxScore: coll.MaxScore(),
 		Took:     searchDuration,
 		Facets:   coll.FacetResults(),
+	}
+
+	if contextScoreFusionKeyExists {
+		rv.FusionKnnHits = knnHits
+	}
+
+	// rescore if fusion flag is set
+	if doScoreFusion {
+		rescorer.rescore(rv)
+		rescorer.restoreSearchRequest()
+		rv.Hits = hitsInCurrentPage(req, rv.Hits)
 	}
 
 	if req.Explain {

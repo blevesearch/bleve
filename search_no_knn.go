@@ -77,6 +77,8 @@ type SearchRequest struct {
 
 	PreSearchData map[string]interface{} `json:"pre_search_data,omitempty"`
 
+	RequestParams *Params `json:"params,omitempty"`
+
 	sortFunc func(sort.Interface)
 }
 
@@ -97,6 +99,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		SearchAfter      []string          `json:"search_after"`
 		SearchBefore     []string          `json:"search_before"`
 		PreSearchData    json.RawMessage   `json:"pre_search_data"`
+		RequestParams    json.RawMessage   `json:"params"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -137,6 +140,25 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	if r.From < 0 {
 		r.From = 0
 	}
+
+	if temp.RequestParams == nil {
+		if IsScoreFusionRequested(r) {
+			// If params is not present and it requires rescoring, assign
+			// default values
+			r.RequestParams = NewDefaultParams(r.From, r.Size)
+		}
+	} else {
+		// if it is a request that requires rescoring, validate the rescoring
+		// parameters. Return errors if they are not valid.
+		if IsScoreFusionRequested(r) {
+			params, err := ParseParams(r, temp.RequestParams)
+			if err != nil {
+				return err
+			}
+			r.RequestParams = params
+		}
+	}
+
 	if temp.PreSearchData != nil {
 		r.PreSearchData, err = query.ParsePreSearchData(temp.PreSearchData)
 		if err != nil {
@@ -177,11 +199,15 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	return nil, nil
 }
 
-func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector) {
+func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector, combineScores bool) {
 }
 
 func requestHasKNN(req *SearchRequest) bool {
 	return false
+}
+
+func numKNNQueries(req *SearchRequest) int {
+	return 0
 }
 
 func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
@@ -206,4 +232,10 @@ func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*
 
 func newKnnPreSearchResultProcessor(req *SearchRequest) *knnPreSearchResultProcessor {
 	return &knnPreSearchResultProcessor{} // equivalent to nil
+}
+
+func (r *rescorer) prepareKnnRequest() {
+}
+
+func (r *rescorer) restoreKnnRequest() {
 }
