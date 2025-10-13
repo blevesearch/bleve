@@ -1106,7 +1106,9 @@ func LoadAndHighlightAllFields(
 			return err
 		}
 		// copy fields to nested doc and append
-		nestedDocs = append(nestedDocs, search.NewNestedDocumentMatch(desc.Fields, desc.Fragments))
+		if len(desc.Fields) != 0 || len(desc.Fragments) != 0 {
+			nestedDocs = append(nestedDocs, search.NewNestedDocumentMatch(desc.Fields, desc.Fragments))
+		}
 		desc.Reset()
 		return nil
 	})
