@@ -41,9 +41,8 @@ type asynchSegmentResult struct {
 	dict    segment.TermDictionary
 	dictItr segment.DictionaryIterator
 
-	cardinality int
-	index       int
-	docs        *roaring.Bitmap
+	index int
+	docs  *roaring.Bitmap
 
 	thesItr segment.ThesaurusIterator
 
@@ -58,11 +57,11 @@ func init() {
 	var err error
 	lb1, err = lev.NewLevenshteinAutomatonBuilder(1, true)
 	if err != nil {
-		panic(fmt.Errorf("Levenshtein automaton ed1 builder err: %v", err))
+		panic(fmt.Errorf("levenshtein automaton ed1 builder err: %v", err))
 	}
 	lb2, err = lev.NewLevenshteinAutomatonBuilder(2, true)
 	if err != nil {
-		panic(fmt.Errorf("Levenshtein automaton ed2 builder err: %v", err))
+		panic(fmt.Errorf("levenshtein automaton ed2 builder err: %v", err))
 	}
 }
 
@@ -1183,36 +1182,6 @@ func (is *IndexSnapshot) ThesaurusKeysRegexp(name string,
 
 func (is *IndexSnapshot) UpdateSynonymSearchCount(delta uint64) {
 	atomic.AddUint64(&is.parent.stats.TotSynonymSearches, delta)
-}
-
-// Update current snapshot updated field data as well as pass it on to all segments and segment bases
-func (is *IndexSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
-	is.m.Lock()
-	defer is.m.Unlock()
-
-	is.MergeUpdateFieldsInfo(updatedFields)
-
-	for _, segmentSnapshot := range is.segment {
-		segmentSnapshot.UpdateFieldsInfo(is.updatedFields)
-	}
-}
-
-// Merge given updated field information with existing updated field information
-func (is *IndexSnapshot) MergeUpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
-	if is.updatedFields == nil {
-		is.updatedFields = updatedFields
-	} else {
-		for fieldName, info := range updatedFields {
-			if val, ok := is.updatedFields[fieldName]; ok {
-				val.Deleted = val.Deleted || info.Deleted
-				val.Index = val.Index || info.Index
-				val.DocValues = val.DocValues || info.DocValues
-				val.Store = val.Store || info.Store
-			} else {
-				is.updatedFields[fieldName] = info
-			}
-		}
-	}
 }
 
 // Update current snapshot updated field data as well as pass it on to all segments and segment bases
