@@ -113,6 +113,19 @@ func (s *SegmentSnapshot) Count() uint64 {
 	return rv
 }
 
+// this counts the root documents in the segment this differs from Count() in that
+// Count() counts all live documents including nested children, whereas this method
+// counts only root live documents
+func (s *SegmentSnapshot) CountRoot() uint64 {
+	var rv uint64
+	if nsb, ok := s.segment.(segment.NestedSegment); ok {
+		rv = nsb.CountRoot(s.deleted)
+	} else {
+		rv = s.Count()
+	}
+	return rv
+}
+
 func (s *SegmentSnapshot) DocNumbers(docIDs []string) (*roaring.Bitmap, error) {
 	rv, err := s.segment.DocNumbers(docIDs)
 	if err != nil {
