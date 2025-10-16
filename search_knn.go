@@ -350,11 +350,6 @@ func validateKNN(req *SearchRequest) error {
 		return fmt.Errorf("knn_operator must be either 'and' / 'or'")
 	}
 
-	if IsScoreFusionRequested(req) {
-		if req.KNNOperator == knnOperatorAnd {
-			return fmt.Errorf("knn operator 'and' is not compatible with score fusion")
-		}
-	}
 	return nil
 }
 
@@ -474,15 +469,6 @@ func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, 
 }
 
 func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*search.DocumentMatch {
-	// If the request is hybrid search, do not use any operator. Individual scores are preserved
-	// for fusion. This is equivalent to doing knnOperatorOr, but without combining score results.
-	if IsScoreFusionRequested(req) {
-		for _, hit := range knnHits {
-			hit.Score = 0.0
-		}
-
-		return knnHits
-	}
 	// if the KNN operator is AND, then we need to filter out the hits that
 	// do not have match the KNN queries.
 	if req.KNNOperator == knnOperatorAnd {
@@ -494,6 +480,12 @@ func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*
 			}
 		}
 		knnHits = knnHits[:idx]
+	}
+
+	// if score fusion required, return early because
+	// score breakdown is retained
+	if IsScoreFusionRequested(req) {
+		return knnHits
 	}
 	// fix the score using score breakdown now
 	// if the score is none, then we need to set the score to 0.0

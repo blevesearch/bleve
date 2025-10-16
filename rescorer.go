@@ -113,7 +113,7 @@ func (r *rescorer) rescore(ftsHits, knnHits search.DocumentMatchCollection) (sea
 	return fusionResult.Hits, fusionResult.Total, fusionResult.MaxScore
 }
 
-// Merge all the FTS and KNN docs
+// Merge all the FTS and KNN docs along with explanations
 func (r *rescorer) mergeDocs(ftsHits, knnHits search.DocumentMatchCollection) search.DocumentMatchCollection {
 	if len(knnHits) == 0 {
 		return ftsHits
@@ -136,6 +136,7 @@ func (r *rescorer) mergeDocs(ftsHits, knnHits search.DocumentMatchCollection) se
 	}
 
 	for _, hit := range knnHitMap {
+		hit.Score = 0
 		ftsHits = append(ftsHits, hit)
 		if r.req.Explain {
 			hit.Expl = &search.Explanation{Value: 0.0, Message: "", Children: append([]*search.Explanation{nil}, hit.Expl.Children...)}
