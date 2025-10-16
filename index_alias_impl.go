@@ -302,7 +302,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 
 	// check if search result was generated as part of preSearch itself
 	if sr == nil {
-		multiSearchParams := multiSearchParams{preSearchData, doScoreFusion, rescorer, fusionKnnHits}
+		multiSearchParams := &multiSearchParams{preSearchData, doScoreFusion, rescorer, fusionKnnHits}
 		sr, err = MultiSearch(ctx, req, multiSearchParams, i.indexes...)
 		if err != nil {
 			return nil, err
@@ -986,7 +986,7 @@ type multiSearchParams struct {
 
 // MultiSearch executes a SearchRequest across multiple Index objects,
 // then merges the results.  The indexes must honor any ctx deadline.
-func MultiSearch(ctx context.Context, req *SearchRequest, params multiSearchParams, indexes ...Index) (*SearchResult, error) {
+func MultiSearch(ctx context.Context, req *SearchRequest, params *multiSearchParams, indexes ...Index) (*SearchResult, error) {
 	searchStart := time.Now()
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
 
