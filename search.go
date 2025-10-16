@@ -519,11 +519,6 @@ type SearchResult struct {
 
 	// The following fields are applicable to BM25 preSearch
 	BM25Stats *search.BM25Stats `json:"bm25_stats,omitempty"`
-
-	// KnnHits is used to return all knn hits after faceting
-	// during search phase. This is only used in hybrid search
-	// with fusion
-	FusionKnnHits search.DocumentMatchCollection `json:"fusion_knn_hits,omitempty"`
 }
 
 func (sr *SearchResult) Size() int {
@@ -595,7 +590,6 @@ func (sr *SearchResult) String() string {
 func (sr *SearchResult) Merge(other *SearchResult) {
 	sr.Status.Merge(other.Status)
 	sr.Hits = append(sr.Hits, other.Hits...)
-	sr.FusionKnnHits = append(sr.FusionKnnHits, other.FusionKnnHits...)
 	sr.Total += other.Total
 	sr.Cost += other.Cost
 	if other.MaxScore > sr.MaxScore {

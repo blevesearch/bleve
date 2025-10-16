@@ -714,11 +714,9 @@ func finalizeSearchResult(ctx context.Context, req *SearchRequest, preSearchResu
 
 	// rescore if fusion flag is set
 	if doScoreFusion {
-		// All hits here are only knn hits, so add in FusionKnnHits
-		preSearchResult.FusionKnnHits = preSearchResult.Hits
-		// Since no FTS hits, set Hits to nil
-		preSearchResult.Hits = nil
-		rescorer.rescore(preSearchResult)
+		// rescore takes ftsHits and knnHits as first and second argument respectively
+		// since this is pure knn, set ftsHits to nil. preSearchResult.Hits contains knn results
+		preSearchResult.Hits, preSearchResult.Total, preSearchResult.MaxScore = rescorer.rescore(nil, preSearchResult.Hits)
 		rescorer.restoreSearchRequest()
 	}
 
@@ -809,11 +807,10 @@ func constructPreSearchDataAndFusionKnnHits(req *SearchRequest, flags *preSearch
 ) (map[string]map[string]interface{}, search.DocumentMatchCollection, error) {
 	var fusionknnhits search.DocumentMatchCollection
 
-	// Checks if we need to send knn hits to indexes in case
-	// of score fusion (for faceting). Extract the knn hits
-	// and set the knn flag to false so that knn hits are not
-	// included in presearchdata
-	if doScoreFusion && flags.knn && req.Facets == nil {
+	// Checks if we need to send the KNN hits to the indexes in the
+	// search phase. If there is score fusion enabled, we do not
+	// send the KNN hits to the indexes.
+	if doScoreFusion && flags.knn {
 		fusionknnhits = preSearchResult.Hits
 		preSearchResult.Hits = nil
 	}
@@ -1057,12 +1054,7 @@ func MultiSearch(ctx context.Context, req *SearchRequest, params multiSearchPara
 
 	// rescore if fusion flag is set
 	if params.doScoreFusion {
-		// If fusionKnnHits is there, add it to the search
-		// result for rescoring.
-		if len(params.fusionKnnHits) > 0 {
-			sr.FusionKnnHits = params.fusionKnnHits
-		}
-		params.rescorer.rescore(sr)
+		sr.Hits, sr.Total, sr.MaxScore = params.rescorer.rescore(sr.Hits, params.fusionKnnHits)
 		params.rescorer.restoreSearchRequest()
 	}
 

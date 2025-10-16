@@ -199,7 +199,7 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	return nil, nil
 }
 
-func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector, combineScores bool) {
+func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector) {
 }
 
 func requestHasKNN(req *SearchRequest) bool {

@@ -158,16 +158,17 @@ func getHybridSearchDocuments() []map[string]interface{} {
 	return documents
 }
 
-func createHybridSearchRequest() *SearchRequest {
-	// Create hybrid search request (FTS + KNN)
+func createScoreFusionRequest(knn bool) *SearchRequest {
 	textQuery := query.NewMatchPhraseQuery("dark")
 	searchRequest := NewSearchRequest(textQuery)
 
-	queryVector_1 := []float32{0, 0, 129} // Similar to blue colors
-	searchRequest.AddKNN("colorvect_l2", queryVector_1, 5, 1.0)
+	if knn {
+		queryVector_1 := []float32{0, 0, 129} // Similar to blue colors
+		searchRequest.AddKNN("colorvect_l2", queryVector_1, 5, 1.0)
 
-	queryVector_2 := []float32{0, 0, 250} // lighter blue
-	searchRequest.AddKNN("colorvect_l2", queryVector_2, 5, 1.0)
+		queryVector_2 := []float32{0, 0, 250} // lighter blue
+		searchRequest.AddKNN("colorvect_l2", queryVector_2, 5, 1.0)
+	}
 
 	searchRequest.RequestParams = &Params{ScoreRankConstant: 1, ScoreWindowSize: 10}
 
@@ -492,7 +493,7 @@ func TestRRFEndToEnd(t *testing.T) {
 	defer cleanup()
 
 	// Create the search request
-	searchRequest := createHybridSearchRequest()
+	searchRequest := createScoreFusionRequest(true)
 
 	// Execute search
 	result, err := index.Search(searchRequest)
@@ -511,7 +512,7 @@ func TestRRFAliasWithSingleIndex(t *testing.T) {
 	defer cleanup()
 
 	// Create the search request
-	searchRequest := createHybridSearchRequest()
+	searchRequest := createScoreFusionRequest(true)
 
 	// Execute search through alias
 	result, err := alias.Search(searchRequest)
@@ -530,7 +531,7 @@ func TestRRFAliasWithTwoIndexes(t *testing.T) {
 	defer cleanup()
 
 	// Create the search request
-	searchRequest := createHybridSearchRequest()
+	searchRequest := createScoreFusionRequest(true)
 
 	// Execute search through alias
 	result, err := alias.Search(searchRequest)
@@ -549,7 +550,7 @@ func TestRRFNestedAliases(t *testing.T) {
 	defer cleanup()
 
 	// Create the search request
-	searchRequest := createHybridSearchRequest()
+	searchRequest := createScoreFusionRequest(true)
 
 	// Execute search through master alias
 	result, err := masterAlias.Search(searchRequest)
@@ -592,7 +593,7 @@ func TestRRFPagination(t *testing.T) {
 			defer cleanup()
 
 			// Create first page request (first 5 results)
-			firstPageRequest := createHybridSearchRequest()
+			firstPageRequest := createScoreFusionRequest(true)
 			firstPageRequest.From = 0
 			firstPageRequest.Size = 5
 
@@ -603,7 +604,7 @@ func TestRRFPagination(t *testing.T) {
 			}
 
 			// Create second page request (next 5 results, starting from index 5)
-			secondPageRequest := createHybridSearchRequest()
+			secondPageRequest := createScoreFusionRequest(true)
 			secondPageRequest.From = 5
 			secondPageRequest.Size = 5
 
@@ -664,7 +665,7 @@ func TestRRFFaceting(t *testing.T) {
 			defer cleanup()
 
 			// Create search request with default scoring and facets
-			defaultRequest := createHybridSearchRequest()
+			defaultRequest := createScoreFusionRequest(false)
 			defaultRequest.Score = ScoreDefault // Use default scoring
 			defaultRequest.Size = 10
 			// Add facet for color field with size 10
@@ -672,7 +673,7 @@ func TestRRFFaceting(t *testing.T) {
 			defaultRequest.AddFacet("color", colorFacet)
 
 			// Create search request with RRF scoring and identical facets
-			rrfRequest := createHybridSearchRequest()
+			rrfRequest := createScoreFusionRequest(true)
 			rrfRequest.Score = ScoreRRF // Use RRF scoring
 			rrfRequest.Size = 10
 			// Add identical facet for color field with size 10

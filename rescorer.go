@@ -92,15 +92,15 @@ func (r *rescorer) restoreSearchRequest() {
 	r.restoreKnnRequest()
 }
 
-func (r *rescorer) rescore(sr *SearchResult) {
-	r.mergeDocs(sr)
+func (r *rescorer) rescore(ftsHits, knnHits search.DocumentMatchCollection) (search.DocumentMatchCollection, uint64, float64) {
+	mergedHits := r.mergeDocs(ftsHits, knnHits)
 
 	var fusionResult *fusion.FusionResult
 
 	switch r.req.Score {
 	case ScoreRRF:
 		res := fusion.ReciprocalRankFusion(
-			sr.Hits,
+			mergedHits,
 			r.origBoosts,
 			r.req.RequestParams.ScoreRankConstant,
 			r.req.RequestParams.ScoreWindowSize,
@@ -110,25 +110,22 @@ func (r *rescorer) rescore(sr *SearchResult) {
 		fusionResult = &res
 	}
 
-	sr.Hits = fusionResult.Hits
-	sr.Total = fusionResult.Total
-	sr.MaxScore = fusionResult.MaxScore
+	return fusionResult.Hits, fusionResult.Total, fusionResult.MaxScore
 }
 
-// Merge all the FTS and KNN docs from sr.Hits
-// and sr.FusionKnnHits
-func (r *rescorer) mergeDocs(sr *SearchResult) {
-	if len(sr.FusionKnnHits) == 0 {
-		return
+// Merge all the FTS and KNN docs
+func (r *rescorer) mergeDocs(ftsHits, knnHits search.DocumentMatchCollection) search.DocumentMatchCollection {
+	if len(knnHits) == 0 {
+		return ftsHits
 	}
 
-	knnHitMap := make(map[string]*search.DocumentMatch, len(sr.FusionKnnHits))
+	knnHitMap := make(map[string]*search.DocumentMatch, len(knnHits))
 
-	for _, hit := range sr.FusionKnnHits {
+	for _, hit := range knnHits {
 		knnHitMap[hit.ID] = hit
 	}
 
-	for _, hit := range sr.Hits {
+	for _, hit := range ftsHits {
 		if knnHit, ok := knnHitMap[hit.ID]; ok {
 			hit.ScoreBreakdown = knnHit.ScoreBreakdown
 			if r.req.Explain {
@@ -139,11 +136,13 @@ func (r *rescorer) mergeDocs(sr *SearchResult) {
 	}
 
 	for _, hit := range knnHitMap {
-		sr.Hits = append(sr.Hits, hit)
+		ftsHits = append(ftsHits, hit)
 		if r.req.Explain {
 			hit.Expl = &search.Explanation{Value: 0.0, Message: "", Children: append([]*search.Explanation{nil}, hit.Expl.Children...)}
 		}
 	}
+
+	return ftsHits
 }
 
 func newRescorer(req *SearchRequest) *rescorer {
