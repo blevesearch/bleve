@@ -296,7 +296,7 @@ func (s *PhraseSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch,
 }
 
 // checkCurrMustMatch is solely concerned with determining if the DocumentMatch
-// pointed to by s.currMust (which satisifies the pre-condition searcher)
+// pointed to by s.currMust (which satisfies the pre-condition searcher)
 // also satisfies the phrase constraints.  if so, it returns a DocumentMatch
 // for this document, otherwise nil
 func (s *PhraseSearcher) checkCurrMustMatch(ctx *search.SearchContext) *search.DocumentMatch {
@@ -458,7 +458,7 @@ func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]s
 	if len(car) == 0 || (len(car) == 1 && car[0] == "") {
 		nextPos := prevPos + 1
 		if prevPos == 0 {
-			// if prevPos was 0, don't set it to 1 (as thats not a real abs pos)
+			// if prevPos was 0, don't set it to 1 (as that's not a real abs pos)
 			nextPos = 0 // don't advance nextPos if prevPos was 0
 		}
 		return findPhrasePaths(nextPos, ap, cdr, tlm, p, remainingSlop, rv)

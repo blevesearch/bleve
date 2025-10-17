@@ -1,0 +1,830 @@
+openapi: 3.0.3
+info:
+  title: Bleve JSON Query Language
+  description: |
+    A comprehensive specification for the Bleve Query JSON Language.
+
+    Bleve is a text indexing library for Go that provides full-text search capabilities.
+    This specification defines the JSON structure for all supported query types in Bleve.
+
+    ## Query Types Supported:
+
+    ### Basic Queries
+    - **Term Query**: Exact term matching
+    - **Match Query**: Full-text search with analysis
+    - **Match Phrase Query**: Phrase matching with proximity
+    - **Prefix Query**: Prefix matching
+    - **Wildcard Query**: Pattern matching with * and ?
+    - **Regexp Query**: Regular expression matching
+    - **Fuzzy Query**: Fuzzy matching with edit distance
+    - **Query String Query**: Human-readable query syntax
+
+    ### Range Queries
+    - **Numeric Range Query**: Numeric value ranges
+    - **Date Range Query**: Date/time ranges
+    - **Term Range Query**: Lexicographic term ranges
+
+    ### Boolean Queries
+    - **Boolean Query**: Must/should/must_not combinations
+    - **Conjunction Query**: All queries must match
+    - **Disjunction Query**: Any query can match
+
+    ### Special Queries
+    - **Match All Query**: Matches all documents
+    - **Match None Query**: Matches no documents
+    - **Bool Field Query**: Boolean field matching
+    - **Doc ID Query**: Document ID matching
+
+    ### Geographic Queries
+    - **Geo Distance Query**: Distance-based geographic search
+    - **Geo Bounding Box Query**: Bounding box geographic search
+    - **Geo Bounding Polygon Query**: Polygon geographic search
+    - **Geo Shape Query**: Complex geographic shape matching
+
+    ### Vector Queries
+    - **KNN Query**: K-nearest neighbors vector search
+
+    ### Network Queries
+    - **IP Range Query**: IP address range matching
+
+    ## Common Properties
+
+  All queries support:
+    - **boost**: Query boost value (float, default 1.0)
+    - **field**: Field to search (string, optional)
+
+    ## Query Parsing
+
+    Bleve automatically detects query types based on the presence of specific JSON fields.
+    The query parser uses a heuristic approach to determine the query type from the JSON structure.
+
+  version: 2.0.0
+  contact:
+    name: Bleve Search
+    url: https://github.com/blevesearch/bleve
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+tags:
+  - name: Basic Queries
+    description: Basic text search queries
+  - name: Range Queries
+    description: Range-based queries for numeric, date, and term values
+  - name: Boolean Queries
+    description: Compound queries combining multiple sub-queries
+  - name: Special Queries
+    description: Special purpose queries like match all/none
+  - name: Geographic Queries
+    description: Geographic and spatial search queries
+  - name: Vector Queries
+    description: Vector similarity and KNN queries
+  - name: Network Queries
+    description: Network and IP address queries
+
+components:
+  schemas:
+    # Base Query Schema
+    Query:
+      type: object
+      description: Base query object - all queries extend this
+      discriminator:
+        propertyName: type
+      properties:
+        boost:
+          type: number
+          format: float
+          description: Query boost value
+          default: 1.0
+          minimum: 0
+        field:
+          type: string
+          description: Field to search (optional, uses default field if not specified)
+      additionalProperties: true
+
+    # Basic Queries
+    TermQuery:
+      allOf:
+        - type: object
+          properties:
+            term:
+              type: string
+              description: Exact term to search for
+              example: "search"
+          required:
+            - term
+          example:
+            term: "search"
+            field: "title"
+            boost: 2.0
+
+    MatchQuery:
+      allOf:
+        - type: object
+          properties:
+            match:
+              type: string
+              description: Text to match (will be analyzed)
+              example: "full text search"
+            operator:
+              type: string
+              enum: [and, or]
+              description: Boolean operator for multiple terms
+              default: "or"
+            fuzziness:
+              oneOf:
+                - type: integer
+                  minimum: 0
+                  maximum: 2
+                  description: Edit distance for fuzzy matching
+                - type: string
+                  enum: ["auto"]
+                  description: Automatic fuzziness
+              default: 0
+            prefix_length:
+              type: integer
+              description: Prefix length for fuzzy matching
+              minimum: 0
+              default: 0
+            analyzer:
+              type: string
+              description: Analyzer to use (optional)
+          required:
+            - match
+          example:
+            match: "full text search"
+            field: "content"
+            operator: "and"
+            fuzziness: 1
+
+    MatchPhraseQuery:
+      allOf:
+        - type: object
+          properties:
+            match_phrase:
+              type: string
+              description: Phrase to match exactly
+              example: "exact phrase match"
+            fuzziness:
+              oneOf:
+                - type: integer
+                  minimum: 0
+                  maximum: 2
+                - type: string
+                  enum: ["auto"]
+              default: 0
+            analyzer:
+              type: string
+              description: Analyzer to use (optional)
+          required:
+            - match_phrase
+          example:
+            match_phrase: "exact phrase match"
+            field: "content"
+            fuzziness: "auto"
+
+    PrefixQuery:
+      allOf:
+        - type: object
+          properties:
+            prefix:
+              type: string
+              description: Prefix to match
+              example: "pref"
+          required:
+            - prefix
+          example:
+            prefix: "pref"
+            field: "title"
+
+    WildcardQuery:
+      allOf:
+        - type: object
+          properties:
+            wildcard:
+              type: string
+              description: Wildcard pattern (* matches any sequence, ? matches single character)
+              example: "te*t"
+          required:
+            - wildcard
+          example:
+            wildcard: "te*t"
+            field: "title"
+
+    RegexpQuery:
+      allOf:
+        - type: object
+          properties:
+            regexp:
+              type: string
+              description: Regular expression pattern (should not include ^ or $)
+              example: "te[st]"
+          required:
+            - regexp
+          example:
+            regexp: "te[st]"
+            field: "title"
+
+    FuzzyQuery:
+      allOf:
+        - type: object
+          properties:
+            term:
+              type: string
+              description: Term for fuzzy matching
+              example: "search"
+            fuzziness:
+              oneOf:
+                - type: integer
+                  minimum: 0
+                  maximum: 2
+                - type: string
+                  enum: ["auto"]
+              default: 1
+            prefix_length:
+              type: integer
+              description: Prefix length for fuzzy matching
+              minimum: 0
+              default: 0
+          required:
+            - term
+          example:
+            term: "search"
+            field: "title"
+            fuzziness: "auto"
+
+    QueryStringQuery:
+      allOf:
+        - type: object
+          properties:
+            query:
+              type: string
+              description: Query string in human-readable syntax
+              example: "title:search AND content:full text"
+          required:
+            - query
+          example:
+            query: "title:search AND content:full text"
+
+    # Range Queries
+    NumericRangeQuery:
+      allOf:
+        - type: object
+          properties:
+            min:
+              type: number
+              format: float
+              description: Minimum value (inclusive by default)
+            max:
+              type: number
+              format: float
+              description: Maximum value (exclusive by default)
+            inclusive_min:
+              type: boolean
+              description: Whether minimum is inclusive
+              default: true
+            inclusive_max:
+              type: boolean
+              description: Whether maximum is inclusive
+              default: false
+          example:
+            min: 10.5
+            max: 100.0
+            inclusive_min: true
+            inclusive_max: false
+            field: "price"
+
+    DateRangeQuery:
+      allOf:
+        - type: object
+          properties:
+            start:
+              type: string
+              format: date-time
+              description: Start date/time
+            end:
+              type: string
+              format: date-time
+              description: End date/time
+            inclusive_start:
+              type: boolean
+              description: Whether start is inclusive
+              default: true
+            inclusive_end:
+              type: boolean
+              description: Whether end is inclusive
+              default: false
+          example:
+            start: "2023-01-01T00:00:00Z"
+            end: "2023-12-31T23:59:59Z"
+            inclusive_start: true
+            inclusive_end: true
+            field: "created_at"
+
+    TermRangeQuery:
+      allOf:
+        - type: object
+          properties:
+            min:
+              type: string
+              description: Minimum term (lexicographic)
+            max:
+              type: string
+              description: Maximum term (lexicographic)
+            inclusive_min:
+              type: boolean
+              description: Whether minimum is inclusive
+              default: true
+            inclusive_max:
+              type: boolean
+              description: Whether maximum is inclusive
+              default: false
+          example:
+            min: "a"
+            max: "m"
+            inclusive_min: true
+            inclusive_max: false
+            field: "name"
+
+    # Boolean Queries
+    BooleanQuery:
+      allOf:
+        - type: object
+          properties:
+            must:
+              oneOf:
+                - type: array
+              description: Queries that must match
+            should:
+              oneOf:
+                - type: array
+              description: Queries that should match (boost score)
+            must_not:
+              oneOf:
+                - type: array
+              description: Queries that must not match
+            filter:
+              oneOf:
+                - type: array
+              description: Queries that filter results (no score impact)
+            min_should:
+              type: integer
+              description: Minimum number of should queries that must match
+              minimum: 0
+          example:
+            must:
+              term: "important"
+              field: "status"
+            should:
+              - match: "urgent"
+                field: "title"
+              - match: "critical"
+                field: "content"
+            must_not:
+              term: "archived"
+              field: "status"
+            boost: 1.5
+
+    ConjunctionQuery:
+      allOf:
+        - type: object
+          properties:
+            conjuncts:
+              type: array
+              description: Array of queries that must all match
+              minItems: 1
+          required:
+            - conjuncts
+          example:
+            conjuncts:
+              - term: "search"
+                field: "title"
+              - match: "full text"
+                field: "content"
+
+    DisjunctionQuery:
+      allOf:
+        - type: object
+          properties:
+            disjuncts:
+              type: array
+              description: Array of queries where at least one must match
+              minItems: 1
+            min:
+              type: number
+              format: float
+              description: Minimum number of disjuncts that must match
+              default: 1
+              minimum: 0
+          required:
+            - disjuncts
+          example:
+            disjuncts:
+              - term: "urgent"
+                field: "title"
+              - term: "critical"
+                field: "content"
+            min: 1
+
+    # Special Queries
+    MatchAllQuery:
+      allOf:
+        - type: object
+          properties:
+            match_all:
+              type: object
+              description: Empty object indicating match all
+          example:
+            match_all: {}
+            boost: 1.0
+
+    MatchNoneQuery:
+      allOf:
+        - type: object
+          properties:
+            match_none:
+              type: object
+              description: Empty object indicating match none
+          example:
+            match_none: {}
+
+    BoolFieldQuery:
+      allOf:
+        - type: object
+          properties:
+            bool:
+              type: boolean
+              description: Boolean value to match
+          required:
+            - bool
+          example:
+            bool: true
+            field: "published"
+
+    DocIDQuery:
+      allOf:
+        - type: object
+          properties:
+            ids:
+              type: array
+              items:
+                type: string
+              description: Array of document IDs to match
+              minItems: 1
+          required:
+            - ids
+          example:
+            ids: ["doc1", "doc2", "doc3"]
+
+    # Geographic Queries
+    GeoDistanceQuery:
+      allOf:
+        - type: object
+          properties:
+            location:
+              oneOf:
+                - type: array
+                  items:
+                    type: number
+                    format: float
+                  minItems: 2
+                  maxItems: 2
+                  description: [longitude, latitude]
+                - type: object
+                  properties:
+                    lon:
+                      type: number
+                      format: float
+                    lat:
+                      type: number
+                      format: float
+            distance:
+              type: string
+              description: Distance string (e.g., "10km", "5mi")
+          required:
+            - location
+            - distance
+          example:
+            location: [-122.4194, 37.7749]
+            distance: "10km"
+            field: "location"
+
+    GeoBoundingBoxQuery:
+      allOf:
+        - type: object
+          properties:
+            top_left:
+              oneOf:
+                - type: array
+                  items:
+                    type: number
+                    format: float
+                  minItems: 2
+                  maxItems: 2
+                - type: object
+                  properties:
+                    lon:
+                      type: number
+                      format: float
+                    lat:
+                      type: number
+                      format: float
+            bottom_right:
+              oneOf:
+                - type: array
+                  items:
+                    type: number
+                    format: float
+                  minItems: 2
+                  maxItems: 2
+                - type: object
+                  properties:
+                    lon:
+                      type: number
+                      format: float
+                    lat:
+                      type: number
+                      format: float
+          required:
+            - top_left
+            - bottom_right
+          example:
+            top_left: [-122.5, 37.8]
+            bottom_right: [-122.3, 37.7]
+            field: "location"
+
+    GeoBoundingPolygonQuery:
+      allOf:
+        - type: object
+          properties:
+            polygon_points:
+              type: array
+              items:
+                oneOf:
+                  - type: array
+                    items:
+                      type: number
+                      format: float
+                    minItems: 2
+                    maxItems: 2
+                  - type: object
+                    properties:
+                      lon:
+                        type: number
+                        format: float
+                      lat:
+                        type: number
+                        format: float
+              description: Array of polygon points [lon, lat]
+              minItems: 3
+          required:
+            - polygon_points
+          example:
+            polygon_points:
+              - [-122.5, 37.8]
+              - [-122.3, 37.8]
+              - [-122.3, 37.7]
+              - [-122.5, 37.7]
+            field: "location"
+
+    GeoShapeQuery:
+      allOf:
+        - type: object
+          properties:
+            geometry:
+              type: object
+              description: GeoJSON geometry object
+              properties:
+                type:
+                  type: string
+                  enum: [Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon, GeometryCollection]
+                coordinates:
+                  description: Geometry coordinates
+              required:
+                - type
+                - coordinates
+          required:
+            - geometry
+          example:
+            geometry:
+              type: "Polygon"
+              coordinates:
+                - [[-122.5, 37.8], [-122.3, 37.8], [-122.3, 37.7], [-122.5, 37.7], [-122.5, 37.8]]
+            field: "location"
+
+    # Vector Queries
+    KNNQuery:
+      allOf:
+        - type: object
+          properties:
+            field:
+              type: string
+              description: Vector field name
+            vector:
+              type: array
+              items:
+                type: number
+                format: float
+              description: Query vector
+              minItems: 1
+            k:
+              type: integer
+              format: int64
+              description: Number of nearest neighbors to return
+              minimum: 1
+              maximum: 10000
+            params:
+              type: object
+              description: Additional parameters for vector search
+          required:
+            - field
+            - vector
+            - k
+          example:
+            field: "embedding"
+            vector: [0.1, 0.2, 0.3, 0.4, 0.5]
+            k: 10
+            boost: 1.0
+
+    # Network Queries
+    IPRangeQuery:
+      allOf:
+        - type: object
+          properties:
+            cidr:
+              type: string
+              description: CIDR notation for IP range (e.g., "192.168.1.0/24")
+          required:
+            - cidr
+          example:
+            cidr: "192.168.1.0/24"
+            field: "ip_address"
+
+    # Phrase Query (internal use)
+    PhraseQuery:
+      allOf:
+        - type: object
+          properties:
+            terms:
+              type: array
+              items:
+                type: string
+              description: Array of terms in phrase order
+          required:
+            - terms
+          example:
+            terms: ["exact", "phrase", "match"]
+            field: "content"
+
+    MultiPhraseQuery:
+      allOf:
+        - type: object
+          properties:
+            terms:
+              type: array
+              items:
+                type: array
+                items:
+                  type: string
+              description: Array of term arrays for multi-phrase matching
+          required:
+            - terms
+          example:
+            terms:
+              - ["exact", "precise"]
+              - ["phrase"]
+              - ["match", "search"]
+
+  examples:
+    # Basic Query Examples
+    simple_term:
+      summary: Simple Term Query
+      value:
+        term: "search"
+        field: "title"
+        boost: 2.0
+
+    simple_match:
+      summary: Simple Match Query
+      value:
+        match: "full text search"
+        field: "content"
+        operator: "and"
+
+    fuzzy_search:
+      summary: Fuzzy Search
+      value:
+        term: "search"
+        field: "title"
+        fuzziness: "auto"
+        prefix_length: 2
+
+    # Boolean Query Examples
+    complex_boolean:
+      summary: Complex Boolean Query
+      value:
+        must:
+          - term: "important"
+            field: "status"
+          - match: "urgent"
+            field: "title"
+        should:
+          - match: "critical"
+            field: "content"
+          - match: "priority"
+            field: "tags"
+        must_not:
+          - term: "archived"
+            field: "status"
+        filter:
+          - term: "published"
+            field: "status"
+        boost: 1.5
+
+    # Range Query Examples
+    price_range:
+      summary: Price Range Query
+      value:
+        min: 10.0
+        max: 100.0
+        inclusive_min: true
+        inclusive_max: false
+        field: "price"
+
+    date_range:
+      summary: Date Range Query
+      value:
+        start: "2023-01-01T00:00:00Z"
+        end: "2023-12-31T23:59:59Z"
+        inclusive_start: true
+        inclusive_end: true
+        field: "created_at"
+
+    # Geographic Query Examples
+    geo_distance:
+      summary: Geographic Distance Query
+      value:
+        location: [-122.4194, 37.7749]
+        distance: "10km"
+        field: "location"
+
+    geo_bounding_box:
+      summary: Geographic Bounding Box Query
+      value:
+        top_left: [-122.5, 37.8]
+        bottom_right: [-122.3, 37.7]
+        field: "location"
+
+    # Vector Query Examples
+    knn_search:
+      summary: K-Nearest Neighbors Query
+      value:
+        field: "embedding"
+        vector: [0.1, 0.2, 0.3, 0.4, 0.5]
+        k: 10
+        boost: 1.0
+
+    # Query String Examples
+    query_string:
+      summary: Query String Query
+      value:
+        query: "title:search AND (content:full text OR content:search) AND -status:archived"
+
+  responses:
+    ValidationSuccess:
+      description: Query validation successful
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              valid:
+                type: boolean
+                example: true
+              query_type:
+                type: string
+                example: "term"
+              message:
+                type: string
+                example: "Query is valid"
+
+    ValidationError:
+      description: Query validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              valid:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: "unknown query type"
+              details:
+                type: string
+                example: "No recognized query fields found"
+
+externalDocs:
+  description: Bleve Documentation
+  url: https://github.com/blevesearch/bleve

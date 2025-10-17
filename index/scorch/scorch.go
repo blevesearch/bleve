@@ -25,6 +25,7 @@ import (
 
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	bolt "go.etcd.io/bbolt"
@@ -217,9 +218,11 @@ func (s *Scorch) fireAsyncError(err error) {
 }
 
 func (s *Scorch) Open() error {
-	err := s.openBolt()
-	if err != nil {
-		return err
+	if s.rootBolt == nil {
+		err := s.openBolt()
+		if err != nil {
+			return err
+		}
 	}
 
 	s.asyncTasks.Add(1)
@@ -371,6 +374,7 @@ func (s *Scorch) Close() (err error) {
 			}
 		}
 		s.root = nil
+		s.rootBolt = nil
 		s.rootLock.Unlock()
 	}
 
@@ -939,4 +943,97 @@ func (s *Scorch) CopyReader() index.CopyReader {
 // external API to fire a scorch event (EventKindIndexStart) externally from bleve
 func (s *Scorch) FireIndexEvent() {
 	s.fireEvent(EventKindIndexStart, 0)
+}
+
+// Updates bolt db with the given field info. Existing field info already in bolt
+// will be merged before persisting. The index mapping is also overwritted both
+// in bolt as well as the index snapshot
+func (s *Scorch) UpdateFields(fieldInfo map[string]*index.UpdateFieldInfo, mappingBytes []byte) error {
+	err := s.updateBolt(fieldInfo, mappingBytes)
+	if err != nil {
+		return err
+	}
+	// Pass the update field info to all snapshots and segment bases
+	s.root.UpdateFieldsInfo(fieldInfo)
+	return nil
+}
+
+func (s *Scorch) OpenMeta() error {
+	if s.rootBolt == nil {
+		err := s.openBolt()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Merge and update deleted field info and rewrite index mapping
+func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mappingBytes []byte) error {
+	return s.rootBolt.Update(func(tx *bolt.Tx) error {
+		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
+		if snapshots == nil {
+			return nil
+		}
+
+		c := snapshots.Cursor()
+		for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
+			_, _, err := decodeUvarintAscending(k)
+			if err != nil {
+				fmt.Printf("unable to parse segment epoch %x, continuing", k)
+				continue
+			}
+			snapshot := snapshots.Bucket(k)
+			cc := snapshot.Cursor()
+			for kk, _ := cc.First(); kk != nil; kk, _ = cc.Next() {
+				if kk[0] == util.BoltInternalKey[0] {
+					internalBucket := snapshot.Bucket(kk)
+					if internalBucket == nil {
+						return fmt.Errorf("segment key, but bucket missing %x", kk)
+					}
+					err = internalBucket.Put(util.MappingInternalKey, mappingBytes)
+					if err != nil {
+						return err
+					}
+				} else if kk[0] != util.BoltMetaDataKey[0] {
+					segmentBucket := snapshot.Bucket(kk)
+					if segmentBucket == nil {
+						return fmt.Errorf("segment key, but bucket missing %x", kk)
+					}
+					var updatedFields map[string]*index.UpdateFieldInfo
+					updatedFieldBytes := segmentBucket.Get(util.BoltUpdatedFieldsKey)
+					if updatedFieldBytes != nil {
+						err := json.Unmarshal(updatedFieldBytes, &updatedFields)
+						if err != nil {
+							return fmt.Errorf("error reading updated field bytes: %v", err)
+						}
+						for field, info := range fieldInfo {
+							if val, ok := updatedFields[field]; ok {
+								updatedFields[field] = &index.UpdateFieldInfo{
+									Deleted:   info.Deleted || val.Deleted,
+									Store:     info.Store || val.Store,
+									DocValues: info.DocValues || val.DocValues,
+									Index:     info.Index || val.Index,
+								}
+							} else {
+								updatedFields[field] = info
+							}
+						}
+					} else {
+						updatedFields = fieldInfo
+					}
+					b, err := json.Marshal(updatedFields)
+					if err != nil {
+						return err
+					}
+					err = segmentBucket.Put(util.BoltUpdatedFieldsKey, b)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+		return nil
+	})
 }

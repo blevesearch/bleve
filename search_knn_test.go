@@ -1701,3 +1701,211 @@ func TestNumVecsStat(t *testing.T) {
 		}
 	}
 }
+
+func TestIndexUpdateVector(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMappingBefore := mapping.NewIndexMapping()
+	indexMappingBefore.TypeMapping = map[string]*mapping.DocumentMapping{}
+	indexMappingBefore.DefaultMapping = &mapping.DocumentMapping{
+		Enabled: true,
+		Dynamic: false,
+		Properties: map[string]*mapping.DocumentMapping{
+			"a": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:                    "vector",
+						Index:                   true,
+						Dims:                    4,
+						Similarity:              "l2_norm",
+						VectorIndexOptimizedFor: "latency",
+					},
+				},
+			},
+			"b": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:                    "vector",
+						Index:                   true,
+						Dims:                    4,
+						Similarity:              "l2_norm",
+						VectorIndexOptimizedFor: "latency",
+					},
+				},
+			},
+			"c": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:                    "vector_base64",
+						Index:                   true,
+						Dims:                    4,
+						Similarity:              "l2_norm",
+						VectorIndexOptimizedFor: "latency",
+					},
+				},
+			},
+			"d": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:                    "vector_base64",
+						Index:                   true,
+						Dims:                    4,
+						Similarity:              "l2_norm",
+						VectorIndexOptimizedFor: "latency",
+					},
+				},
+			},
+		},
+		Fields: []*mapping.FieldMapping{},
+	}
+	indexMappingBefore.IndexDynamic = false
+	indexMappingBefore.StoreDynamic = false
+	indexMappingBefore.DocValuesDynamic = false
+
+	index, err := New(tmpIndexPath, indexMappingBefore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc1 := map[string]interface{}{"a": []float32{0.32894259691238403, 0.6973215341567993, 0.6835201978683472, 0.38296082615852356}, "b": []float32{0.32894259691238403, 0.6973215341567993, 0.6835201978683472, 0.38296082615852356}, "c": "L5MOPw7NID5SQMU9pHUoPw==", "d": "L5MOPw7NID5SQMU9pHUoPw=="}
+	doc2 := map[string]interface{}{"a": []float32{0.0018692062003538013, 0.41076546907424927, 0.5675257444381714, 0.45832985639572144}, "b": []float32{0.0018692062003538013, 0.41076546907424927, 0.5675257444381714, 0.45832985639572144}, "c": "czloP94ZCD71ldY+GbAOPw==", "d": "czloP94ZCD71ldY+GbAOPw=="}
+	doc3 := map[string]interface{}{"a": []float32{0.7853356599807739, 0.6904757618904114, 0.5643226504325867, 0.682637631893158}, "b": []float32{0.7853356599807739, 0.6904757618904114, 0.5643226504325867, 0.682637631893158}, "c": "Chh6P2lOqT47mjg/0odlPg==", "d": "Chh6P2lOqT47mjg/0odlPg=="}
+	batch := index.NewBatch()
+	err = batch.Index("001", doc1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = batch.Index("002", doc2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = batch.Index("003", doc3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = index.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	indexMappingAfter := mapping.NewIndexMapping()
+	indexMappingAfter.TypeMapping = map[string]*mapping.DocumentMapping{}
+	indexMappingAfter.DefaultMapping = &mapping.DocumentMapping{
+		Enabled: true,
+		Dynamic: false,
+		Properties: map[string]*mapping.DocumentMapping{
+			"a": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:                    "vector",
+						Index:                   true,
+						Dims:                    4,
+						Similarity:              "l2_norm",
+						VectorIndexOptimizedFor: "latency",
+					},
+				},
+			},
+			"c": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:                    "vector_base64",
+						Index:                   true,
+						Dims:                    4,
+						Similarity:              "l2_norm",
+						VectorIndexOptimizedFor: "latency",
+					},
+				},
+			},
+			"d": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:                    "vector_base64",
+						Index:                   false,
+						Dims:                    4,
+						Similarity:              "l2_norm",
+						VectorIndexOptimizedFor: "latency",
+					},
+				},
+			},
+		},
+		Fields: []*mapping.FieldMapping{},
+	}
+	indexMappingAfter.IndexDynamic = false
+	indexMappingAfter.StoreDynamic = false
+	indexMappingAfter.DocValuesDynamic = false
+
+	mappingString, err := json.Marshal(indexMappingAfter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := map[string]interface{}{
+		"updated_mapping": string(mappingString),
+	}
+
+	index, err = OpenUsing(tmpIndexPath, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	q1 := NewSearchRequest(NewMatchNoneQuery())
+	q1.AddKNN("a", []float32{1, 2, 3, 4}, 3, 1.0)
+	res1, err := index.Search(q1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res1.Hits) != 3 {
+		t.Fatalf("Expected 3 hits, got %d\n", len(res1.Hits))
+	}
+	q2 := NewSearchRequest(NewMatchNoneQuery())
+	q2.AddKNN("b", []float32{1, 2, 3, 4}, 3, 1.0)
+	res2, err := index.Search(q2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res2.Hits) != 0 {
+		t.Fatalf("Expected 0 hits, got %d\n", len(res2.Hits))
+	}
+	q3 := NewSearchRequest(NewMatchNoneQuery())
+	q3.AddKNN("c", []float32{1, 2, 3, 4}, 3, 1.0)
+	res3, err := index.Search(q3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res3.Hits) != 3 {
+		t.Fatalf("Expected 3 hits, got %d\n", len(res3.Hits))
+	}
+	q4 := NewSearchRequest(NewMatchNoneQuery())
+	q4.AddKNN("d", []float32{1, 2, 3, 4}, 3, 1.0)
+	res4, err := index.Search(q4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res4.Hits) != 0 {
+		t.Fatalf("Expected 0 hits, got %d\n", len(res4.Hits))
+	}
+}

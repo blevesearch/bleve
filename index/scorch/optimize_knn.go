@@ -79,6 +79,12 @@ func (o *OptimizeVR) Finish() error {
 					wg.Done()
 				}()
 				for field, vrs := range o.vrs {
+					// Early exit if the field is supposed to be completely deleted or
+					// if it's index data has been deleted
+					if info, ok := o.snapshot.updatedFields[field]; ok && (info.Deleted || info.Index) {
+						continue
+					}
+
 					vecIndex, err := segment.InterpretVectorIndex(field,
 						o.requiresFiltering, origSeg.deleted)
 					if err != nil {
@@ -185,7 +191,7 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 				err := cbF(sumVectorIndexSize)
 				if err != nil {
 					// it's important to invoke the end callback at this point since
-					// if the earlier searchers of this optimze struct were successful
+					// if the earlier searchers of this optimize struct were successful
 					// the cost corresponding to it would be incremented and if the
 					// current searcher fails the check then we end up erroring out
 					// the overall optimized searcher creation, the cost needs to be

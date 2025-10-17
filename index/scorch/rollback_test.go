@@ -525,7 +525,7 @@ func TestBackupRacingWithPurge(t *testing.T) {
 	time.Sleep(1 * RollbackSamplingInterval / 12)
 	indexDummyData(t, scorchi, 9)
 
-	// now if the purge code is invoked, there's a possiblity of the latest snapshot
+	// now if the purge code is invoked, there's a possibility of the latest snapshot
 	// being removed from bolt and the corresponding file segment getting cleaned up.
 	scorchi.removeOldData()
 
