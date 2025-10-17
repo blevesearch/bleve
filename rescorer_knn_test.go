@@ -170,7 +170,8 @@ func createScoreFusionRequest(knn bool) *SearchRequest {
 		searchRequest.AddKNN("colorvect_l2", queryVector_2, 5, 1.0)
 	}
 
-	searchRequest.AddParams(1, 10)
+	params := RequestParams{1, 10}
+	searchRequest.AddParams(params)
 
 	searchRequest.Size = 10
 	searchRequest.Score = ScoreRRF
