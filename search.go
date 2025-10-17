@@ -420,6 +420,14 @@ func (r *SearchRequest) SetSearchBefore(before []string) {
 	r.SearchBefore = before
 }
 
+// AddParams adds a RequestParams field to the search request
+func (r *SearchRequest) AddParams(scoreRankConstant, scoreWindowSize int) {
+	r.Params = &RequestParams{
+		ScoreRankConstant: scoreRankConstant,
+		ScoreWindowSize: scoreWindowSize,
+	}
+}
+
 // NewSearchRequest creates a new SearchRequest
 // for the Query, using default values for all
 // other search parameters.
