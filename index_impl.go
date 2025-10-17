@@ -562,19 +562,14 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}()
 
-	var doScoreFusion bool
+	// rescorer will be set if score fusion is supposed to happen
+	// at this alias (root alias), else will be nil
 	var rescorer *rescorer
 	if _, ok := ctx.Value(search.ScoreFusionKey).(bool); !ok {
-		// Since the score fusion key is not set, check if it is a hybrid search.
-		// If it is, then set doScoreFusion. This indicates that the rescoring
-		// must happen locally within this index, and there are no other
-		// indexes/aliases involved.
-		doScoreFusion = IsScoreFusionRequested(req)
-
 		// new context will be used in internal functions to collect data
 		// as suitable for hybrid search. Rescorer is used for rescoring
 		// using fusion algorithms.
-		if doScoreFusion {
+		if IsScoreFusionRequested(req) {
 			ctx = context.WithValue(ctx, search.ScoreFusionKey, true)
 			rescorer = newRescorer(req)
 			rescorer.prepareSearchRequest()
@@ -664,8 +659,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			}
 		}
 	} else {
-		// if score fusion, run collect if doScoreFusion is true
-		if doScoreFusion && requestHasKNN(req) {
+		// if score fusion, run collect if rescorer is defined
+		if rescorer != nil && requestHasKNN(req) {
 			knnHits, err = i.runKnnCollector(ctx, req, indexReader, false)
 		}
 	}
@@ -896,7 +891,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	// rescore if fusion flag is set
-	if doScoreFusion {
+	if rescorer != nil {
 		rv.Hits, rv.Total, rv.MaxScore = rescorer.rescore(rv.Hits, knnHits)
 		rescorer.restoreSearchRequest()
 		rv.Hits = hitsInCurrentPage(req, rv.Hits)

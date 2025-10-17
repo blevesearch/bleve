@@ -228,18 +228,14 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		return i.indexes[0].SearchInContext(ctx, req)
 	}
 
-	var doScoreFusion bool
+	// rescorer will be set if score fusion is supposed to happen
+	// at this alias (root alias), else will be nil
 	var rescorer *rescorer
 	if _, ok := ctx.Value(search.ScoreFusionKey).(bool); !ok {
-		// Since the score fusion key is not set, check if it is a hybrid search.
-		// If it is, then set doScoreFusion. This indicates that score
-		// combination must happen at this alias.
-		doScoreFusion = IsScoreFusionRequested(req)
-
 		// new context will be used in internal functions to collect data
 		// as suitable for fusion. Rescorer is used for rescoring
 		// using fusion algorithms.
-		if doScoreFusion {
+		if IsScoreFusionRequested(req) {
 			ctx = context.WithValue(ctx, search.ScoreFusionKey, true)
 			rescorer = newRescorer(req)
 			rescorer.prepareSearchRequest()
@@ -289,10 +285,10 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// if the request is satisfied by the preSearch result, then we can
 		// directly return the preSearch result as the final result
 		if requestSatisfiedByPreSearch(req, flags) {
-			sr = finalizeSearchResult(ctx, req, preSearchResult, doScoreFusion, rescorer)
+			sr = finalizeSearchResult(ctx, req, preSearchResult, rescorer)
 			// no need to run the 2nd phase MultiSearch(..)
 		} else {
-			preSearchData, fusionKnnHits, err = constructPreSearchDataAndFusionKnnHits(req, flags, preSearchResult, doScoreFusion, i.indexes)
+			preSearchData, fusionKnnHits, err = constructPreSearchDataAndFusionKnnHits(req, flags, preSearchResult, rescorer, i.indexes)
 			if err != nil {
 				return nil, err
 			}
@@ -302,7 +298,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 
 	// check if search result was generated as part of preSearch itself
 	if sr == nil {
-		multiSearchParams := &multiSearchParams{preSearchData, doScoreFusion, rescorer, fusionKnnHits}
+		multiSearchParams := &multiSearchParams{preSearchData, rescorer, fusionKnnHits}
 		sr, err = MultiSearch(ctx, req, multiSearchParams, i.indexes...)
 		if err != nil {
 			return nil, err
@@ -682,7 +678,7 @@ func preSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, i
 // if the request is satisfied by just the preSearch result,
 // finalize the result and return it directly without
 // performing multi search
-func finalizeSearchResult(ctx context.Context, req *SearchRequest, preSearchResult *SearchResult, doScoreFusion bool, rescorer *rescorer) *SearchResult {
+func finalizeSearchResult(ctx context.Context, req *SearchRequest, preSearchResult *SearchResult, rescorer *rescorer) *SearchResult {
 	if preSearchResult == nil {
 		return nil
 	}
@@ -712,8 +708,7 @@ func finalizeSearchResult(ctx context.Context, req *SearchRequest, preSearchResu
 		preSearchResult.Hits = collector.FilterHitsBySearchAfter(preSearchResult.Hits, req.Sort, req.SearchAfter)
 	}
 
-	// rescore if fusion flag is set
-	if doScoreFusion {
+	if rescorer != nil {
 		// rescore takes ftsHits and knnHits as first and second argument respectively
 		// since this is pure knn, set ftsHits to nil. preSearchResult.Hits contains knn results
 		preSearchResult.Hits, preSearchResult.Total, preSearchResult.MaxScore = rescorer.rescore(nil, preSearchResult.Hits)
@@ -803,14 +798,14 @@ func constructPreSearchData(req *SearchRequest, flags *preSearchFlags,
 // If we need to store knn hits at alias: returns all the knn hits
 // If we should send it to leaf indexes: includes in presearch data
 func constructPreSearchDataAndFusionKnnHits(req *SearchRequest, flags *preSearchFlags,
-	preSearchResult *SearchResult, doScoreFusion bool, indexes []Index,
+	preSearchResult *SearchResult, rescorer *rescorer, indexes []Index,
 ) (map[string]map[string]interface{}, search.DocumentMatchCollection, error) {
 	var fusionknnhits search.DocumentMatchCollection
 
 	// Checks if we need to send the KNN hits to the indexes in the
 	// search phase. If there is score fusion enabled, we do not
 	// send the KNN hits to the indexes.
-	if doScoreFusion && flags.knn {
+	if rescorer != nil && flags.knn {
 		fusionknnhits = preSearchResult.Hits
 		preSearchResult.Hits = nil
 	}
@@ -979,7 +974,6 @@ func hitsInCurrentPage(req *SearchRequest, hits []*search.DocumentMatch) []*sear
 // Extra parameters for MultiSearch
 type multiSearchParams struct {
 	preSearchData map[string]map[string]interface{}
-	doScoreFusion bool
 	rescorer      *rescorer
 	fusionKnnHits search.DocumentMatchCollection
 }
@@ -1052,8 +1046,7 @@ func MultiSearch(ctx context.Context, req *SearchRequest, params *multiSearchPar
 		}
 	}
 
-	// rescore if fusion flag is set
-	if params.doScoreFusion {
+	if params.rescorer != nil {
 		sr.Hits, sr.Total, sr.MaxScore = params.rescorer.rescore(sr.Hits, params.fusionKnnHits)
 		params.rescorer.restoreSearchRequest()
 	}
