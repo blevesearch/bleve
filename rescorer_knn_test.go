@@ -170,7 +170,7 @@ func createScoreFusionRequest(knn bool) *SearchRequest {
 		searchRequest.AddKNN("colorvect_l2", queryVector_2, 5, 1.0)
 	}
 
-	searchRequest.RequestParams = &Params{ScoreRankConstant: 1, ScoreWindowSize: 10}
+	searchRequest.Params = &RequestParams{ScoreRankConstant: 1, ScoreWindowSize: 10}
 
 	searchRequest.Size = 10
 	searchRequest.Score = ScoreRRF
@@ -632,7 +632,6 @@ func TestRRFPagination(t *testing.T) {
 		})
 	}
 }
-
 
 // TestHybridRRFFaceting tests that facet results are identical whether using RRF or default scoring in hybrid search
 func TestRRFFaceting(t *testing.T) {

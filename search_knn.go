@@ -67,7 +67,7 @@ type SearchRequest struct {
 
 	PreSearchData map[string]interface{} `json:"pre_search_data,omitempty"`
 
-	RequestParams *Params `json:"params,omitempty"`
+	Params *RequestParams `json:"params,omitempty"`
 
 	sortFunc func(sort.Interface)
 }
@@ -150,7 +150,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		KNN              []*tempKNNReq     `json:"knn"`
 		KNNOperator      knnOperator       `json:"knn_operator"`
 		PreSearchData    json.RawMessage   `json:"pre_search_data"`
-		RequestParams    json.RawMessage   `json:"params"`
+		Params           json.RawMessage   `json:"params"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -192,21 +192,19 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.From = 0
 	}
 
-	if temp.RequestParams == nil {
-		if IsScoreFusionRequested(r) {
+	if IsScoreFusionRequested(r) {
+		if temp.Params == nil {
 			// If params is not present and it is requires rescoring, assign
 			// default values
-			r.RequestParams = NewDefaultParams(r.From, r.Size)
-		}
-	} else {
-		// if it is a request that requires rescoring, parse the rescoring
-		// parameters.
-		if IsScoreFusionRequested(r) {
-			params, err := ParseParams(r, temp.RequestParams)
+			r.Params = NewDefaultParams(r.From, r.Size)
+		} else {
+			// if it is a request that requires rescoring, parse the rescoring
+			// parameters.
+			params, err := ParseParams(r, temp.Params)
 			if err != nil {
 				return err
 			}
-			r.RequestParams = params
+			r.Params = params
 		}
 	}
 
@@ -264,7 +262,7 @@ func copySearchRequest(req *SearchRequest, preSearchData map[string]interface{})
 		KNN:              req.KNN,
 		KNNOperator:      req.KNNOperator,
 		PreSearchData:    preSearchData,
-		RequestParams:    req.RequestParams,
+		Params:           req.Params,
 	}
 	return &rv
 

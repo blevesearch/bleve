@@ -46,15 +46,15 @@ type rescorer struct {
 // - Setting boosts to 1: top level boosts only used for rescoring
 // - Setting From and Size to 0 and ScoreWindowSize
 func (r *rescorer) prepareSearchRequest() error {
-	if r.req.RequestParams == nil {
-		r.req.RequestParams = NewDefaultParams(r.req.From, r.req.Size)
+	if r.req.Params == nil {
+		r.req.Params = NewDefaultParams(r.req.From, r.req.Size)
 	}
 
 	r.origFrom = r.req.From
 	r.origSize = r.req.Size
 
 	r.req.From = 0
-	r.req.Size = r.req.RequestParams.ScoreWindowSize
+	r.req.Size = r.req.Params.ScoreWindowSize
 
 	// req.Query's top level boost comes first, followed by the KNN queries
 	numQueries := numKNNQueries(r.req) + 1
@@ -102,8 +102,8 @@ func (r *rescorer) rescore(ftsHits, knnHits search.DocumentMatchCollection) (sea
 		res := fusion.ReciprocalRankFusion(
 			mergedHits,
 			r.origBoosts,
-			r.req.RequestParams.ScoreRankConstant,
-			r.req.RequestParams.ScoreWindowSize,
+			r.req.Params.ScoreRankConstant,
+			r.req.Params.ScoreWindowSize,
 			numKNNQueries(r.req),
 			r.req.Explain,
 		)

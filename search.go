@@ -686,20 +686,20 @@ func IsScoreFusionRequested(req *SearchRequest) bool {
 }
 
 // Additional parameters in the search request. Currently only being
-// used for hybrid search parameters.
-type Params struct {
+// used for score fusion parameters.
+type RequestParams struct {
 	ScoreRankConstant int `json:"score_rank_constant,omitempty"`
 	ScoreWindowSize   int `json:"score_window_size,omitempty"`
 }
 
-func NewDefaultParams(from, size int) *Params {
-	return &Params{
+func NewDefaultParams(from, size int) *RequestParams {
+	return &RequestParams{
 		ScoreRankConstant: DefaultScoreRankConstant,
 		ScoreWindowSize:   from + size,
 	}
 }
 
-func (p *Params) UnmarshalJSON(input []byte) error {
+func (p *RequestParams) UnmarshalJSON(input []byte) error {
 	var temp struct {
 		ScoreRankConstant *int `json:"score_rank_constant,omitempty"`
 		ScoreWindowSize   *int `json:"score_window_size,omitempty"`
@@ -720,7 +720,7 @@ func (p *Params) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-func (p *Params) Validate(size int) error {
+func (p *RequestParams) Validate(size int) error {
 	if p.ScoreWindowSize < 1 {
 		return fmt.Errorf("score window size must be greater than 0")
 	} else if p.ScoreWindowSize < size {
@@ -730,7 +730,7 @@ func (p *Params) Validate(size int) error {
 	return nil
 }
 
-func ParseParams(r *SearchRequest, input []byte) (*Params, error) {
+func ParseParams(r *SearchRequest, input []byte) (*RequestParams, error) {
 	params := NewDefaultParams(r.From, r.Size)
 	if len(input) == 0 {
 		return params, nil
