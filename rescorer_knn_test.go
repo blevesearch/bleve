@@ -844,7 +844,7 @@ func TestRSFEndToEnd(t *testing.T) {
 	defer cleanup()
 
 	// Create the search request
-	searchRequest := createHybridSearchRequest(ScoreRSF)
+	searchRequest := createScoreFusionRequest(ScoreRSF, true)
 
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, search.SearchTypeKey, search.GlobalScoring)
@@ -866,7 +866,7 @@ func TestRSFAliasWithSingleIndex(t *testing.T) {
 	defer cleanup()
 
 	// Create the search request
-	searchRequest := createHybridSearchRequest(ScoreRSF)
+	searchRequest := createScoreFusionRequest(ScoreRSF, true)
 
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, search.SearchTypeKey, search.GlobalScoring)
@@ -888,7 +888,7 @@ func TestRSFAliasWithTwoIndexes(t *testing.T) {
 	defer cleanup()
 
 	// Create the search request
-	searchRequest := createHybridSearchRequest(ScoreRSF)
+	searchRequest := createScoreFusionRequest(ScoreRSF, true)
 
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, search.SearchTypeKey, search.GlobalScoring)
@@ -910,7 +910,7 @@ func TestRSFNestedAliases(t *testing.T) {
 	defer cleanup()
 
 	// Create the search request
-	searchRequest := createHybridSearchRequest(ScoreRSF)
+	searchRequest := createScoreFusionRequest(ScoreRSF, true)
 
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, search.SearchTypeKey, search.GlobalScoring)
@@ -956,7 +956,7 @@ func TestRSFPagination(t *testing.T) {
 			defer cleanup()
 
 			// Create first page request (first 5 results)
-			firstPageRequest := createHybridSearchRequest(ScoreRSF)
+			firstPageRequest := createScoreFusionRequest(ScoreDefault, true)
 			firstPageRequest.From = 0
 			firstPageRequest.Size = 5
 
@@ -967,7 +967,7 @@ func TestRSFPagination(t *testing.T) {
 			}
 
 			// Create second page request (next 5 results, starting from index 5)
-			secondPageRequest := createHybridSearchRequest(ScoreRSF)
+			secondPageRequest := createScoreFusionRequest(ScoreDefault, true)
 			secondPageRequest.From = 5
 			secondPageRequest.Size = 5
 
@@ -1027,7 +1027,7 @@ func TestRSFFaceting(t *testing.T) {
 			defer cleanup()
 
 			// Create search request with default scoring and facets
-			defaultRequest := createHybridSearchRequest(ScoreRRF)
+			defaultRequest := createScoreFusionRequest(ScoreDefault, false)
 			defaultRequest.Score = ScoreDefault // Use default scoring
 			defaultRequest.Size = 10
 			// Add facet for color field with size 10
@@ -1035,7 +1035,7 @@ func TestRSFFaceting(t *testing.T) {
 			defaultRequest.AddFacet("color", colorFacet)
 
 			// Create search request with RSF scoring and identical facets
-			rsfRequest := createHybridSearchRequest(ScoreRSF)
+			rsfRequest := createScoreFusionRequest(ScoreRSF, true)
 			rsfRequest.Size = 10
 			// Add identical facet for color field with size 10
 			colorFacetRSF := NewFacetRequest("color", 10)

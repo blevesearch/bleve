@@ -110,9 +110,9 @@ func (r *rescorer) rescore(ftsHits, knnHits search.DocumentMatchCollection) (sea
 		fusionResult = &res
 	case ScoreRSF:
 		res := fusion.RelativeScoreFusion(
-			sr.Hits,
+			mergedHits,
 			r.origBoosts,
-			r.req.RequestParams.ScoreWindowSize,
+			r.req.Params.ScoreWindowSize,
 			numKNNQueries(r.req),
 			r.req.Explain,
 		)
