@@ -1,4 +1,4 @@
-# Hybrid Search
+# Score Fusion for Hybrid Search
 
 Bleve supports **hybrid search** that combines full-text search (FTS) with vector (kNN) search to leverage the strengths of both approaches:
 
