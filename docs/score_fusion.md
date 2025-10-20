@@ -50,7 +50,7 @@ Where:
 ```go
 // Create a hybrid search with RRF fusion
 searchRequest := bleve.NewSearchRequest(bleve.NewMatchQuery("dark chocolate"))
-searchRequest.Score = ScoreRRF  // Alternatively, set to "rrf"
+searchRequest.Score = bleve.ScoreRRF  // Alternatively, set to "rrf"
 
 // Add first kNN component
 searchRequest.AddKNN(
@@ -69,7 +69,7 @@ searchRequest.AddKNN(
 )
 
 // Optional: Configure RRF parameters
-params := RequestParams{
+params := bleve.RequestParams{
     ScoreRankConstant: 60,                   // Rank constant (default: 60)
     ScoreWindowSize: 150                     // Window size (default: size)
 }
@@ -115,7 +115,7 @@ Where:
 ```go
 // Create a hybrid search with RSF fusion
 searchRequest := bleve.NewSearchRequest(bleve.NewMatchQuery("machine learning"))
-searchRequest.Score = ScoreRSF  // Or set to "rsf"
+searchRequest.Score = bleve.ScoreRSF  // Or set to "rsf"
 
 // Add first kNN component
 searchRequest.AddKNN(
@@ -134,7 +134,7 @@ searchRequest.AddKNN(
 )
 
 // Optional: Configure RRF parameters
-params := RequestParams{
+params := bleve.RequestParams{
     ScoreWindowSize: 150                     // Window size (default: size)
 }
 searchRequest.AddParams(params)
@@ -154,7 +154,7 @@ The `Score` field in your search request specifies which fusion strategy to use:
 
 ### Params
 
-The `Params` object contains additional parameters for hybrid search:
+The `Params` object contains additional parameters for score fusion:
 
 #### Score Window Size
 
@@ -165,7 +165,8 @@ The `Params` object contains additional parameters for hybrid search:
 * **Purpose**: Controls the tradeoff between relevance and performance
 
 A larger window size increases the chance of finding relevant results but requires more computation. For pagination to work consistently, ensure:
-```
+
+```text
 From + Size <= ScoreWindowSize
 ```
 
@@ -218,9 +219,9 @@ searchRequest := bleve.NewSearchRequest(query)
 searchRequest.AddKNN("vec", queryVector, 10, 1.0)
 ```
 
-For RRF and RSF, weights determine the **relative importance** of each component's contribution, rather than scaling raw scores. 
+For RRF and RSF, weights determine the **relative importance** of each component's contribution, rather than scaling raw scores.
 
-**Example:** If `fts_boost = 2.0` and `knn_boost = 1.0`, the FTS contribution is twice as important as the kNN contribution in the final ranking.
+**Example:** If `fts_boost = 2.0` and `knn_boost = 1.0`, the FTS contribution is twice as important as the kNN contribution in the final ranking in RRF or RSF.
 
 ## Restrictions
 
@@ -228,13 +229,13 @@ When using score fusion (`Score` set to `"rrf"` or `"rsf"`), certain features ar
 
 * **SearchAfter/SearchBefore**: Not compatible with score fusion. For pagination, use `From` and `Size` only.
 * **Sort**: Only descending score sort (`-_score`) or default sorting is allowed
-* Faceting will take into account only documents that are part of the FTS result list, and ignore documents that were only part of the KNN result list.
+* **Faceting**: Only documents included in the FTS result list are considered. Documents that appear exclusively in the KNN result list are ignored during faceting.
 
 ## Choosing a Fusion Strategy
 
 | Use Case | Recommended Strategy |
 |----------|---------------------|
-| Different score scales (e.g., TF-IDF + L2 distance) | **RRF** |
+| Different score scales (e.g., TF-IDF + L2 distance) | **RRF/RSF** |
 | Minimal tuning, out-of-the-box performance | **RRF** |
 | Want to preserve score magnitude importance | **RSF** |
 | Have well-tuned boost values already | **Additive (default)** |
