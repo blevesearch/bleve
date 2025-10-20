@@ -5,7 +5,7 @@ Bleve supports **hybrid search** that combines full-text search (FTS) with vecto
 * **Full-text search** excels at exact keyword matching, filtering, and structured queries
 * **Vector search** captures semantic similarity and handles synonyms and paraphrasing naturally
 
-When using hybrid search, you can choose different **score fusion strategies** to combine results from both search methods. This document describes the available fusion strategies and how to use them.
+With *v2.5.4* onwards - when using hybrid search, you can choose different **score fusion strategies** to combine results from both search methods. This document describes the available fusion strategies and how to use them.
 
 ## Fusion Strategies
 
