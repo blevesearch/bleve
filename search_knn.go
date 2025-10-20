@@ -67,6 +67,8 @@ type SearchRequest struct {
 
 	PreSearchData map[string]interface{} `json:"pre_search_data,omitempty"`
 
+	Params *RequestParams `json:"params,omitempty"`
+
 	sortFunc func(sort.Interface)
 }
 
@@ -148,6 +150,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		KNN              []*tempKNNReq     `json:"knn"`
 		KNNOperator      knnOperator       `json:"knn_operator"`
 		PreSearchData    json.RawMessage   `json:"pre_search_data"`
+		Params           json.RawMessage   `json:"params"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -187,6 +190,22 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	}
 	if r.From < 0 {
 		r.From = 0
+	}
+
+	if IsScoreFusionRequested(r) {
+		if temp.Params == nil {
+			// If params is not present and it is requires rescoring, assign
+			// default values
+			r.Params = NewDefaultParams(r.From, r.Size)
+		} else {
+			// if it is a request that requires rescoring, parse the rescoring
+			// parameters.
+			params, err := ParseParams(r, temp.Params)
+			if err != nil {
+				return err
+			}
+			r.Params = params
+		}
 	}
 
 	r.KNN = make([]*KNNRequest, len(temp.KNN))
@@ -243,6 +262,7 @@ func copySearchRequest(req *SearchRequest, preSearchData map[string]interface{})
 		KNN:              req.KNN,
 		KNNOperator:      req.KNNOperator,
 		PreSearchData:    preSearchData,
+		Params:           req.Params,
 	}
 	return &rv
 
@@ -327,6 +347,7 @@ func validateKNN(req *SearchRequest) error {
 	default:
 		return fmt.Errorf("knn_operator must be either 'and' / 'or'")
 	}
+
 	return nil
 }
 
@@ -458,6 +479,12 @@ func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*
 		}
 		knnHits = knnHits[:idx]
 	}
+
+	// if score fusion required, return early because
+	// score breakdown is retained
+	if IsScoreFusionRequested(req) {
+		return knnHits
+	}
 	// fix the score using score breakdown now
 	// if the score is none, then we need to set the score to 0.0
 	// if req.Explain is true, then we need to use the expl breakdown to
@@ -537,6 +564,10 @@ func requestHasKNN(req *SearchRequest) bool {
 	return len(req.KNN) > 0
 }
 
+func numKNNQueries(req *SearchRequest) int {
+	return len(req.KNN)
+}
+
 // returns true if the search request contains a KNN request that can be
 // satisfied by just performing a preSearch, completely bypassing the
 // actual search.
@@ -606,5 +637,27 @@ func newKnnPreSearchResultProcessor(req *SearchRequest) *knnPreSearchResultProce
 			// the merged knn hits are finalized and set in the search result.
 			sr.Hits, _ = knnStore.Final(nil)
 		},
+	}
+}
+
+// Replace knn boost values for fusion rescoring queries
+func (r *rescorer) prepareKnnRequest() {
+	for i := range r.req.KNN {
+		b := r.req.KNN[i].Boost
+		if b != nil {
+			r.origBoosts[i+1] = b.Value()
+			newB := query.Boost(1.0)
+			r.req.KNN[i].Boost = &newB
+		} else {
+			r.origBoosts[i+1] = 1.0
+		}
+	}
+}
+
+// Restore knn boost values for fusion rescoring queries
+func (r *rescorer) restoreKnnRequest() {
+	for i := range r.req.KNN {
+		b := query.Boost(r.origBoosts[i+1])
+		r.req.KNN[i].Boost = &b
 	}
 }

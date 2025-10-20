@@ -77,6 +77,8 @@ type SearchRequest struct {
 
 	PreSearchData map[string]interface{} `json:"pre_search_data,omitempty"`
 
+	Params *RequestParams `json:"params,omitempty"`
+
 	sortFunc func(sort.Interface)
 }
 
@@ -97,6 +99,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		SearchAfter      []string          `json:"search_after"`
 		SearchBefore     []string          `json:"search_before"`
 		PreSearchData    json.RawMessage   `json:"pre_search_data"`
+		Params           json.RawMessage   `json:"params"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -137,6 +140,23 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	if r.From < 0 {
 		r.From = 0
 	}
+
+	if IsScoreFusionRequested(r) {
+		if temp.Params == nil {
+			// If params is not present and it is requires rescoring, assign
+			// default values
+			r.Params = NewDefaultParams(r.From, r.Size)
+		} else {
+			// if it is a request that requires rescoring, parse the rescoring
+			// parameters.
+			params, err := ParseParams(r, temp.Params)
+			if err != nil {
+				return err
+			}
+			r.Params = params
+		}
+	}
+
 	if temp.PreSearchData != nil {
 		r.PreSearchData, err = query.ParsePreSearchData(temp.PreSearchData)
 		if err != nil {
@@ -184,6 +204,10 @@ func requestHasKNN(req *SearchRequest) bool {
 	return false
 }
 
+func numKNNQueries(req *SearchRequest) int {
+	return 0
+}
+
 func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
 }
 
@@ -206,4 +230,10 @@ func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*
 
 func newKnnPreSearchResultProcessor(req *SearchRequest) *knnPreSearchResultProcessor {
 	return &knnPreSearchResultProcessor{} // equivalent to nil
+}
+
+func (r *rescorer) prepareKnnRequest() {
+}
+
+func (r *rescorer) restoreKnnRequest() {
 }
