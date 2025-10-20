@@ -23,17 +23,17 @@ Reciprocal Rank Fusion is a **rank-based** algorithm that combines results based
 
 For each document appearing in FTS or kNN results, the RRF score is calculated as:
 
-```
-RRF_score = w_fts * (1 / (k + rank_fts)) + Σ w_knn_i * (1 / (k + rank_knn_i))
+```math
+RRF\_score = w_{\text{fts}} \cdot \frac{1}{k + \text{rank}_{\text{fts}}} + \sum_{i=1}^{n} w_{\text{knn}_i} \cdot \frac{1}{k + \text{rank}_{\text{knn}_i}}
 ```
 
 Where:
-* `rank_fts`: 1-indexed rank of the document in the FTS result list (or 0 if not present)
-* `rank_knn_i`: 1-indexed rank of the document in the i-th kNN result list (or 0 if not present)
-* `k`: rank constant (default: 60) that dampens the impact of rank differences
-* `w_fts`: weight from the FTS query boost value
-* `w_knn_i`: weight from the i-th kNN query boost value
-* `Σ`: summation over all kNN queries (you can add multiple kNN queries)
+* $\text{rank}_{\text{fts}}$: 1-indexed rank of the document in the FTS result list (or 0 if not present)
+* $\text{rank}_{\text{knn}_i}$: 1-indexed rank of the document in the i-th kNN result list (or 0 if not present)
+* $k$: rank constant (default: 60) that dampens the impact of rank differences
+* $w_{\text{fts}}$: weight from the FTS query boost value
+* $w_{\text{knn}_i}$: weight from the i-th kNN query boost value
+* $\sum_{i=1}^{n}$: summation over all kNN queries (you can add multiple kNN queries)
 
 **Advantages:**
 * Distribution-agnostic – no need for score normalization
@@ -85,16 +85,21 @@ Relative Score Fusion is a **score-based** strategy that normalizes scores from 
 **Algorithm:**
 
 1. **Min-max normalize** each result set independently:
-   ```
-   normalized_score = (score - min_score) / (max_score - min_score)
-   ```
+
+```math
+\text{normalized\_score} = \frac{\text{score} - \text{min\_score}}{\text{max\_score} - \text{min\_score}}
+```
 
 2. **Combine** normalized scores using weighted addition:
-   ```
-   RSF_score = w_fts * normalized_fts_score + Σ w_knn_i * normalized_knn_i_score
-   ```
-   
-   Where `Σ` represents summation over all kNN queries (you can add multiple kNN queries).
+
+```math
+RSF\_score = w_{\text{fts}} \cdot \text{normalized\_score\_fts} + \sum_{i=1}^{n} w_{\text{knn}_i} \cdot \text{normalized\_score\_knn}_i
+```
+
+Where:
+* $w_{\text{fts}}$: weight from the FTS query boost value
+* $w_{\text{knn}_i}$: weight from the i-th kNN query boost value
+* $\sum_{i=1}^{n}$: summation over all kNN queries (you can add multiple kNN queries)
 
 **Advantages:**
 * Score-aware – retains relevance magnitude information
