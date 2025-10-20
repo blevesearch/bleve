@@ -108,6 +108,15 @@ func (r *rescorer) rescore(ftsHits, knnHits search.DocumentMatchCollection) (sea
 			r.req.Explain,
 		)
 		fusionResult = &res
+	case ScoreRSF:
+		res := fusion.RelativeScoreFusion(
+			mergedHits,
+			r.origBoosts,
+			r.req.Params.ScoreWindowSize,
+			numKNNQueries(r.req),
+			r.req.Explain,
+		)
+		fusionResult = &res
 	}
 
 	return fusionResult.Hits, fusionResult.Total, fusionResult.MaxScore

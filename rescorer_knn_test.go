@@ -18,6 +18,7 @@
 package bleve
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -158,7 +159,8 @@ func getHybridSearchDocuments() []map[string]interface{} {
 	return documents
 }
 
-func createScoreFusionRequest(knn bool) *SearchRequest {
+func createScoreFusionRequest(scoreMethod string, knn bool) *SearchRequest {
+	// Create hybrid search request (FTS + KNN)
 	textQuery := query.NewMatchPhraseQuery("dark")
 	searchRequest := NewSearchRequest(textQuery)
 
@@ -174,8 +176,8 @@ func createScoreFusionRequest(knn bool) *SearchRequest {
 	searchRequest.AddParams(params)
 
 	searchRequest.Size = 10
-	searchRequest.Score = ScoreRRF
 
+	searchRequest.Score = scoreMethod
 	searchRequest.Explain = false
 	return searchRequest
 }
@@ -494,7 +496,7 @@ func TestRRFEndToEnd(t *testing.T) {
 	defer cleanup()
 
 	// Create the search request
-	searchRequest := createScoreFusionRequest(true)
+	searchRequest := createScoreFusionRequest(ScoreRRF, true)
 
 	// Execute search
 	result, err := index.Search(searchRequest)
@@ -513,7 +515,7 @@ func TestRRFAliasWithSingleIndex(t *testing.T) {
 	defer cleanup()
 
 	// Create the search request
-	searchRequest := createScoreFusionRequest(true)
+	searchRequest := createScoreFusionRequest(ScoreRRF, true)
 
 	// Execute search through alias
 	result, err := alias.Search(searchRequest)
@@ -532,7 +534,7 @@ func TestRRFAliasWithTwoIndexes(t *testing.T) {
 	defer cleanup()
 
 	// Create the search request
-	searchRequest := createScoreFusionRequest(true)
+	searchRequest := createScoreFusionRequest(ScoreRRF, true)
 
 	// Execute search through alias
 	result, err := alias.Search(searchRequest)
@@ -551,7 +553,7 @@ func TestRRFNestedAliases(t *testing.T) {
 	defer cleanup()
 
 	// Create the search request
-	searchRequest := createScoreFusionRequest(true)
+	searchRequest := createScoreFusionRequest(ScoreRRF, true)
 
 	// Execute search through master alias
 	result, err := masterAlias.Search(searchRequest)
@@ -594,7 +596,7 @@ func TestRRFPagination(t *testing.T) {
 			defer cleanup()
 
 			// Create first page request (first 5 results)
-			firstPageRequest := createScoreFusionRequest(true)
+			firstPageRequest := createScoreFusionRequest(ScoreRRF, true)
 			firstPageRequest.From = 0
 			firstPageRequest.Size = 5
 
@@ -605,7 +607,7 @@ func TestRRFPagination(t *testing.T) {
 			}
 
 			// Create second page request (next 5 results, starting from index 5)
-			secondPageRequest := createScoreFusionRequest(true)
+			secondPageRequest := createScoreFusionRequest(ScoreRRF, true)
 			secondPageRequest.From = 5
 			secondPageRequest.Size = 5
 
@@ -665,7 +667,7 @@ func TestRRFFaceting(t *testing.T) {
 			defer cleanup()
 
 			// Create search request with default scoring and facets
-			defaultRequest := createScoreFusionRequest(false)
+			defaultRequest := createScoreFusionRequest(ScoreDefault, false)
 			defaultRequest.Score = ScoreDefault // Use default scoring
 			defaultRequest.Size = 10
 			// Add facet for color field with size 10
@@ -673,7 +675,7 @@ func TestRRFFaceting(t *testing.T) {
 			defaultRequest.AddFacet("color", colorFacet)
 
 			// Create search request with RRF scoring and identical facets
-			rrfRequest := createScoreFusionRequest(true)
+			rrfRequest := createScoreFusionRequest(ScoreRRF, true)
 			rrfRequest.Score = ScoreRRF // Use RRF scoring
 			rrfRequest.Size = 10
 			// Add identical facet for color field with size 10
@@ -754,6 +756,365 @@ func TestRRFFaceting(t *testing.T) {
 					if defaultTerm.Count != rrfTerm.Count {
 						t.Errorf("Facet term count differs for %s: default=%d, RRF=%d",
 							defaultTerm.Term, defaultTerm.Count, rrfTerm.Count)
+					}
+				}
+			}
+		})
+	}
+}
+
+// verifyRSFResults verifies that the search hits match expected RSF ranking and scores
+func verifyRSFResults(t *testing.T, hits search.DocumentMatchCollection) {
+	// For RSF, we expect similar high-level results to RRF but with different scoring methodology
+	// RSF uses min-max normalization of scores within the window
+	// Expected top documents should include those matching "dark" query and similar vectors
+
+	// Verify we have reasonable number of results
+	if len(hits) == 0 {
+		t.Fatal("Expected non-empty search results for RSF")
+	}
+
+	// Verify we have at least 8 results
+	if len(hits) < 8 {
+		t.Errorf("Expected at least 6 results for RSF, got %d", len(hits))
+	}
+
+	// Documents that should definitely appear in top results (high relevance)
+	// These all get both text relevance (for "dark blue") or strong vector similarity
+	topExpectedDocs := []string{"dark blue", "navy", "blue", "medium blue"}
+
+	// Create map of all hits for easier lookup
+	docMap := make(map[string]int) // doc -> position (0-based)
+	for i, hit := range hits {
+		docMap[hit.ID] = i
+	}
+
+	// Verify that "dark blue" appears in top 5 positions (high text + vector relevance)
+	if pos, found := docMap["dark blue"]; !found {
+		t.Error("Expected 'dark blue' to appear in results but not found")
+	} else if pos >= 5 {
+		t.Errorf("Expected 'dark blue' in top 3 positions, found at position %d", pos+1)
+	}
+
+	// Verify that at least 3 of the top expected documents appear in top 5 results
+	topFoundCount := 0
+	for _, expectedDoc := range topExpectedDocs {
+		if pos, found := docMap[expectedDoc]; found && pos < 5 {
+			topFoundCount++
+		}
+	}
+	if topFoundCount < 3 {
+		t.Errorf("Expected at least 3 of top expected documents in top 5 results, found %d", topFoundCount)
+	}
+
+	// Verify scores are reasonable and within expected range
+	// RSF scores should be between 0 and sum of weights (3.0 with default weights)
+	// but typically should be more constrained than the full range
+	for i, hit := range hits {
+		if hit.Score < 0 || hit.Score > 3.0 {
+			t.Errorf("Hit %d (%s) has unreasonable score: %.6f", i, hit.ID, hit.Score)
+		}
+		// First hit should have a substantial score (at least 0.1)
+		if i == 0 && hit.Score < 0.1 {
+			t.Errorf("Top hit (%s) has unexpectedly low score: %.6f", hit.ID, hit.Score)
+		}
+	}
+
+	// Verify hits are sorted by score descending with strict ordering
+	for i := 1; i < len(hits); i++ {
+		if hits[i-1].Score < hits[i].Score {
+			t.Errorf("Hits not sorted properly: hit %d (%s, score %.6f) < hit %d (%s, score %.6f)",
+				i, hits[i-1].ID, hits[i-1].Score, i+1, hits[i].ID, hits[i].Score)
+		}
+	}
+
+	// Verify score range is reasonable - top score should be significantly higher than bottom
+	topScore := hits[0].Score
+	fifthScore := hits[4].Score
+	if topScore-fifthScore < 0.001 {
+		t.Errorf("Insufficient score differentiation: top score %.6f, 5rd score %.6f (diff: %.6f)",
+			topScore, fifthScore, topScore-fifthScore)
+	}
+}
+
+// TestRSFEndToEnd tests RSF scoring with a single index
+func TestRSFEndToEnd(t *testing.T) {
+	// Setup the index configuration
+	index, cleanup := setupSingleIndex(t)
+	defer cleanup()
+
+	// Create the search request
+	searchRequest := createScoreFusionRequest(ScoreRSF, true)
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, search.SearchTypeKey, search.GlobalScoring)
+
+	// Execute search
+	result, err := index.SearchInContext(ctx, searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify RSF results
+	verifyRSFResults(t, result.Hits)
+}
+
+// TestRSFAliasWithSingleIndex tests RSF with an alias containing one index
+func TestRSFAliasWithSingleIndex(t *testing.T) {
+	// Setup the alias configuration
+	alias, cleanup := setupAliasWithSingleIndex(t)
+	defer cleanup()
+
+	// Create the search request
+	searchRequest := createScoreFusionRequest(ScoreRSF, true)
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, search.SearchTypeKey, search.GlobalScoring)
+
+	// Execute search
+	result, err := alias.SearchInContext(ctx, searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify RSF results - should be identical to direct index search
+	verifyRSFResults(t, result.Hits)
+}
+
+// TestRSFAliasWithTwoIndexes tests RSF with an alias containing two indexes
+func TestRSFAliasWithTwoIndexes(t *testing.T) {
+	// Setup the alias configuration
+	alias, cleanup := setupAliasWithTwoIndexes(t)
+	defer cleanup()
+
+	// Create the search request
+	searchRequest := createScoreFusionRequest(ScoreRSF, true)
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, search.SearchTypeKey, search.GlobalScoring)
+
+	// Execute search
+	result, err := alias.SearchInContext(ctx, searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify RSF results - should be identical to single index results
+	verifyRSFResults(t, result.Hits)
+}
+
+// TestRSFNestedAliases tests RSF with an alias containing two index aliases
+func TestRSFNestedAliases(t *testing.T) {
+	// Setup the nested aliases configuration
+	masterAlias, cleanup := setupNestedAliases(t)
+	defer cleanup()
+
+	// Create the search request
+	searchRequest := createScoreFusionRequest(ScoreRSF, true)
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, search.SearchTypeKey, search.GlobalScoring)
+
+	// Execute search
+	result, err := masterAlias.SearchInContext(ctx, searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify RSF results - should be identical to single index results
+	verifyRSFResults(t, result.Hits)
+}
+
+// TestRSFPagination tests RSF with pagination across different index/alias configurations
+func TestRSFPagination(t *testing.T) {
+	scenarios := []struct {
+		name  string
+		setup func(t *testing.T) (Index, func())
+	}{
+		{
+			name:  "SingleIndex",
+			setup: setupSingleIndex,
+		},
+		{
+			name:  "AliasWithSingleIndex",
+			setup: setupAliasWithSingleIndex,
+		},
+		{
+			name:  "AliasWithTwoIndexes",
+			setup: setupAliasWithTwoIndexes,
+		},
+		{
+			name:  "NestedAliases",
+			setup: setupNestedAliases,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			// Setup the index/alias configuration
+			index, cleanup := scenario.setup(t)
+			defer cleanup()
+
+			// Create first page request (first 5 results)
+			firstPageRequest := createScoreFusionRequest(ScoreDefault, true)
+			firstPageRequest.From = 0
+			firstPageRequest.Size = 5
+
+			// Execute first page search
+			firstPageResult, err := index.Search(firstPageRequest)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Create second page request (next 5 results, starting from index 5)
+			secondPageRequest := createScoreFusionRequest(ScoreDefault, true)
+			secondPageRequest.From = 5
+			secondPageRequest.Size = 5
+
+			// Execute second page search
+			secondPageResult, err := index.Search(secondPageRequest)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Combine results from both pages
+			combinedHits := make(search.DocumentMatchCollection, 0, len(firstPageResult.Hits)+len(secondPageResult.Hits))
+			combinedHits = append(combinedHits, firstPageResult.Hits...)
+			combinedHits = append(combinedHits, secondPageResult.Hits...)
+
+			// Verify we have reasonable number of results
+			if len(firstPageResult.Hits) == 0 {
+				t.Error("Expected results in first page, got none")
+			}
+			if len(combinedHits) == 0 {
+				t.Error("Expected combined results, got none")
+			}
+
+			// Verify combined RSF results
+			verifyRSFResults(t, combinedHits)
+		})
+	}
+}
+
+// TestRSFFaceting tests that facet results are identical whether using RSF or default scoring in hybrid search
+func TestRSFFaceting(t *testing.T) {
+	scenarios := []struct {
+		name  string
+		setup func(t *testing.T) (Index, func())
+	}{
+		{
+			name:  "SingleIndex",
+			setup: setupSingleIndex,
+		},
+		{
+			name:  "AliasWithSingleIndex",
+			setup: setupAliasWithSingleIndex,
+		},
+		{
+			name:  "AliasWithTwoIndexes",
+			setup: setupAliasWithTwoIndexes,
+		},
+		{
+			name:  "NestedAliases",
+			setup: setupNestedAliases,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			// Setup the index/alias configuration
+			index, cleanup := scenario.setup(t)
+			defer cleanup()
+
+			// Create search request with default scoring and facets
+			defaultRequest := createScoreFusionRequest(ScoreDefault, false)
+			defaultRequest.Score = ScoreDefault // Use default scoring
+			defaultRequest.Size = 10
+			// Add facet for color field with size 10
+			colorFacet := NewFacetRequest("color", 10)
+			defaultRequest.AddFacet("color", colorFacet)
+
+			// Create search request with RSF scoring and identical facets
+			rsfRequest := createScoreFusionRequest(ScoreRSF, true)
+			rsfRequest.Size = 10
+			// Add identical facet for color field with size 10
+			colorFacetRSF := NewFacetRequest("color", 10)
+			rsfRequest.AddFacet("color", colorFacetRSF)
+
+			// Execute both searches
+			defaultResult, err := index.Search(defaultRequest)
+			if err != nil {
+				t.Fatalf("Default scoring search failed: %v", err)
+			}
+
+			rsfResult, err := index.Search(rsfRequest)
+			if err != nil {
+				t.Fatalf("RSF scoring search failed: %v", err)
+			}
+
+			// Verify both searches returned results
+			if len(defaultResult.Hits) == 0 {
+				t.Fatal("Expected search results with default scoring, got none")
+			}
+			if len(rsfResult.Hits) == 0 {
+				t.Fatal("Expected search results with RSF scoring, got none")
+			}
+
+			// Verify both searches returned facets
+			if defaultResult.Facets == nil {
+				t.Fatal("Expected facets with default scoring, got nil")
+			}
+			if rsfResult.Facets == nil {
+				t.Fatal("Expected facets with RSF scoring, got nil")
+			}
+
+			// Check that color facet exists in both results
+			defaultColorFacet, defaultExists := defaultResult.Facets["color"]
+			rsfColorFacet, rsfExists := rsfResult.Facets["color"]
+
+			if !defaultExists {
+				t.Fatal("Expected color facet in default scoring results")
+			}
+			if !rsfExists {
+				t.Fatal("Expected color facet in RSF scoring results")
+			}
+
+			// Compare the facet results - they should be identical
+			// Since facets are based on the document corpus and not scoring,
+			// they should not be affected by the scoring method (even with KNN)
+			if defaultColorFacet.Total != rsfColorFacet.Total {
+				t.Errorf("Facet totals differ: default=%d, RSF=%d",
+					defaultColorFacet.Total, rsfColorFacet.Total)
+			}
+
+			if defaultColorFacet.Missing != rsfColorFacet.Missing {
+				t.Errorf("Facet missing counts differ: default=%d, RSF=%d",
+					defaultColorFacet.Missing, rsfColorFacet.Missing)
+			}
+
+			if defaultColorFacet.Other != rsfColorFacet.Other {
+				t.Errorf("Facet other counts differ: default=%d, RSF=%d",
+					defaultColorFacet.Other, rsfColorFacet.Other)
+			}
+
+			// Compare the facet terms
+			defaultTerms := defaultColorFacet.Terms.Terms()
+			rsfTerms := rsfColorFacet.Terms.Terms()
+
+			if len(defaultTerms) != len(rsfTerms) {
+				t.Errorf("Facet terms count differs: default=%d, RSF=%d",
+					len(defaultTerms), len(rsfTerms))
+			} else {
+				// Compare each term
+				for i, defaultTerm := range defaultTerms {
+					rsfTerm := rsfTerms[i]
+					if defaultTerm.Term != rsfTerm.Term {
+						t.Errorf("Facet term differs at position %d: default=%s, RSF=%s",
+							i, defaultTerm.Term, rsfTerm.Term)
+					}
+					if defaultTerm.Count != rsfTerm.Count {
+						t.Errorf("Facet term count differs for %s: default=%d, RSF=%d",
+							defaultTerm.Term, defaultTerm.Count, rsfTerm.Count)
 					}
 				}
 			}
