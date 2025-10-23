@@ -679,7 +679,8 @@ func (i *indexImpl) buildKNNCollector(KNNQuery query.Query, reader index.IndexRe
 				if err != nil {
 					return nil, err
 				}
-				if fs != nil && fs.IntersectsPrefix(nestedPrefixes) {
+				if (fs != nil && fs.IntersectsPrefix(nestedPrefixes)) ||
+					isMatchAllQuery(KNNQuery) {
 					return collector.NewNestedKNNCollector(nr, kArray, somOfK), nil
 				}
 			}
@@ -699,7 +700,8 @@ func (i *indexImpl) buildEligibleCollector(filterQuery query.Query, reader index
 				if err != nil {
 					return nil, err
 				}
-				if fs != nil && fs.IntersectsPrefix(nestedPrefixes) {
+				if (fs != nil && fs.IntersectsPrefix(nestedPrefixes)) ||
+					isMatchAllQuery(filterQuery) {
 					return collector.NewNestedEligibleCollector(nr, size), nil
 				}
 			}

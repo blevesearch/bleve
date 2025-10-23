@@ -742,8 +742,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	if !contextScoreFusionKeyExists {
 		setKnnHitsInCollector(knnHits, req, coll)
 	}
-	
-
 	if fts != nil {
 		if is, ok := indexReader.(*scorch.IndexSnapshot); ok {
 			is.UpdateSynonymSearchCount(1)
@@ -1461,7 +1459,8 @@ func (i *indexImpl) buildTopNCollector(req *SearchRequest, reader index.IndexRea
 				if err != nil {
 					return nil, err
 				}
-				if fs != nil && fs.IntersectsPrefix(nestedPrefixes) {
+				if (fs != nil && fs.IntersectsPrefix(nestedPrefixes)) ||
+					isMatchAllQuery(req.Query) {
 					return newNestedCollector(nr), nil
 				}
 			}
