@@ -16,6 +16,7 @@ package search
 
 import (
 	"context"
+	"strings"
 
 	"github.com/blevesearch/geo/s2"
 )
@@ -236,4 +237,39 @@ var (
 type BM25Stats struct {
 	DocCount         float64        `json:"doc_count"`
 	FieldCardinality map[string]int `json:"field_cardinality"`
+}
+
+// FieldSet represents a set of queried fields.
+type FieldSet map[string]struct{}
+
+// NewFieldSet creates a new FieldSet.
+func NewFieldSet() FieldSet {
+	return make(map[string]struct{})
+}
+
+// Add adds a field to the set.
+func (fs FieldSet) Add(field string) {
+	fs[field] = struct{}{}
+}
+
+// IntersectsPrefix returns true if any field in this set
+// starts with any field from other.
+func (fs FieldSet) IntersectsPrefix(other FieldSet) bool {
+	for field := range fs {
+		for prefix := range other {
+			if strings.HasPrefix(field, prefix) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Slice returns the fields in this set as a slice of strings.
+func (fs FieldSet) Slice() []string {
+	rv := make([]string, 0, len(fs))
+	for field := range fs {
+		rv = append(rv, field)
+	}
+	return rv
 }

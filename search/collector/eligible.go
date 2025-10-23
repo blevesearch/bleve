@@ -31,16 +31,31 @@ type EligibleCollector struct {
 	total            uint64
 	took             time.Duration
 	eligibleSelector index.EligibleDocumentSelector
+
+	nestedStore *collectStoreNested
 }
 
 func NewEligibleCollector(size int) *EligibleCollector {
 	return newEligibleCollector(size)
 }
 
+func NewNestedEligibleCollector(nr index.NestedReader, size int) *EligibleCollector {
+	return newNestedEligibleCollector(nr, size)
+}
+
 func newEligibleCollector(size int) *EligibleCollector {
 	// No sort order & skip always 0 since this is only to filter eligible docs.
 	ec := &EligibleCollector{
 		size: size,
+	}
+	return ec
+}
+
+func newNestedEligibleCollector(nr index.NestedReader, size int) *EligibleCollector {
+	// No sort order & skip always 0 since this is only to filter eligible docs.
+	ec := &EligibleCollector{
+		size:        size,
+		nestedStore: newStoreNested(nr),
 	}
 	return ec
 }
@@ -108,15 +123,40 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 		}
 		ec.total++
 
-		err = dmHandler(next)
-		if err != nil {
-			break
+		if ec.nestedStore != nil {
+			doc, err := ec.nestedStore.AddDocument(next)
+			if err != nil {
+				return err
+			}
+			// recycle
+			searchContext.DocumentMatchPool.Put(doc)
+		} else {
+			err = dmHandler(next)
+			if err != nil {
+				break
+			}
 		}
 
 		next, err = searcher.Next(searchContext)
 	}
 	if err != nil {
 		return err
+	}
+
+	if ec.nestedStore != nil {
+		var count uint64
+		err := ec.nestedStore.VisitRoots(func(doc *search.DocumentMatch) error {
+			// process the root document
+			if err := dmHandler(doc); err != nil {
+				return err
+			}
+			count++
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		ec.total = count
 	}
 
 	// help finalize/flush the results in case

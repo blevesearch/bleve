@@ -5173,3 +5173,768 @@ func TestSearchRequestValidatePagination(t *testing.T) {
 		})
 	}
 }
+
+func TestNestedMapping(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	docs := []string{
+		`{
+			"title": "Tech Insights",
+			"posts": [
+				{
+					"title": "AI Trends",
+					"published_date": "2025-04-22",
+					"comments": [
+						{
+							"author": "Jane",
+							"text": "Very informative!",
+							"likes": 1
+						},
+						{
+							"author": "Tom",
+							"text": "Needs more detail.",
+							"likes": 3
+						}
+					]
+				},
+				{
+					"title": "Quantum Computing",
+					"published_date": "2025-11-15",
+					"comments": [
+						{
+							"author": "Jane",
+							"text": "Mind-blowing!",
+							"likes": 5
+						}
+					]
+				}
+			]
+		}`,
+		`{
+			"title": "Science Digest",
+			"posts": [
+				{
+					"title": "CRISPR and Gene Editing",
+					"published_date": "2025-06-10",
+					"comments": [
+						{
+							"author": "Alex",
+							"text": "Fascinating potential.",
+							"likes": 1
+						}
+					]
+				}
+			]
+		}`,
+		`{
+			"title": "Future Scope",
+			"posts": [
+				{
+					"title": "SpaceX Mars Plans",
+					"published_date": "2025-01-05",
+					"comments": []
+				},
+				{
+					"title": "Brain-Computer Interfaces",
+					"published_date": "2024-12-12",
+					"comments": [
+						{
+							"author": "Lina",
+							"text": "A bit scary, honestly.",
+							"likes": 0
+						},
+						{
+							"author": "Ken",
+							"text": "The future is now.",
+							"likes": 4
+						}
+					]
+				},
+				{
+					"title": "Fusion Energy Breakthroughs",
+					"published_date": "2025-07-01",
+					"comments": [
+						{
+							"author": "Sam",
+							"text": "Finally!",
+							"likes": 6
+						}
+					]
+				}
+			]
+		}`,
+	}
+
+	imap := mapping.NewIndexMapping()
+
+	keywordMapping := NewTextFieldMapping()
+	keywordMapping.Analyzer = keyword.Name
+
+	englishMapping := NewTextFieldMapping()
+	englishMapping.Analyzer = en.AnalyzerName
+
+	numericMapping := NewNumericFieldMapping()
+
+	dateTimeMapping := NewDateTimeFieldMapping()
+
+	commentMapping := NewDocumentMapping()
+	commentMapping.AddFieldMappingsAt("author", englishMapping)
+	commentMapping.AddFieldMappingsAt("text", englishMapping)
+	commentMapping.AddFieldMappingsAt("likes", numericMapping)
+	commentMapping.Nested = true
+
+	postsMapping := NewDocumentMapping()
+	postsMapping.AddFieldMappingsAt("title", englishMapping)
+	postsMapping.AddFieldMappingsAt("published_date", dateTimeMapping)
+	postsMapping.AddSubDocumentMapping("comments", commentMapping)
+	postsMapping.Nested = true
+
+	imap.DefaultMapping.AddFieldMappingsAt("title", englishMapping)
+	imap.DefaultMapping.AddSubDocumentMapping("posts", postsMapping)
+
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch := idx.NewBatch()
+	for id, doc := range docs {
+		var document map[string]interface{}
+		err = json.Unmarshal([]byte(doc), &document)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = batch.Index(fmt.Sprintf("%d", id), document)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Test 1: Date range + Author conjunction
+	t.Run("DateRangeAndAuthor", func(t *testing.T) {
+		q1 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
+		q1.SetField("posts.published_date")
+		q2 := query.NewMatchQuery("Jane")
+		q2.SetField("posts.comments.author")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "0" // "Tech Insights" has posts in 2025 with comments by Jane
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 2: Multiple author conjunction
+	t.Run("MultipleAuthors", func(t *testing.T) {
+		q1 := query.NewMatchQuery("Jane")
+		q1.SetField("posts.comments.author")
+		q2 := query.NewMatchQuery("Tom")
+		q2.SetField("posts.comments.author")
+
+		// This should match documents where the same post has comments by both Jane AND Tom
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// No post has a comment written by both both Jane and Tom
+		if len(res.Hits) != 0 {
+			t.Fatalf("expected 0 hits, got %d", len(res.Hits))
+		}
+	})
+
+	// Test 3: Likes range + Author conjunction
+	t.Run("LikesRangeAndAuthor", func(t *testing.T) {
+		minLikes := 3.0
+		q1 := query.NewNumericRangeQuery(&minLikes, nil)
+		q1.SetField("posts.comments.likes")
+		q2 := query.NewMatchQuery("Jane")
+		q2.SetField("posts.comments.author")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find posts where Jane has comments with >= 3 likes
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "0" // "Tech Insights" has a post with comments by Jane with 5 likes
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 4: Triple conjunction (date + author + likes)
+	t.Run("TripleConjunction", func(t *testing.T) {
+		q1 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
+		q1.SetField("posts.published_date")
+		q2 := query.NewMatchQuery("Jane")
+		q2.SetField("posts.comments.author")
+		minLikes := 1.0
+		q3 := query.NewNumericRangeQuery(&minLikes, nil)
+		q3.SetField("posts.comments.likes")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2, q3})
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find posts from 2025 where Jane has comments with >= 1 likes
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "0" // "Tech Insights" has posts in 2025 with comments by Jane with >= 1 likes
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 5: Text search + Author conjunction
+	t.Run("TextSearchAndAuthor", func(t *testing.T) {
+		q1 := query.NewMatchQuery("informative")
+		q1.SetField("posts.comments.text")
+		q2 := query.NewMatchQuery("Jane")
+		q2.SetField("posts.comments.author")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find posts where Jane wrote "informative" in comments
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+	})
+
+	// Test 6: Post title + Comment author conjunction (cross-level)
+	t.Run("PostTitleAndCommentAuthor", func(t *testing.T) {
+		q1 := query.NewMatchQuery("AI")
+		q1.SetField("posts.title")
+		q2 := query.NewMatchQuery("Jane")
+		q2.SetField("posts.comments.author")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find posts with "AI" in title AND Jane in comments
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "0" // "Tech Insights" has a post titled "AI Trends" with comments by Jane
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 7: Empty results conjunction
+	t.Run("EmptyResults", func(t *testing.T) {
+		q1 := query.NewMatchQuery("NonexistentAuthor")
+		q1.SetField("posts.comments.author")
+		q2 := query.NewMatchQuery("Jane")
+		q2.SetField("posts.comments.author")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find no results (impossible for same comment to be by both authors)
+		if len(res.Hits) != 0 {
+			t.Fatalf("expected 0 hits, got %d", len(res.Hits))
+		}
+	})
+
+	// Test 8: Disjunction within conjunction for more complex scenarios
+	t.Run("DisjunctionWithinConjunction", func(t *testing.T) {
+		// Find posts from 2025 with comments by either Jane OR Tom
+		q1 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
+		q1.SetField("posts.published_date")
+
+		janeQuery := query.NewMatchQuery("Jane")
+		janeQuery.SetField("posts.comments.author")
+		tomQuery := query.NewMatchQuery("Tom")
+		tomQuery.SetField("posts.comments.author")
+
+		authorDisjunction := query.NewDisjunctionQuery([]query.Query{janeQuery, tomQuery})
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, authorDisjunction})
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find posts from 2025 with comments by Jane OR Tom
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "0" // "Tech Insights" has posts in 2025 with comments by Jane and Tom
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+	// Test 9: Advanced Nested Conjunction - Multi-level constraints
+	t.Run("AdvancedNestedMultiLevel", func(t *testing.T) {
+		// Find documents with:
+		// 1. Posts from specific month (April 2025)
+		// 2. Comments by Jane
+		// 3. Those comments have >= 1 like
+		// 4. Post title contains "AI"
+		q1 := query.NewDateRangeStringQuery("2025-04-01", "2025-04-30")
+		q1.SetField("posts.published_date")
+
+		q2 := query.NewMatchQuery("Jane")
+		q2.SetField("posts.comments.author")
+
+		minLikes := 1.0
+		q3 := query.NewNumericRangeQuery(&minLikes, nil)
+		q3.SetField("posts.comments.likes")
+
+		q4 := query.NewMatchQuery("AI")
+		q4.SetField("posts.title")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2, q3, q4})
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Tech Insights has AI post in April 2025 with Jane comment having 1 like
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "0"
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 10: Nested Conjunction with Text Analysis
+	t.Run("NestedTextAnalysis", func(t *testing.T) {
+		// Find posts where specific text appears in comments by specific authors
+		q1 := query.NewMatchQuery("scary")
+		q1.SetField("posts.comments.text")
+
+		q2 := query.NewMatchQuery("Lina")
+		q2.SetField("posts.comments.author")
+
+		// Also ensure it's from a 2024 post
+		q3 := query.NewDateRangeStringQuery("2024-01-01", "2024-12-31")
+		q3.SetField("posts.published_date")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2, q3})
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Future Scope has 2024 post with Lina's "scary" comment
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "2"
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 11: Cross-document comparison - Multiple documents matching different criteria
+	t.Run("CrossDocumentComparison", func(t *testing.T) {
+		// Find all documents with 2025 posts that have any comments
+		q1 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
+		q1.SetField("posts.published_date")
+
+		q2 := query.NewWildcardQuery("*") // Any author (wildcard-like behavior)
+		q2.SetField("posts.comments.author")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// All 3 documents have posts from 2025
+		if len(res.Hits) != 3 {
+			t.Fatalf("expected 3 hits, got %d", len(res.Hits))
+		}
+	})
+
+	// Test 12: Nested Conjunction with Range Queries
+	t.Run("NestedRangeQueries", func(t *testing.T) {
+		// Find documents with posts from July 2025 AND comments with likes between 5-10
+		q1 := query.NewDateRangeStringQuery("2025-07-01", "2025-07-31")
+		q1.SetField("posts.published_date")
+
+		minLikes := 5.0
+		maxLikes := 10.0
+		q2 := query.NewNumericRangeQuery(&minLikes, &maxLikes)
+		q2.SetField("posts.comments.likes")
+
+		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Future Scope has July 2025 post (Fusion Energy) with Sam's comment having 6 likes
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "2"
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 13: Complex Boolean Logic within Nested Context
+	t.Run("ComplexBooleanNested", func(t *testing.T) {
+		// Find documents where:
+		// (Author is Jane OR Tom) AND (likes >= 3) AND (post from 2025)
+		janeQuery := query.NewMatchQuery("Jane")
+		janeQuery.SetField("posts.comments.author")
+		tomQuery := query.NewMatchQuery("Tom")
+		tomQuery.SetField("posts.comments.author")
+		authorDisjunction := query.NewDisjunctionQuery([]query.Query{janeQuery, tomQuery})
+
+		minLikes := 3.0
+		likesQuery := query.NewNumericRangeQuery(&minLikes, nil)
+		likesQuery.SetField("posts.comments.likes")
+
+		dateQuery := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
+		dateQuery.SetField("posts.published_date")
+
+		mainConjunction := query.NewConjunctionQuery([]query.Query{authorDisjunction, likesQuery, dateQuery})
+
+		req := NewSearchRequest(mainConjunction)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find Tech Insights (Jane with 5 likes and Tom with 3 likes in 2025 posts)
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
+		}
+		expectedDocID := "0"
+		if res.Hits[0].ID != expectedDocID {
+			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
+		}
+	})
+
+	// Test 14: Test combining nested query with non-nested root field query
+	t.Run("NestedWithRootField", func(t *testing.T) {
+		// Root field query (non-nested)
+		rootQuery := query.NewMatchQuery("Tech")
+		rootQuery.SetField("title")
+
+		// Nested field query
+		nestedQuery := query.NewMatchQuery("Jane")
+		nestedQuery.SetField("posts.comments.author")
+
+		// Combine both
+		cq := query.NewConjunctionQuery([]query.Query{rootQuery, nestedQuery})
+
+		req := NewSearchRequest(cq)
+		res, err := idx.Search(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Should find "Tech Insights" document with Jane's comments
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hits for mixed nested/root query, got %d", len(res.Hits))
+		}
+	})
+}
+
+func TestNestedPrefixes(t *testing.T) {
+	t.Run("NoNestedFields", func(t *testing.T) {
+		imap := mapping.NewIndexMapping()
+
+		// Add some regular field mappings
+		englishMapping := NewTextFieldMapping()
+		englishMapping.Analyzer = en.AnalyzerName
+		imap.DefaultMapping.AddFieldMappingsAt("title", englishMapping)
+		imap.DefaultMapping.AddFieldMappingsAt("description", englishMapping)
+
+		prefixes := imap.NestedPrefixes()
+		if prefixes != nil {
+			t.Fatal("expected nil for mapping with no nested fields")
+		}
+	})
+
+	t.Run("SingleNestedField", func(t *testing.T) {
+		imap := mapping.NewIndexMapping()
+
+		englishMapping := NewTextFieldMapping()
+		englishMapping.Analyzer = en.AnalyzerName
+
+		// Create a nested mapping
+		userMapping := NewDocumentMapping()
+		userMapping.AddFieldMappingsAt("name", englishMapping)
+		userMapping.AddFieldMappingsAt("email", englishMapping)
+		userMapping.Nested = true
+
+		imap.DefaultMapping.AddSubDocumentMapping("user", userMapping)
+
+		prefixes := imap.NestedPrefixes()
+		if prefixes == nil {
+			t.Fatal("expected non-nil result for mapping with nested fields")
+		}
+
+		// Should contain "user" prefix
+		if _, exists := prefixes["user"]; !exists {
+			t.Errorf("expected 'user' in nested prefixes, got %v", prefixes)
+		}
+
+		if len(prefixes) != 1 {
+			t.Errorf("expected 1 nested prefix, got %d: %v", len(prefixes), prefixes)
+		}
+	})
+
+	t.Run("MultipleNestedFields", func(t *testing.T) {
+		imap := mapping.NewIndexMapping()
+
+		englishMapping := NewTextFieldMapping()
+		englishMapping.Analyzer = en.AnalyzerName
+		numericMapping := NewNumericFieldMapping()
+
+		// Create multiple nested mappings
+		userMapping := NewDocumentMapping()
+		userMapping.AddFieldMappingsAt("name", englishMapping)
+		userMapping.Nested = true
+
+		productMapping := NewDocumentMapping()
+		productMapping.AddFieldMappingsAt("title", englishMapping)
+		productMapping.AddFieldMappingsAt("price", numericMapping)
+		productMapping.Nested = true
+
+		imap.DefaultMapping.AddSubDocumentMapping("user", userMapping)
+		imap.DefaultMapping.AddSubDocumentMapping("products", productMapping)
+
+		prefixes := imap.NestedPrefixes()
+		if prefixes == nil {
+			t.Fatal("expected non-nil result for mapping with nested fields")
+		}
+
+		expectedPrefixes := map[string]struct{}{
+			"user":     {},
+			"products": {},
+		}
+
+		if len(prefixes) != len(expectedPrefixes) {
+			t.Errorf("expected %d nested prefixes, got %d: %v", len(expectedPrefixes), len(prefixes), prefixes)
+		}
+
+		for prefix := range expectedPrefixes {
+			if _, exists := prefixes[prefix]; !exists {
+				t.Errorf("expected '%s' in nested prefixes, got %v", prefix, prefixes)
+			}
+		}
+	})
+
+	t.Run("DeeplyNestedFields", func(t *testing.T) {
+		imap := mapping.NewIndexMapping()
+
+		englishMapping := NewTextFieldMapping()
+		englishMapping.Analyzer = en.AnalyzerName
+		numericMapping := NewNumericFieldMapping()
+		dateTimeMapping := NewDateTimeFieldMapping()
+
+		// Create deeply nested structure: posts -> comments
+		commentMapping := NewDocumentMapping()
+		commentMapping.AddFieldMappingsAt("author", englishMapping)
+		commentMapping.AddFieldMappingsAt("text", englishMapping)
+		commentMapping.AddFieldMappingsAt("likes", numericMapping)
+		commentMapping.Nested = true
+
+		postsMapping := NewDocumentMapping()
+		postsMapping.AddFieldMappingsAt("title", englishMapping)
+		postsMapping.AddFieldMappingsAt("published_date", dateTimeMapping)
+		postsMapping.AddSubDocumentMapping("comments", commentMapping)
+		postsMapping.Nested = true
+
+		imap.DefaultMapping.AddFieldMappingsAt("title", englishMapping)
+		imap.DefaultMapping.AddSubDocumentMapping("posts", postsMapping)
+
+		prefixes := imap.NestedPrefixes()
+		if prefixes == nil {
+			t.Fatal("expected non-nil result for mapping with nested fields")
+		}
+
+		// With correct logic, we should only get "posts" as prefix
+		// because posts.* fields are covered by the "posts" prefix
+		expectedPrefixes := map[string]struct{}{
+			"posts": {},
+		}
+
+		if len(prefixes) != len(expectedPrefixes) {
+			t.Errorf("expected %d nested prefixes, got %d: %v", len(expectedPrefixes), len(prefixes), prefixes)
+		}
+
+		for prefix := range expectedPrefixes {
+			if _, exists := prefixes[prefix]; !exists {
+				t.Errorf("expected '%s' in nested prefixes, got %v", prefix, prefixes)
+			}
+		}
+
+		// Test that we can find the right prefixes for field matching
+		testFields := []string{
+			"posts.title",
+			"posts.comments.author",
+			"posts.comments.text",
+			"posts.comments.likes",
+		}
+
+		// Check that our prefixes work with IntersectsPrefix
+		fieldSet := search.NewFieldSet()
+		for _, field := range testFields {
+			fieldSet.Add(field)
+		}
+
+		if !fieldSet.IntersectsPrefix(prefixes) {
+			t.Errorf("expected field set %v to intersect with nested prefixes %v", testFields, prefixes)
+		}
+	})
+
+	t.Run("TypeMappingNestedFields", func(t *testing.T) {
+		imap := mapping.NewIndexMapping()
+
+		englishMapping := NewTextFieldMapping()
+		englishMapping.Analyzer = en.AnalyzerName
+
+		// Create nested mapping in type mapping
+		userMapping := NewDocumentMapping()
+		nestedAddressMapping := NewDocumentMapping()
+		nestedAddressMapping.AddFieldMappingsAt("street", englishMapping)
+		nestedAddressMapping.AddFieldMappingsAt("city", englishMapping)
+		nestedAddressMapping.Nested = true
+
+		userMapping.AddFieldMappingsAt("name", englishMapping)
+		userMapping.AddSubDocumentMapping("address", nestedAddressMapping)
+
+		imap.AddDocumentMapping("user", userMapping)
+
+		prefixes := imap.NestedPrefixes()
+		if prefixes == nil {
+			t.Fatal("expected non-nil result for type mapping with nested fields")
+		}
+
+		// Should contain "address" prefix
+		if _, exists := prefixes["address"]; !exists {
+			t.Errorf("expected 'address' in nested prefixes, got %v", prefixes)
+		}
+	})
+
+	t.Run("DisabledMappingsIgnored", func(t *testing.T) {
+		imap := mapping.NewIndexMapping()
+
+		englishMapping := NewTextFieldMapping()
+		englishMapping.Analyzer = en.AnalyzerName
+
+		// Create nested mapping but disable it
+		disabledMapping := NewDocumentMapping()
+		disabledMapping.AddFieldMappingsAt("name", englishMapping)
+		disabledMapping.Nested = true
+		disabledMapping.Enabled = false
+
+		// Create enabled nested mapping
+		enabledMapping := NewDocumentMapping()
+		enabledMapping.AddFieldMappingsAt("title", englishMapping)
+		enabledMapping.Nested = true
+		enabledMapping.Enabled = true
+
+		imap.AddDocumentMapping("disabled", disabledMapping)
+		imap.DefaultMapping.AddSubDocumentMapping("enabled", enabledMapping)
+
+		prefixes := imap.NestedPrefixes()
+		if prefixes == nil {
+			t.Fatal("expected non-nil result for mapping with enabled nested fields")
+		}
+
+		// Should only contain "enabled" prefix, not "disabled"
+		if _, exists := prefixes["disabled"]; exists {
+			t.Errorf("expected disabled mapping to be ignored, but found 'disabled' in %v", prefixes)
+		}
+
+		if _, exists := prefixes["enabled"]; !exists {
+			t.Errorf("expected 'enabled' in nested prefixes, got %v", prefixes)
+		}
+	})
+
+	t.Run("MixedNestedAndRegularFields", func(t *testing.T) {
+		imap := mapping.NewIndexMapping()
+
+		englishMapping := NewTextFieldMapping()
+		englishMapping.Analyzer = en.AnalyzerName
+
+		// Mix of nested and regular fields
+		regularMapping := NewDocumentMapping()
+		regularMapping.AddFieldMappingsAt("description", englishMapping)
+		regularMapping.Nested = false // explicitly not nested
+
+		nestedMapping := NewDocumentMapping()
+		nestedMapping.AddFieldMappingsAt("content", englishMapping)
+		nestedMapping.Nested = true
+
+		imap.DefaultMapping.AddFieldMappingsAt("title", englishMapping)
+		imap.DefaultMapping.AddSubDocumentMapping("regular", regularMapping)
+		imap.DefaultMapping.AddSubDocumentMapping("nested", nestedMapping)
+
+		prefixes := imap.NestedPrefixes()
+		if prefixes == nil {
+			t.Fatal("expected non-nil result for mapping with nested fields")
+		}
+
+		// Should only contain "nested" prefix
+		if len(prefixes) != 1 {
+			t.Errorf("expected 1 nested prefix, got %d: %v", len(prefixes), prefixes)
+		}
+
+		if _, exists := prefixes["nested"]; !exists {
+			t.Errorf("expected 'nested' in nested prefixes, got %v", prefixes)
+		}
+
+		if _, exists := prefixes["regular"]; exists {
+			t.Errorf("expected regular mapping to not be included, but found 'regular' in %v", prefixes)
+		}
+	})
+}

@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/util"
 )
@@ -44,6 +45,7 @@ type DocumentMapping struct {
 	Dynamic              bool                        `json:"dynamic"`
 	Properties           map[string]*DocumentMapping `json:"properties,omitempty"`
 	Fields               []*FieldMapping             `json:"fields,omitempty"`
+	Nested               bool                        `json:"nested,omitempty"`
 	DefaultAnalyzer      string                      `json:"default_analyzer,omitempty"`
 	DefaultSynonymSource string                      `json:"default_synonym_source,omitempty"`
 
@@ -316,6 +318,11 @@ func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
+		case "nested":
+			err := util.UnmarshalJSON(v, &dm.Nested)
+			if err != nil {
+				return err
+			}
 		case "default_analyzer":
 			err := util.UnmarshalJSON(v, &dm.DefaultAnalyzer)
 			if err != nil {
@@ -438,10 +445,19 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 			}
 		}
 	case reflect.Slice, reflect.Array:
+		subDocMapping, _ := dm.documentMappingForPathElements(path)
+		nestedSubObjects := subDocMapping != nil && subDocMapping.Nested
 		for i := 0; i < val.Len(); i++ {
 			if val.Index(i).CanInterface() {
 				fieldVal := val.Index(i).Interface()
-				dm.processProperty(fieldVal, path, append(indexes, uint64(i)), context)
+				if nestedSubObjects {
+					nestedDocument := document.NewDocument(fmt.Sprintf("%s_$%s_$%d", context.doc.ID(), encodePath(path), i))
+					nestedContext := context.im.newWalkContext(nestedDocument, dm)
+					dm.processProperty(fieldVal, path, append(indexes, uint64(i)), nestedContext)
+					context.doc.AddNestedDocument(nestedDocument)
+				} else {
+					dm.processProperty(fieldVal, path, append(indexes, uint64(i)), context)
+				}
 			}
 		}
 	case reflect.Ptr:
