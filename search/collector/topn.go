@@ -90,7 +90,7 @@ const CheckDoneEvery = uint64(1024)
 // skipping over the first 'skip' hits
 // ordering hits by the provided sort order
 func NewTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector {
-	return newTopNCollector(size, skip, sort)
+	return newTopNCollector(size, skip, sort, nil)
 }
 
 // NewTopNCollectorAfter builds a collector to find the top 'size' hits
@@ -98,7 +98,7 @@ func NewTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector 
 // ordering hits by the provided sort order
 // starting after the provided 'after' sort values
 func NewTopNCollectorAfter(size int, sort search.SortOrder, after []string) *TopNCollector {
-	rv := newTopNCollector(size, 0, sort)
+	rv := newTopNCollector(size, 0, sort, nil)
 	rv.searchAfter = createSearchAfterDocument(sort, after)
 	return rv
 }
@@ -109,7 +109,7 @@ func NewTopNCollectorAfter(size int, sort search.SortOrder, after []string) *Top
 // while ensuring the nested documents are handled correctly
 // (i.e. parent document is returned instead of nested document)
 func NewNestedTopNCollector(size int, skip int, sort search.SortOrder, nr index.NestedReader) *TopNCollector {
-	return newNestedTopNCollector(size, skip, sort, nr)
+	return newTopNCollector(size, skip, sort, nr)
 }
 
 // NewNestedTopNCollectorAfter builds a collector to find the top 'size' hits
@@ -119,37 +119,21 @@ func NewNestedTopNCollector(size int, skip int, sort search.SortOrder, nr index.
 // while ensuring the nested documents are handled correctly
 // (i.e. parent document is returned instead of nested document)
 func NewNestedTopNCollectorAfter(size int, sort search.SortOrder, after []string, nr index.NestedReader) *TopNCollector {
-	rv := newNestedTopNCollector(size, 0, sort, nr)
+	rv := newTopNCollector(size, 0, sort, nr)
 	rv.searchAfter = createSearchAfterDocument(sort, after)
 	return rv
 }
 
-func newTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector {
+func newTopNCollector(size int, skip int, sort search.SortOrder, nr index.NestedReader) *TopNCollector {
 	hc := &TopNCollector{size: size, skip: skip, sort: sort}
 
 	hc.store = getOptimalCollectorStore(size, skip, func(i, j *search.DocumentMatch) int {
 		return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
 	})
 
-	// these lookups traverse an interface, so do once up-front
-	if sort.RequiresDocID() {
-		hc.needDocIds = true
+	if nr != nil {
+		hc.nestedStore = newStoreNested(nr)
 	}
-	hc.neededFields = sort.RequiredFields()
-	hc.cachedScoring = sort.CacheIsScore()
-	hc.cachedDesc = sort.CacheDescending()
-
-	return hc
-}
-
-func newNestedTopNCollector(size int, skip int, sort search.SortOrder, nr index.NestedReader) *TopNCollector {
-	hc := &TopNCollector{size: size, skip: skip, sort: sort}
-
-	hc.store = getOptimalCollectorStore(size, skip, func(i, j *search.DocumentMatch) int {
-		return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
-	})
-
-	hc.nestedStore = newStoreNested(nr)
 
 	// these lookups traverse an interface, so do once up-front
 	if sort.RequiresDocID() {
@@ -369,7 +353,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 
 	if hc.nestedStore != nil {
-		var count int
+		var count uint64
 		err := hc.nestedStore.VisitRoots(func(doc *search.DocumentMatch) error {
 			if err := hc.adjustDocumentMatch(searchContext, reader, doc); err != nil {
 				return err
@@ -386,7 +370,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		if err != nil {
 			return err
 		}
-		hc.total = uint64(count)
+		hc.total = count
 	}
 
 	if hc.knnHits != nil {

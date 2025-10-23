@@ -455,9 +455,9 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 					nestedContext := context.im.newWalkContext(nestedDocument, dm)
 					dm.processProperty(fieldVal, path, append(indexes, uint64(i)), nestedContext)
 					context.doc.AddNestedDocument(nestedDocument)
-					continue
+				} else {
+					dm.processProperty(fieldVal, path, append(indexes, uint64(i)), context)
 				}
-				dm.processProperty(fieldVal, path, append(indexes, uint64(i)), context)
 			}
 		}
 	case reflect.Ptr:

@@ -57,6 +57,12 @@ func (expl *Explanation) Size() int {
 
 const MergedExplMessage = "sum of merged explanations:"
 
+// MergeExpl merges two explanations into one.
+// If either explanation is nil, the other is returned.
+// If the first explanation is already a merged explanation,
+// the second explanation is appended to its children.
+// Otherwise, a new merged explanation is created
+// with the two explanations as its children.
 func MergeExpl(first, second *Explanation) *Explanation {
 	if first == nil {
 		return second
@@ -69,12 +75,6 @@ func MergeExpl(first, second *Explanation) *Explanation {
 		first.Value += second.Value
 		first.Children = append(first.Children, second)
 		return first
-	}
-	if second.Message == MergedExplMessage {
-		// reuse second explanation as the merged one
-		second.Value += first.Value
-		second.Children = append(second.Children, first)
-		return second
 	}
 	// create a new explanation to hold the merged one
 	rv := &Explanation{

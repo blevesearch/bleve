@@ -1238,8 +1238,8 @@ func (i *IndexSnapshot) Ancestors(ID index.IndexInternalID) ([]index.IndexIntern
 	rv[0] = index.NewIndexInternalID(nil, ldoc+globalOffset)
 
 	// then all ancestors shifted by +1
-	for j := 1; j < len(ancestors)+1; j++ {
-		rv[j] = index.NewIndexInternalID(nil, ancestors[j-1]+globalOffset)
+	for j := 0; j < len(ancestors); j++ {
+		rv[j+1] = index.NewIndexInternalID(nil, ancestors[j]+globalOffset)
 	}
 	return rv, nil
 }

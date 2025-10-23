@@ -223,7 +223,7 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 	}
 
 	if hc.nestedStore != nil {
-		var count int
+		var count uint64
 		err := hc.nestedStore.VisitRoots(func(doc *search.DocumentMatch) error {
 			// process the root document
 			if err := dmHandler(doc); err != nil {
@@ -235,7 +235,7 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 		if err != nil {
 			return err
 		}
-		hc.total = uint64(count)
+		hc.total = count
 	}
 
 	// help finalize/flush the results in case

@@ -144,7 +144,7 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 	}
 
 	if ec.nestedStore != nil {
-		var count int
+		var count uint64
 		err := ec.nestedStore.VisitRoots(func(doc *search.DocumentMatch) error {
 			// process the root document
 			if err := dmHandler(doc); err != nil {
@@ -156,7 +156,7 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 		if err != nil {
 			return err
 		}
-		ec.total = uint64(count)
+		ec.total = count
 	}
 
 	// help finalize/flush the results in case

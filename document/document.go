@@ -31,7 +31,7 @@ func init() {
 }
 
 type Document struct {
-	id               string      `json:"id"`
+	id               string
 	Fields           []Field     `json:"fields"`
 	NestedDocuments  []*Document `json:"nested_documents"`
 	CompositeFields  []*CompositeField
