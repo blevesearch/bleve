@@ -42,3 +42,10 @@ func validateFieldMapping(field *FieldMapping, path []string,
 	fieldAliasCtx map[string]*FieldMapping) error {
 	return validateFieldType(field)
 }
+
+// -----------------------------------------------------------------------------
+// vector source functions
+
+func (im *IndexMappingImpl) VectorSources() []string {
+	return []string{"vector indexing is not implemented"}
+}
