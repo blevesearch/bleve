@@ -58,6 +58,7 @@ type IndexMapping interface {
 	AnalyzerNamed(name string) analysis.Analyzer
 
 	FieldMappingForPath(path string) FieldMapping
+	VectorSources() []string
 }
 
 // A SynonymMapping extends the IndexMapping interface to provide
