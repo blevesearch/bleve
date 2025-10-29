@@ -94,6 +94,10 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	if err != nil {
 		return nil, err
 	}
+	fileReader, err := util.NewFileReader(fileWriter.Id())
+	if err != nil {
+		return nil, err
+	}
 
 	rv := indexImpl{
 		path:   path,
@@ -101,6 +105,7 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 		m:      mapping,
 		meta:   newIndexMeta(indexType, kvstore, kvconfig),
 		writer: fileWriter,
+		reader: fileReader,
 	}
 	rv.stats = &IndexStat{i: &rv}
 	// at this point there is hope that we can be successful, so save index meta
@@ -163,11 +168,6 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	rv.stats = &IndexStat{i: rv}
 
 	rv.meta, rv.reader, err = openIndexMeta(path)
-	if err != nil {
-		return nil, err
-	}
-
-	rv.writer, err = util.NewFileWriterWithId(rv.reader.Id())
 	if err != nil {
 		return nil, err
 	}

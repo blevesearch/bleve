@@ -71,8 +71,12 @@ func openIndexMeta(path string) (*indexMeta, *util.FileReader, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		pos -= len(writerId)
-		err = util.UnmarshalJSON(metaBytes[0:pos], &im)
+
+		buf, err := fileReader.Process(metaBytes[0:pos])
+		if err != nil {
+			return nil, nil, err
+		}
+		err = util.UnmarshalJSON(buf, &im)
 		if err != nil {
 			return nil, nil, ErrorIndexMetaCorrupt
 		}

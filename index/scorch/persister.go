@@ -677,7 +677,11 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segP
 		val := make([]byte, 8)
 		bytesWritten := atomic.LoadUint64(&snapshot.parent.stats.TotBytesWrittenAtIndexTime)
 		binary.LittleEndian.PutUint64(val, bytesWritten)
-		err = internalBucket.Put(util.TotBytesWrittenKey, val)
+		buf, err := writer.Process(val)
+		if err != nil {
+			return nil, nil, err
+		}
+		err = internalBucket.Put(util.TotBytesWrittenKey, buf)
 		if err != nil {
 			return nil, nil, err
 		}
