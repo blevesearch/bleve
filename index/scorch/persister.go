@@ -769,7 +769,11 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segP
 			if err != nil {
 				return nil, nil, err
 			}
-			err = snapshotSegmentBucket.Put(util.BoltUpdatedFieldsKey, b)
+			updatedFieldsBytes, err := writer.Process(b)
+			if err != nil {
+				return nil, nil, err
+			}
+			err = snapshotSegmentBucket.Put(util.BoltUpdatedFieldsKey, updatedFieldsBytes)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -1067,7 +1071,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket, reader *util.FileReader
 	if deletedBytes != nil {
 		deletedBytes, err = reader.Process(deletedBytes)
 		if err != nil {
-			_ = segment.Close()
+			_ = seg.Close()
 			return nil, err
 		}
 		deletedBitmap := roaring.NewBitmap()
@@ -1086,7 +1090,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket, reader *util.FileReader
 		var statsMap map[string]map[string]uint64
 		statBytes, err = reader.Process(statBytes)
 		if err != nil {
-			_ = segment.Close()
+			_ = seg.Close()
 			return nil, err
 		}
 		err := json.Unmarshal(statBytes, &statsMap)
@@ -1100,8 +1104,12 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket, reader *util.FileReader
 	updatedFieldBytes := segmentBucket.Get(util.BoltUpdatedFieldsKey)
 	if updatedFieldBytes != nil {
 		var updatedFields map[string]*index.UpdateFieldInfo
-
-		err := json.Unmarshal(updatedFieldBytes, &updatedFields)
+		updatedFieldBytes, err := reader.Process(updatedFieldBytes)
+		if err != nil {
+			_ = seg.Close()
+			return nil, err
+		}
+		err = json.Unmarshal(updatedFieldBytes, &updatedFields)
 		if err != nil {
 			_ = seg.Close()
 			return nil, fmt.Errorf("error reading updated field bytes: %v", err)

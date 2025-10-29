@@ -988,6 +988,27 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 				continue
 			}
 			snapshot := snapshots.Bucket(k)
+			metaBucket := snapshot.Bucket(util.BoltMetaDataKey)
+			if metaBucket == nil {
+				return fmt.Errorf("meta-data bucket missing")
+			}
+
+			writer, err := util.NewFileWriter()
+			if err != nil {
+				return fmt.Errorf("unable to load correct writer: %v", err)
+			}
+
+			readerId := string(metaBucket.Get(boltMetaDataWriterIdKey))
+			reader, err := util.NewFileReader(readerId)
+			if err != nil {
+				return fmt.Errorf("unable to load correct reader: %v", err)
+			}
+
+			err = metaBucket.Put(util.BoltMetaDataWriterIdKey, []byte(writer.Id()))
+			if err != nil {
+				return err
+			}
+
 			cc := snapshot.Cursor()
 			for kk, _ := cc.First(); kk != nil; kk, _ = cc.Next() {
 				if kk[0] == util.BoltInternalKey[0] {
@@ -995,19 +1016,56 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 					if internalBucket == nil {
 						return fmt.Errorf("segment key, but bucket missing %x", kk)
 					}
-					err = internalBucket.Put(util.MappingInternalKey, mappingBytes)
+
+					internalVals := make(map[string][]byte)
+					err := internalBucket.ForEach(func(key []byte, val []byte) error {
+						copiedVal, err := reader.Process(append([]byte(nil), val...))
+						if err != nil {
+							return err
+						}
+						internalVals[string(key)] = copiedVal
+						return nil
+					})
 					if err != nil {
 						return err
+					}
+
+					for key, val := range internalVals {
+						valBytes, err := writer.Process(val)
+						if err != nil {
+							return err
+						}
+						if key == string(util.MappingInternalKey) {
+							buf, err := writer.Process(mappingBytes)
+							if err != nil {
+								return err
+							}
+							err = internalBucket.Put([]byte(key), buf)
+							if err != nil {
+								return err
+							}
+						} else {
+							err = internalBucket.Put([]byte(key), valBytes)
+							if err != nil {
+								return err
+							}
+						}
 					}
 				} else if kk[0] != util.BoltMetaDataKey[0] {
 					segmentBucket := snapshot.Bucket(kk)
 					if segmentBucket == nil {
 						return fmt.Errorf("segment key, but bucket missing %x", kk)
 					}
+
 					var updatedFields map[string]*index.UpdateFieldInfo
 					updatedFieldBytes := segmentBucket.Get(util.BoltUpdatedFieldsKey)
 					if updatedFieldBytes != nil {
-						err := json.Unmarshal(updatedFieldBytes, &updatedFields)
+						buf, err := reader.Process(updatedFieldBytes)
+						if err != nil {
+							return err
+						}
+
+						err = json.Unmarshal(buf, &updatedFields)
 						if err != nil {
 							return fmt.Errorf("error reading updated field bytes: %v", err)
 						}
@@ -1030,9 +1088,49 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 					if err != nil {
 						return err
 					}
-					err = segmentBucket.Put(util.BoltUpdatedFieldsKey, b)
+					buf, err := writer.Process(b)
 					if err != nil {
 						return err
+					}
+					err = segmentBucket.Put(util.BoltUpdatedFieldsKey, buf)
+					if err != nil {
+						return err
+					}
+
+					deletedBytes := segmentBucket.Get(util.BoltDeletedKey)
+					if deletedBytes != nil {
+						deletedBytes, err = reader.Process(deletedBytes)
+						if err != nil {
+							return err
+						}
+
+						buf, err := writer.Process(deletedBytes)
+						if err != nil {
+							return err
+						}
+
+						err = segmentBucket.Put(util.BoltDeletedKey, buf)
+						if err != nil {
+							return err
+						}
+					}
+
+					statBytes := segmentBucket.Get(util.BoltStatsKey)
+					if statBytes != nil {
+						statBytes, err = reader.Process(statBytes)
+						if err != nil {
+							return err
+						}
+
+						buf, err := writer.Process(statBytes)
+						if err != nil {
+							return err
+						}
+
+						err = segmentBucket.Put(util.BoltStatsKey, buf)
+						if err != nil {
+							return err
+						}
 					}
 				}
 			}
