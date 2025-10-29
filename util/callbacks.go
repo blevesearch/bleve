@@ -15,12 +15,6 @@ var WriterCallbackGetter = func() (string, func(data, counter []byte) ([]byte, e
 	}, nil
 }
 
-var WriterCallbackGetterWithId = func(cbId string) (func(data, counter []byte) ([]byte, error), error) {
-	return func(data, counter []byte) ([]byte, error) {
-		return data, nil
-	}, nil
-}
-
 var ReaderCallbackGetter = func(cbId string) (func(data []byte) ([]byte, error), error) {
 	return func(data []byte) ([]byte, error) {
 		return data, nil
@@ -32,109 +26,80 @@ var CounterGetter = func() ([]byte, error) {
 }
 
 func init() {
-	// Variables used for development and testing purposes
+	// // Variables used for development and testing purposes
 	// encryptionKey := make([]byte, 32)
 	// if _, err := rand.Read(encryptionKey); err != nil {
 	// 	panic("failed to generate AES key: " + err.Error())
 	// }
 
-	// latestCallbackId = "exampleCallback"
-	// keys[latestCallbackId] = encryptionKey
+	// key := make([]byte, 32)
+	// keyId := "test-key-id"
 
-	// latestCallbackId = "exampleCallback"
-
-	// WriterCallbackGetter = func() (string, func(data, counter []byte) ([]byte, error), error) {
-	// 	cbLock.RLock()
-	// 	if latestCallbackId == "" {
-	// 		return "", func(data []byte, _ []byte) ([]byte, error) {
-	// 			return data, nil
-	// 		}, nil
-	// 	}
-	// 	keyCopy := make([]byte, 32)
-	// 	keyIdCopy := latestCallbackId
-	// 	if key, exists := keys[latestCallbackId]; exists {
-	// 		copy(keyCopy, key)
-	// 	}
-	// 	cbLock.RUnlock()
-
-	// 	block, err := aes.NewCipher(keyCopy)
-	// 	if err != nil {
-	// 		return "", nil, err
-	// 	}
-	// 	aesgcm, err := cipher.NewGCM(block)
-	// 	if err != nil {
-	// 		return "", nil, err
-	// 	}
-
-	// 	return keyIdCopy, func(data, counter []byte) ([]byte, error) {
-	// 		ciphertext := aesgcm.Seal(nil, counter, data, nil)
-	// 		result := append(ciphertext, counter...)
-	// 		return result, nil
-	// 	}, nil
+	// if _, err := rand.Read(key); err != nil {
+	// 	panic("Failed to generate random key: " + err.Error())
 	// }
 
-	// ReaderCallbackGetter = func(cbId string) (func(data []byte) ([]byte, error), error) {
-	// 	cbLock.RLock()
-	// 	keyCopy := make([]byte, 32)
-	// 	if key, exists := keys[cbId]; exists {
-	// 		copy(keyCopy, key)
-	// 	}
-	// 	cbLock.RUnlock()
+	// block, err := aes.NewCipher(key)
+	// if err != nil {
+	// 	panic("Failed to create AES cipher: " + err.Error())
+	// }
 
-	// 	if len(keyCopy) == 0 {
-	// 		return func(data []byte) ([]byte, error) {
-	// 			return data, nil
-	// 		}, nil
-	// 	} else {
-	// 		block, err := aes.NewCipher(keyCopy)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	// 		aesgcm, err := cipher.NewGCM(block)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-
-	// 		return func(data []byte) ([]byte, error) {
-	// 			if len(data) < 12 {
-	// 				return nil, fmt.Errorf("ciphertext too short")
-	// 			}
-
-	// 			nonce := data[len(data)-12:]
-	// 			ciphertext := data[:len(data)-12]
-
-	// 			plaintext, err := aesgcm.Open(nil, nonce, ciphertext, nil)
-	// 			if err != nil {
-	// 				return nil, fmt.Errorf("decryption failed: %w", err)
-	// 			}
-
-	// 			return plaintext, nil
-	// 		}, nil
-	// 	}
+	// aesgcm, err := cipher.NewGCM(block)
+	// if err != nil {
+	// 	panic("Failed to create AES GCM: " + err.Error())
 	// }
 
 	// CounterGetter = func() ([]byte, error) {
-	// 	nonce := make([]byte, 12) // GCM standard
-	// 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+	// 	counter := make([]byte, 12)
+	// 	if _, err := rand.Read(counter); err != nil {
 	// 		return nil, err
 	// 	}
-	// 	return nonce, nil
+	// 	return counter, nil
+	// }
+
+	// writerCallback := func(data, counter []byte) ([]byte, error) {
+	// 	ciphertext := aesgcm.Seal(nil, counter, data, nil)
+	// 	result := append(ciphertext, counter...)
+
+	// 	// For testing purposes only
+	// 	result = append(append([]byte("EncStart"), result...), []byte("EncEnd")...)
+
+	// 	return result, nil
+	// }
+
+	// readerCallback := func(data []byte) ([]byte, error) {
+	// 	// For testing purposes only
+	// 	data = bytes.TrimPrefix(data, []byte("EncStart"))
+	// 	data = bytes.TrimSuffix(data, []byte("EncEnd"))
+
+	// 	if len(data) < 12 {
+	// 		return nil, fmt.Errorf("ciphertext too short")
+	// 	}
+
+	// 	counter := data[len(data)-12:]
+	// 	ciphertext := data[:len(data)-12]
+	// 	plaintext, err := aesgcm.Open(nil, counter, ciphertext, nil)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	return plaintext, nil
+	// }
+
+	// WriterCallbackGetter = func() (string, func(data []byte, counter []byte) ([]byte, error), error) {
+	// 	return keyId, writerCallback, nil
+	// }
+
+	// ReaderCallbackGetter = func(id string) (func(data []byte) ([]byte, error), error) {
+	// 	if id != keyId {
+	// 		return nil, fmt.Errorf("unknown callback ID: %s", id)
+	// 	}
+	// 	return readerCallback, nil
 	// }
 
 	zapv16.WriterCallbackGetter = WriterCallbackGetter
 	zapv16.ReaderCallbackGetter = ReaderCallbackGetter
 	zapv16.CounterGetter = CounterGetter
 }
-
-// Function used for development and testing purposes
-// func SetNewCallback(callbackId string, key []byte) {
-// 	if callbackId != "" {
-// 		cbLock.Lock()
-// 		keys[callbackId] = key
-// 		latestCallbackId = callbackId
-// 		cbLock.Unlock()
-// 	}
-// }
 
 type FileWriter struct {
 	writerCB func(data, counter []byte) ([]byte, error)
@@ -155,24 +120,6 @@ func NewFileWriter() (*FileWriter, error) {
 	}
 
 	return rv, nil
-}
-
-func NewFileWriterWithId(cbId string) (*FileWriter, error) {
-	writerCB, err := WriterCallbackGetterWithId(cbId)
-	if err != nil {
-		return nil, err
-	}
-
-	counter, err := CounterGetter()
-	if err != nil {
-		return nil, err
-	}
-
-	return &FileWriter{
-		writerCB: writerCB,
-		counter:  counter,
-		id:       cbId,
-	}, nil
 }
 
 func (w *FileWriter) Process(data []byte) ([]byte, error) {

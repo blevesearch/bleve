@@ -36,7 +36,10 @@ func TestIndexMeta(t *testing.T) {
 		t.Errorf("expected error, got nil")
 	}
 
-	writer := &util.FileWriter{}
+	writer, err := util.NewFileWriter()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// create meta
 	im := &indexMeta{Storage: "boltdb"}
 	err = im.Save(testIndexPath, writer)
