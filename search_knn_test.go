@@ -1881,7 +1881,7 @@ func TestIndexUpdateVector(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res1.Hits) != 3 {
-		t.Fatalf("Expected 3 hits, got %d\n", len(res1.Hits))
+		t.Fatalf("Expected 3 hits, got %d", len(res1.Hits))
 	}
 	q2 := NewSearchRequest(NewMatchNoneQuery())
 	q2.AddKNN("b", []float32{1, 2, 3, 4}, 3, 1.0)
@@ -1890,7 +1890,7 @@ func TestIndexUpdateVector(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res2.Hits) != 0 {
-		t.Fatalf("Expected 0 hits, got %d\n", len(res2.Hits))
+		t.Fatalf("Expected 0 hits, got %d", len(res2.Hits))
 	}
 	q3 := NewSearchRequest(NewMatchNoneQuery())
 	q3.AddKNN("c", []float32{1, 2, 3, 4}, 3, 1.0)
@@ -1899,7 +1899,7 @@ func TestIndexUpdateVector(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res3.Hits) != 3 {
-		t.Fatalf("Expected 3 hits, got %d\n", len(res3.Hits))
+		t.Fatalf("Expected 3 hits, got %d", len(res3.Hits))
 	}
 	q4 := NewSearchRequest(NewMatchNoneQuery())
 	q4.AddKNN("d", []float32{1, 2, 3, 4}, 3, 1.0)
@@ -1908,7 +1908,7 @@ func TestIndexUpdateVector(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(res4.Hits) != 0 {
-		t.Fatalf("Expected 0 hits, got %d\n", len(res4.Hits))
+		t.Fatalf("Expected 0 hits, got %d", len(res4.Hits))
 	}
 }
 
@@ -1988,42 +1988,6 @@ func TestIndexInsightsTermFrequencies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	q1 := NewSearchRequest(NewMatchNoneQuery())
-	q1.AddKNN("a", []float32{1, 2, 3, 4}, 3, 1.0)
-	res1, err := index.Search(q1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res1.Hits) != 3 {
-		t.Fatalf("Expected 3 hits, got %d\n", len(res1.Hits))
-	}
-	q2 := NewSearchRequest(NewMatchNoneQuery())
-	q2.AddKNN("b", []float32{1, 2, 3, 4}, 3, 1.0)
-	res2, err := index.Search(q2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res2.Hits) != 0 {
-		t.Fatalf("Expected 0 hits, got %d\n", len(res2.Hits))
-	}
-	q3 := NewSearchRequest(NewMatchNoneQuery())
-	q3.AddKNN("c", []float32{1, 2, 3, 4}, 3, 1.0)
-	res3, err := index.Search(q3)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res3.Hits) != 3 {
-		t.Fatalf("Expected 3 hits, got %d\n", len(res3.Hits))
-	}
-	q4 := NewSearchRequest(NewMatchNoneQuery())
-	q4.AddKNN("d", []float32{1, 2, 3, 4}, 3, 1.0)
-	res4, err := index.Search(q4)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res4.Hits) != 0 {
-		t.Fatalf("Expected 0 hits, got %d\n", len(res4.Hits))
-	}
 	if !reflect.DeepEqual(termFreqs, expectTermFreqs) {
 		t.Fatalf("term freqs do not match: got: %v, expected: %v", termFreqs, expectTermFreqs)
 	}
