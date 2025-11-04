@@ -67,8 +67,16 @@ func initTwoDocs(twoDocIndex index.Index) {
 		panic(err)
 	}
 	batch := index.NewBatch()
+
+	// Make a copy of the documents to prevent modification of the
+	// original slice across multiple tests
+	docs := []document.Document{}
 	for _, doc := range twoDocIndexDocs {
-		batch.Update(doc)
+		docs = append(docs, *doc)
+	}
+
+	for _, doc := range docs {
+		batch.Update(&doc)
 	}
 	err = twoDocIndex.Batch(batch)
 	if err != nil {

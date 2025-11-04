@@ -45,14 +45,16 @@ import (
 )
 
 type indexImpl struct {
-	path  string
-	name  string
-	meta  *indexMeta
-	i     index.Index
-	m     mapping.IndexMapping
-	mutex sync.RWMutex
-	open  bool
-	stats *IndexStat
+	path   string
+	name   string
+	meta   *indexMeta
+	i      index.Index
+	m      mapping.IndexMapping
+	mutex  sync.RWMutex
+	open   bool
+	stats  *IndexStat
+	writer *util.FileWriter
+	reader *util.FileReader
 }
 
 const storePath = "store"
@@ -88,16 +90,28 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 		return nil, fmt.Errorf("bleve not configured for file based indexing")
 	}
 
+	fileWriter, err := util.NewFileWriter()
+	if err != nil {
+		return nil, err
+	}
+	fileReader, err := util.NewFileReader(fileWriter.Id())
+	if err != nil {
+		return nil, err
+	}
+
 	rv := indexImpl{
-		path: path,
-		name: path,
-		m:    mapping,
-		meta: newIndexMeta(indexType, kvstore, kvconfig),
+		path:   path,
+		name:   path,
+		m:      mapping,
+		meta:   newIndexMeta(indexType, kvstore, kvconfig),
+		writer: fileWriter,
+		reader: fileReader,
 	}
 	rv.stats = &IndexStat{i: &rv}
 	// at this point there is hope that we can be successful, so save index meta
 	if path != "" {
-		err = rv.meta.Save(path)
+		kvconfig["callback_id"] = rv.writer.Id()
+		err = rv.meta.Save(path, rv.writer)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +167,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	}
 	rv.stats = &IndexStat{i: rv}
 
-	rv.meta, err = openIndexMeta(path)
+	rv.meta, rv.reader, err = openIndexMeta(path)
 	if err != nil {
 		return nil, err
 	}
@@ -478,6 +492,44 @@ func (i *indexImpl) DocCount() (count uint64, err error) {
 // Returns a SearchResult object or an error.
 func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 	return i.SearchInContext(context.Background(), req)
+}
+
+func (i *indexImpl) KeysInUse() (map[string]struct{}, error) {
+
+	keys := map[string]struct{}{}
+	keys[i.reader.Id()] = struct{}{}
+
+	if cidx, ok := i.i.(index.CustomizableIndex); ok {
+		cKeys, err := cidx.KeysInUse()
+		if err != nil {
+			return nil, err
+		}
+		for k := range cKeys {
+			keys[k] = struct{}{}
+		}
+	}
+
+	return keys, nil
+}
+
+func (i *indexImpl) DropKeys(keys map[string]struct{}) error {
+
+	if _, ok := keys[i.reader.Id()]; ok {
+		err := i.meta.UpdateWriter(i.path)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cidx, ok := i.i.(index.CustomizableIndex); ok {
+		return cidx.DropKeys(keys)
+	} else {
+		if _, ok := keys[""]; ok {
+			return fmt.Errorf("underlying index does not support DropKeys")
+		}
+	}
+
+	return nil
 }
 
 var (

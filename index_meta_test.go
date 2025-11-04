@@ -17,6 +17,8 @@ package bleve
 import (
 	"os"
 	"testing"
+
+	"github.com/blevesearch/bleve/v2/util"
 )
 
 func TestIndexMeta(t *testing.T) {
@@ -29,21 +31,25 @@ func TestIndexMeta(t *testing.T) {
 	}()
 
 	// open non-existent meta should give an error
-	_, err := openIndexMeta(testIndexPath)
+	_, _, err := openIndexMeta(testIndexPath)
 	if err == nil {
 		t.Errorf("expected error, got nil")
 	}
 
+	writer, err := util.NewFileWriter()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// create meta
 	im := &indexMeta{Storage: "boltdb"}
-	err = im.Save(testIndexPath)
+	err = im.Save(testIndexPath, writer)
 	if err != nil {
 		t.Error(err)
 	}
 	im = nil
 
 	// open a meta that exists
-	im, err = openIndexMeta(testIndexPath)
+	im, _, err = openIndexMeta(testIndexPath)
 	if err != nil {
 		t.Error(err)
 	}
@@ -52,7 +58,7 @@ func TestIndexMeta(t *testing.T) {
 	}
 
 	// save a meta that already exists
-	err = im.Save(testIndexPath)
+	err = im.Save(testIndexPath, writer)
 	if err == nil {
 		t.Errorf("expected error, got nil")
 	}

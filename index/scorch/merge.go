@@ -89,10 +89,19 @@ OUTER:
 				}
 
 				startTime := time.Now()
-
+				var err error
 				// lets get started
-				err := s.planMergeAtSnapshot(ctrlMsg.ctx, ctrlMsg.options,
-					ourSnapshot)
+				if ctrlMsg.plan == nil {
+					err = s.planMergeAtSnapshot(ctrlMsg.ctx, ctrlMsg.options,
+						ourSnapshot)
+				} else {
+					cw := newCloseChWrapper(s.closeCh, ctrlMsg.ctx)
+					defer cw.close()
+					go cw.listen()
+
+					err = s.executePlanMergeAtSnapshot(ctrlMsg.plan, cw)
+				}
+
 				if err != nil {
 					atomic.StoreUint64(&s.iStats.mergeEpoch, 0)
 					if err == segment.ErrClosed {
@@ -161,6 +170,7 @@ OUTER:
 type mergerCtrl struct {
 	ctx     context.Context
 	options *mergeplan.MergePlanOptions
+	plan    *mergeplan.MergePlan
 	doneCh  chan struct{}
 }
 
@@ -301,15 +311,18 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 	atomic.AddUint64(&s.stats.TotFileMergePlanTasks, uint64(len(resultMergePlan.Tasks)))
 
-	// process tasks in serial for now
-	var filenames []string
-
 	cw := newCloseChWrapper(s.closeCh, ctx)
 	defer cw.close()
 
 	go cw.listen()
 
-	for _, task := range resultMergePlan.Tasks {
+	return s.executePlanMergeAtSnapshot(resultMergePlan, cw)
+}
+
+func (s *Scorch) executePlanMergeAtSnapshot(plan *mergeplan.MergePlan, cw *closeChWrapper) error {
+	var filenames []string
+
+	for _, task := range plan.Tasks {
 		if len(task.Segments) == 0 {
 			atomic.AddUint64(&s.stats.TotFileMergePlanTasksSegmentsEmpty, 1)
 			continue

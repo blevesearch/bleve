@@ -15,6 +15,7 @@
 package scorch
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -24,6 +25,7 @@ import (
 	"time"
 
 	"github.com/RoaringBitmap/roaring/v2"
+	"github.com/blevesearch/bleve/v2/index/scorch/mergeplan"
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
@@ -161,6 +163,7 @@ func NewScorch(storeName string,
 	if ok {
 		rv.onAsyncError = RegistryAsyncErrorCallbacks[aecbName]
 	}
+
 	// validate any custom persistor options to
 	// prevent an async error in the persistor routine
 	_, err = rv.parsePersisterOptions()
@@ -985,6 +988,27 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 				continue
 			}
 			snapshot := snapshots.Bucket(k)
+			metaBucket := snapshot.Bucket(util.BoltMetaDataKey)
+			if metaBucket == nil {
+				return fmt.Errorf("meta-data bucket missing")
+			}
+
+			writer, err := util.NewFileWriter()
+			if err != nil {
+				return fmt.Errorf("unable to load correct writer: %v", err)
+			}
+
+			readerId := string(metaBucket.Get(boltMetaDataWriterIdKey))
+			reader, err := util.NewFileReader(readerId)
+			if err != nil {
+				return fmt.Errorf("unable to load correct reader: %v", err)
+			}
+
+			err = metaBucket.Put(util.BoltMetaDataWriterIdKey, []byte(writer.Id()))
+			if err != nil {
+				return err
+			}
+
 			cc := snapshot.Cursor()
 			for kk, _ := cc.First(); kk != nil; kk, _ = cc.Next() {
 				if kk[0] == util.BoltInternalKey[0] {
@@ -992,19 +1016,56 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 					if internalBucket == nil {
 						return fmt.Errorf("segment key, but bucket missing %x", kk)
 					}
-					err = internalBucket.Put(util.MappingInternalKey, mappingBytes)
+
+					internalVals := make(map[string][]byte)
+					err := internalBucket.ForEach(func(key []byte, val []byte) error {
+						copiedVal, err := reader.Process(append([]byte(nil), val...))
+						if err != nil {
+							return err
+						}
+						internalVals[string(key)] = copiedVal
+						return nil
+					})
 					if err != nil {
 						return err
+					}
+
+					for key, val := range internalVals {
+						valBytes, err := writer.Process(val)
+						if err != nil {
+							return err
+						}
+						if key == string(util.MappingInternalKey) {
+							buf, err := writer.Process(mappingBytes)
+							if err != nil {
+								return err
+							}
+							err = internalBucket.Put([]byte(key), buf)
+							if err != nil {
+								return err
+							}
+						} else {
+							err = internalBucket.Put([]byte(key), valBytes)
+							if err != nil {
+								return err
+							}
+						}
 					}
 				} else if kk[0] != util.BoltMetaDataKey[0] {
 					segmentBucket := snapshot.Bucket(kk)
 					if segmentBucket == nil {
 						return fmt.Errorf("segment key, but bucket missing %x", kk)
 					}
+
 					var updatedFields map[string]*index.UpdateFieldInfo
 					updatedFieldBytes := segmentBucket.Get(util.BoltUpdatedFieldsKey)
 					if updatedFieldBytes != nil {
-						err := json.Unmarshal(updatedFieldBytes, &updatedFields)
+						buf, err := reader.Process(updatedFieldBytes)
+						if err != nil {
+							return err
+						}
+
+						err = json.Unmarshal(buf, &updatedFields)
 						if err != nil {
 							return fmt.Errorf("error reading updated field bytes: %v", err)
 						}
@@ -1027,13 +1088,167 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 					if err != nil {
 						return err
 					}
-					err = segmentBucket.Put(util.BoltUpdatedFieldsKey, b)
+					buf, err := writer.Process(b)
 					if err != nil {
 						return err
+					}
+					err = segmentBucket.Put(util.BoltUpdatedFieldsKey, buf)
+					if err != nil {
+						return err
+					}
+
+					deletedBytes := segmentBucket.Get(util.BoltDeletedKey)
+					if deletedBytes != nil {
+						deletedBytes, err = reader.Process(deletedBytes)
+						if err != nil {
+							return err
+						}
+
+						buf, err := writer.Process(deletedBytes)
+						if err != nil {
+							return err
+						}
+
+						err = segmentBucket.Put(util.BoltDeletedKey, buf)
+						if err != nil {
+							return err
+						}
+					}
+
+					statBytes := segmentBucket.Get(util.BoltStatsKey)
+					if statBytes != nil {
+						statBytes, err = reader.Process(statBytes)
+						if err != nil {
+							return err
+						}
+
+						buf, err := writer.Process(statBytes)
+						if err != nil {
+							return err
+						}
+
+						err = segmentBucket.Put(util.BoltStatsKey, buf)
+						if err != nil {
+							return err
+						}
 					}
 				}
 			}
 		}
 		return nil
 	})
+}
+
+func (s *Scorch) KeysInUse() ([]string, error) {
+	s.rootLock.RLock()
+	defer s.rootLock.RUnlock()
+
+	keyMap := make(map[string]struct{})
+	for _, segmentSnapShot := range s.root.segment {
+		if seg, ok := segmentSnapShot.segment.(segment.CustomizableSegment); ok {
+			keyMap[seg.CallbackId()] = struct{}{}
+		}
+	}
+
+	boltKeys, err := s.boltKeysInUse()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, k := range boltKeys {
+		keyMap[k] = struct{}{}
+	}
+
+	rv := make([]string, 0, len(keyMap))
+	for k := range keyMap {
+		rv = append(rv, k)
+	}
+
+	return rv, nil
+}
+
+func (s *Scorch) DropKeys(ids []string) error {
+
+	keyMap := make(map[string]struct{})
+	for _, k := range ids {
+		keyMap[k] = struct{}{}
+	}
+
+	err := s.removeBoltKeys(ids)
+	if err != nil {
+		return err
+	}
+
+	s.rootLock.Lock()
+	defer s.rootLock.Unlock()
+
+	segsToCompact := make([]mergeplan.Segment, 0)
+	for _, segmentSnapShot := range s.root.segment {
+		if seg, ok := segmentSnapShot.segment.(segment.CustomizableSegment); ok {
+			if _, ok := keyMap[seg.CallbackId()]; ok {
+				segsToCompact = append(segsToCompact, segmentSnapShot)
+			}
+		}
+	}
+
+	if len(segsToCompact) > 0 {
+		return s.forceMergeSegs(segsToCompact)
+	}
+
+	return nil
+}
+
+// Force merge all given segments regardless of their elibility for compaction
+// Large segments will be rewritten instead of merging
+func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment) error {
+	// Create a merge plan with the filtered segments and force a merge
+	// to remove the callback from the segments.
+	mergePlannerOptions, err := s.parseMergePlannerOptions()
+	if err != nil {
+		return fmt.Errorf("mergePlannerOption json parsing err: %v", err)
+
+	}
+
+	atomic.AddUint64(&s.stats.TotFileMergePlan, 1)
+
+	mergePlan, err := mergeplan.Plan(segsToCompact, mergePlannerOptions)
+	if err != nil {
+		atomic.AddUint64(&s.stats.TotFileMergePlanErr, 1)
+		return fmt.Errorf("merge plan creation err: %v", err)
+	}
+
+	segDictionary := make(map[uint64]bool)
+	for _, seg := range segsToCompact {
+		segDictionary[seg.Id()] = true
+	}
+
+	if mergePlan == nil {
+		mergePlan = &mergeplan.MergePlan{
+			Tasks: make([]*mergeplan.MergeTask, 0),
+		}
+	}
+
+	for _, task := range mergePlan.Tasks {
+		for _, seg := range task.Segments {
+			segDictionary[seg.Id()] = false
+		}
+	}
+
+	for _, seg := range segsToCompact {
+		if segDictionary[seg.Id()] {
+			mergePlan.Tasks = append(mergePlan.Tasks, &mergeplan.MergeTask{
+				Segments: []mergeplan.Segment{seg},
+			})
+		}
+	}
+
+	atomic.AddUint64(&s.stats.TotFileMergePlanOk, 1)
+	atomic.AddUint64(&s.stats.TotFileMergePlanTasks, uint64(len(mergePlan.Tasks)))
+
+	s.forceMergeRequestCh <- &mergerCtrl{
+		plan: mergePlan,
+		ctx:  context.Background(),
+	}
+
+	return nil
 }
