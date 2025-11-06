@@ -83,6 +83,9 @@ type FieldMapping struct {
 	VectorIndexOptimizedFor string `json:"vector_index_optimized_for,omitempty"`
 
 	SynonymSource string `json:"synonym_source,omitempty"`
+
+	// Flag that indicates whether to use GPU for field indexing and searching
+	GPU bool `json:"gpu,omitempty"`
 }
 
 // NewTextFieldMapping returns a default field mapping for text
