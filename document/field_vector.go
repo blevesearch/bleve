@@ -42,6 +42,7 @@ type VectorField struct {
 	value                   []float32
 	numPlainTextBytes       uint64
 	vectorIndexOptimizedFor string // Optimization applied to this index.
+	gpu                     bool   // Whether to use GPU for indexing/searching
 }
 
 func (n *VectorField) Size() int {
@@ -98,17 +99,18 @@ func (n *VectorField) GoString() string {
 // For the sake of not polluting the API, we are keeping arrayPositions as a
 // parameter, but it is not used.
 func NewVectorField(name string, arrayPositions []uint64,
-	vector []float32, dims int, similarity, vectorIndexOptimizedFor string) *VectorField {
+	vector []float32, dims int, similarity, vectorIndexOptimizedFor string,
+	gpu bool) *VectorField {
 	return NewVectorFieldWithIndexingOptions(name, arrayPositions,
 		vector, dims, similarity, vectorIndexOptimizedFor,
-		DefaultVectorIndexingOptions)
+		gpu, DefaultVectorIndexingOptions)
 }
 
 // For the sake of not polluting the API, we are keeping arrayPositions as a
 // parameter, but it is not used.
 func NewVectorFieldWithIndexingOptions(name string, arrayPositions []uint64,
 	vector []float32, dims int, similarity, vectorIndexOptimizedFor string,
-	options index.FieldIndexingOptions) *VectorField {
+	gpu bool, options index.FieldIndexingOptions) *VectorField {
 
 	return &VectorField{
 		name:                    name,
@@ -118,6 +120,7 @@ func NewVectorFieldWithIndexingOptions(name string, arrayPositions []uint64,
 		value:                   vector,
 		numPlainTextBytes:       numBytesFloat32s(vector),
 		vectorIndexOptimizedFor: vectorIndexOptimizedFor,
+		gpu:                     gpu,
 	}
 }
 
@@ -143,4 +146,8 @@ func (n *VectorField) Similarity() string {
 
 func (n *VectorField) IndexOptimizedFor() string {
 	return n.vectorIndexOptimizedFor
+}
+
+func (n *VectorField) GPU() bool {
+	return n.gpu
 }
