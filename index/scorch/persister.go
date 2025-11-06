@@ -1251,7 +1251,11 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 }
 
 func (s *Scorch) maxSegmentIDOnDisk() (uint64, error) {
-	files, err := os.ReadDir(s.path)
+	if s.vfsDir == nil {
+		return 0, nil
+	}
+
+	files, err := s.vfsDir.ReadDir(".")
 	if err != nil {
 		return 0, err
 	}
@@ -1280,26 +1284,29 @@ func (s *Scorch) removeOldZapFiles() error {
 		return err
 	}
 
-	files, err := os.ReadDir(s.path)
+	if s.vfsDir == nil {
+		return nil
+	}
+
+	files, err := s.vfsDir.ReadDir(".")
 	if err != nil {
 		return err
 	}
 
 	s.rootLock.RLock()
+	defer s.rootLock.RUnlock()
 
 	for _, f := range files {
 		fname := f.Name()
 		if filepath.Ext(fname) == ".zap" {
 			if _, exists := liveFileNames[fname]; !exists && !s.ineligibleForRemoval[fname] && (s.copyScheduled[fname] <= 0) {
-				err := os.Remove(s.path + string(os.PathSeparator) + fname)
+				err := s.vfsDir.Remove(fname)
 				if err != nil {
 					log.Printf("got err removing file: %s, err: %v", fname, err)
 				}
 			}
 		}
 	}
-
-	s.rootLock.RUnlock()
 
 	return nil
 }

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/RoaringBitmap/roaring/v2"
+	"github.com/blevesearch/bleve/v2/index/scorch/vfs"
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
@@ -47,6 +48,10 @@ type Scorch struct {
 	config        map[string]interface{}
 	analysisQueue *index.AnalysisQueue
 	path          string
+
+	// vfsDir is the pluggable directory for segment storage
+	// If nil, falls back to filesystem operations at 'path'
+	vfsDir vfs.Directory
 
 	unsafeBatch bool
 
@@ -145,6 +150,12 @@ func NewScorch(storeName string,
 	}
 
 	rv.root = &IndexSnapshot{parent: rv, refs: 1, creator: "NewScorch"}
+
+	// Check if a custom VFS directory is provided
+	if dir, ok := config["vfsDirectory"].(vfs.Directory); ok {
+		rv.vfsDir = dir
+	}
+
 	ro, ok := config["read_only"].(bool)
 	if ok {
 		rv.readOnly = ro
@@ -246,6 +257,15 @@ func (s *Scorch) openBolt() error {
 	}
 	if s.path == "" {
 		s.unsafeBatch = true
+	}
+
+	// Initialize VFS directory if not already set
+	if s.vfsDir == nil && s.path != "" {
+		var err error
+		s.vfsDir, err = vfs.NewFSDirectory(s.path)
+		if err != nil {
+			return fmt.Errorf("failed to create VFS directory: %w", err)
+		}
 	}
 
 	rootBoltOpt := *bolt.DefaultOptions
@@ -600,19 +620,17 @@ func (s *Scorch) diskFileStats(rootSegmentPaths map[string]struct{}) (uint64,
 	uint64, uint64,
 ) {
 	var numFilesOnDisk, numBytesUsedDisk, numBytesOnDiskByRoot uint64
-	if s.path != "" {
-		files, err := os.ReadDir(s.path)
+	if s.vfsDir != nil {
+		files, err := s.vfsDir.ReadDir(".")
 		if err == nil {
 			for _, f := range files {
 				if !f.IsDir() {
-					if finfo, err := f.Info(); err == nil {
-						numBytesUsedDisk += uint64(finfo.Size())
-						numFilesOnDisk++
-						if rootSegmentPaths != nil {
-							fname := s.path + string(os.PathSeparator) + finfo.Name()
-							if _, fileAtRoot := rootSegmentPaths[fname]; fileAtRoot {
-								numBytesOnDiskByRoot += uint64(finfo.Size())
-							}
+					numBytesUsedDisk += uint64(f.Size())
+					numFilesOnDisk++
+					if rootSegmentPaths != nil {
+						fname := s.path + string(os.PathSeparator) + f.Name()
+						if _, fileAtRoot := rootSegmentPaths[fname]; fileAtRoot {
+							numBytesOnDiskByRoot += uint64(f.Size())
 						}
 					}
 				}
