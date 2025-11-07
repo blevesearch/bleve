@@ -94,7 +94,7 @@ func (n *VectorBase64Field) GoString() string {
 // For the sake of not polluting the API, we are keeping arrayPositions as a
 // parameter, but it is not used.
 func NewVectorBase64Field(name string, arrayPositions []uint64, vectorBase64 string,
-	dims int, similarity, vectorIndexOptimizedFor string, gpu bool) (*VectorBase64Field, error) {
+	dims int, similarity, vectorIndexOptimizedFor string) (*VectorBase64Field, error) {
 
 	decodedVector, err := DecodeVector(vectorBase64)
 	if err != nil {
@@ -104,7 +104,7 @@ func NewVectorBase64Field(name string, arrayPositions []uint64, vectorBase64 str
 	return &VectorBase64Field{
 		vectorField: NewVectorFieldWithIndexingOptions(name, arrayPositions,
 			decodedVector, dims, similarity,
-			vectorIndexOptimizedFor, gpu, DefaultVectorIndexingOptions),
+			vectorIndexOptimizedFor, DefaultVectorIndexingOptions),
 
 		base64Encoding: vectorBase64,
 	}, nil
