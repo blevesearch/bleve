@@ -17,6 +17,8 @@ package bleve
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -1135,4 +1137,160 @@ func (f *indexAliasImplFieldDict) Close() error {
 
 func (f *indexAliasImplFieldDict) Cardinality() int {
 	return f.fieldDict.Cardinality()
+}
+
+// -----------------------------------------------------------------------------
+
+func (i *indexAliasImpl) TermFrequencies(field string, limit int, descending bool) (
+	[]index.TermFreq, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
+	if len(i.indexes) < 1 {
+		return nil, ErrorAliasEmpty
+	}
+
+	// short circuit the simple case
+	if len(i.indexes) == 1 {
+		if idx, ok := i.indexes[0].(InsightsIndex); ok {
+			return idx.TermFrequencies(field, limit, descending)
+		}
+		return nil, nil
+	}
+
+	// run search on each index in separate go routine
+	var waitGroup sync.WaitGroup
+	asyncResults := make(chan []index.TermFreq, len(i.indexes))
+
+	searchChildIndex := func(in Index, field string, limit int, descending bool) {
+		var rv []index.TermFreq
+		if idx, ok := in.(InsightsIndex); ok {
+			// over sample for higher accuracy
+			rv, _ = idx.TermFrequencies(field, limit*5, descending)
+		}
+		asyncResults <- rv
+		waitGroup.Done()
+	}
+
+	waitGroup.Add(len(i.indexes))
+	for _, in := range i.indexes {
+		go searchChildIndex(in, field, limit, descending)
+	}
+
+	// on another go routine, close after finished
+	go func() {
+		waitGroup.Wait()
+		close(asyncResults)
+	}()
+
+	rvTermFreqsMap := make(map[string]uint64)
+	for asr := range asyncResults {
+		for _, entry := range asr {
+			rvTermFreqsMap[entry.Term] += entry.Frequency
+		}
+	}
+
+	rvTermFreqs := make([]index.TermFreq, 0, len(rvTermFreqsMap))
+	for term, freq := range rvTermFreqsMap {
+		rvTermFreqs = append(rvTermFreqs, index.TermFreq{
+			Term:      term,
+			Frequency: freq,
+		})
+	}
+
+	if descending {
+		sort.Slice(rvTermFreqs, func(i, j int) bool {
+			if rvTermFreqs[i].Frequency == rvTermFreqs[j].Frequency {
+				// If frequencies are equal, sort by term lexicographically
+				return strings.Compare(rvTermFreqs[i].Term, rvTermFreqs[j].Term) < 0
+			}
+			return rvTermFreqs[i].Frequency > rvTermFreqs[j].Frequency
+		})
+	} else {
+		sort.Slice(rvTermFreqs, func(i, j int) bool {
+			if rvTermFreqs[i].Frequency == rvTermFreqs[j].Frequency {
+				// If frequencies are equal, sort by term lexicographically
+				return strings.Compare(rvTermFreqs[i].Term, rvTermFreqs[j].Term) < 0
+			}
+			return rvTermFreqs[i].Frequency < rvTermFreqs[j].Frequency
+		})
+	}
+
+	if limit > len(rvTermFreqs) {
+		limit = len(rvTermFreqs)
+	}
+
+	return rvTermFreqs[:limit], nil
+}
+
+func (i *indexAliasImpl) CentroidCardinalities(field string, limit int, descending bool) (
+	[]index.CentroidCardinality, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
+	if len(i.indexes) < 1 {
+		return nil, ErrorAliasEmpty
+	}
+
+	// short circuit the simple case
+	if len(i.indexes) == 1 {
+		if idx, ok := i.indexes[0].(InsightsIndex); ok {
+			return idx.CentroidCardinalities(field, limit, descending)
+		}
+		return nil, nil
+	}
+
+	// run search on each index in separate go routine
+	var waitGroup sync.WaitGroup
+	asyncResults := make(chan []index.CentroidCardinality, len(i.indexes))
+
+	searchChildIndex := func(in Index, field string, limit int, descending bool) {
+		var rv []index.CentroidCardinality
+		if idx, ok := in.(InsightsIndex); ok {
+			rv, _ = idx.CentroidCardinalities(field, limit, descending)
+		}
+		asyncResults <- rv
+		waitGroup.Done()
+	}
+
+	waitGroup.Add(len(i.indexes))
+	for _, in := range i.indexes {
+		go searchChildIndex(in, field, limit, descending)
+	}
+
+	// on another go routine, close after finished
+	go func() {
+		waitGroup.Wait()
+		close(asyncResults)
+	}()
+
+	rvCentroidCardinalitiesResult := make([]index.CentroidCardinality, 0, limit)
+	for asr := range asyncResults {
+		asr = append(asr, rvCentroidCardinalitiesResult...)
+		if descending {
+			sort.Slice(asr, func(i, j int) bool {
+				return asr[i].Cardinality > asr[j].Cardinality
+			})
+		} else {
+			sort.Slice(asr, func(i, j int) bool {
+				return asr[i].Cardinality < asr[j].Cardinality
+			})
+		}
+
+		if limit > len(asr) {
+			limit = len(asr)
+		}
+
+		rvCentroidCardinalitiesResult = asr[:limit]
+	}
+
+	return rvCentroidCardinalitiesResult, nil
 }

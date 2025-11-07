@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -1233,4 +1234,62 @@ func (is *IndexSnapshot) MergeUpdateFieldsInfo(updatedFields map[string]*index.U
 			}
 		}
 	}
+}
+
+// TermFrequencies returns the top N terms ordered by the frequencies
+// for a given field across all segments in the index snapshot.
+func (is *IndexSnapshot) TermFrequencies(field string, limit int, descending bool) (
+	termFreqs []index.TermFreq, err error) {
+	if len(is.segment) == 0 {
+		return nil, nil
+	}
+
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be positive")
+	}
+
+	// Use FieldDict which aggregates term frequencies across all segments
+	fieldDict, err := is.FieldDict(field)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get field dictionary for field %s: %v", field, err)
+	}
+	defer fieldDict.Close()
+
+	// Preallocate slice with capacity equal to the number of unique terms
+	// in the field dictionary
+	termFreqs = make([]index.TermFreq, 0, fieldDict.Cardinality())
+
+	// Iterate through all terms using FieldDict
+	for {
+		dictEntry, err := fieldDict.Next()
+		if err != nil {
+			return nil, fmt.Errorf("error iterating field dictionary: %v", err)
+		}
+		if dictEntry == nil {
+			break // End of terms
+		}
+
+		termFreqs = append(termFreqs, index.TermFreq{
+			Term:      dictEntry.Term,
+			Frequency: dictEntry.Count,
+		})
+	}
+
+	// Sort by frequency (descending or ascending)
+	sort.Slice(termFreqs, func(i, j int) bool {
+		if termFreqs[i].Frequency == termFreqs[j].Frequency {
+			// If frequencies are equal, sort by term lexicographically
+			return strings.Compare(termFreqs[i].Term, termFreqs[j].Term) < 0
+		}
+		if descending {
+			return termFreqs[i].Frequency > termFreqs[j].Frequency
+		}
+		return termFreqs[i].Frequency < termFreqs[j].Frequency
+	})
+
+	if limit >= len(termFreqs) {
+		return termFreqs, nil
+	}
+
+	return termFreqs[:limit], nil
 }
