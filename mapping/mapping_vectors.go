@@ -149,7 +149,7 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	fieldName := getFieldName(pathString, path, fm)
 	options := fm.Options()
 	field := document.NewVectorFieldWithIndexingOptions(fieldName, indexes, vector,
-		fm.Dims, fm.Similarity, fm.VectorIndexOptimizedFor, fm.GPU, options)
+		fm.Dims, fm.Similarity, fm.VectorIndexOptimizedFor, options)
 	context.doc.AddField(field)
 
 	// "_all" composite field is not applicable for vector field
@@ -176,7 +176,7 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	fieldName := getFieldName(pathString, path, fm)
 	options := fm.Options()
 	field := document.NewVectorFieldWithIndexingOptions(fieldName, indexes, decodedVector,
-		fm.Dims, fm.Similarity, fm.VectorIndexOptimizedFor, fm.GPU, options)
+		fm.Dims, fm.Similarity, fm.VectorIndexOptimizedFor, options)
 	context.doc.AddField(field)
 
 	// "_all" composite field is not applicable for vector_base64 field
