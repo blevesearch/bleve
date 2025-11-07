@@ -99,18 +99,17 @@ func (n *VectorField) GoString() string {
 // For the sake of not polluting the API, we are keeping arrayPositions as a
 // parameter, but it is not used.
 func NewVectorField(name string, arrayPositions []uint64,
-	vector []float32, dims int, similarity, vectorIndexOptimizedFor string,
-	gpu bool) *VectorField {
+	vector []float32, dims int, similarity, vectorIndexOptimizedFor string) *VectorField {
 	return NewVectorFieldWithIndexingOptions(name, arrayPositions,
 		vector, dims, similarity, vectorIndexOptimizedFor,
-		gpu, DefaultVectorIndexingOptions)
+		DefaultVectorIndexingOptions)
 }
 
 // For the sake of not polluting the API, we are keeping arrayPositions as a
 // parameter, but it is not used.
 func NewVectorFieldWithIndexingOptions(name string, arrayPositions []uint64,
 	vector []float32, dims int, similarity, vectorIndexOptimizedFor string,
-	gpu bool, options index.FieldIndexingOptions) *VectorField {
+	options index.FieldIndexingOptions) *VectorField {
 
 	return &VectorField{
 		name:                    name,
@@ -120,7 +119,6 @@ func NewVectorFieldWithIndexingOptions(name string, arrayPositions []uint64,
 		value:                   vector,
 		numPlainTextBytes:       numBytesFloat32s(vector),
 		vectorIndexOptimizedFor: vectorIndexOptimizedFor,
-		gpu:                     gpu,
 	}
 }
 
