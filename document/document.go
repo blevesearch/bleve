@@ -174,7 +174,7 @@ func (d *Document) NestedFields() search.FieldSet {
 	collectFields = func(doc index.Document) {
 		// Add all field names from this nested document
 		doc.VisitFields(func(field index.Field) {
-			fieldSet.Add(field.Name())
+			fieldSet.AddField(field.Name())
 		})
 		// Recursively collect from this document's nested documents
 		if nd, ok := doc.(index.NestedDocument); ok {

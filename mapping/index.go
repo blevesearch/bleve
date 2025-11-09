@@ -580,35 +580,47 @@ func (im *IndexMappingImpl) SynonymSourceVisitor(visitor analysis.SynonymSourceV
 	return nil
 }
 
-// NestedPrefixes returns a set of all the field prefixes that are marked as nested
-// in this mapping. If there are no nested fields, it returns nil.
-func (im *IndexMappingImpl) NestedPrefixes() search.FieldSet {
-	var rv search.FieldSet
-	var collectNestedFields func(dm *DocumentMapping, pathComponents []string)
-	collectNestedFields = func(dm *DocumentMapping, pathComponents []string) {
+func (im *IndexMappingImpl) buildNestedPrefixes() {
+	var collectNestedFields func(dm *DocumentMapping, pathComponents []string, currentDepth int)
+	collectNestedFields = func(dm *DocumentMapping, pathComponents []string, currentDepth int) {
 		for name, docMapping := range dm.Properties {
 			newPathComponents := append(pathComponents, name)
 			if docMapping.Nested {
-				if rv == nil {
-					rv = search.NewFieldSet()
-				}
-				rv[strings.Join(newPathComponents, pathSeparator)] = struct{}{}
+				// This is a nested field boundary
+				path := strings.Join(newPathComponents, ".")
+				im.cache.NestedPrefixes.AddPrefix(path, currentDepth+1)
+				// Continue deeper with incremented depth
+				collectNestedFields(docMapping, newPathComponents, currentDepth+1)
 			} else {
-				collectNestedFields(docMapping, newPathComponents)
+				// Not nested, continue with same depth
+				collectNestedFields(docMapping, newPathComponents, currentDepth)
 			}
 		}
 	}
-
-	// Traverse default mapping if enabled
+	// Start from depth 0 (root)
 	if im.DefaultMapping != nil && im.DefaultMapping.Enabled {
-		collectNestedFields(im.DefaultMapping, []string{})
+		collectNestedFields(im.DefaultMapping, []string{}, 0)
 	}
-
-	// Traverse all type mappings if enabled
+	// Now do this for each type mapping
 	for _, docMapping := range im.TypeMapping {
 		if docMapping.Enabled {
-			collectNestedFields(docMapping, []string{})
+			collectNestedFields(docMapping, []string{}, 0)
 		}
 	}
-	return rv
+}
+
+func (im *IndexMappingImpl) CoveringDepth(fs search.FieldSet) int {
+	if im.cache == nil || im.cache.NestedPrefixes == nil {
+		return 0
+	}
+
+	im.cache.NestedPrefixes.InitOnce(func() {
+		im.buildNestedPrefixes()
+	})
+
+	return im.cache.NestedPrefixes.CoveringDepth(fs)
+}
+
+func (im *IndexMappingImpl) NestedPrefixes() search.FieldSet {
+	return nil
 }

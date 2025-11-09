@@ -248,7 +248,7 @@ func NewFieldSet() FieldSet {
 }
 
 // Add adds a field to the set.
-func (fs FieldSet) Add(field string) {
+func (fs FieldSet) AddField(field string) {
 	fs[field] = struct{}{}
 }
 

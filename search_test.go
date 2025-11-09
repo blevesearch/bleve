@@ -5685,256 +5685,234 @@ func TestNestedMapping(t *testing.T) {
 	})
 }
 
+func createNestedIndexMapping() mapping.IndexMapping {
+
+	/*
+		company
+		├── id
+		├── name
+		├── departments[] (nested)
+		│     ├── name
+		│     ├── budget
+		│     ├── employees[] (nested)
+		│     │     ├── name
+		│     │     ├── role
+		│     └── projects[] (nested)
+		│           ├── title
+		│           ├── status
+		└── locations[] (nested)
+				├── city
+				├── country
+	*/
+
+	// Create the index mapping
+	imap := mapping.NewIndexMapping()
+
+	// Create company mapping
+	companyMapping := mapping.NewDocumentMapping()
+	companyMapping.Enabled = true
+	companyMapping.Dynamic = false
+
+	// Company ID field
+	companyIDField := mapping.NewTextFieldMapping()
+	companyMapping.AddFieldMappingsAt("id", companyIDField)
+
+	// Company name field
+	companyNameField := mapping.NewTextFieldMapping()
+	companyMapping.AddFieldMappingsAt("name", companyNameField)
+
+	// Departments mapping
+	departmentsMapping := mapping.NewDocumentMapping()
+	departmentsMapping.Nested = true
+
+	// Department name field
+	deptNameField := mapping.NewTextFieldMapping()
+	departmentsMapping.AddFieldMappingsAt("name", deptNameField)
+
+	// Department budget field
+	deptBudgetField := mapping.NewNumericFieldMapping()
+	departmentsMapping.AddFieldMappingsAt("budget", deptBudgetField)
+
+	// Employees mapping
+	employeesMapping := mapping.NewDocumentMapping()
+	employeesMapping.Nested = true
+
+	// Employee name field
+	empNameField := mapping.NewTextFieldMapping()
+	employeesMapping.AddFieldMappingsAt("name", empNameField)
+
+	// Employee role field
+	empRoleField := mapping.NewTextFieldMapping()
+	employeesMapping.AddFieldMappingsAt("role", empRoleField)
+
+	departmentsMapping.AddSubDocumentMapping("employees", employeesMapping)
+
+	// Projects mapping
+	projectsMapping := mapping.NewDocumentMapping()
+	projectsMapping.Nested = true
+
+	// Project title field
+	projTitleField := mapping.NewTextFieldMapping()
+	projectsMapping.AddFieldMappingsAt("title", projTitleField)
+
+	// Project status field
+	projStatusField := mapping.NewTextFieldMapping()
+	projectsMapping.AddFieldMappingsAt("status", projStatusField)
+
+	departmentsMapping.AddSubDocumentMapping("projects", projectsMapping)
+
+	companyMapping.AddSubDocumentMapping("departments", departmentsMapping)
+
+	// Locations mapping
+	locationsMapping := mapping.NewDocumentMapping()
+	locationsMapping.Nested = true
+
+	// Location city field
+	cityField := mapping.NewTextFieldMapping()
+	locationsMapping.AddFieldMappingsAt("city", cityField)
+
+	// Location country field
+	countryField := mapping.NewTextFieldMapping()
+	locationsMapping.AddFieldMappingsAt("country", countryField)
+
+	companyMapping.AddSubDocumentMapping("locations", locationsMapping)
+
+	// Add company to type mapping
+	imap.DefaultMapping.AddSubDocumentMapping("company", companyMapping)
+
+	return imap
+}
 func TestNestedPrefixes(t *testing.T) {
-	t.Run("NoNestedFields", func(t *testing.T) {
-		imap := mapping.NewIndexMapping()
+	imap := createNestedIndexMapping()
 
-		// Add some regular field mappings
-		englishMapping := NewTextFieldMapping()
-		englishMapping.Analyzer = en.AnalyzerName
-		imap.DefaultMapping.AddFieldMappingsAt("title", englishMapping)
-		imap.DefaultMapping.AddFieldMappingsAt("description", englishMapping)
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-		prefixes := imap.NestedPrefixes()
-		if prefixes != nil {
-			t.Fatal("expected nil for mapping with no nested fields")
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
 		}
-	})
+	}()
 
-	t.Run("SingleNestedField", func(t *testing.T) {
-		imap := mapping.NewIndexMapping()
+	nmap, ok := imap.(mapping.NestedMapping)
+	if !ok {
+		t.Fatal("index mapping is not a NestedMapping")
+	}
 
-		englishMapping := NewTextFieldMapping()
-		englishMapping.Analyzer = en.AnalyzerName
+	// Test 1: Employee Role AND Employee Name
+	fs := search.NewFieldSet()
+	fs.AddField("company.departments.employees.role")
+	fs.AddField("company.departments.employees.name")
 
-		// Create a nested mapping
-		userMapping := NewDocumentMapping()
-		userMapping.AddFieldMappingsAt("name", englishMapping)
-		userMapping.AddFieldMappingsAt("email", englishMapping)
-		userMapping.Nested = true
+	// Expected depth is 2 (employees are nested within departments)
+	expectedDepth := 2
 
-		imap.DefaultMapping.AddSubDocumentMapping("user", userMapping)
+	actualDepth := nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
 
-		prefixes := imap.NestedPrefixes()
-		if prefixes == nil {
-			t.Fatal("expected non-nil result for mapping with nested fields")
-		}
+	// Test 2: Employee Role AND Employee Name AND Department Name
+	fs = search.NewFieldSet()
+	fs.AddField("company.departments.employees.role")
+	fs.AddField("company.departments.employees.name")
+	fs.AddField("company.departments.name")
+	// Expected depth is 1 (employees and department share the same department context)
+	expectedDepth = 1
 
-		// Should contain "user" prefix
-		if _, exists := prefixes["user"]; !exists {
-			t.Errorf("expected 'user' in nested prefixes, got %v", prefixes)
-		}
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
 
-		if len(prefixes) != 1 {
-			t.Errorf("expected 1 nested prefix, got %d: %v", len(prefixes), prefixes)
-		}
-	})
+	// Test 3: Employee Role AND Location City
+	fs = search.NewFieldSet()
+	fs.AddField("company.departments.employees.role")
+	fs.AddField("company.locations.city")
+	// Expected depth is 0 (employees and locations are in different nested contexts)
+	expectedDepth = 0
 
-	t.Run("MultipleNestedFields", func(t *testing.T) {
-		imap := mapping.NewIndexMapping()
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
 
-		englishMapping := NewTextFieldMapping()
-		englishMapping.Analyzer = en.AnalyzerName
-		numericMapping := NewNumericFieldMapping()
+	// Test 4: Company Name AND Location Country
+	fs = search.NewFieldSet()
+	fs.AddField("company.name")
+	fs.AddField("company.locations.country")
+	fs.AddField("company.locations.city")
+	// Expected depth is 0 (company.name is at root, locations are nested)
+	expectedDepth = 0
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
 
-		// Create multiple nested mappings
-		userMapping := NewDocumentMapping()
-		userMapping.AddFieldMappingsAt("name", englishMapping)
-		userMapping.Nested = true
+	// Test 5: Department Budget AND Project Status AND Employee Name
+	fs = search.NewFieldSet()
+	fs.AddField("company.departments.budget")
+	fs.AddField("company.departments.projects.status")
+	fs.AddField("company.departments.employees.name")
+	// Expected depth is 1 (all share the same department context)
+	expectedDepth = 1
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
 
-		productMapping := NewDocumentMapping()
-		productMapping.AddFieldMappingsAt("title", englishMapping)
-		productMapping.AddFieldMappingsAt("price", numericMapping)
-		productMapping.Nested = true
+	// Test 6: Single Field - Company ID
+	fs = search.NewFieldSet()
+	fs.AddField("company.id")
+	// Expected depth is 0 (company.id is at root)
+	expectedDepth = 0
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
 
-		imap.DefaultMapping.AddSubDocumentMapping("user", userMapping)
-		imap.DefaultMapping.AddSubDocumentMapping("products", productMapping)
+	// Test 7: No Fields
+	fs = search.NewFieldSet()
+	// Expected depth is 0 (no fields)
+	expectedDepth = 0
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
 
-		prefixes := imap.NestedPrefixes()
-		if prefixes == nil {
-			t.Fatal("expected non-nil result for mapping with nested fields")
-		}
+	// Test 8: All Fields
+	fs = search.NewFieldSet()
+	fs.AddField("company.id")
+	fs.AddField("company.name")
+	fs.AddField("company.departments.name")
+	fs.AddField("company.departments.budget")
+	fs.AddField("company.departments.employees.name")
+	fs.AddField("company.departments.employees.role")
+	fs.AddField("company.departments.projects.title")
+	fs.AddField("company.departments.projects.status")
+	fs.AddField("company.locations.city")
+	fs.AddField("company.locations.country")
+	// Expected depth is 0 (fields span multiple nested contexts)
+	expectedDepth = 0
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
 
-		expectedPrefixes := map[string]struct{}{
-			"user":     {},
-			"products": {},
-		}
+	// Test 9: Project Title AND Project Status
+	fs = search.NewFieldSet()
+	fs.AddField("company.departments.projects.title")
+	fs.AddField("company.departments.projects.status")
+	// Expected depth is 2 (projects are nested within departments)
+	expectedDepth = 2
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
 
-		if len(prefixes) != len(expectedPrefixes) {
-			t.Errorf("expected %d nested prefixes, got %d: %v", len(expectedPrefixes), len(prefixes), prefixes)
-		}
-
-		for prefix := range expectedPrefixes {
-			if _, exists := prefixes[prefix]; !exists {
-				t.Errorf("expected '%s' in nested prefixes, got %v", prefix, prefixes)
-			}
-		}
-	})
-
-	t.Run("DeeplyNestedFields", func(t *testing.T) {
-		imap := mapping.NewIndexMapping()
-
-		englishMapping := NewTextFieldMapping()
-		englishMapping.Analyzer = en.AnalyzerName
-		numericMapping := NewNumericFieldMapping()
-		dateTimeMapping := NewDateTimeFieldMapping()
-
-		// Create deeply nested structure: posts -> comments
-		commentMapping := NewDocumentMapping()
-		commentMapping.AddFieldMappingsAt("author", englishMapping)
-		commentMapping.AddFieldMappingsAt("text", englishMapping)
-		commentMapping.AddFieldMappingsAt("likes", numericMapping)
-		commentMapping.Nested = true
-
-		postsMapping := NewDocumentMapping()
-		postsMapping.AddFieldMappingsAt("title", englishMapping)
-		postsMapping.AddFieldMappingsAt("published_date", dateTimeMapping)
-		postsMapping.AddSubDocumentMapping("comments", commentMapping)
-		postsMapping.Nested = true
-
-		imap.DefaultMapping.AddFieldMappingsAt("title", englishMapping)
-		imap.DefaultMapping.AddSubDocumentMapping("posts", postsMapping)
-
-		prefixes := imap.NestedPrefixes()
-		if prefixes == nil {
-			t.Fatal("expected non-nil result for mapping with nested fields")
-		}
-
-		// With correct logic, we should only get "posts" as prefix
-		// because posts.* fields are covered by the "posts" prefix
-		expectedPrefixes := map[string]struct{}{
-			"posts": {},
-		}
-
-		if len(prefixes) != len(expectedPrefixes) {
-			t.Errorf("expected %d nested prefixes, got %d: %v", len(expectedPrefixes), len(prefixes), prefixes)
-		}
-
-		for prefix := range expectedPrefixes {
-			if _, exists := prefixes[prefix]; !exists {
-				t.Errorf("expected '%s' in nested prefixes, got %v", prefix, prefixes)
-			}
-		}
-
-		// Test that we can find the right prefixes for field matching
-		testFields := []string{
-			"posts.title",
-			"posts.comments.author",
-			"posts.comments.text",
-			"posts.comments.likes",
-		}
-
-		// Check that our prefixes work with IntersectsPrefix
-		fieldSet := search.NewFieldSet()
-		for _, field := range testFields {
-			fieldSet.Add(field)
-		}
-
-		if !fieldSet.IntersectsPrefix(prefixes) {
-			t.Errorf("expected field set %v to intersect with nested prefixes %v", testFields, prefixes)
-		}
-	})
-
-	t.Run("TypeMappingNestedFields", func(t *testing.T) {
-		imap := mapping.NewIndexMapping()
-
-		englishMapping := NewTextFieldMapping()
-		englishMapping.Analyzer = en.AnalyzerName
-
-		// Create nested mapping in type mapping
-		userMapping := NewDocumentMapping()
-		nestedAddressMapping := NewDocumentMapping()
-		nestedAddressMapping.AddFieldMappingsAt("street", englishMapping)
-		nestedAddressMapping.AddFieldMappingsAt("city", englishMapping)
-		nestedAddressMapping.Nested = true
-
-		userMapping.AddFieldMappingsAt("name", englishMapping)
-		userMapping.AddSubDocumentMapping("address", nestedAddressMapping)
-
-		imap.AddDocumentMapping("user", userMapping)
-
-		prefixes := imap.NestedPrefixes()
-		if prefixes == nil {
-			t.Fatal("expected non-nil result for type mapping with nested fields")
-		}
-
-		// Should contain "address" prefix
-		if _, exists := prefixes["address"]; !exists {
-			t.Errorf("expected 'address' in nested prefixes, got %v", prefixes)
-		}
-	})
-
-	t.Run("DisabledMappingsIgnored", func(t *testing.T) {
-		imap := mapping.NewIndexMapping()
-
-		englishMapping := NewTextFieldMapping()
-		englishMapping.Analyzer = en.AnalyzerName
-
-		// Create nested mapping but disable it
-		disabledMapping := NewDocumentMapping()
-		disabledMapping.AddFieldMappingsAt("name", englishMapping)
-		disabledMapping.Nested = true
-		disabledMapping.Enabled = false
-
-		// Create enabled nested mapping
-		enabledMapping := NewDocumentMapping()
-		enabledMapping.AddFieldMappingsAt("title", englishMapping)
-		enabledMapping.Nested = true
-		enabledMapping.Enabled = true
-
-		imap.AddDocumentMapping("disabled", disabledMapping)
-		imap.DefaultMapping.AddSubDocumentMapping("enabled", enabledMapping)
-
-		prefixes := imap.NestedPrefixes()
-		if prefixes == nil {
-			t.Fatal("expected non-nil result for mapping with enabled nested fields")
-		}
-
-		// Should only contain "enabled" prefix, not "disabled"
-		if _, exists := prefixes["disabled"]; exists {
-			t.Errorf("expected disabled mapping to be ignored, but found 'disabled' in %v", prefixes)
-		}
-
-		if _, exists := prefixes["enabled"]; !exists {
-			t.Errorf("expected 'enabled' in nested prefixes, got %v", prefixes)
-		}
-	})
-
-	t.Run("MixedNestedAndRegularFields", func(t *testing.T) {
-		imap := mapping.NewIndexMapping()
-
-		englishMapping := NewTextFieldMapping()
-		englishMapping.Analyzer = en.AnalyzerName
-
-		// Mix of nested and regular fields
-		regularMapping := NewDocumentMapping()
-		regularMapping.AddFieldMappingsAt("description", englishMapping)
-		regularMapping.Nested = false // explicitly not nested
-
-		nestedMapping := NewDocumentMapping()
-		nestedMapping.AddFieldMappingsAt("content", englishMapping)
-		nestedMapping.Nested = true
-
-		imap.DefaultMapping.AddFieldMappingsAt("title", englishMapping)
-		imap.DefaultMapping.AddSubDocumentMapping("regular", regularMapping)
-		imap.DefaultMapping.AddSubDocumentMapping("nested", nestedMapping)
-
-		prefixes := imap.NestedPrefixes()
-		if prefixes == nil {
-			t.Fatal("expected non-nil result for mapping with nested fields")
-		}
-
-		// Should only contain "nested" prefix
-		if len(prefixes) != 1 {
-			t.Errorf("expected 1 nested prefix, got %d: %v", len(prefixes), prefixes)
-		}
-
-		if _, exists := prefixes["nested"]; !exists {
-			t.Errorf("expected 'nested' in nested prefixes, got %v", prefixes)
-		}
-
-		if _, exists := prefixes["regular"]; exists {
-			t.Errorf("expected regular mapping to not be included, but found 'regular' in %v", prefixes)
-		}
-	})
 }

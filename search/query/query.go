@@ -469,7 +469,7 @@ func ExtractFields(q Query, m mapping.IndexMapping, fs search.FieldSet) (search.
 			if fs == nil {
 				fs = search.NewFieldSet()
 			}
-			fs.Add(f)
+			fs.AddField(f)
 		}
 	case *QueryStringQuery:
 		var expandedQuery Query

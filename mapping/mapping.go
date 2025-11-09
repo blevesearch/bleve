@@ -77,7 +77,5 @@ type SynonymMapping interface {
 }
 
 type NestedMapping interface {
-	IndexMapping
-
-	NestedPrefixes() search.FieldSet
+	CoveringDepth(fieldPaths search.FieldSet) int
 }
