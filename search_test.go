@@ -5820,4 +5820,61 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	if res.Hits[0].ID != "3" {
 		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
 	}
+
+	// Test 7a: Find companies where Ivan the Manager works London, UK
+
+	empNameQuery = query.NewMatchQuery("Ivan")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery = query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	countryQuery = query.NewMatchQuery("UK")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("London")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	req = buildReq([]query.Query{empQuery, locQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 0 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+
+	// Test 7b: Find companies where Ivan the Manager works London, Canada
+
+	empNameQuery = query.NewMatchQuery("Ivan")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery = query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	countryQuery = query.NewMatchQuery("Canada")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("London")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	req = buildReq([]query.Query{empQuery, locQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "3" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
 }
