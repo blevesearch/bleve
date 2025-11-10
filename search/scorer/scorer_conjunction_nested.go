@@ -45,15 +45,24 @@ func NewNestedConjunctionQueryScorer(options search.SearcherOptions) *NestedConj
 }
 
 func (s *NestedConjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch,
-	ancestry [][]index.IndexInternalID) (*search.DocumentMatch, error) {
+	ancestry [][]index.IndexInternalID, joinIdx int) (*search.DocumentMatch, error) {
 	// find the shortest ancestor path
-	lcaIdx := 0
-	lcaPath := ancestry[lcaIdx]
-	// find the lowest common ancestor path
-	for i := 1; i < len(ancestry) && i < len(constituents); i++ {
-		if len(ancestry[i]) < len(lcaPath) {
+	// for all ancestry chains that are shallower than the joinIdx,
+	// we will consider their full depth instead, and for the
+	// others we will consider up to the joinIdx depth as
+	// the LCA candidate
+	lcaIdx := -1
+	lcaDepth := -1
+	for i, anc := range ancestry {
+		var candidateDepth int
+		if len(anc) <= joinIdx {
+			candidateDepth = len(anc)
+		} else {
+			candidateDepth = joinIdx + 1
+		}
+		if lcaDepth == -1 || candidateDepth < lcaDepth {
+			lcaDepth = candidateDepth
 			lcaIdx = i
-			lcaPath = ancestry[i]
 		}
 	}
 	// take the lca document

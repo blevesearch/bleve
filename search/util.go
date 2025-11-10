@@ -16,7 +16,6 @@ package search
 
 import (
 	"context"
-	"strings"
 
 	"github.com/blevesearch/geo/s2"
 )
@@ -250,19 +249,6 @@ func NewFieldSet() FieldSet {
 // Add adds a field to the set.
 func (fs FieldSet) AddField(field string) {
 	fs[field] = struct{}{}
-}
-
-// IntersectsPrefix returns true if any field in this set
-// starts with any field from other.
-func (fs FieldSet) IntersectsPrefix(other FieldSet) bool {
-	for field := range fs {
-		for prefix := range other {
-			if strings.HasPrefix(field, prefix) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // Slice returns the fields in this set as a slice of strings.

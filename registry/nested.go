@@ -87,9 +87,22 @@ func (nfc *NestedFieldCache) CoveringDepth(fieldPaths search.FieldSet) int {
 	return deepestLevel
 }
 
-func (nfc *NestedFieldCache) HasNestedPrefixes() bool {
+func (nfc *NestedFieldCache) CountNested() int {
 	nfc.c.mutex.RLock()
 	defer nfc.c.mutex.RUnlock()
 
-	return len(nfc.c.data) > 0
+	return len(nfc.c.data)
+}
+
+func (nfc *NestedFieldCache) IntersectsPrefix(fieldPaths search.FieldSet) bool {
+	nfc.c.mutex.RLock()
+	defer nfc.c.mutex.RUnlock()
+	for prefix := range nfc.c.data {
+		for path := range fieldPaths {
+			if strings.HasPrefix(path, prefix) {
+				return true
+			}
+		}
+	}
+	return false
 }

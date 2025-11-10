@@ -621,6 +621,26 @@ func (im *IndexMappingImpl) CoveringDepth(fs search.FieldSet) int {
 	return im.cache.NestedPrefixes.CoveringDepth(fs)
 }
 
-func (im *IndexMappingImpl) NestedPrefixes() search.FieldSet {
-	return nil
+func (im *IndexMappingImpl) CountNested() int {
+	if im.cache == nil || im.cache.NestedPrefixes == nil {
+		return 0
+	}
+
+	im.cache.NestedPrefixes.InitOnce(func() {
+		im.buildNestedPrefixes()
+	})
+
+	return im.cache.NestedPrefixes.CountNested()
+}
+
+func (im *IndexMappingImpl) IntersectsPrefix(fs search.FieldSet) bool {
+	if im.cache == nil || im.cache.NestedPrefixes == nil {
+		return false
+	}
+
+	im.cache.NestedPrefixes.InitOnce(func() {
+		im.buildNestedPrefixes()
+	})
+
+	return im.cache.NestedPrefixes.IntersectsPrefix(fs)
 }

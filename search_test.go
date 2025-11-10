@@ -5174,517 +5174,6 @@ func TestSearchRequestValidatePagination(t *testing.T) {
 	}
 }
 
-func TestNestedMapping(t *testing.T) {
-	tmpIndexPath := createTmpIndexPath(t)
-	defer cleanupTmpIndexPath(t, tmpIndexPath)
-
-	docs := []string{
-		`{
-			"title": "Tech Insights",
-			"posts": [
-				{
-					"title": "AI Trends",
-					"published_date": "2025-04-22",
-					"comments": [
-						{
-							"author": "Jane",
-							"text": "Very informative!",
-							"likes": 1
-						},
-						{
-							"author": "Tom",
-							"text": "Needs more detail.",
-							"likes": 3
-						}
-					]
-				},
-				{
-					"title": "Quantum Computing",
-					"published_date": "2025-11-15",
-					"comments": [
-						{
-							"author": "Jane",
-							"text": "Mind-blowing!",
-							"likes": 5
-						}
-					]
-				}
-			]
-		}`,
-		`{
-			"title": "Science Digest",
-			"posts": [
-				{
-					"title": "CRISPR and Gene Editing",
-					"published_date": "2025-06-10",
-					"comments": [
-						{
-							"author": "Alex",
-							"text": "Fascinating potential.",
-							"likes": 1
-						}
-					]
-				}
-			]
-		}`,
-		`{
-			"title": "Future Scope",
-			"posts": [
-				{
-					"title": "SpaceX Mars Plans",
-					"published_date": "2025-01-05",
-					"comments": []
-				},
-				{
-					"title": "Brain-Computer Interfaces",
-					"published_date": "2024-12-12",
-					"comments": [
-						{
-							"author": "Lina",
-							"text": "A bit scary, honestly.",
-							"likes": 0
-						},
-						{
-							"author": "Ken",
-							"text": "The future is now.",
-							"likes": 4
-						}
-					]
-				},
-				{
-					"title": "Fusion Energy Breakthroughs",
-					"published_date": "2025-07-01",
-					"comments": [
-						{
-							"author": "Sam",
-							"text": "Finally!",
-							"likes": 6
-						}
-					]
-				}
-			]
-		}`,
-	}
-
-	imap := mapping.NewIndexMapping()
-
-	keywordMapping := NewTextFieldMapping()
-	keywordMapping.Analyzer = keyword.Name
-
-	englishMapping := NewTextFieldMapping()
-	englishMapping.Analyzer = en.AnalyzerName
-
-	numericMapping := NewNumericFieldMapping()
-
-	dateTimeMapping := NewDateTimeFieldMapping()
-
-	commentMapping := NewDocumentMapping()
-	commentMapping.AddFieldMappingsAt("author", englishMapping)
-	commentMapping.AddFieldMappingsAt("text", englishMapping)
-	commentMapping.AddFieldMappingsAt("likes", numericMapping)
-	commentMapping.Nested = true
-
-	postsMapping := NewDocumentMapping()
-	postsMapping.AddFieldMappingsAt("title", englishMapping)
-	postsMapping.AddFieldMappingsAt("published_date", dateTimeMapping)
-	postsMapping.AddSubDocumentMapping("comments", commentMapping)
-	postsMapping.Nested = true
-
-	imap.DefaultMapping.AddFieldMappingsAt("title", englishMapping)
-	imap.DefaultMapping.AddSubDocumentMapping("posts", postsMapping)
-
-	idx, err := New(tmpIndexPath, imap)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err = idx.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	batch := idx.NewBatch()
-	for id, doc := range docs {
-		var document map[string]interface{}
-		err = json.Unmarshal([]byte(doc), &document)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = batch.Index(fmt.Sprintf("%d", id), document)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	err = idx.Batch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Test 1: Date range + Author conjunction
-	t.Run("DateRangeAndAuthor", func(t *testing.T) {
-		q1 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
-		q1.SetField("posts.published_date")
-		q2 := query.NewMatchQuery("Jane")
-		q2.SetField("posts.comments.author")
-
-		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-
-		req := NewSearchRequest(cq)
-		res, err := idx.Search(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(res.Hits) != 1 {
-			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
-		}
-		expectedDocID := "0" // "Tech Insights" has posts in 2025 with comments by Jane
-		if res.Hits[0].ID != expectedDocID {
-			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
-		}
-	})
-
-	// Test 2: Multiple author conjunction
-	t.Run("MultipleAuthors", func(t *testing.T) {
-		q1 := query.NewMatchQuery("Jane")
-		q1.SetField("posts.comments.author")
-		q2 := query.NewMatchQuery("Tom")
-		q2.SetField("posts.comments.author")
-
-		// This should match documents where the same post has comments by both Jane AND Tom
-		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-
-		req := NewSearchRequest(cq)
-		res, err := idx.Search(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// No post has a comment written by both both Jane and Tom
-		if len(res.Hits) != 0 {
-			t.Fatalf("expected 0 hits, got %d", len(res.Hits))
-		}
-	})
-
-	// Test 3: Likes range + Author conjunction
-	t.Run("LikesRangeAndAuthor", func(t *testing.T) {
-		minLikes := 3.0
-		q1 := query.NewNumericRangeQuery(&minLikes, nil)
-		q1.SetField("posts.comments.likes")
-		q2 := query.NewMatchQuery("Jane")
-		q2.SetField("posts.comments.author")
-
-		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-
-		req := NewSearchRequest(cq)
-		res, err := idx.Search(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Should find posts where Jane has comments with >= 3 likes
-		if len(res.Hits) != 1 {
-			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
-		}
-		expectedDocID := "0" // "Tech Insights" has a post with comments by Jane with 5 likes
-		if res.Hits[0].ID != expectedDocID {
-			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
-		}
-	})
-
-	// Test 4: Triple conjunction (date + author + likes)
-	t.Run("TripleConjunction", func(t *testing.T) {
-		q1 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
-		q1.SetField("posts.published_date")
-		q2 := query.NewMatchQuery("Jane")
-		q2.SetField("posts.comments.author")
-		minLikes := 1.0
-		q3 := query.NewNumericRangeQuery(&minLikes, nil)
-		q3.SetField("posts.comments.likes")
-
-		cq := query.NewConjunctionQuery([]query.Query{q1, q2, q3})
-
-		req := NewSearchRequest(cq)
-		res, err := idx.Search(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Should find posts from 2025 where Jane has comments with >= 1 likes
-		if len(res.Hits) != 1 {
-			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
-		}
-		expectedDocID := "0" // "Tech Insights" has posts in 2025 with comments by Jane with >= 1 likes
-		if res.Hits[0].ID != expectedDocID {
-			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
-		}
-	})
-
-	// Test 5: Text search + Author conjunction
-	t.Run("TextSearchAndAuthor", func(t *testing.T) {
-		q1 := query.NewMatchQuery("informative")
-		q1.SetField("posts.comments.text")
-		q2 := query.NewMatchQuery("Jane")
-		q2.SetField("posts.comments.author")
-
-		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-
-		req := NewSearchRequest(cq)
-		res, err := idx.Search(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Should find posts where Jane wrote "informative" in comments
-		if len(res.Hits) != 1 {
-			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
-		}
-	})
-
-	// Test 6: Post title + Comment author conjunction (cross-level)
-	t.Run("PostTitleAndCommentAuthor", func(t *testing.T) {
-		q1 := query.NewMatchQuery("AI")
-		q1.SetField("posts.title")
-		q2 := query.NewMatchQuery("Jane")
-		q2.SetField("posts.comments.author")
-
-		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-
-		req := NewSearchRequest(cq)
-		res, err := idx.Search(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Should find posts with "AI" in title AND Jane in comments
-		if len(res.Hits) != 1 {
-			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
-		}
-		expectedDocID := "0" // "Tech Insights" has a post titled "AI Trends" with comments by Jane
-		if res.Hits[0].ID != expectedDocID {
-			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
-		}
-	})
-
-	// Test 7: Empty results conjunction
-	t.Run("EmptyResults", func(t *testing.T) {
-		q1 := query.NewMatchQuery("NonexistentAuthor")
-		q1.SetField("posts.comments.author")
-		q2 := query.NewMatchQuery("Jane")
-		q2.SetField("posts.comments.author")
-
-		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-
-		req := NewSearchRequest(cq)
-		res, err := idx.Search(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Should find no results (impossible for same comment to be by both authors)
-		if len(res.Hits) != 0 {
-			t.Fatalf("expected 0 hits, got %d", len(res.Hits))
-		}
-	})
-
-	// Test 8: Disjunction within conjunction for more complex scenarios
-	t.Run("DisjunctionWithinConjunction", func(t *testing.T) {
-		// Find posts from 2025 with comments by either Jane OR Tom
-		q1 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
-		q1.SetField("posts.published_date")
-
-		janeQuery := query.NewMatchQuery("Jane")
-		janeQuery.SetField("posts.comments.author")
-		tomQuery := query.NewMatchQuery("Tom")
-		tomQuery.SetField("posts.comments.author")
-
-		authorDisjunction := query.NewDisjunctionQuery([]query.Query{janeQuery, tomQuery})
-
-		cq := query.NewConjunctionQuery([]query.Query{q1, authorDisjunction})
-
-		req := NewSearchRequest(cq)
-		res, err := idx.Search(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Should find posts from 2025 with comments by Jane OR Tom
-		if len(res.Hits) != 1 {
-			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
-		}
-		expectedDocID := "0" // "Tech Insights" has posts in 2025 with comments by Jane and Tom
-		if res.Hits[0].ID != expectedDocID {
-			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
-		}
-	})
-	// Test 9: Advanced Nested Conjunction - Multi-level constraints
-	t.Run("AdvancedNestedMultiLevel", func(t *testing.T) {
-		// Find documents with:
-		// 1. Posts from specific month (April 2025)
-		// 2. Comments by Jane
-		// 3. Those comments have >= 1 like
-		// 4. Post title contains "AI"
-		q1 := query.NewDateRangeStringQuery("2025-04-01", "2025-04-30")
-		q1.SetField("posts.published_date")
-
-		q2 := query.NewMatchQuery("Jane")
-		q2.SetField("posts.comments.author")
-
-		minLikes := 1.0
-		q3 := query.NewNumericRangeQuery(&minLikes, nil)
-		q3.SetField("posts.comments.likes")
-
-		q4 := query.NewMatchQuery("AI")
-		q4.SetField("posts.title")
-
-		cq := query.NewConjunctionQuery([]query.Query{q1, q2, q3, q4})
-
-		req := NewSearchRequest(cq)
-		res, err := idx.Search(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Tech Insights has AI post in April 2025 with Jane comment having 1 like
-		if len(res.Hits) != 1 {
-			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
-		}
-		expectedDocID := "0"
-		if res.Hits[0].ID != expectedDocID {
-			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
-		}
-	})
-
-	// Test 10: Nested Conjunction with Text Analysis
-	t.Run("NestedTextAnalysis", func(t *testing.T) {
-		// Find posts where specific text appears in comments by specific authors
-		q1 := query.NewMatchQuery("scary")
-		q1.SetField("posts.comments.text")
-
-		q2 := query.NewMatchQuery("Lina")
-		q2.SetField("posts.comments.author")
-
-		// Also ensure it's from a 2024 post
-		q3 := query.NewDateRangeStringQuery("2024-01-01", "2024-12-31")
-		q3.SetField("posts.published_date")
-
-		cq := query.NewConjunctionQuery([]query.Query{q1, q2, q3})
-
-		req := NewSearchRequest(cq)
-		res, err := idx.Search(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Future Scope has 2024 post with Lina's "scary" comment
-		if len(res.Hits) != 1 {
-			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
-		}
-		expectedDocID := "2"
-		if res.Hits[0].ID != expectedDocID {
-			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
-		}
-	})
-
-	// Test 11: Cross-document comparison - Multiple documents matching different criteria
-	t.Run("CrossDocumentComparison", func(t *testing.T) {
-		// Find all documents with 2025 posts that have any comments
-		q1 := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
-		q1.SetField("posts.published_date")
-
-		q2 := query.NewWildcardQuery("*") // Any author (wildcard-like behavior)
-		q2.SetField("posts.comments.author")
-
-		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-
-		req := NewSearchRequest(cq)
-		res, err := idx.Search(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// All 3 documents have posts from 2025
-		if len(res.Hits) != 3 {
-			t.Fatalf("expected 3 hits, got %d", len(res.Hits))
-		}
-	})
-
-	// Test 12: Nested Conjunction with Range Queries
-	t.Run("NestedRangeQueries", func(t *testing.T) {
-		// Find documents with posts from July 2025 AND comments with likes between 5-10
-		q1 := query.NewDateRangeStringQuery("2025-07-01", "2025-07-31")
-		q1.SetField("posts.published_date")
-
-		minLikes := 5.0
-		maxLikes := 10.0
-		q2 := query.NewNumericRangeQuery(&minLikes, &maxLikes)
-		q2.SetField("posts.comments.likes")
-
-		cq := query.NewConjunctionQuery([]query.Query{q1, q2})
-
-		req := NewSearchRequest(cq)
-		res, err := idx.Search(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Future Scope has July 2025 post (Fusion Energy) with Sam's comment having 6 likes
-		if len(res.Hits) != 1 {
-			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
-		}
-		expectedDocID := "2"
-		if res.Hits[0].ID != expectedDocID {
-			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
-		}
-	})
-
-	// Test 13: Complex Boolean Logic within Nested Context
-	t.Run("ComplexBooleanNested", func(t *testing.T) {
-		// Find documents where:
-		// (Author is Jane OR Tom) AND (likes >= 3) AND (post from 2025)
-		janeQuery := query.NewMatchQuery("Jane")
-		janeQuery.SetField("posts.comments.author")
-		tomQuery := query.NewMatchQuery("Tom")
-		tomQuery.SetField("posts.comments.author")
-		authorDisjunction := query.NewDisjunctionQuery([]query.Query{janeQuery, tomQuery})
-
-		minLikes := 3.0
-		likesQuery := query.NewNumericRangeQuery(&minLikes, nil)
-		likesQuery.SetField("posts.comments.likes")
-
-		dateQuery := query.NewDateRangeStringQuery("2025-01-01", "2025-12-31")
-		dateQuery.SetField("posts.published_date")
-
-		mainConjunction := query.NewConjunctionQuery([]query.Query{authorDisjunction, likesQuery, dateQuery})
-
-		req := NewSearchRequest(mainConjunction)
-		res, err := idx.Search(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Should find Tech Insights (Jane with 5 likes and Tom with 3 likes in 2025 posts)
-		if len(res.Hits) != 1 {
-			t.Fatalf("expected 1 hits, got %d", len(res.Hits))
-		}
-		expectedDocID := "0"
-		if res.Hits[0].ID != expectedDocID {
-			t.Fatalf("expected doc ID %s, got %s", expectedDocID, res.Hits[0].ID)
-		}
-	})
-
-	// Test 14: Test combining nested query with non-nested root field query
-	t.Run("NestedWithRootField", func(t *testing.T) {
-		// Root field query (non-nested)
-		rootQuery := query.NewMatchQuery("Tech")
-		rootQuery.SetField("title")
-
-		// Nested field query
-		nestedQuery := query.NewMatchQuery("Jane")
-		nestedQuery.SetField("posts.comments.author")
-
-		// Combine both
-		cq := query.NewConjunctionQuery([]query.Query{rootQuery, nestedQuery})
-
-		req := NewSearchRequest(cq)
-		res, err := idx.Search(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Should find "Tech Insights" document with Jane's comments
-		if len(res.Hits) != 1 {
-			t.Fatalf("expected 1 hits for mixed nested/root query, got %d", len(res.Hits))
-		}
-	})
-}
-
 func createNestedIndexMapping() mapping.IndexMapping {
 
 	/*
@@ -5710,8 +5199,6 @@ func createNestedIndexMapping() mapping.IndexMapping {
 
 	// Create company mapping
 	companyMapping := mapping.NewDocumentMapping()
-	companyMapping.Enabled = true
-	companyMapping.Dynamic = false
 
 	// Company ID field
 	companyIDField := mapping.NewTextFieldMapping()
@@ -5753,6 +5240,7 @@ func createNestedIndexMapping() mapping.IndexMapping {
 
 	// Project title field
 	projTitleField := mapping.NewTextFieldMapping()
+	projTitleField.Analyzer = keyword.Name
 	projectsMapping.AddFieldMappingsAt("title", projTitleField)
 
 	// Project status field
@@ -5915,4 +5403,421 @@ func TestNestedPrefixes(t *testing.T) {
 		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
 	}
 
+	// Test 10: Department Name AND Location Country
+	fs = search.NewFieldSet()
+	fs.AddField("company.departments.name")
+	fs.AddField("company.locations.country")
+	fs.AddField("company.locations.city")
+
+	// Expected depth is 0 (departments and locations are in different nested contexts)
+	expectedDepth = 0
+
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
+}
+
+func TestNestedConjunctionQuery(t *testing.T) {
+	imap := createNestedIndexMapping()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	// Index 3 sample documents
+	docs := []struct {
+		id   string
+		data string
+	}{
+		{
+			id: "1",
+			data: `{
+				"company": {
+					"id": "c1",
+					"name": "TechCorp",
+					"departments": [
+						{
+							"name": "Engineering",
+							"budget": 2000000,
+							"employees": [
+								{"name": "Alice", "role": "Engineer"},
+								{"name": "Bob", "role": "Manager"}
+							],
+							"projects": [
+								{"title": "Project X", "status": "ongoing"},
+								{"title": "Project Y", "status": "completed"}
+							]
+						},
+						{
+							"name": "Sales",
+							"budget": 300000,
+							"employees": [
+								{"name": "Eve", "role": "Salesperson"},
+								{"name": "Mallory", "role": "Manager"}
+							],
+							"projects": [
+								{"title": "Project A", "status": "completed"},
+								{"title": "Project B", "status": "ongoing"}
+							]
+						}	
+					],
+					"locations": [
+						{"city": "Athens", "country": "Greece"},
+						{"city": "Berlin", "country": "USA"}
+					]
+				}
+			}`,
+		},
+		{
+			id: "2",
+			data: `{
+				"company" : {
+					"id": "c2",
+					"name": "BizInc",
+					"departments": [
+						{
+							"name": "Marketing",
+							"budget": 800000,
+							"employees": [
+								{"name": "Eve", "role": "Marketer"},
+								{"name": "David", "role": "Manager"}
+							],
+							"projects": [
+								{"title": "Project Z", "status": "ongoing"},
+								{"title": "Project W", "status": "planned"}
+							]
+						},
+						{
+							"name": "Engineering",
+							"budget": 800000,
+							"employees": [
+								{"name": "Frank", "role": "Manager"},
+								{"name": "Grace", "role": "Engineer"}
+							],
+							"projects": [
+								{"title": "Project Alpha", "status": "completed"},
+								{"title": "Project Beta", "status": "ongoing"}
+							]
+						}	
+					],
+					"locations": [
+						{"city": "Athens", "country": "USA"},
+						{"city": "London", "country": "UK"}
+					]
+				}
+			}`,
+		},
+		{
+			id: "3",
+			data: `{
+				"company": {
+					"id": "c3",
+					"name": "WebSolutions",
+					"departments": [
+						{
+							"name": "HR",
+							"budget": 800000,
+							"employees": [
+								{"name": "Eve", "role": "Manager"},
+								{"name": "Frank", "role": "HR"}
+							],
+							"projects": [
+								{"title": "Project Beta", "status": "completed"},
+								{"title": "Project B", "status": "ongoing"}
+							]
+						},
+						{
+							"name": "Engineering",
+							"budget": 200000,
+							"employees": [
+								{"name": "Heidi", "role": "Support Engineer"},
+								{"name": "Ivan", "role": "Manager"}
+							],
+							"projects": [
+								{"title": "Project Helpdesk", "status": "ongoing"},
+								{"title": "Project FAQ", "status": "completed"}
+							]
+						}
+					],
+					"locations": [
+						{"city": "Edinburgh", "country": "UK"},
+						{"city": "London", "country": "Canada"}
+					]
+				}
+			}`,
+		},
+	}
+
+	for _, doc := range docs {
+		var dataMap map[string]interface{}
+		err := json.Unmarshal([]byte(doc.data), &dataMap)
+		if err != nil {
+			t.Fatalf("failed to unmarshal document %s: %v", doc.id, err)
+		}
+		err = idx.Index(doc.id, dataMap)
+		if err != nil {
+			t.Fatalf("failed to index document %s: %v", doc.id, err)
+		}
+	}
+
+	var buildReq = func(subQueries []query.Query) *SearchRequest {
+		rv := NewSearchRequest(query.NewConjunctionQuery(subQueries))
+		rv.SortBy([]string{"_id"})
+		return rv
+	}
+
+	var (
+		req             *SearchRequest
+		res             *SearchResult
+		deptNameQuery   *query.MatchQuery
+		deptBudgetQuery *query.NumericRangeQuery
+		empNameQuery    *query.MatchQuery
+		empRoleQuery    *query.MatchQuery
+		projTitleQuery  *query.MatchQuery
+		projStatusQuery *query.MatchQuery
+		countryQuery    *query.MatchQuery
+		cityQuery       *query.MatchQuery
+	)
+
+	// Test 1: Find companies with a department named "Engineering" AND budget over 900000
+	deptNameQuery = query.NewMatchQuery("Engineering")
+	deptNameQuery.SetField("company.departments.name")
+
+	min := float64(800000)
+	deptBudgetQuery = query.NewNumericRangeQuery(&min, nil)
+	deptBudgetQuery.SetField("company.departments.budget")
+
+	req = buildReq([]query.Query{deptNameQuery, deptBudgetQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "1" || res.Hits[1].ID != "2" {
+		t.Fatalf("unexpected hit IDs: %v, %v", res.Hits[0].ID, res.Hits[1].ID)
+	}
+
+	// Test 2: Find companies with an employee named "Eve" AND project status "completed"
+	empNameQuery = query.NewMatchQuery("Eve")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	projStatusQuery = query.NewMatchQuery("completed")
+	projStatusQuery.SetField("company.departments.projects.status")
+
+	req = buildReq([]query.Query{empNameQuery, projStatusQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "1" || res.Hits[1].ID != "3" {
+		t.Fatalf("unexpected hit IDs: %v, %v", res.Hits[0].ID, res.Hits[1].ID)
+	}
+
+	// Test 3: Find companies located in "Athens, USA" AND with an Engineering department
+	countryQuery = query.NewMatchQuery("USA")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("Athens")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery := query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	deptNameQuery = query.NewMatchQuery("Engineering")
+	deptNameQuery.SetField("company.departments.name")
+
+	req = buildReq([]query.Query{locQuery, deptNameQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "2" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
+
+	// Test 4a: Find companies located in "Athens, USA" AND with an Engineering department with a budget over 1M
+	countryQuery = query.NewMatchQuery("USA")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("Athens")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	deptNameQuery = query.NewMatchQuery("Engineering")
+	deptNameQuery.SetField("company.departments.name")
+
+	min = float64(1000000)
+	deptBudgetQuery = query.NewNumericRangeQuery(&min, nil)
+	deptBudgetQuery.SetField("company.departments.budget")
+
+	deptQuery := query.NewConjunctionQuery([]query.Query{deptNameQuery, deptBudgetQuery})
+
+	req = buildReq([]query.Query{locQuery, deptQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 0 {
+		t.Fatalf("expected 0 hits, got %d", len(res.Hits))
+	}
+
+	// Test 4b: Find companies located in "Athens, Greece" AND with an Engineering department with a budget over 1M
+	countryQuery = query.NewMatchQuery("Greece")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("Athens")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	deptNameQuery = query.NewMatchQuery("Engineering")
+	deptNameQuery.SetField("company.departments.name")
+
+	min = float64(1000000)
+	deptBudgetQuery = query.NewNumericRangeQuery(&min, nil)
+	deptBudgetQuery.SetField("company.departments.budget")
+
+	deptQuery = query.NewConjunctionQuery([]query.Query{deptNameQuery, deptBudgetQuery})
+
+	req = buildReq([]query.Query{locQuery, deptQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1hits, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "1" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
+
+	// Test 5a: Find companies with an employee named "Frank" AND role "Manager" whose department is
+	// handling a project titled "Project Beta" which is marked as "ongoing"
+	empNameQuery = query.NewMatchQuery("Frank")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery := query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	projTitleQuery = query.NewMatchQuery("Project Beta")
+	projTitleQuery.SetField("company.departments.projects.title")
+
+	projStatusQuery = query.NewMatchQuery("completed")
+	projStatusQuery.SetField("company.departments.projects.status")
+
+	projQuery := query.NewConjunctionQuery([]query.Query{projTitleQuery, projStatusQuery})
+
+	req = buildReq([]query.Query{empQuery, projQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 0 {
+		t.Fatalf("expected 0 hit, got %d", len(res.Hits))
+	}
+
+	// Test 5b: Find companies with an employee named "Frank" AND role "Manager" whose department is
+	// handling a project titled "Project Beta" which is marked as "completed"
+	empNameQuery = query.NewMatchQuery("Frank")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery = query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	projTitleQuery = query.NewMatchQuery("Project Beta")
+	projTitleQuery.SetField("company.departments.projects.title")
+
+	projStatusQuery = query.NewMatchQuery("ongoing")
+	projStatusQuery.SetField("company.departments.projects.status")
+
+	projQuery = query.NewConjunctionQuery([]query.Query{projTitleQuery, projStatusQuery})
+
+	req = buildReq([]query.Query{empQuery, projQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "2" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
+
+	// Test 6a: Find companies with an employee named "Eve" AND role "Manager"
+	// who is working in a department located in "London, UK"
+	empNameQuery = query.NewMatchQuery("Eve")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery = query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	countryQuery = query.NewMatchQuery("UK")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("London")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	req = buildReq([]query.Query{empQuery, locQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 0 {
+		t.Fatalf("expected 0 hit, got %d", len(res.Hits))
+	}
+
+	// Test 6b: Find companies with an employee named "Eve" AND role "Manager"
+	// who is working in a department located in "London, Canada"
+	empNameQuery = query.NewMatchQuery("Eve")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery = query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	countryQuery = query.NewMatchQuery("Canada")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("London")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	req = buildReq([]query.Query{empQuery, locQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "3" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
 }

@@ -1451,7 +1451,7 @@ func (i *indexImpl) buildTopNCollector(req *SearchRequest, reader index.IndexRea
 	}
 
 	if nm, ok := i.m.(mapping.NestedMapping); ok {
-		if nestedPrefixes := nm.NestedPrefixes(); nestedPrefixes != nil {
+		if nm.CountNested() > 0 {
 			if nr, ok := reader.(index.NestedReader); ok {
 				var fs search.FieldSet
 				var err error
@@ -1459,8 +1459,7 @@ func (i *indexImpl) buildTopNCollector(req *SearchRequest, reader index.IndexRea
 				if err != nil {
 					return nil, err
 				}
-				if (fs != nil && fs.IntersectsPrefix(nestedPrefixes)) ||
-					isMatchAllQuery(req.Query) {
+				if nm.IntersectsPrefix(fs) {
 					return newNestedCollector(nr), nil
 				}
 			}

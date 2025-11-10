@@ -42,11 +42,12 @@ type NestedConjunctionSearcher struct {
 	pivotIDx      int
 	scorer        *scorer.NestedConjunctionQueryScorer
 	initialized   bool
+	joinIdx       int
 	options       search.SearcherOptions
 }
 
 func NewNestedConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
-	searchers []search.Searcher, options search.SearcherOptions) (search.Searcher, error) {
+	searchers []search.Searcher, joinIdx int, options search.SearcherOptions) (search.Searcher, error) {
 
 	var nr index.NestedReader
 	var ok bool
@@ -62,10 +63,21 @@ func NewNestedConjunctionSearcher(ctx context.Context, indexReader index.IndexRe
 		currs:         make([]*search.DocumentMatch, len(searchers)),
 		currAncestors: make([][]index.IndexInternalID, len(searchers)),
 		scorer:        scorer.NewNestedConjunctionQueryScorer(options),
+		joinIdx:       joinIdx,
 	}
 	rv.computeQueryNorm()
 
 	return &rv, nil
+}
+
+// getTargetAncestor returns the appropriate ancestor ID for the given joinIdx
+// if the ancestry chain is shallower than joinIdx, it returns the deepest ancestor
+// otherwise it returns the ancestor at joinIdx level from the top-most ancestor
+func getTargetAncestor(ancestors []index.IndexInternalID, joinIdx int) index.IndexInternalID {
+	if len(ancestors) > joinIdx {
+		return ancestors[len(ancestors)-joinIdx-1]
+	}
+	return ancestors[len(ancestors)-1]
 }
 
 func (s *NestedConjunctionSearcher) initSearchers(ctx *search.SearchContext) (bool, error) {
@@ -214,8 +226,9 @@ func (s *NestedConjunctionSearcher) Next(ctx *search.SearchContext) (*search.Doc
 		pivotID := pivotDM.IndexInternalID
 		// first, make sure the pivot is ahead of all the other searchers
 		// we do this by getting the max of all the other searchers' IDs
+		// at their respective target ancestors
 		// and if the pivot is behind that, we advance it to that
-		maxID := pivotID
+		maxID := getTargetAncestor(pivotAncestors, s.joinIdx)
 		for i := 0; i < len(s.searchers); i++ {
 			if i == s.pivotIDx {
 				// skip the pivot itself
@@ -226,8 +239,10 @@ func (s *NestedConjunctionSearcher) Next(ctx *search.SearchContext) (*search.Doc
 				// one of the searchers is exhausted, so we are done
 				return nil, nil
 			}
-			if curr.IndexInternalID.Compare(maxID) > 0 {
-				maxID = curr.IndexInternalID
+			targetAncestor := getTargetAncestor(s.currAncestors[i], s.joinIdx)
+			// now compare curr's target ancestor with maxID
+			if targetAncestor.Compare(maxID) > 0 {
+				maxID = targetAncestor
 			}
 		}
 		if maxID.Compare(pivotID) > 0 {
@@ -253,10 +268,15 @@ func (s *NestedConjunctionSearcher) Next(ctx *search.SearchContext) (*search.Doc
 		// at this point, we know the pivot is ahead of all the other searchers
 		// now try to align all the other searchers to the pivot's ancestry
 		// we do this by advancing each searcher to the corresponding ancestor
-		// of the pivot, once that is done we check if all the searchers are aligned
-		// if they are, we have a match, otherwise we have a scenario where one or more
-		// searchers have advanced beyond the pivot, so we need to restart the whole process
-		// where we have to find the new maxID and advance the pivot as done above
+		// of the pivot, with searchers with insufficient depth being advanced
+		// to the corresponding document ID in the pivot's ancestry and
+		// and the searchers with sufficient depth being advanced to the
+		// ancestor at joinIdx level  once that is done we check if all the
+		// searchers are aligned if they are, we have a match, otherwise we have a
+		// scenario where one or more searchers have advanced beyond the pivot, so
+		// we need to restart the whole process where we have to find the new maxID
+		// and advance the pivot as done above
+		allAligned := true
 		for i := 0; i < len(s.searchers); i++ {
 			if i == s.pivotIDx {
 				// skip the pivot itself
@@ -269,7 +289,15 @@ func (s *NestedConjunctionSearcher) Next(ctx *search.SearchContext) (*search.Doc
 			}
 			// try to align curr to the pivot's ancestry by advancing the
 			// searcher to the corresponding ancestor of the pivot
-			targetAncestor := pivotAncestors[len(pivotAncestors)-len(s.currAncestors[i])]
+			var targetAncestor index.IndexInternalID
+			if len(s.currAncestors[i]) > s.joinIdx {
+				// this searcher has sufficient depth, so use the pivot's ancestor at joinIdx
+				targetAncestor = pivotAncestors[len(pivotAncestors)-s.joinIdx-1]
+			} else {
+				// this searcher does not have sufficient depth, so use the pivot's
+				// ancestor at the searcher's max depth
+				targetAncestor = pivotAncestors[len(s.currAncestors[i])-1]
+			}
 			if curr.IndexInternalID.Compare(targetAncestor) < 0 {
 				var err error
 				ctx.DocumentMatchPool.Put(curr)
@@ -287,39 +315,17 @@ func (s *NestedConjunctionSearcher) Next(ctx *search.SearchContext) (*search.Doc
 					return nil, err
 				}
 			}
-		}
-		// now we check if all the searchers are aligned with the pivot, which will happen
-		// when the pivot docID is >= all the other searchers' docIDs, if any searcher moved
-		// past the required pivot's ancestor it will naturally be ahead the pivot's docID
-		// which would mean there is no alignment and we need to restart the whole process
-		allAligned := true
-		for i := 0; i < len(s.searchers); i++ {
-			if i == s.pivotIDx {
-				// skip the pivot itself
-				continue
-			}
-			curr := s.currs[i]
-			if curr == nil {
-				// one of the searchers is exhausted, so we are done
-				return nil, nil
-			}
-			if curr.IndexInternalID.Compare(pivotID) > 0 {
-				// this searcher has moved past the pivot, so no alignment
+			// now check if we are aligned
+			currID := getTargetAncestor(s.currAncestors[i], s.joinIdx)
+			if currID.Compare(targetAncestor) != 0 {
 				allAligned = false
-				break
-			}
-			// now check if the ancestry chains are compatible
-			if !s.suffixJoinOK(s.currAncestors[i], pivotAncestors) {
-				// ancestry chains are not compatible, so no alignment
-				allAligned = false
-				break
 			}
 		}
 		if allAligned {
 			// we have a match, so we can build the resulting DocumentMatch
 			// we do this by delegating to the scorer, which will pick the lowest
 			// common ancestor (LCA) and merge all the constituents into it
-			dm, err := s.scorer.Score(ctx, s.currs, s.currAncestors)
+			dm, err := s.scorer.Score(ctx, s.currs, s.currAncestors, s.joinIdx)
 			if err != nil {
 				return nil, err
 			}
@@ -355,26 +361,4 @@ func (s *NestedConjunctionSearcher) Advance(ctx *search.SearchContext, ID index.
 		}
 		ctx.DocumentMatchPool.Put(next)
 	}
-}
-
-// suffixJoinOK checks if one ancestry path is a suffix of the other
-func (s *NestedConjunctionSearcher) suffixJoinOK(ancA, ancB []index.IndexInternalID) bool {
-	lenA := len(ancA)
-	lenB := len(ancB)
-	if lenA == 0 || lenB == 0 {
-		return false
-	}
-
-	// compare last minLen elements
-	minLen := min(lenB, lenA)
-
-	offsetA := lenA - minLen
-	offsetB := lenB - minLen
-
-	for i := range minLen {
-		if !ancA[offsetA+i].Equals(ancB[offsetB+i]) {
-			return false
-		}
-	}
-	return true
 }
