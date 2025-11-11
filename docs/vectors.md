@@ -19,6 +19,7 @@
     | `v2.4.3`, `v2.4.4` | [blevesearch/faiss@b747c55](https://github.com/blevesearch/faiss/tree/b747c55a93a9627039c34d44b081f375dca94e57) (modified v1.8.0) |
     | `v2.5.0`, `v2.5.1` | [blevesearch/faiss@352484e](https://github.com/blevesearch/faiss/tree/352484e0fc9d1f8f46737841efe5f26e0f383f71) (modified v1.10.0) |
     | `v2.5.2`, `v2.5.3`, `v2.5.4` | [blevesearch/faiss@b3d4e00](https://github.com/blevesearch/faiss/tree/b3d4e00a69425b95e0b283da7801efc9f66b580d) (modified v1.11.0) |
+    | `v2.5.5` | [blevesearch/faiss@8a59a0c](https://github.com/blevesearch/faiss/tree/8a59a0c552fa2d14fa871f6b6bc793de1d277f5e) (modified v1.12.0) |
 
 ## Supported
 

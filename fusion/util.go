@@ -82,8 +82,8 @@ func scoreSortFunc() func(i, j *search.DocumentMatch) int {
 
 func getFusionExplAt(hit *search.DocumentMatch, i int, value float64, message string) *search.Explanation {
 	return &search.Explanation{
-		Value: value,
-		Message: message,
+		Value:    value,
+		Message:  message,
 		Children: []*search.Explanation{hit.Expl.Children[i]},
 	}
 }
