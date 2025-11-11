@@ -34,6 +34,7 @@ import (
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/bleve_index_api/vfs"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	bolt "go.etcd.io/bbolt"
 )
@@ -554,59 +555,64 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	return true, nil
 }
 
-func copyToDirectory(srcPath string, d index.Directory) (int64, error) {
-	if d == nil {
-		return 0, nil
-	}
-
-	dest, err := d.GetWriter(filepath.Join("store", filepath.Base(srcPath)))
+func copyBetweenDirectories(srcName string, srcDir vfs.Directory, dstDir vfs.Directory) error {
+	// Open source file from VFS
+	source, err := srcDir.Open(srcName)
 	if err != nil {
-		return 0, fmt.Errorf("GetWriter err: %v", err)
-	}
-
-	sourceFileStat, err := os.Stat(srcPath)
-	if err != nil {
-		return 0, err
-	}
-
-	if !sourceFileStat.Mode().IsRegular() {
-		return 0, fmt.Errorf("%s is not a regular file", srcPath)
-	}
-
-	source, err := os.Open(srcPath)
-	if err != nil {
-		return 0, err
+		return fmt.Errorf("VFS source open %s: %w", srcName, err)
 	}
 	defer source.Close()
+
+	// Create destination file in VFS
+	dest, err := dstDir.Create(srcName)
+	if err != nil {
+		return fmt.Errorf("VFS dest create %s: %w", srcName, err)
+	}
 	defer dest.Close()
-	return io.Copy(dest, source)
+
+	// Use 1MB buffer for better performance with remote storage
+	buf := make([]byte, 1024*1024)
+	if _, err := io.CopyBuffer(dest, source, buf); err != nil {
+		return fmt.Errorf("VFS copy %s: %w", srcName, err)
+	}
+
+	// Critical: Sync destination for durability
+	if err := dest.Sync(); err != nil {
+		return fmt.Errorf("VFS dest sync %s: %w", srcName, err)
+	}
+
+	return nil
 }
 
-func persistToDirectory(seg segment.UnpersistedSegment, d index.Directory,
-	path string,
+func persistToDirectory(seg segment.UnpersistedSegment, d vfs.Directory,
+	name string,
 ) error {
-	if d == nil {
-		return seg.Persist(path)
-	}
-
+	// Segments must implement io.WriterTo for VFS persistence
 	sg, ok := seg.(io.WriterTo)
 	if !ok {
-		return fmt.Errorf("no io.WriterTo segment implementation found")
+		return fmt.Errorf("segment doesn't implement io.WriterTo for VFS persistence")
 	}
 
-	w, err := d.GetWriter(filepath.Join("store", filepath.Base(path)))
+	w, err := d.Create(name)
 	if err != nil {
-		return err
+		return fmt.Errorf("VFS create %s: %w", name, err)
+	}
+	defer w.Close()
+
+	if _, err := sg.WriteTo(w); err != nil {
+		return fmt.Errorf("segment write to %s: %w", name, err)
 	}
 
-	_, err = sg.WriteTo(w)
-	w.Close()
+	// Critical: Sync before close for durability
+	if err := w.Sync(); err != nil {
+		return fmt.Errorf("VFS sync %s: %w", name, err)
+	}
 
-	return err
+	return nil
 }
 
 func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
-	segPlugin SegmentPlugin, exclude map[uint64]struct{}, d index.Directory) (
+	segPlugin SegmentPlugin, exclude map[uint64]struct{}, d vfs.Directory) (
 	[]string, map[uint64]string, error) {
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
 	if err != nil {
@@ -683,11 +689,9 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 		}
 		switch seg := segmentSnapshot.segment.(type) {
 		case segment.PersistedSegment:
+			// Persisted segments are already in the VFS directory
+			// No need to copy them - just record their metadata
 			segPath := seg.Path()
-			_, err = copyToDirectory(segPath, d)
-			if err != nil {
-				return nil, nil, fmt.Errorf("segment: %s copy err: %v", segPath, err)
-			}
 			filename := filepath.Base(segPath)
 			err = snapshotSegmentBucket.Put(util.BoltPathKey, []byte(filename))
 			if err != nil {
@@ -699,12 +703,21 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			// restricts which in-memory segment to be persisted to disk)
 			if _, ok := exclude[segmentSnapshot.id]; !ok {
 				filename := zapFileName(segmentSnapshot.id)
-				path := filepath.Join(path, filename)
-				err := persistToDirectory(seg, d, path)
-				if err != nil {
-					return nil, nil, fmt.Errorf("segment: %s persist err: %v", path, err)
+
+				// VFS is now mandatory for segment persistence
+				if d == nil {
+					return nil, nil, fmt.Errorf("VFS directory required for segment persistence")
 				}
-				newSegmentPaths[segmentSnapshot.id] = path
+
+				err := persistToDirectory(seg, d, filename)
+				if err != nil {
+					return nil, nil, fmt.Errorf("segment %s persist err: %v", filename, err)
+				}
+
+				// Store the full path for backwards compatibility (used by segment opening code)
+				fullPath := filepath.Join(path, filename)
+				newSegmentPaths[segmentSnapshot.id] = fullPath
+
 				err = snapshotSegmentBucket.Put(util.BoltPathKey, []byte(filename))
 				if err != nil {
 					return nil, nil, err
@@ -768,7 +781,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot, exclude map[uint
 		}
 	}()
 
-	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin, exclude, nil)
+	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin, exclude, s.vfsDir)
 	if err != nil {
 		return err
 	}
@@ -793,9 +806,20 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot, exclude map[uint
 			}
 		}()
 		for segmentID, path := range newSegmentPaths {
-			newSegments[segmentID], err = s.segPlugin.Open(path)
-			if err != nil {
-				return fmt.Errorf("error opening new segment at %s, %v", path, err)
+			// Try VFS-aware plugin first, fall back to legacy path-based
+			if vfsPlugin, ok := s.segPlugin.(SegmentPluginVFS); ok && s.vfsDir != nil {
+				// Use VFS-aware method with relative filename
+				filename := filepath.Base(path)
+				newSegments[segmentID], err = vfsPlugin.OpenVFS(s.vfsDir, filename)
+				if err != nil {
+					return fmt.Errorf("error opening segment %s via VFS, %v", filename, err)
+				}
+			} else {
+				// Legacy path-based opening
+				newSegments[segmentID], err = s.segPlugin.Open(path)
+				if err != nil {
+					return fmt.Errorf("error opening new segment at %s, %v", path, err)
+				}
 			}
 		}
 
@@ -1004,10 +1028,24 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	if pathBytes == nil {
 		return nil, fmt.Errorf("segment path missing")
 	}
-	segmentPath := s.path + string(os.PathSeparator) + string(pathBytes)
-	seg, err := s.segPlugin.Open(segmentPath)
-	if err != nil {
-		return nil, fmt.Errorf("error opening bolt segment: %v", err)
+	filename := string(pathBytes)
+
+	// Try VFS-aware plugin first, fall back to legacy path-based
+	var seg segment.Segment
+	var err error
+	if vfsPlugin, ok := s.segPlugin.(SegmentPluginVFS); ok && s.vfsDir != nil {
+		// Use VFS-aware method with relative filename
+		seg, err = vfsPlugin.OpenVFS(s.vfsDir, filename)
+		if err != nil {
+			return nil, fmt.Errorf("error opening segment %s via VFS: %v", filename, err)
+		}
+	} else {
+		// Legacy path-based opening
+		segmentPath := s.path + string(os.PathSeparator) + filename
+		seg, err = s.segPlugin.Open(segmentPath)
+		if err != nil {
+			return nil, fmt.Errorf("error opening bolt segment: %v", err)
+		}
 	}
 
 	rv := &SegmentSnapshot{

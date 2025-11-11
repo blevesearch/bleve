@@ -21,7 +21,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
+
+	apivfs "github.com/blevesearch/bleve_index_api/vfs"
 )
 
 // FSDirectory is a Directory implementation that uses the local filesystem.
@@ -49,8 +50,19 @@ func (d *FSDirectory) Open(name string) (io.ReadCloser, error) {
 	return os.Open(fullPath)
 }
 
+// OpenAt opens the named file for random access reading.
+// This is used for memory-mapped segments.
+func (d *FSDirectory) OpenAt(name string) (apivfs.ReaderAtCloser, error) {
+	fullPath := d.FullPath(name)
+	f, err := os.Open(fullPath)
+	if err != nil {
+		return nil, err
+	}
+	return apivfs.NewFileReaderAtCloser(f), nil
+}
+
 // Create creates or truncates the named file for writing.
-func (d *FSDirectory) Create(name string) (io.WriteCloser, error) {
+func (d *FSDirectory) Create(name string) (apivfs.WriteCloser, error) {
 	fullPath := d.FullPath(name)
 
 	// Ensure parent directory exists
@@ -88,7 +100,7 @@ func (d *FSDirectory) Rename(oldpath, newpath string) error {
 }
 
 // Stat returns FileInfo describing the named file.
-func (d *FSDirectory) Stat(name string) (FileInfo, error) {
+func (d *FSDirectory) Stat(name string) (apivfs.FileInfo, error) {
 	fullPath := d.FullPath(name)
 	fi, err := os.Stat(fullPath)
 	if err != nil {
@@ -98,14 +110,14 @@ func (d *FSDirectory) Stat(name string) (FileInfo, error) {
 }
 
 // ReadDir reads the named directory and returns a list of directory entries.
-func (d *FSDirectory) ReadDir(name string) ([]FileInfo, error) {
+func (d *FSDirectory) ReadDir(name string) ([]apivfs.FileInfo, error) {
 	fullPath := d.FullPath(name)
 	entries, err := os.ReadDir(fullPath)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]FileInfo, 0, len(entries))
+	result := make([]apivfs.FileInfo, 0, len(entries))
 	for _, entry := range entries {
 		info, err := entry.Info()
 		if err != nil {
@@ -151,7 +163,8 @@ func (d *FSDirectory) Lock() error {
 	}
 
 	// Try to acquire an exclusive lock (non-blocking)
-	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	// Uses platform-specific implementation (flock on Unix, LockFileEx on Windows)
+	err = flock(f, true)
 	if err != nil {
 		f.Close()
 		return fmt.Errorf("failed to acquire lock (another process may have the index open): %w", err)
@@ -171,7 +184,8 @@ func (d *FSDirectory) Unlock() error {
 	}
 
 	// Release the lock
-	if err := syscall.Flock(int(d.lockFile.Fd()), syscall.LOCK_UN); err != nil {
+	// Uses platform-specific implementation (flock on Unix, UnlockFileEx on Windows)
+	if err := funlock(d.lockFile); err != nil {
 		return fmt.Errorf("failed to release lock: %w", err)
 	}
 
@@ -210,5 +224,5 @@ type fsFileInfo struct {
 	os.FileInfo
 }
 
-// Ensure FSDirectory implements Directory
-var _ Directory = (*FSDirectory)(nil)
+// Ensure FSDirectory implements apivfs.Directory
+var _ apivfs.Directory = (*FSDirectory)(nil)

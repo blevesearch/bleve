@@ -354,14 +354,26 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 		if len(segmentsToMerge) > 0 {
 			filename = zapFileName(newSegmentID)
 			s.markIneligibleForRemoval(filename)
-			path := s.path + string(os.PathSeparator) + filename
 
 			fileMergeZapStartTime := time.Now()
 
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
 			prevBytesReadTotal := cumulateBytesRead(segmentsToMerge)
-			newDocNums, _, err := s.segPlugin.Merge(segmentsToMerge, docsToDrop, path,
-				cw.cancelCh, s)
+
+			// Try VFS-aware plugin first, fall back to legacy path-based
+			var newDocNums [][]uint64
+			var err error
+			if vfsPlugin, ok := s.segPlugin.(SegmentPluginVFS); ok && s.vfsDir != nil {
+				// Use VFS-aware merge with relative filename
+				newDocNums, _, err = vfsPlugin.MergeVFS(s.vfsDir, filename,
+					segmentsToMerge, docsToDrop, cw.cancelCh, s)
+			} else {
+				// Legacy path-based merge
+				path := s.path + string(os.PathSeparator) + filename
+				newDocNums, _, err = s.segPlugin.Merge(segmentsToMerge, docsToDrop, path,
+					cw.cancelCh, s)
+			}
+
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
 
 			fileMergeZapTime := uint64(time.Since(fileMergeZapStartTime))
@@ -379,7 +391,15 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 				return fmt.Errorf("merging failed: %v", err)
 			}
 
-			seg, err = s.segPlugin.Open(path)
+			// Open the newly merged segment
+			if vfsPlugin, ok := s.segPlugin.(SegmentPluginVFS); ok && s.vfsDir != nil {
+				// Use VFS-aware open with relative filename
+				seg, err = vfsPlugin.OpenVFS(s.vfsDir, filename)
+			} else {
+				// Legacy path-based open
+				path := s.path + string(os.PathSeparator) + filename
+				seg, err = s.segPlugin.Open(path)
+			}
 			if err != nil {
 				s.unmarkIneligibleForRemoval(filename)
 				atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
@@ -523,12 +543,23 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			defer wg.Done()
 			newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
 			filename := zapFileName(newSegmentID)
-			path := s.path + string(os.PathSeparator) + filename
 
 			// the newly merged segment is already flushed out to disk, just needs
 			// to be opened using mmap.
-			newDocIDs, _, err :=
-				s.segPlugin.Merge(segsBatch, dropsBatch, path, s.closeCh, s)
+			var newDocIDs [][]uint64
+			var err error
+
+			// Try VFS-aware plugin first, fall back to legacy path-based
+			if vfsPlugin, ok := s.segPlugin.(SegmentPluginVFS); ok && s.vfsDir != nil {
+				// Use VFS-aware merge with relative filename
+				newDocIDs, _, err = vfsPlugin.MergeVFS(s.vfsDir, filename,
+					segsBatch, dropsBatch, s.closeCh, s)
+			} else {
+				// Legacy path-based merge
+				path := s.path + string(os.PathSeparator) + filename
+				newDocIDs, _, err = s.segPlugin.Merge(segsBatch, dropsBatch, path, s.closeCh, s)
+			}
+
 			if err != nil {
 				em.Lock()
 				errs = append(errs, err)
@@ -536,6 +567,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 				atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
 				return
 			}
+
 			// to prevent accidental cleanup of this newly created file, mark it
 			// as ineligible for removal. this will be flipped back when the bolt
 			// is updated - which is valid, since the snapshot updated in bolt is
@@ -543,7 +575,16 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			s.markIneligibleForRemoval(filename)
 			newMergedSegmentIDs[id] = newSegmentID
 			newDocIDsSet[id] = newDocIDs
-			newMergedSegments[id], err = s.segPlugin.Open(path)
+
+			// Open the newly merged segment
+			if vfsPlugin, ok := s.segPlugin.(SegmentPluginVFS); ok && s.vfsDir != nil {
+				// Use VFS-aware open with relative filename
+				newMergedSegments[id], err = vfsPlugin.OpenVFS(s.vfsDir, filename)
+			} else {
+				// Legacy path-based open
+				path := s.path + string(os.PathSeparator) + filename
+				newMergedSegments[id], err = s.segPlugin.Open(path)
+			}
 			if err != nil {
 				em.Lock()
 				errs = append(errs, err)

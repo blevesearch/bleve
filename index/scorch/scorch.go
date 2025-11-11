@@ -28,6 +28,7 @@ import (
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
+	apivfs "github.com/blevesearch/bleve_index_api/vfs"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	bolt "go.etcd.io/bbolt"
 )
@@ -51,7 +52,7 @@ type Scorch struct {
 
 	// vfsDir is the pluggable directory for segment storage
 	// If nil, falls back to filesystem operations at 'path'
-	vfsDir vfs.Directory
+	vfsDir apivfs.Directory
 
 	unsafeBatch bool
 
@@ -152,7 +153,7 @@ func NewScorch(storeName string,
 	rv.root = &IndexSnapshot{parent: rv, refs: 1, creator: "NewScorch"}
 
 	// Check if a custom VFS directory is provided
-	if dir, ok := config["vfsDirectory"].(vfs.Directory); ok {
+	if dir, ok := config["vfsDirectory"].(apivfs.Directory); ok {
 		rv.vfsDir = dir
 	}
 
@@ -281,10 +282,21 @@ func (s *Scorch) openBolt() error {
 			return os.OpenFile(path, os.O_RDONLY, mode)
 		}
 	} else {
+		// Create base directory for BoltDB (local filesystem)
 		if s.path != "" {
 			err := os.MkdirAll(s.path, 0o700)
 			if err != nil {
-				return err
+				return fmt.Errorf("create local directory: %w", err)
+			}
+		}
+
+		// Ensure VFS directory exists for segments
+		// For FSDirectory, this is the same as the local directory
+		// For remote VFS (S3, etc.), this creates the necessary storage structure
+		if s.vfsDir != nil {
+			err := s.vfsDir.MkdirAll(".", 0o700)
+			if err != nil {
+				return fmt.Errorf("create VFS directory: %w", err)
 			}
 		}
 	}
