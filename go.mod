@@ -48,5 +48,5 @@ require (
 // Use bleve_index_api branch with VFS support
 replace github.com/blevesearch/bleve_index_api => github.com/ajroetker/bleve_index_api v0.0.0-20251111010750-7b3692d79f01
 
-// Use zapx branch with VFS support
-replace github.com/blevesearch/zapx/v16 => github.com/ajroetker/zapx/v16 v16.0.0-20251111202718-67691ba74877
+// Use VFS-enabled zapx from ajroetker fork
+replace github.com/blevesearch/zapx/v16 => github.com/ajroetker/zapx/v16 v16.0.0-20251111234330-70822381ed85

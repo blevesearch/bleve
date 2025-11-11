@@ -71,7 +71,7 @@ func (d *FSDirectory) Create(name string) (apivfs.WriteCloser, error) {
 		return nil, fmt.Errorf("failed to create parent directory: %w", err)
 	}
 
-	f, err := os.Create(fullPath)
+	f, err := os.OpenFile(fullPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -139,6 +139,21 @@ func (d *FSDirectory) Sync() error {
 	// For filesystem directories, we don't need to do anything special here.
 	// Individual file syncs happen when files are closed.
 	return nil
+}
+
+// GetWriter implements index.Directory for backwards compatibility.
+// This allows FSDirectory to be used where index.Directory is expected.
+func (d *FSDirectory) GetWriter(filePath string) (io.WriteCloser, error) {
+	// Create any necessary parent directories
+	dir := filepath.Dir(filePath)
+	if dir != "" && dir != "." {
+		if err := d.MkdirAll(dir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create parent directories: %w", err)
+		}
+	}
+
+	// Use Create to get a WriteCloser
+	return d.Create(filePath)
 }
 
 // Lock acquires an exclusive lock on the directory.

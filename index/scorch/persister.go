@@ -599,13 +599,52 @@ func persistToDirectory(seg segment.UnpersistedSegment, d vfs.Directory,
 	}
 	defer w.Close()
 
-	if _, err := sg.WriteTo(w); err != nil {
+	n, err := sg.WriteTo(w)
+	if err != nil {
 		return fmt.Errorf("segment write to %s: %w", name, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("segment write to %s produced 0 bytes", name)
 	}
 
 	// Critical: Sync before close for durability
 	if err := w.Sync(); err != nil {
 		return fmt.Errorf("VFS sync %s: %w", name, err)
+	}
+
+	return nil
+}
+
+// copySegmentFile copies a segment file from source VFS to destination VFS.
+func copySegmentFile(src, dst vfs.Directory, filename string) error {
+	return copySegmentFileWithPath(src, dst, filename, filename)
+}
+
+// copySegmentFileWithPath copies a segment file from source VFS to destination VFS,
+// allowing different paths for source and destination.
+func copySegmentFileWithPath(src, dst vfs.Directory, srcFilename, dstFilename string) error {
+	// Open source file for reading
+	r, err := src.Open(srcFilename)
+	if err != nil {
+		return fmt.Errorf("failed to open source file %s: %w", srcFilename, err)
+	}
+	defer r.Close()
+
+	// Create destination file for writing
+	w, err := dst.Create(dstFilename)
+	if err != nil {
+		return fmt.Errorf("failed to create dest file %s: %w", dstFilename, err)
+	}
+	defer w.Close()
+
+	// Copy the file contents
+	if _, err := io.Copy(w, r); err != nil {
+		return fmt.Errorf("failed to copy data from %s to %s: %w", srcFilename, dstFilename, err)
+	}
+
+	// Sync to ensure durability
+	if err := w.Sync(); err != nil {
+		return fmt.Errorf("failed to sync dest file %s: %w", dstFilename, err)
 	}
 
 	return nil
@@ -689,10 +728,24 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 		}
 		switch seg := segmentSnapshot.segment.(type) {
 		case segment.PersistedSegment:
-			// Persisted segments are already in the VFS directory
-			// No need to copy them - just record their metadata
+			// Persisted segments are already in the source VFS directory
 			segPath := seg.Path()
 			filename := filepath.Base(segPath)
+
+			// If destination VFS is provided and different from source, copy the segment file
+			if d != nil && snapshot.parent != nil && snapshot.parent.vfsDir != nil && d != snapshot.parent.vfsDir {
+				// Source and destination are different - copy the segment file
+				// If path is specified (e.g. "store"), prepend it to the filename for destination
+				destFilename := filename
+				if path != "" {
+					destFilename = filepath.Join(path, filename)
+				}
+				err := copySegmentFileWithPath(snapshot.parent.vfsDir, d, filename, destFilename)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to copy segment %s: %w", filename, err)
+				}
+			}
+
 			err = snapshotSegmentBucket.Put(util.BoltPathKey, []byte(filename))
 			if err != nil {
 				return nil, nil, err

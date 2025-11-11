@@ -310,6 +310,13 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 	go cw.listen()
 
 	for _, task := range resultMergePlan.Tasks {
+		// Check if context was cancelled before starting next task
+		select {
+		case <-cw.cancelCh:
+			return segment.ErrClosed
+		default:
+		}
+
 		if len(task.Segments) == 0 {
 			atomic.AddUint64(&s.stats.TotFileMergePlanTasksSegmentsEmpty, 1)
 			continue

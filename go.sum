@@ -2,8 +2,8 @@ github.com/RoaringBitmap/roaring/v2 v2.4.5 h1:uGrrMreGjvAtTBobc0g5IrW1D5ldxDQYe2
 github.com/RoaringBitmap/roaring/v2 v2.4.5/go.mod h1:FiJcsfkGje/nZBZgCu0ZxCPOKD/hVXDS2dXi7/eUFE0=
 github.com/ajroetker/bleve_index_api v0.0.0-20251111010750-7b3692d79f01 h1:SbGoS4vY5GDtDwxKy4iT+s0LsEBQMKd/FNRwTCnWssI=
 github.com/ajroetker/bleve_index_api v0.0.0-20251111010750-7b3692d79f01/go.mod h1:rKQDl4u51uwafZxFrPD1R7xFOwKnzZW7s/LSeK4lgo0=
-github.com/ajroetker/zapx/v16 v16.0.0-20251111202718-67691ba74877 h1:LdZ2GwvNsTYSW9jyBwdGteL4wNisp4j7P8sEmehSU0k=
-github.com/ajroetker/zapx/v16 v16.0.0-20251111202718-67691ba74877/go.mod h1:7y0yPdM9JLW29eRvgtmgaxujU4t0CUfzo1sFvP1lLss=
+github.com/ajroetker/zapx/v16 v16.0.0-20251111234330-70822381ed85 h1:pY9/pLIPBX6JMYI9DzultU8yybMBVaqzN8ceU/dQurQ=
+github.com/ajroetker/zapx/v16 v16.0.0-20251111234330-70822381ed85/go.mod h1:7y0yPdM9JLW29eRvgtmgaxujU4t0CUfzo1sFvP1lLss=
 github.com/bits-and-blooms/bitset v1.12.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/bits-and-blooms/bitset v1.22.0 h1:Tquv9S8+SGaS3EhyA+up3FXzmkhxPGjQQCkcs2uw7w4=
 github.com/bits-and-blooms/bitset v1.22.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
