@@ -15,7 +15,9 @@
 package facet
 
 import (
+	"bytes"
 	"reflect"
+	"regexp"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -30,25 +32,45 @@ func init() {
 }
 
 type TermsFacetBuilder struct {
-	size       int
-	field      string
-	termsCount map[string]int
-	total      int
-	missing    int
-	sawValue   bool
+	size        int
+	field       string
+	prefixBytes []byte
+	regex       *regexp.Regexp
+	termsCount  map[string]int
+	total       int
+	missing     int
+	sawValue    bool
 }
 
-func NewTermsFacetBuilder(field string, size int) *TermsFacetBuilder {
-	return &TermsFacetBuilder{
+func NewTermsFacetBuilder(field string, size int, prefix, pattern string) (*TermsFacetBuilder, error) {
+	fb := &TermsFacetBuilder{
 		size:       size,
 		field:      field,
 		termsCount: make(map[string]int),
 	}
+
+	// Convert prefix to []byte once for zero-allocation comparisons
+	if prefix != "" {
+		fb.prefixBytes = []byte(prefix)
+	}
+
+	// Compile regex once
+	if pattern != "" {
+		var err error
+		fb.regex, err = regexp.Compile(pattern)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return fb, nil
 }
 
 func (fb *TermsFacetBuilder) Size() int {
 	sizeInBytes := reflectStaticSizeTermsFacetBuilder + size.SizeOfPtr +
-		len(fb.field)
+		len(fb.field) +
+		len(fb.prefixBytes) +
+		size.SizeOfPtr // regex pointer
 
 	for k := range fb.termsCount {
 		sizeInBytes += size.SizeOfString + len(k) +
@@ -63,8 +85,22 @@ func (fb *TermsFacetBuilder) Field() string {
 }
 
 func (fb *TermsFacetBuilder) UpdateVisitor(term []byte) {
+	// Fast prefix check on []byte - zero allocation
+	if len(fb.prefixBytes) > 0 && !bytes.HasPrefix(term, fb.prefixBytes) {
+		fb.total++
+		return
+	}
+
+	// Fast regex check on []byte - zero allocation
+	if fb.regex != nil && !fb.regex.Match(term) {
+		fb.total++
+		return
+	}
+
+	// Only convert to string if term matches filters
+	termStr := string(term)
 	fb.sawValue = true
-	fb.termsCount[string(term)] = fb.termsCount[string(term)] + 1
+	fb.termsCount[termStr] = fb.termsCount[termStr] + 1
 	fb.total++
 }
 
