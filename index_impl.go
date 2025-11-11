@@ -57,8 +57,6 @@ type indexImpl struct {
 
 const storePath = "store"
 
-var mappingInternalKey = []byte("_mapping")
-
 const (
 	SearchQueryStartCallbackKey search.ContextKey = "_search_query_start_callback_key"
 	SearchQueryEndCallbackKey   search.ContextKey = "_search_query_end_callback_key"
@@ -664,6 +662,16 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	sendBytesRead := func(bytesRead uint64) {
 		totalSearchCost += bytesRead
 	}
+	// Ensure IO cost accounting and result cost assignment happen on all return paths
+	defer func() {
+		if sr != nil {
+			sr.Cost = totalSearchCost
+		}
+		if is, ok := indexReader.(*scorch.IndexSnapshot); ok {
+			is.UpdateIOStats(totalSearchCost)
+		}
+		search.RecordSearchCost(ctx, search.DoneM, 0)
+	}()
 
 	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey, search.SearchIOStatsCallbackFunc(sendBytesRead))
 
@@ -681,7 +689,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	// ------------------------------------------------------------------------------------------
 
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
-		preSearchResult, err := i.preSearch(ctx, req, indexReader)
+		sr, err = i.preSearch(ctx, req, indexReader)
 		if err != nil {
 			return nil, err
 		}
@@ -695,7 +703,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		// time stat
 		searchDuration := time.Since(searchStart)
 		atomic.AddUint64(&i.stats.searchTime, uint64(searchDuration))
-		return preSearchResult, nil
+
+		return sr, nil
 	}
 
 	var reverseQueryExecution bool
@@ -813,14 +822,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if serr := searcher.Close(); err == nil && serr != nil {
 			err = serr
 		}
-		if sr != nil {
-			sr.Cost = totalSearchCost
-		}
-		if sr, ok := indexReader.(*scorch.IndexSnapshot); ok {
-			sr.UpdateIOStats(totalSearchCost)
-		}
-
-		search.RecordSearchCost(ctx, search.DoneM, 0)
 	}()
 
 	if req.Facets != nil {
