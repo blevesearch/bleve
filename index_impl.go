@@ -57,8 +57,6 @@ type indexImpl struct {
 
 const storePath = "store"
 
-var mappingInternalKey = []byte("_mapping")
-
 const (
 	SearchQueryStartCallbackKey search.ContextKey = "_search_query_start_callback_key"
 	SearchQueryEndCallbackKey   search.ContextKey = "_search_query_end_callback_key"
@@ -641,8 +639,57 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}
 
+	// ------------------------------------------------------------------------------------------
+	// set up additional contexts for any search operation that will proceed from
+	// here, such as presearch, collectors etc.
+
+	// Scoring model callback to be used to get scoring model
+	scoringModelCallback := func() string {
+		if isBM25Enabled(i.m) {
+			return index.BM25Scoring
+		}
+		return index.DefaultScoringModel
+	}
+	ctx = context.WithValue(ctx, search.GetScoringModelCallbackKey,
+		search.GetScoringModelCallbackFn(scoringModelCallback))
+
+	// This callback and variable handles the tracking of bytes read
+	//  1. as part of creation of tfr and its Next() calls which is
+	//     accounted by invoking this callback when the TFR is closed.
+	//  2. the docvalues portion (accounted in collector) and the retrieval
+	//     of stored fields bytes (by LoadAndHighlightFields)
+	var totalSearchCost uint64
+	sendBytesRead := func(bytesRead uint64) {
+		totalSearchCost += bytesRead
+	}
+	// Ensure IO cost accounting and result cost assignment happen on all return paths
+	defer func() {
+		if sr != nil {
+			sr.Cost = totalSearchCost
+		}
+		if is, ok := indexReader.(*scorch.IndexSnapshot); ok {
+			is.UpdateIOStats(totalSearchCost)
+		}
+		search.RecordSearchCost(ctx, search.DoneM, 0)
+	}()
+
+	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey, search.SearchIOStatsCallbackFunc(sendBytesRead))
+
+	// Geo buffer pool callback to be used for getting geo buffer pool
+	var bufPool *s2.GeoBufferPool
+	getBufferPool := func() *s2.GeoBufferPool {
+		if bufPool == nil {
+			bufPool = s2.NewGeoBufferPool(search.MaxGeoBufPoolSize, search.MinGeoBufPoolSize)
+		}
+
+		return bufPool
+	}
+
+	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey, search.GeoBufferPoolCallbackFunc(getBufferPool))
+	// ------------------------------------------------------------------------------------------
+
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
-		preSearchResult, err := i.preSearch(ctx, req, indexReader)
+		sr, err = i.preSearch(ctx, req, indexReader)
 		if err != nil {
 			return nil, err
 		}
@@ -656,7 +703,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		// time stat
 		searchDuration := time.Since(searchStart)
 		atomic.AddUint64(&i.stats.searchTime, uint64(searchDuration))
-		return preSearchResult, nil
+
+		return sr, nil
 	}
 
 	var reverseQueryExecution bool
@@ -726,6 +774,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		// if score fusion, run collect if rescorer is defined
 		if rescorer != nil && requestHasKNN(req) {
 			knnHits, err = i.runKnnCollector(ctx, req, indexReader, false)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -753,43 +804,11 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		ctx = context.WithValue(ctx, search.FieldTermSynonymMapKey, fts)
 	}
 
-	scoringModelCallback := func() string {
-		if isBM25Enabled(i.m) {
-			return index.BM25Scoring
-		}
-		return index.DefaultScoringModel
-	}
-	ctx = context.WithValue(ctx, search.GetScoringModelCallbackKey,
-		search.GetScoringModelCallbackFn(scoringModelCallback))
-
 	// set the bm25Stats (stats important for consistent scoring) in
 	// the context object
 	if bm25Stats != nil {
 		ctx = context.WithValue(ctx, search.BM25StatsKey, bm25Stats)
 	}
-
-	// This callback and variable handles the tracking of bytes read
-	//  1. as part of creation of tfr and its Next() calls which is
-	//     accounted by invoking this callback when the TFR is closed.
-	//  2. the docvalues portion (accounted in collector) and the retrieval
-	//     of stored fields bytes (by LoadAndHighlightFields)
-	var totalSearchCost uint64
-	sendBytesRead := func(bytesRead uint64) {
-		totalSearchCost += bytesRead
-	}
-
-	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey, search.SearchIOStatsCallbackFunc(sendBytesRead))
-
-	var bufPool *s2.GeoBufferPool
-	getBufferPool := func() *s2.GeoBufferPool {
-		if bufPool == nil {
-			bufPool = s2.NewGeoBufferPool(search.MaxGeoBufPoolSize, search.MinGeoBufPoolSize)
-		}
-
-		return bufPool
-	}
-
-	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey, search.GeoBufferPoolCallbackFunc(getBufferPool))
 
 	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
@@ -803,14 +822,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if serr := searcher.Close(); err == nil && serr != nil {
 			err = serr
 		}
-		if sr != nil {
-			sr.Cost = totalSearchCost
-		}
-		if sr, ok := indexReader.(*scorch.IndexSnapshot); ok {
-			sr.UpdateIOStats(totalSearchCost)
-		}
-
-		search.RecordSearchCost(ctx, search.DoneM, 0)
 	}()
 
 	if req.Facets != nil {
