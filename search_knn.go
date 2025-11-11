@@ -24,7 +24,6 @@ import (
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/document"
-	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
@@ -669,19 +668,19 @@ func (r *rescorer) restoreKnnRequest() {
 	}
 }
 
-func (i *indexImpl) buildKNNCollector(KNNQuery query.Query, reader index.IndexReader, kArray []int64, somOfK int64) (*collector.KNNCollector, error) {
-	if nm, ok := i.m.(mapping.NestedMapping); ok {
+func (i *indexImpl) buildKNNCollector(ctx context.Context, KNNQuery query.Query, reader index.IndexReader, kArray []int64, somOfK int64) (*collector.KNNCollector, error) {
+	// check if we are in nested mode
+	if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); ok && nestedMode {
+		// get the nested reader from the index reader
 		if nr, ok := reader.(index.NestedReader); ok {
-			if nm.CountNested() > 0 {
-				var fs search.FieldSet
-				var err error
-				fs, err = query.ExtractFields(KNNQuery, i.m, fs)
-				if err != nil {
-					return nil, err
-				}
-				if nm.IntersectsPrefix(fs) {
-					return collector.NewNestedKNNCollector(nr, kArray, somOfK), nil
-				}
+			var fs search.FieldSet
+			var err error
+			fs, err = query.ExtractFields(KNNQuery, i.m, fs)
+			if err != nil {
+				return nil, err
+			}
+			if nm.IntersectsPrefix(fs) {
+				return collector.NewNestedKNNCollector(nr, kArray, somOfK), nil
 			}
 		}
 	}
@@ -689,19 +688,19 @@ func (i *indexImpl) buildKNNCollector(KNNQuery query.Query, reader index.IndexRe
 	return collector.NewKNNCollector(kArray, somOfK), nil
 }
 
-func (i *indexImpl) buildEligibleCollector(filterQuery query.Query, reader index.IndexReader, size int) (*collector.EligibleCollector, error) {
-	if nm, ok := i.m.(mapping.NestedMapping); ok {
+func (i *indexImpl) buildEligibleCollector(ctx context.Context, filterQuery query.Query, reader index.IndexReader, size int) (*collector.EligibleCollector, error) {
+	// check if we are in nested mode
+	if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); ok && nestedMode {
+		// get the nested reader from the index reader
 		if nr, ok := reader.(index.NestedReader); ok {
-			if nm.CountNested() > 0 {
-				var fs search.FieldSet
-				var err error
-				fs, err = query.ExtractFields(filterQuery, i.m, fs)
-				if err != nil {
-					return nil, err
-				}
-				if nm.IntersectsPrefix(fs) {
-					return collector.NewNestedEligibleCollector(nr, size), nil
-				}
+			var fs search.FieldSet
+			var err error
+			fs, err = query.ExtractFields(filterQuery, i.m, fs)
+			if err != nil {
+				return nil, err
+			}
+			if nm.IntersectsPrefix(fs) {
+				return collector.NewNestedEligibleCollector(nr, size), nil
 			}
 		}
 	}

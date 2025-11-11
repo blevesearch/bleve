@@ -156,6 +156,10 @@ const (
 	// ScoreFusionKey is used to communicate whether KNN hits need to be preserved for
 	// hybrid search algorithms (like RRF)
 	ScoreFusionKey ContextKey = "_fusion_rescoring_key"
+
+	// NestedSearchKey is used to communicate whether the search is performed
+	// in an index with nested documents
+	NestedSearchKey ContextKey = "_nested_search_key"
 )
 
 func RecordSearchCost(ctx context.Context,

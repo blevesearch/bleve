@@ -640,6 +640,53 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}
 
+	// ------------------------------------------------------------------------------------------
+	// set up additional contexts for any search operation that will proceed from
+	// here, such as presearch, knn collector, topn collector etc.
+
+	// Scoring model callback to be used to get scoring model
+	scoringModelCallback := func() string {
+		if isBM25Enabled(i.m) {
+			return index.BM25Scoring
+		}
+		return index.DefaultScoringModel
+	}
+	ctx = context.WithValue(ctx, search.GetScoringModelCallbackKey,
+		search.GetScoringModelCallbackFn(scoringModelCallback))
+
+	// This callback and variable handles the tracking of bytes read
+	//  1. as part of creation of tfr and its Next() calls which is
+	//     accounted by invoking this callback when the TFR is closed.
+	//  2. the docvalues portion (accounted in collector) and the retrieval
+	//     of stored fields bytes (by LoadAndHighlightFields)
+	var totalSearchCost uint64
+	sendBytesRead := func(bytesRead uint64) {
+		totalSearchCost += bytesRead
+	}
+
+	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey, search.SearchIOStatsCallbackFunc(sendBytesRead))
+
+	// Geo buffer pool callback to be used for getting geo buffer pool
+	var bufPool *s2.GeoBufferPool
+	getBufferPool := func() *s2.GeoBufferPool {
+		if bufPool == nil {
+			bufPool = s2.NewGeoBufferPool(search.MaxGeoBufPoolSize, search.MinGeoBufPoolSize)
+		}
+
+		return bufPool
+	}
+
+	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey, search.GeoBufferPoolCallbackFunc(getBufferPool))
+
+	// check if the index mapping has any nested fields, which should force
+	// all collectors and searchers to be run in nested mode
+	if nm, ok := i.m.(mapping.NestedMapping); ok {
+		if nm.CountNested() > 0 {
+			ctx = context.WithValue(ctx, search.NestedSearchKey, true)
+		}
+	}
+	// ------------------------------------------------------------------------------------------
+
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
 		preSearchResult, err := i.preSearch(ctx, req, indexReader)
 		if err != nil {
@@ -666,7 +713,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		req.SearchBefore = nil
 	}
 
-	coll, err := i.buildTopNCollector(req, indexReader)
+	coll, err := i.buildTopNCollector(ctx, req, indexReader)
 	if err != nil {
 		return nil, err
 	}
@@ -749,43 +796,11 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		ctx = context.WithValue(ctx, search.FieldTermSynonymMapKey, fts)
 	}
 
-	scoringModelCallback := func() string {
-		if isBM25Enabled(i.m) {
-			return index.BM25Scoring
-		}
-		return index.DefaultScoringModel
-	}
-	ctx = context.WithValue(ctx, search.GetScoringModelCallbackKey,
-		search.GetScoringModelCallbackFn(scoringModelCallback))
-
 	// set the bm25Stats (stats important for consistent scoring) in
 	// the context object
 	if bm25Stats != nil {
 		ctx = context.WithValue(ctx, search.BM25StatsKey, bm25Stats)
 	}
-
-	// This callback and variable handles the tracking of bytes read
-	//  1. as part of creation of tfr and its Next() calls which is
-	//     accounted by invoking this callback when the TFR is closed.
-	//  2. the docvalues portion (accounted in collector) and the retrieval
-	//     of stored fields bytes (by LoadAndHighlightFields)
-	var totalSearchCost uint64
-	sendBytesRead := func(bytesRead uint64) {
-		totalSearchCost += bytesRead
-	}
-
-	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey, search.SearchIOStatsCallbackFunc(sendBytesRead))
-
-	var bufPool *s2.GeoBufferPool
-	getBufferPool := func() *s2.GeoBufferPool {
-		if bufPool == nil {
-			bufPool = s2.NewGeoBufferPool(search.MaxGeoBufPoolSize, search.MinGeoBufPoolSize)
-		}
-
-		return bufPool
-	}
-
-	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey, search.GeoBufferPoolCallbackFunc(getBufferPool))
 
 	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
@@ -1435,7 +1450,7 @@ func (i *indexImpl) FireIndexEvent() {
 	}
 }
 
-func (i *indexImpl) buildTopNCollector(req *SearchRequest, reader index.IndexReader) (*collector.TopNCollector, error) {
+func (i *indexImpl) buildTopNCollector(ctx context.Context, req *SearchRequest, reader index.IndexReader) (*collector.TopNCollector, error) {
 	newCollector := func() *collector.TopNCollector {
 		if req.SearchAfter != nil {
 			return collector.NewTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter)
@@ -1450,18 +1465,18 @@ func (i *indexImpl) buildTopNCollector(req *SearchRequest, reader index.IndexRea
 		return collector.NewNestedTopNCollector(req.Size, req.From, req.Sort, nr)
 	}
 
-	if nm, ok := i.m.(mapping.NestedMapping); ok {
-		if nm.CountNested() > 0 {
-			if nr, ok := reader.(index.NestedReader); ok {
-				var fs search.FieldSet
-				var err error
-				fs, err = query.ExtractFields(req.Query, i.m, fs)
-				if err != nil {
-					return nil, err
-				}
-				if nm.IntersectsPrefix(fs) {
-					return newNestedCollector(nr), nil
-				}
+	// check if we are in nested mode
+	if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); ok && nestedMode {
+		// get the nested reader from the index reader
+		if nr, ok := reader.(index.NestedReader); ok {
+			var fs search.FieldSet
+			var err error
+			fs, err = query.ExtractFields(req.Query, i.m, fs)
+			if err != nil {
+				return nil, err
+			}
+			if nm.IntersectsPrefix(fs) {
+				return newNestedCollector(nr), nil
 			}
 		}
 	}
