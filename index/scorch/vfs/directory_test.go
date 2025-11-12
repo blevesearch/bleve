@@ -72,8 +72,12 @@ func directoryTestSuite(t *testing.T, dir apivfs.Directory) {
 		if err != nil {
 			t.Fatalf("Failed to create file: %v", err)
 		}
-		w.Write(testData)
-		w.Close()
+		if _, err := w.Write(testData); err != nil {
+			t.Fatalf("Failed to write data: %v", err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("Failed to close writer: %v", err)
+		}
 
 		// Stat file
 		fi, err := dir.Stat(testFile)
@@ -90,7 +94,9 @@ func directoryTestSuite(t *testing.T, dir apivfs.Directory) {
 		}
 
 		// Clean up
-		dir.Remove(testFile)
+		if err := dir.Remove(testFile); err != nil {
+			t.Fatalf("Failed to remove file: %v", err)
+		}
 	})
 
 	t.Run("Rename", func(t *testing.T) {
@@ -103,8 +109,12 @@ func directoryTestSuite(t *testing.T, dir apivfs.Directory) {
 		if err != nil {
 			t.Fatalf("Failed to create file: %v", err)
 		}
-		w.Write(testData)
-		w.Close()
+		if _, err := w.Write(testData); err != nil {
+			t.Fatalf("Failed to write data: %v", err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("Failed to close writer: %v", err)
+		}
 
 		// Rename
 		if err := dir.Rename(oldName, newName); err != nil {
@@ -128,7 +138,9 @@ func directoryTestSuite(t *testing.T, dir apivfs.Directory) {
 		}
 
 		// Clean up
-		dir.Remove(newName)
+		if err := dir.Remove(newName); err != nil {
+			t.Fatalf("Failed to remove file: %v", err)
+		}
 	})
 
 	t.Run("Remove", func(t *testing.T) {
@@ -139,8 +151,12 @@ func directoryTestSuite(t *testing.T, dir apivfs.Directory) {
 		if err != nil {
 			t.Fatalf("Failed to create file: %v", err)
 		}
-		w.Write([]byte("remove test"))
-		w.Close()
+		if _, err := w.Write([]byte("remove test")); err != nil {
+			t.Fatalf("Failed to write data: %v", err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("Failed to close writer: %v", err)
+		}
 
 		// Remove file
 		if err := dir.Remove(testFile); err != nil {

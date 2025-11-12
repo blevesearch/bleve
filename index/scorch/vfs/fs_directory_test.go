@@ -132,8 +132,12 @@ func TestFSDirectory_DirectoryOperations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create file %s: %v", name, err)
 		}
-		w.Write([]byte("test"))
-		w.Close()
+		if _, err := w.Write([]byte("test")); err != nil {
+			t.Fatalf("Failed to write to file %s: %v", name, err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("Failed to close file %s: %v", name, err)
+		}
 	}
 
 	// Test ReadDir
@@ -216,8 +220,12 @@ func TestFSDirectory_ConcurrentReads(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
-	w.Write(testData)
-	w.Close()
+	if _, err := w.Write(testData); err != nil {
+		t.Fatalf("Failed to write to file: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Failed to close file: %v", err)
+	}
 
 	// Perform concurrent reads
 	const numReaders = 10

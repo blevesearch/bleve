@@ -29,7 +29,7 @@ import (
 type FSDirectory struct {
 	basePath string
 	lockFile *os.File
-	mu       sync.RWMutex
+	mu       sync.Mutex
 }
 
 // NewFSDirectory creates a new filesystem-based Directory at the given path.
@@ -181,7 +181,9 @@ func (d *FSDirectory) Lock() error {
 	// Uses platform-specific implementation (flock on Unix, LockFileEx on Windows)
 	err = flock(f, true)
 	if err != nil {
-		f.Close()
+		if closeErr := f.Close(); closeErr != nil {
+			return fmt.Errorf("failed to acquire lock (another process may have the index open): %w, and failed to close lock file: %v", err, closeErr)
+		}
 		return fmt.Errorf("failed to acquire lock (another process may have the index open): %w", err)
 	}
 
