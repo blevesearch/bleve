@@ -30,4 +30,6 @@ var (
 	BoltMetaDataWriterIdKey       = []byte("writerId")
 
 	MappingInternalKey = []byte("_mapping")
+
+	BoltWriterContext = []byte("bolt")
 )

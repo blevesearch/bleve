@@ -1,151 +1,135 @@
 package util
 
-import (
-	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
-	"fmt"
+var WriterHook func(context []byte) (string, func(data []byte) []byte, error)
 
-	zapv16 "github.com/blevesearch/zapx/v16"
-)
-
-// Variables used for development and testing purposes
-// var keys = map[string][]byte{}
-// var cbLock = sync.RWMutex{}
-// var latestCallbackId string
-
-var WriterCallbackGetter = func() (string, func(data, counter []byte) ([]byte, error), error) {
-	return "", func(data, counter []byte) ([]byte, error) {
-		return data, nil
-	}, nil
-}
-
-var ReaderCallbackGetter = func(cbId string) (func(data []byte) ([]byte, error), error) {
-	return func(data []byte) ([]byte, error) {
-		return data, nil
-	}, nil
-}
-
-var CounterGetter = func() ([]byte, error) {
-	return nil, nil
-}
+var ReaderHook func(id string, context []byte) (func(data []byte) ([]byte, error), error)
 
 func init() {
 	// Variables used for development and testing purposes
-	encryptionKey := make([]byte, 32)
-	if _, err := rand.Read(encryptionKey); err != nil {
-		panic("failed to generate AES key: " + err.Error())
-	}
+	// encryptionKey := make([]byte, 32)
+	// if _, err := rand.Read(encryptionKey); err != nil {
+	// 	panic("failed to generate AES key: " + err.Error())
+	// }
 
-	key := make([]byte, 32)
-	keyId := "test-key-id"
+	// key := make([]byte, 32)
+	// keyId := "test-key-id"
+	// label := []byte("search")
 
-	if _, err := rand.Read(key); err != nil {
-		panic("Failed to generate random key: " + err.Error())
-	}
+	// if _, err := rand.Read(key); err != nil {
+	// 	panic("Failed to generate random key: " + err.Error())
+	// }
 
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		panic("Failed to create AES cipher: " + err.Error())
-	}
+	// WriterHook = func(context []byte) (string, func(data []byte) []byte, error) {
 
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		panic("Failed to create AES GCM: " + err.Error())
-	}
+	// 	derivedKey := make([]byte, 32)
+	// 	derivedKey, err := crypto.OpenSSLKBKDFDeriveKey(key, label, context, derivedKey, "SHA2-256", "")
+	// 	if err != nil {
+	// 		return "", nil, err
+	// 	}
 
-	CounterGetter = func() ([]byte, error) {
-		counter := make([]byte, 12)
-		if _, err := rand.Read(counter); err != nil {
-			return nil, err
-		}
-		return counter, nil
-	}
+	// 	block, err := aes.NewCipher(derivedKey)
+	// 	if err != nil {
+	// 		panic("Failed to create AES cipher: " + err.Error())
+	// 	}
 
-	writerCallback := func(data, counter []byte) ([]byte, error) {
-		ciphertext := aesgcm.Seal(nil, counter, data, nil)
-		result := append(ciphertext, counter...)
+	// 	aesgcm, err := cipher.NewGCM(block)
+	// 	if err != nil {
+	// 		panic("Failed to create AES GCM: " + err.Error())
+	// 	}
 
-		// For testing purposes only
-		result = append(append([]byte("EncStart"), result...), []byte("EncEnd")...)
+	// 	nonce := make([]byte, 12)
+	// 	if _, err := rand.Read(nonce); err != nil {
+	// 		panic("Failed to generate random nonce: " + err.Error())
+	// 	}
 
-		return result, nil
-	}
+	// 	writerCallback := func(data []byte) []byte {
+	// 		ciphertext := aesgcm.Seal(nil, nonce, data, nil)
+	// 		result := append(ciphertext, nonce...)
 
-	readerCallback := func(data []byte) ([]byte, error) {
-		// For testing purposes only
-		data = bytes.TrimPrefix(data, []byte("EncStart"))
-		data = bytes.TrimSuffix(data, []byte("EncEnd"))
+	// 		for i := len(nonce) - 1; i >= 0; i-- {
+	// 			if nonce[i] < 255 {
+	// 				nonce[i]++
+	// 				break
+	// 			}
+	// 			nonce[i] = 0
+	// 		}
+	// 		return result
+	// 	}
 
-		if len(data) < 12 {
-			return nil, fmt.Errorf("ciphertext too short")
-		}
+	// 	return keyId, writerCallback, nil
+	// }
 
-		counter := data[len(data)-12:]
-		ciphertext := data[:len(data)-12]
-		plaintext, err := aesgcm.Open(nil, counter, ciphertext, nil)
-		if err != nil {
-			return nil, err
-		}
-		return plaintext, nil
-	}
+	// ReaderHook = func(id string, context []byte) (func(data []byte) ([]byte, error), error) {
+	// 	if id != keyId {
+	// 		return nil, fmt.Errorf("unknown callback ID: %s", id)
+	// 	}
 
-	WriterCallbackGetter = func() (string, func(data []byte, counter []byte) ([]byte, error), error) {
-		return keyId, writerCallback, nil
-	}
+	// 	derivedKey := make([]byte, 32)
+	// 	derivedKey, err := crypto.OpenSSLKBKDFDeriveKey(key, label, context, derivedKey, "SHA2-256", "")
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
 
-	ReaderCallbackGetter = func(id string) (func(data []byte) ([]byte, error), error) {
-		if id != keyId {
-			return nil, fmt.Errorf("unknown callback ID: %s", id)
-		}
-		return readerCallback, nil
-	}
+	// 	block, err := aes.NewCipher(derivedKey)
+	// 	if err != nil {
+	// 		panic("Failed to create AES cipher: " + err.Error())
+	// 	}
 
-	zapv16.WriterCallbackGetter = WriterCallbackGetter
-	zapv16.ReaderCallbackGetter = ReaderCallbackGetter
-	zapv16.CounterGetter = CounterGetter
+	// 	aesgcm, err := cipher.NewGCM(block)
+	// 	if err != nil {
+	// 		panic("Failed to create AES GCM: " + err.Error())
+	// 	}
+
+	// 	readerCallback := func(data []byte) ([]byte, error) {
+
+	// 		if len(data) < 12 {
+	// 			return nil, fmt.Errorf("ciphertext too short")
+	// 		}
+
+	// 		nonce := data[len(data)-12:]
+	// 		ciphertext := data[:len(data)-12]
+	// 		plaintext, err := aesgcm.Open(nil, nonce, ciphertext, nil)
+	// 		if err != nil {
+	// 			return nil, fmt.Errorf("failed to decrypt data: %w", err)
+	// 		}
+
+	// 		return plaintext, nil
+	// 	}
+
+	// 	return readerCallback, nil
+	// }
+
+	// zapv16.WriterHook = WriterHook
+	// zapv16.ReaderHook = ReaderHook
 }
 
 type FileWriter struct {
-	writerCB func(data, counter []byte) ([]byte, error)
-	counter  []byte
-	id       string
+	processor func(data []byte) []byte
+	context   []byte
+	id        string
 }
 
-func NewFileWriter() (*FileWriter, error) {
-	var err error
-	rv := &FileWriter{}
-	rv.id, rv.writerCB, err = WriterCallbackGetter()
-	if err != nil {
-		return nil, err
+func NewFileWriter(context []byte) (*FileWriter, error) {
+	rv := &FileWriter{
+		context: context,
 	}
-	rv.counter, err = CounterGetter()
-	if err != nil {
-		return nil, err
+
+	if WriterHook != nil {
+		var err error
+		rv.id, rv.processor, err = WriterHook(rv.context)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return rv, nil
 }
 
-func (w *FileWriter) Process(data []byte) ([]byte, error) {
-	if w.writerCB != nil {
-		w.incrementCounter()
-		return w.writerCB(data, w.counter)
+func (w *FileWriter) Process(data []byte) []byte {
+	if w.processor != nil {
+		return w.processor(data)
 	}
-	return data, nil
-}
-
-func (w *FileWriter) incrementCounter() {
-	if w.counter != nil {
-		for i := len(w.counter) - 1; i >= 0; i-- {
-			if w.counter[i] < 255 {
-				w.counter[i]++
-				return
-			}
-			w.counter[i] = 0
-		}
-	}
+	return data
 }
 
 func (w *FileWriter) Id() string {
@@ -153,25 +137,30 @@ func (w *FileWriter) Id() string {
 }
 
 type FileReader struct {
-	readerCB func(data []byte) ([]byte, error)
-	id       string
+	processor func(data []byte) ([]byte, error)
+	id        string
+	context   []byte
 }
 
-func NewFileReader(cbId string) (*FileReader, error) {
-	readerCB, err := ReaderCallbackGetter(cbId)
-	if err != nil {
-		return nil, err
+func NewFileReader(id string, context []byte) (*FileReader, error) {
+	rv := &FileReader{
+		id: id,
 	}
 
-	return &FileReader{
-		readerCB: readerCB,
-		id:       cbId,
-	}, nil
+	if ReaderHook != nil {
+		var err error
+		rv.processor, err = ReaderHook(id, context)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return rv, nil
 }
 
 func (r *FileReader) Process(data []byte) ([]byte, error) {
-	if r.readerCB != nil {
-		return r.readerCB(data)
+	if r.processor != nil {
+		return r.processor(data)
 	}
 	return data, nil
 }
