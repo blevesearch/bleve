@@ -993,13 +993,13 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 				return fmt.Errorf("meta-data bucket missing")
 			}
 
-			writer, err := util.NewFileWriter()
+			writer, err := util.NewFileWriter(util.BoltWriterContext)
 			if err != nil {
 				return fmt.Errorf("unable to load correct writer: %v", err)
 			}
 
 			readerId := string(metaBucket.Get(boltMetaDataWriterIdKey))
-			reader, err := util.NewFileReader(readerId)
+			reader, err := util.NewFileReader(readerId, util.BoltWriterContext)
 			if err != nil {
 				return fmt.Errorf("unable to load correct reader: %v", err)
 			}
@@ -1031,15 +1031,9 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 					}
 
 					for key, val := range internalVals {
-						valBytes, err := writer.Process(val)
-						if err != nil {
-							return err
-						}
+						valBytes := writer.Process(val)
 						if key == string(util.MappingInternalKey) {
-							buf, err := writer.Process(mappingBytes)
-							if err != nil {
-								return err
-							}
+							buf := writer.Process(mappingBytes)
 							err = internalBucket.Put([]byte(key), buf)
 							if err != nil {
 								return err
@@ -1088,10 +1082,7 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 					if err != nil {
 						return err
 					}
-					buf, err := writer.Process(b)
-					if err != nil {
-						return err
-					}
+					buf := writer.Process(b)
 					err = segmentBucket.Put(util.BoltUpdatedFieldsKey, buf)
 					if err != nil {
 						return err
@@ -1104,11 +1095,7 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 							return err
 						}
 
-						buf, err := writer.Process(deletedBytes)
-						if err != nil {
-							return err
-						}
-
+						buf := writer.Process(deletedBytes)
 						err = segmentBucket.Put(util.BoltDeletedKey, buf)
 						if err != nil {
 							return err
@@ -1122,11 +1109,7 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 							return err
 						}
 
-						buf, err := writer.Process(statBytes)
-						if err != nil {
-							return err
-						}
-
+						buf := writer.Process(statBytes)
 						err = segmentBucket.Put(util.BoltStatsKey, buf)
 						if err != nil {
 							return err

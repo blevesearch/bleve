@@ -90,11 +90,11 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 		return nil, fmt.Errorf("bleve not configured for file based indexing")
 	}
 
-	fileWriter, err := util.NewFileWriter()
+	fileWriter, err := util.NewFileWriter([]byte(metaFilename))
 	if err != nil {
 		return nil, err
 	}
-	fileReader, err := util.NewFileReader(fileWriter.Id())
+	fileReader, err := util.NewFileReader(fileWriter.Id(), []byte(metaFilename))
 	if err != nil {
 		return nil, err
 	}
@@ -797,7 +797,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	if !contextScoreFusionKeyExists {
 		setKnnHitsInCollector(knnHits, req, coll)
 	}
-	
 
 	if fts != nil {
 		if is, ok := indexReader.(*scorch.IndexSnapshot); ok {

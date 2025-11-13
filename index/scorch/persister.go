@@ -632,7 +632,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segP
 	if err != nil {
 		return nil, nil, err
 	}
-	writer, err := util.NewFileWriter()
+	writer, err := util.NewFileWriter(util.BoltWriterContext)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -663,10 +663,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segP
 	}
 	// TODO optimize writing these in order?
 	for k, v := range snapshot.internal {
-		buf, err := writer.Process(v)
-		if err != nil {
-			return nil, nil, err
-		}
+		buf := writer.Process(v)
 		err = internalBucket.Put([]byte(k), buf)
 		if err != nil {
 			return nil, nil, err
@@ -677,10 +674,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segP
 		val := make([]byte, 8)
 		bytesWritten := atomic.LoadUint64(&snapshot.parent.stats.TotBytesWrittenAtIndexTime)
 		binary.LittleEndian.PutUint64(val, bytesWritten)
-		buf, err := writer.Process(val)
-		if err != nil {
-			return nil, nil, err
-		}
+		buf := writer.Process(val)
 		err = internalBucket.Put(util.TotBytesWrittenKey, buf)
 		if err != nil {
 			return nil, nil, err
@@ -737,10 +731,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segP
 			if err != nil {
 				return nil, nil, fmt.Errorf("error persisting roaring bytes: %v", err)
 			}
-			roaringBytes, err := writer.Process(roaringBuf.Bytes())
-			if err != nil {
-				return nil, nil, err
-			}
+			roaringBytes := writer.Process(roaringBuf.Bytes())
 			err = snapshotSegmentBucket.Put(util.BoltDeletedKey, roaringBytes)
 			if err != nil {
 				return nil, nil, err
@@ -753,10 +744,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segP
 			if err != nil {
 				return nil, nil, err
 			}
-			statsBytes, err := writer.Process(b)
-			if err != nil {
-				return nil, nil, err
-			}
+			statsBytes := writer.Process(b)
 			err = snapshotSegmentBucket.Put(util.BoltStatsKey, statsBytes)
 			if err != nil {
 				return nil, nil, err
@@ -769,10 +757,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segP
 			if err != nil {
 				return nil, nil, err
 			}
-			updatedFieldsBytes, err := writer.Process(b)
-			if err != nil {
-				return nil, nil, err
-			}
+			updatedFieldsBytes := writer.Process(b)
 			err = snapshotSegmentBucket.Put(util.BoltUpdatedFieldsKey, updatedFieldsBytes)
 			if err != nil {
 				return nil, nil, err
@@ -996,7 +981,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 			"unable to load correct segment wrapper: %v", err)
 	}
 	readerId := string(metaBucket.Get(boltMetaDataWriterIdKey))
-	reader, err := util.NewFileReader(readerId)
+	reader, err := util.NewFileReader(readerId, util.BoltWriterContext)
 	if err != nil {
 		_ = rv.DecRef()
 		return nil, fmt.Errorf("unable to load correct reader: %v", err)
@@ -1161,7 +1146,7 @@ func (s *Scorch) removeBoltKeys(ids []string) error {
 	for _, id := range ids {
 		keyMap[id] = struct{}{}
 	}
-	writer, err := util.NewFileWriter()
+	writer, err := util.NewFileWriter(util.BoltWriterContext)
 	if err != nil {
 		return err
 	}
@@ -1183,7 +1168,7 @@ func (s *Scorch) removeBoltKeys(ids []string) error {
 			}
 			readerId := string(metaBucket.Get(boltMetaDataWriterIdKey))
 			if _, ok := keyMap[readerId]; ok {
-				reader, err := util.NewFileReader(readerId)
+				reader, err := util.NewFileReader(readerId, util.BoltWriterContext)
 				if err != nil {
 					return fmt.Errorf("unable to load correct reader: %v", err)
 				}
@@ -1201,10 +1186,7 @@ func (s *Scorch) removeBoltKeys(ids []string) error {
 								return err
 							}
 
-							newBuf, err := writer.Process(buf)
-							if err != nil {
-								return err
-							}
+							newBuf := writer.Process(buf)
 							return internalBucket.Put(key, newBuf)
 						})
 						if err != nil {
@@ -1223,10 +1205,7 @@ func (s *Scorch) removeBoltKeys(ids []string) error {
 								return err
 							}
 
-							newBuf, err := writer.Process(buf)
-							if err != nil {
-								return err
-							}
+							newBuf := writer.Process(buf)
 							err = segmentBucket.Put(boltDeletedKey, newBuf)
 							if err != nil {
 								return err
@@ -1240,10 +1219,7 @@ func (s *Scorch) removeBoltKeys(ids []string) error {
 								return err
 							}
 
-							newBuf, err := writer.Process(buf)
-							if err != nil {
-								return err
-							}
+							newBuf := writer.Process(buf)
 							err = segmentBucket.Put(boltStatsKey, newBuf)
 							if err != nil {
 								return err

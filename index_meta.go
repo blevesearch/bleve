@@ -67,7 +67,7 @@ func openIndexMeta(path string) (*indexMeta, *util.FileReader, error) {
 		}
 
 		writerId := metaBytes[pos : pos+writerIdLen]
-		fileReader, err = util.NewFileReader(string(writerId))
+		fileReader, err = util.NewFileReader(string(writerId), []byte(metaFilename))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -115,10 +115,7 @@ func (i *indexMeta) Save(path string, writer *util.FileWriter) (err error) {
 		}
 	}()
 
-	metaBytes, err = writer.Process(metaBytes)
-	if err != nil {
-		return err
-	}
+	metaBytes = writer.Process(metaBytes)
 
 	_, err = indexMetaFile.Write(metaBytes)
 	if err != nil {
@@ -174,7 +171,7 @@ func (i *indexMeta) UpdateWriter(path string) error {
 	}
 
 	writerId := metaBytes[pos : pos+writerIdLen]
-	fileReader, err := util.NewFileReader(string(writerId))
+	fileReader, err := util.NewFileReader(string(writerId), []byte(metaFilename))
 	if err != nil {
 		return err
 	}
@@ -184,15 +181,12 @@ func (i *indexMeta) UpdateWriter(path string) error {
 		return err
 	}
 
-	writer, err := util.NewFileWriter()
+	writer, err := util.NewFileWriter([]byte(metaFilename))
 	if err != nil {
 		return err
 	}
 
-	metaBytes, err = writer.Process(metaBytes)
-	if err != nil {
-		return err
-	}
+	metaBytes = writer.Process(metaBytes)
 
 	metaBytes = append(metaBytes, []byte(writer.Id())...)
 	binary.BigEndian.PutUint32(metaBytes, uint32(len(writer.Id())))
