@@ -22,11 +22,33 @@ import (
 	"github.com/blevesearch/bleve/v2/search"
 )
 
+// sortDocMatchIdxsByScore orders the provided index slice in-place based on the
+// corresponding hit scores, breaking ties by `HitNumber`.
+func sortDocMatchIdxsByScore(hits search.DocumentMatchCollection, idxs []int) {
+	if len(idxs) < 2 {
+		return
+	}
+
+	sort.Slice(idxs, func(a, b int) bool {
+		left := hits[idxs[a]]
+		right := hits[idxs[b]]
+		if left.Score == right.Score {
+			return left.HitNumber < right.HitNumber
+		}
+		return left.Score > right.Score
+	})
+}
+
+// formatRRFMessage builds the explanation string for a single component of the
+// Reciprocal Rank Fusion calculation.
 func formatRRFMessage(weight float64, rank int, rankConstant int) string {
 	return fmt.Sprintf("rrf score (weight=%.3f, rank=%d, rank_constant=%d), normalized score of", weight, rank, rankConstant)
 }
 
-// ReciprocalRankFusion performs a reciprocal rank fusion on the search results.
+// ReciprocalRankFusion applies Reciprocal Rank Fusion across the primary FTS
+// results and each KNN sub-query. Ranks are limited to `windowSize` per source,
+// weighted, and combined into a single fused score, with optional explanation
+// details.
 func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64, rankConstant int, windowSize int, numKNNQueries int, explain bool) FusionResult {
 	if len(hits) == 0 {
 		return FusionResult{
@@ -36,90 +58,117 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 		}
 	}
 
-	// Create a map of document ID to a slice of ranks.
-	// The first element of the slice is the rank from the FTS search,
-	// and the subsequent elements are the ranks from the KNN searches.
-	docRanks := make(map[string][]int)
+	numRanks := numKNNQueries + 1
 
-	// Pre-assign rank lists to each candidate document
-	for _, hit := range hits {
-		docRanks[hit.ID] = make([]int, numKNNQueries+1)
+	sortedIdxs := make([]int, len(hits))
+	for i := range hits {
+		sortedIdxs[i] = i
 	}
 
-	// Only a max of `window_size` elements need to be counted for. Stop
-	// calculating rank once this threshold is hit.
-	sort.Slice(hits, func(a, b int) bool {
-		return scoreSortFunc()(hits[a], hits[b]) < 0
-	})
-	// Only consider top windowSize docs for rescoring
-	for i := range min(windowSize, len(hits)) {
-		if hits[i].Score != 0.0 {
-			// Skip if Score is 0, since that means the document was not
-			// found as part of FTS, and only in KNN.
-			docRanks[hits[i].ID][0] = i + 1
+	sortDocMatchIdxsByScore(hits, sortedIdxs)
+
+	limit := len(sortedIdxs)
+	if windowSize >= 0 && windowSize < limit {
+		limit = windowSize
+	}
+
+	scores := make([]float64, len(hits))
+
+	var ranks []int
+	if explain {
+		ranks = make([]int, len(hits)*numRanks)
+	}
+
+	if limit > 0 {
+		ftsWeight := weights[0]
+		for i := 0; i < limit; i++ {
+			docIdx := sortedIdxs[i]
+			hit := hits[docIdx]
+			if hit.Score == 0.0 {
+				continue
+			}
+			rank := i + 1
+			if explain {
+				ranks[docIdx*numRanks] = rank
+			}
+			scores[docIdx] += ftsWeight / float64(rankConstant+rank)
 		}
 	}
 
-	// Allocate knnDocs and reuse it within the loop
-	knnDocs := make([]*search.DocumentMatch, 0, len(hits))
+	knnDocs := make([]docScore, 0, len(hits))
 
-	// For each KNN query, rank the documents based on their KNN score.
-	for i := range numKNNQueries {
+	for queryIdx := 0; queryIdx < numKNNQueries; queryIdx++ {
 		knnDocs = knnDocs[:0]
 
-		for _, hit := range hits {
-			if _, ok := hit.ScoreBreakdown[i]; ok {
-				knnDocs = append(knnDocs, hit)
+		for idx, hit := range hits {
+			if hit.ScoreBreakdown == nil {
+				continue
+			}
+			if score, ok := hit.ScoreBreakdown[queryIdx]; ok {
+				knnDocs = append(knnDocs, docScore{
+					idx:   idx,
+					score: score,
+				})
 			}
 		}
 
-		// Sort the documents based on their score for this KNN query.
-		sort.Slice(knnDocs, func(a, b int) bool {
-			return scoreBreakdownSortFunc(i)(knnDocs[a], knnDocs[b]) < 0
-		})
+		if len(knnDocs) == 0 {
+			continue
+		}
 
-		// Update the ranks of the documents in the docRanks map.
-		// Only consider top windowSize docs for rescoring.
-		for j := range min(windowSize, len(knnDocs)) {
-			docRanks[knnDocs[j].ID][i+1] = j + 1
+		sortDocScores(knnDocs, hits)
+
+		limit := len(knnDocs)
+		if windowSize >= 0 && windowSize < limit {
+			limit = windowSize
+		}
+		if limit == 0 {
+			continue
+		}
+
+		weight := weights[queryIdx+1]
+		for rankIdx := 0; rankIdx < limit; rankIdx++ {
+			entry := knnDocs[rankIdx]
+			docIdx := entry.idx
+			rank := rankIdx + 1
+			if explain {
+				ranks[docIdx*numRanks+(queryIdx+1)] = rank
+			}
+			scores[docIdx] += weight / float64(rankConstant+rank)
 		}
 	}
 
-	// Calculate the RRF score for each document.
 	var maxScore float64
-	for _, hit := range hits {
-		var rrfScore float64
-		var explChildren []*search.Explanation
-		if explain {
-			explChildren = make([]*search.Explanation, 0, numKNNQueries+1)
-		}
-		for i, rank := range docRanks[hit.ID] {
-			if rank > 0 {
-				partialRrfScore := weights[i] * 1.0 / float64(rankConstant+rank)
-				if explain {
-					expl := getFusionExplAt(
-						hit,
-						i,
-						partialRrfScore,
-						formatRRFMessage(weights[i], rank, rankConstant),
-					)
-					explChildren = append(explChildren, expl)
-				}
-				rrfScore += partialRrfScore
-			}
-		}
-		hit.Score = rrfScore
+	for idx, hit := range hits {
+		hit.Score = scores[idx]
 		hit.ScoreBreakdown = nil
-		if rrfScore > maxScore {
-			maxScore = rrfScore
+
+		if hit.Score > maxScore {
+			maxScore = hit.Score
 		}
 
 		if explain {
+			base := idx * numRanks
+			explChildren := make([]*search.Explanation, 0, numRanks)
+			for i := 0; i < numRanks; i++ {
+				rank := ranks[base+i]
+				if rank == 0 {
+					continue
+				}
+				partial := weights[i] / float64(rankConstant+rank)
+				expl := getFusionExplAt(
+					hit,
+					i,
+					partial,
+					formatRRFMessage(weights[i], rank, rankConstant),
+				)
+				explChildren = append(explChildren, expl)
+			}
 			finalizeFusionExpl(hit, explChildren)
 		}
 	}
 
-	sort.Sort(hits)
+	sortDocMatchesByScore(hits)
 	if len(hits) > windowSize {
 		hits = hits[:windowSize]
 	}
