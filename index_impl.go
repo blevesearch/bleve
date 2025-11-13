@@ -643,7 +643,17 @@ func buildAggregation(aggRequest *AggregationRequest) (search.AggregationBuilder
 		if aggRequest.Size != nil {
 			size = *aggRequest.Size
 		}
-		return aggregation.NewTermsAggregation(aggRequest.Field, size, subAggBuilders), nil
+		termsAgg, err := aggregation.NewTermsAggregation(
+			aggRequest.Field,
+			size,
+			aggRequest.TermPrefix,
+			aggRequest.TermPattern,
+			subAggBuilders,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error creating terms aggregation: %w", err)
+		}
+		return termsAgg, nil
 
 	case "range":
 		if len(aggRequest.NumericRanges) == 0 {

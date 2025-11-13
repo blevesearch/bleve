@@ -275,6 +275,8 @@ type AggregationRequest struct {
 
 	// Bucket aggregation configuration
 	Size           *int             `json:"size,omitempty"`            // For terms aggregations
+	TermPrefix     string           `json:"term_prefix,omitempty"`     // For terms aggregations - filter by prefix
+	TermPattern    string           `json:"term_pattern,omitempty"`    // For terms aggregations - filter by regex
 	NumericRanges  []*numericRange  `json:"numeric_ranges,omitempty"`  // For numeric range aggregations
 	DateTimeRanges []*dateTimeRange `json:"date_ranges,omitempty"`     // For date range aggregations
 
@@ -296,6 +298,19 @@ func NewTermsAggregation(field string, size int) *AggregationRequest {
 		Type:  "terms",
 		Field: field,
 		Size:  &size,
+	}
+}
+
+// NewTermsAggregationWithFilter creates a filtered terms bucket aggregation
+// prefix filters terms by prefix (fast, zero-allocation byte comparison)
+// pattern filters terms by regex (flexible but slower)
+func NewTermsAggregationWithFilter(field string, size int, prefix, pattern string) *AggregationRequest {
+	return &AggregationRequest{
+		Type:        "terms",
+		Field:       field,
+		Size:        &size,
+		TermPrefix:  prefix,
+		TermPattern: pattern,
 	}
 }
 

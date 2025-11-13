@@ -15,7 +15,10 @@
 package aggregation
 
 import (
+	"bytes"
+	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/numeric"
@@ -39,6 +42,8 @@ func init() {
 type TermsAggregation struct {
 	field          string
 	size           int
+	prefixBytes    []byte                        // Pre-converted prefix for fast matching
+	regex          *regexp.Regexp                // Pre-compiled regex for pattern matching
 	termCounts     map[string]int64              // term -> document count
 	termSubAggs    map[string]*subAggregationSet // term -> sub-aggregations
 	subAggBuilders map[string]search.AggregationBuilder
@@ -51,22 +56,43 @@ type subAggregationSet struct {
 	builders map[string]search.AggregationBuilder
 }
 
-// NewTermsAggregation creates a new terms aggregation
-func NewTermsAggregation(field string, size int, subAggregations map[string]search.AggregationBuilder) *TermsAggregation {
+// NewTermsAggregation creates a new terms aggregation with optional filtering
+func NewTermsAggregation(field string, size int, prefix, pattern string, subAggregations map[string]search.AggregationBuilder) (*TermsAggregation, error) {
 	if size <= 0 {
 		size = 10 // default
 	}
-	return &TermsAggregation{
+
+	ta := &TermsAggregation{
 		field:          field,
 		size:           size,
 		termCounts:     make(map[string]int64),
 		termSubAggs:    make(map[string]*subAggregationSet),
 		subAggBuilders: subAggregations,
 	}
+
+	// Convert prefix to []byte once for zero-allocation comparisons
+	if prefix != "" {
+		ta.prefixBytes = []byte(prefix)
+	}
+
+	// Compile regex once
+	if pattern != "" {
+		var err error
+		ta.regex, err = regexp.Compile(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("invalid term pattern: %w", err)
+		}
+	}
+
+	return ta, nil
 }
 
 func (ta *TermsAggregation) Size() int {
-	sizeInBytes := reflectStaticSizeTermsAggregation + size.SizeOfPtr + len(ta.field)
+	sizeInBytes := reflectStaticSizeTermsAggregation + size.SizeOfPtr +
+		len(ta.field) +
+		len(ta.prefixBytes) +
+		size.SizeOfPtr // regex pointer
+
 	for term := range ta.termCounts {
 		sizeInBytes += size.SizeOfString + len(term) + 8 // int64 = 8 bytes
 	}
@@ -104,7 +130,18 @@ func (ta *TermsAggregation) StartDoc() {
 func (ta *TermsAggregation) UpdateVisitor(field string, term []byte) {
 	// If this is our field, track the bucket
 	if field == ta.field {
+		// Fast prefix check on []byte - zero allocation
+		if len(ta.prefixBytes) > 0 && !bytes.HasPrefix(term, ta.prefixBytes) {
+			return // Skip terms that don't match prefix
+		}
+
+		// Fast regex check on []byte - zero allocation
+		if ta.regex != nil && !ta.regex.Match(term) {
+			return // Skip terms that don't match regex
+		}
+
 		ta.sawValue = true
+		// Only convert to string if term matches filters
 		termStr := string(term)
 		ta.currentTerm = termStr
 

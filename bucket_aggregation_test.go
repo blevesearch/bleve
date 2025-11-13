@@ -222,3 +222,24 @@ func ExampleAggregationsRequest_termsWithSubAggregations() {
 	//         bucket.Aggregations["total_revenue"].Value)
 	// }
 }
+
+// Example: Filtered terms aggregation with prefix
+func ExampleAggregationsRequest_filteredTerms() {
+	// This example shows how to filter terms by prefix
+	query := NewMatchAllQuery()
+	searchRequest := NewSearchRequest(query)
+
+	// Only aggregate brands starting with "sam" (e.g., samsung, samsonite)
+	filteredBrands := NewTermsAggregationWithFilter("brand", 10, "sam", "")
+	filteredBrands.AddSubAggregation("avg_price", NewAggregationRequest("avg", "price"))
+
+	searchRequest.Aggregations = AggregationsRequest{
+		"filtered_brands": filteredBrands,
+	}
+
+	// Or use regex for more complex patterns:
+	// Pattern to match product codes like "PROD-1234"
+	productCodes := NewTermsAggregationWithFilter("product_code", 20, "", "^PROD-[0-9]{4}$")
+
+	searchRequest.Aggregations["product_codes"] = productCodes
+}
