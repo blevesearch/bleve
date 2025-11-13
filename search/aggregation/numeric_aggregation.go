@@ -112,6 +112,10 @@ func (sa *SumAggregation) Result() *search.AggregationResult {
 	}
 }
 
+func (sa *SumAggregation) Clone() search.AggregationBuilder {
+	return NewSumAggregation(sa.field)
+}
+
 // AvgAggregation computes the average of numeric values
 type AvgAggregation struct {
 	field    string
@@ -174,6 +178,10 @@ func (aa *AvgAggregation) Result() *search.AggregationResult {
 		Type:  "avg",
 		Value: avg,
 	}
+}
+
+func (aa *AvgAggregation) Clone() search.AggregationBuilder {
+	return NewAvgAggregation(aa.field)
 }
 
 // MinAggregation computes the minimum value
@@ -241,6 +249,10 @@ func (ma *MinAggregation) Result() *search.AggregationResult {
 	}
 }
 
+func (ma *MinAggregation) Clone() search.AggregationBuilder {
+	return NewMinAggregation(ma.field)
+}
+
 // MaxAggregation computes the maximum value
 type MaxAggregation struct {
 	field    string
@@ -306,6 +318,10 @@ func (ma *MaxAggregation) Result() *search.AggregationResult {
 	}
 }
 
+func (ma *MaxAggregation) Clone() search.AggregationBuilder {
+	return NewMaxAggregation(ma.field)
+}
+
 // CountAggregation counts the number of values
 type CountAggregation struct {
 	field    string
@@ -358,6 +374,10 @@ func (ca *CountAggregation) Result() *search.AggregationResult {
 		Type:  "count",
 		Value: ca.count,
 	}
+}
+
+func (ca *CountAggregation) Clone() search.AggregationBuilder {
+	return NewCountAggregation(ca.field)
 }
 
 // SumSquaresAggregation computes the sum of squares
@@ -418,6 +438,10 @@ func (ssa *SumSquaresAggregation) Result() *search.AggregationResult {
 		Type:  "sumsquares",
 		Value: ssa.sumSquares,
 	}
+}
+
+func (ssa *SumSquaresAggregation) Clone() search.AggregationBuilder {
+	return NewSumSquaresAggregation(ssa.field)
 }
 
 // StatsAggregation computes comprehensive statistics including standard deviation
@@ -525,4 +549,8 @@ func (sta *StatsAggregation) Result() *search.AggregationResult {
 		Type:  "stats",
 		Value: result,
 	}
+}
+
+func (sta *StatsAggregation) Clone() search.AggregationBuilder {
+	return NewStatsAggregation(sta.field)
 }

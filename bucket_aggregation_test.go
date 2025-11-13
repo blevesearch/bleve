@@ -243,3 +243,159 @@ func ExampleAggregationsRequest_filteredTerms() {
 
 	searchRequest.Aggregations["product_codes"] = productCodes
 }
+
+// TestNestedBucketAggregations tests bucket aggregations nested within other bucket aggregations
+func TestNestedBucketAggregations(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMapping := NewIndexMapping()
+	index, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Index documents with region, category, and price
+	docs := []struct {
+		ID       string
+		Region   string
+		Category string
+		Price    float64
+	}{
+		{"doc1", "US", "Electronics", 999.00},
+		{"doc2", "US", "Electronics", 799.00},
+		{"doc3", "US", "Books", 29.99},
+		{"doc4", "US", "Books", 19.99},
+		{"doc5", "EU", "Electronics", 899.00},
+		{"doc6", "EU", "Electronics", 699.00},
+		{"doc7", "EU", "Books", 24.99},
+		{"doc8", "APAC", "Electronics", 1099.00},
+		{"doc9", "APAC", "Books", 34.99},
+	}
+
+	batch := index.NewBatch()
+	for _, doc := range docs {
+		data := map[string]interface{}{
+			"region":   doc.Region,
+			"category": doc.Category,
+			"price":    doc.Price,
+		}
+		err := batch.Index(doc.ID, data)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = index.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test nested bucket aggregation: Group by region, then by category within each region
+	query := NewMatchAllQuery()
+	searchRequest := NewSearchRequest(query)
+
+	// Create nested terms aggregation: region -> category -> avg price
+	byCategory := NewTermsAggregation("category", 10)
+	byCategory.AddSubAggregation("avg_price", NewAggregationRequest("avg", "price"))
+	byCategory.AddSubAggregation("total_revenue", NewAggregationRequest("sum", "price"))
+
+	byRegion := NewTermsAggregation("region", 10)
+	byRegion.AddSubAggregation("by_category", byCategory)
+
+	searchRequest.Aggregations = AggregationsRequest{
+		"by_region": byRegion,
+	}
+	searchRequest.Size = 0 // Don't need hits
+
+	results, err := index.Search(searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	regionAgg, ok := results.Aggregations["by_region"]
+	if !ok {
+		t.Fatal("Expected by_region aggregation")
+	}
+
+	if len(regionAgg.Buckets) != 3 {
+		t.Fatalf("Expected 3 region buckets, got %d", len(regionAgg.Buckets))
+	}
+
+	// Find US region bucket
+	var usBucket *search.Bucket
+	for _, bucket := range regionAgg.Buckets {
+		if bucket.Key == "us" { // lowercase due to text analysis
+			usBucket = bucket
+			break
+		}
+	}
+
+	if usBucket == nil {
+		t.Fatal("US region bucket not found")
+	}
+
+	if usBucket.Count != 4 {
+		t.Fatalf("Expected US count 4, got %d", usBucket.Count)
+	}
+
+	// Check nested category aggregation within US region
+	if usBucket.Aggregations == nil {
+		t.Fatal("Expected sub-aggregations in US bucket")
+	}
+
+	categoryAgg, ok := usBucket.Aggregations["by_category"]
+	if !ok {
+		t.Fatal("Expected by_category sub-aggregation in US bucket")
+	}
+
+	if len(categoryAgg.Buckets) != 2 {
+		t.Fatalf("Expected 2 category buckets in US region, got %d", len(categoryAgg.Buckets))
+	}
+
+	// Find Electronics category in US region
+	var electronicsCategory *search.Bucket
+	for _, bucket := range categoryAgg.Buckets {
+		if bucket.Key == "electronics" {
+			electronicsCategory = bucket
+			break
+		}
+	}
+
+	if electronicsCategory == nil {
+		t.Fatal("Electronics category not found in US region")
+	}
+
+	if electronicsCategory.Count != 2 {
+		t.Fatalf("Expected 2 electronics items in US, got %d", electronicsCategory.Count)
+	}
+
+	// Check metric sub-aggregations within category
+	avgPrice := electronicsCategory.Aggregations["avg_price"]
+	if avgPrice == nil {
+		t.Fatal("Expected avg_price in electronics category")
+	}
+
+	expectedAvg := 899.0 // (999 + 799) / 2
+	actualAvg := avgPrice.Value.(float64)
+	if actualAvg < expectedAvg-1 || actualAvg > expectedAvg+1 {
+		t.Fatalf("Expected US electronics avg price around %f, got %f (note: if sum is doubled, count must also be doubled to get correct avg)", expectedAvg, actualAvg)
+	}
+
+	totalRevenue := electronicsCategory.Aggregations["total_revenue"]
+	if totalRevenue == nil {
+		t.Fatal("Expected total_revenue in electronics category")
+	}
+
+	// Verify total revenue
+	expectedTotal := 1798.0 // 999 + 799
+	actualTotal := totalRevenue.Value.(float64)
+	if actualTotal != expectedTotal {
+		t.Fatalf("Expected US electronics total %f, got %f", expectedTotal, actualTotal)
+	}
+}

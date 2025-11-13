@@ -42,6 +42,7 @@ type AggregationBuilder interface {
 	Type() string
 
 	Size() int
+	Clone() AggregationBuilder // Creates a fresh instance for sub-aggregation bucket cloning
 }
 
 // AggregationsBuilder manages multiple aggregation builders

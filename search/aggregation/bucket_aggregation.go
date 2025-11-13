@@ -16,7 +16,6 @@ package aggregation
 
 import (
 	"bytes"
-	"fmt"
 	"reflect"
 	"regexp"
 	"sort"
@@ -56,42 +55,33 @@ type subAggregationSet struct {
 	builders map[string]search.AggregationBuilder
 }
 
-// NewTermsAggregation creates a new terms aggregation with optional filtering
-func NewTermsAggregation(field string, size int, prefix, pattern string, subAggregations map[string]search.AggregationBuilder) (*TermsAggregation, error) {
+// NewTermsAggregation creates a new terms aggregation
+func NewTermsAggregation(field string, size int, subAggregations map[string]search.AggregationBuilder) *TermsAggregation {
 	if size <= 0 {
 		size = 10 // default
 	}
 
-	ta := &TermsAggregation{
+	return &TermsAggregation{
 		field:          field,
 		size:           size,
 		termCounts:     make(map[string]int64),
 		termSubAggs:    make(map[string]*subAggregationSet),
 		subAggBuilders: subAggregations,
 	}
-
-	// Convert prefix to []byte once for zero-allocation comparisons
-	if prefix != "" {
-		ta.prefixBytes = []byte(prefix)
-	}
-
-	// Compile regex once
-	if pattern != "" {
-		var err error
-		ta.regex, err = regexp.Compile(pattern)
-		if err != nil {
-			return nil, fmt.Errorf("invalid term pattern: %w", err)
-		}
-	}
-
-	return ta, nil
 }
 
 func (ta *TermsAggregation) Size() int {
 	sizeInBytes := reflectStaticSizeTermsAggregation + size.SizeOfPtr +
 		len(ta.field) +
 		len(ta.prefixBytes) +
-		size.SizeOfPtr // regex pointer
+		size.SizeOfPtr // regex pointer (does not include actual regexp.Regexp object size)
+
+	// Estimate regex object size if present.
+	if ta.regex != nil {
+		// This is only the static size of regexp.Regexp struct, not including heap allocations.
+		sizeInBytes += int(reflect.TypeOf(*ta.regex).Size())
+		// NOTE: Actual memory usage of regexp.Regexp may be higher due to internal allocations.
+	}
 
 	for term := range ta.termCounts {
 		sizeInBytes += size.SizeOfString + len(term) + 8 // int64 = 8 bytes
@@ -103,6 +93,20 @@ func (ta *TermsAggregation) Field() string {
 	return ta.field
 }
 
+// SetPrefixFilter sets the prefix filter for term aggregations.
+func (ta *TermsAggregation) SetPrefixFilter(prefix string) {
+	if prefix != "" {
+		ta.prefixBytes = []byte(prefix)
+	} else {
+		ta.prefixBytes = nil
+	}
+}
+
+// SetRegexFilter sets the compiled regex filter for term aggregations.
+func (ta *TermsAggregation) SetRegexFilter(regex *regexp.Regexp) {
+	ta.regex = regex
+}
+
 func (ta *TermsAggregation) Type() string {
 	return "terms"
 }
@@ -111,13 +115,21 @@ func (ta *TermsAggregation) SubAggregationFields() []string {
 	if ta.subAggBuilders == nil {
 		return nil
 	}
-	fields := make([]string, 0, len(ta.subAggBuilders))
+	// Use a map to track unique fields
+	fieldSet := make(map[string]bool)
 	for _, subAgg := range ta.subAggBuilders {
-		fields = append(fields, subAgg.Field())
+		fieldSet[subAgg.Field()] = true
 		// If sub-agg is also a bucket, recursively collect its fields
 		if bucketed, ok := subAgg.(search.BucketAggregation); ok {
-			fields = append(fields, bucketed.SubAggregationFields()...)
+			for _, f := range bucketed.SubAggregationFields() {
+				fieldSet[f] = true
+			}
 		}
+	}
+	// Convert map to slice
+	fields := make([]string, 0, len(fieldSet))
+	for field := range fieldSet {
+		fields = append(fields, field)
 	}
 	return fields
 }
@@ -154,6 +166,13 @@ func (ta *TermsAggregation) UpdateVisitor(field string, term []byte) {
 				// Clone sub-aggregation builders for this bucket
 				ta.termSubAggs[termStr] = &subAggregationSet{
 					builders: ta.cloneSubAggBuilders(),
+				}
+			}
+			// Start document processing for this bucket's sub-aggregations
+			// This is called once per document for the bucket it falls into
+			if subAggs, exists := ta.termSubAggs[termStr]; exists {
+				for _, subAgg := range subAggs.builders {
+					subAgg.StartDoc()
 				}
 			}
 		}
@@ -227,27 +246,37 @@ func (ta *TermsAggregation) Result() *search.AggregationResult {
 	}
 }
 
+func (ta *TermsAggregation) Clone() search.AggregationBuilder {
+	// Clone sub-aggregations
+	var clonedSubAggs map[string]search.AggregationBuilder
+	if ta.subAggBuilders != nil {
+		clonedSubAggs = make(map[string]search.AggregationBuilder, len(ta.subAggBuilders))
+		for name, subAgg := range ta.subAggBuilders {
+			clonedSubAggs[name] = subAgg.Clone()
+		}
+	}
+
+	// Create new terms aggregation
+	cloned := NewTermsAggregation(ta.field, ta.size, clonedSubAggs)
+
+	// Copy filters
+	if ta.prefixBytes != nil {
+		cloned.prefixBytes = make([]byte, len(ta.prefixBytes))
+		copy(cloned.prefixBytes, ta.prefixBytes)
+	}
+	if ta.regex != nil {
+		cloned.regex = ta.regex // regexp.Regexp is safe to share
+	}
+
+	return cloned
+}
+
 // cloneSubAggBuilders creates fresh instances of sub-aggregation builders
 func (ta *TermsAggregation) cloneSubAggBuilders() map[string]search.AggregationBuilder {
-	cloned := make(map[string]search.AggregationBuilder)
+	cloned := make(map[string]search.AggregationBuilder, len(ta.subAggBuilders))
 	for name, builder := range ta.subAggBuilders {
-		// Create a new instance based on the type
-		switch builder.Type() {
-		case "sum":
-			cloned[name] = NewSumAggregation(builder.Field())
-		case "avg":
-			cloned[name] = NewAvgAggregation(builder.Field())
-		case "min":
-			cloned[name] = NewMinAggregation(builder.Field())
-		case "max":
-			cloned[name] = NewMaxAggregation(builder.Field())
-		case "count":
-			cloned[name] = NewCountAggregation(builder.Field())
-		case "sumsquares":
-			cloned[name] = NewSumSquaresAggregation(builder.Field())
-		case "stats":
-			cloned[name] = NewStatsAggregation(builder.Field())
-		}
+		// Use Clone() method which properly handles all aggregation types including nested buckets
+		cloned[name] = builder.Clone()
 	}
 	return cloned
 }
@@ -298,13 +327,21 @@ func (ra *RangeAggregation) SubAggregationFields() []string {
 	if ra.subAggBuilders == nil {
 		return nil
 	}
-	fields := make([]string, 0, len(ra.subAggBuilders))
+	// Use a map to track unique fields
+	fieldSet := make(map[string]bool)
 	for _, subAgg := range ra.subAggBuilders {
-		fields = append(fields, subAgg.Field())
+		fieldSet[subAgg.Field()] = true
 		// If sub-agg is also a bucket, recursively collect its fields
 		if bucketed, ok := subAgg.(search.BucketAggregation); ok {
-			fields = append(fields, bucketed.SubAggregationFields()...)
+			for _, f := range bucketed.SubAggregationFields() {
+				fieldSet[f] = true
+			}
 		}
+	}
+	// Convert map to slice
+	fields := make([]string, 0, len(fieldSet))
+	for field := range fieldSet {
+		fields = append(fields, field)
 	}
 	return fields
 }
@@ -339,6 +376,18 @@ func (ra *RangeAggregation) UpdateVisitor(field string, term []byte) {
 								ra.rangeSubAggs[rangeName] = &subAggregationSet{
 									builders: ra.cloneSubAggBuilders(),
 								}
+							}
+						}
+					}
+				}
+
+				// Start document processing for all ranges this document falls into
+				// This is called once per document for each range it falls into
+				if ra.subAggBuilders != nil && len(ra.subAggBuilders) > 0 {
+					for _, rangeName := range ra.currentRanges {
+						if subAggs, exists := ra.rangeSubAggs[rangeName]; exists {
+							for _, subAgg := range subAggs.builders {
+								subAgg.StartDoc()
 							}
 						}
 					}
@@ -404,25 +453,41 @@ func (ra *RangeAggregation) Result() *search.AggregationResult {
 	}
 }
 
-func (ra *RangeAggregation) cloneSubAggBuilders() map[string]search.AggregationBuilder {
-	cloned := make(map[string]search.AggregationBuilder)
-	for name, builder := range ra.subAggBuilders {
-		switch builder.Type() {
-		case "sum":
-			cloned[name] = NewSumAggregation(builder.Field())
-		case "avg":
-			cloned[name] = NewAvgAggregation(builder.Field())
-		case "min":
-			cloned[name] = NewMinAggregation(builder.Field())
-		case "max":
-			cloned[name] = NewMaxAggregation(builder.Field())
-		case "count":
-			cloned[name] = NewCountAggregation(builder.Field())
-		case "sumsquares":
-			cloned[name] = NewSumSquaresAggregation(builder.Field())
-		case "stats":
-			cloned[name] = NewStatsAggregation(builder.Field())
+func (ra *RangeAggregation) Clone() search.AggregationBuilder {
+	// Clone sub-aggregations
+	var clonedSubAggs map[string]search.AggregationBuilder
+	if ra.subAggBuilders != nil {
+		clonedSubAggs = make(map[string]search.AggregationBuilder, len(ra.subAggBuilders))
+		for name, subAgg := range ra.subAggBuilders {
+			clonedSubAggs[name] = subAgg.Clone()
 		}
+	}
+
+	// Deep copy ranges
+	clonedRanges := make(map[string]*NumericRange, len(ra.ranges))
+	for name, r := range ra.ranges {
+		clonedRange := &NumericRange{
+			Name: r.Name,
+		}
+		if r.Min != nil {
+			min := *r.Min
+			clonedRange.Min = &min
+		}
+		if r.Max != nil {
+			max := *r.Max
+			clonedRange.Max = &max
+		}
+		clonedRanges[name] = clonedRange
+	}
+
+	return NewRangeAggregation(ra.field, clonedRanges, clonedSubAggs)
+}
+
+func (ra *RangeAggregation) cloneSubAggBuilders() map[string]search.AggregationBuilder {
+	cloned := make(map[string]search.AggregationBuilder, len(ra.subAggBuilders))
+	for name, builder := range ra.subAggBuilders {
+		// Use Clone() method which properly handles all aggregation types including nested buckets
+		cloned[name] = builder.Clone()
 	}
 	return cloned
 }

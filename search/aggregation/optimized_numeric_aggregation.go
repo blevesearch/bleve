@@ -15,6 +15,8 @@
 package aggregation
 
 import (
+	"math"
+
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/query"
 	index "github.com/blevesearch/bleve_index_api"
@@ -109,6 +111,8 @@ func (osa *OptimizedStatsAggregation) Result() *search.AggregationResult {
 
 func (osa *OptimizedStatsAggregation) optimizedResult() *search.AggregationResult {
 	result := &StatsResult{}
+	minInitialized := false
+	maxInitialized := false
 
 	// Merge all segment stats
 	for _, stats := range osa.segmentStats {
@@ -117,11 +121,14 @@ func (osa *OptimizedStatsAggregation) optimizedResult() *search.AggregationResul
 		result.SumSquares += stats.SumSquares
 
 		if stats.Count > 0 {
-			if result.Min == 0 || stats.Min < result.Min {
+			// Use proper initialization tracking instead of checking for zero
+			if !minInitialized || stats.Min < result.Min {
 				result.Min = stats.Min
+				minInitialized = true
 			}
-			if result.Max == 0 || stats.Max > result.Max {
+			if !maxInitialized || stats.Max > result.Max {
 				result.Max = stats.Max
+				maxInitialized = true
 			}
 		}
 	}
@@ -135,7 +142,7 @@ func (osa *OptimizedStatsAggregation) optimizedResult() *search.AggregationResul
 		if result.Variance < 0 {
 			result.Variance = 0
 		}
-		result.StdDev = result.Variance // Using variance as stddev for now
+		result.StdDev = math.Sqrt(result.Variance)
 	}
 
 	return &search.AggregationResult{

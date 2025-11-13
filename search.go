@@ -17,6 +17,7 @@ package bleve
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"time"
@@ -282,6 +283,9 @@ type AggregationRequest struct {
 
 	// Sub-aggregations (for bucket aggregations)
 	Aggregations AggregationsRequest `json:"aggregations,omitempty"`
+
+	// Compiled regex pattern (cached during validation)
+	compiledPattern *regexp.Regexp
 }
 
 // NewAggregationRequest creates a simple metric aggregation request
@@ -331,6 +335,16 @@ func (ar *AggregationRequest) AddSubAggregation(name string, subAgg *Aggregation
 	ar.Aggregations[name] = subAgg
 }
 
+// SetPrefixFilter sets the prefix filter for terms aggregations.
+func (ar *AggregationRequest) SetPrefixFilter(prefix string) {
+	ar.TermPrefix = prefix
+}
+
+// SetRegexFilter sets the regex pattern filter for terms aggregations.
+func (ar *AggregationRequest) SetRegexFilter(pattern string) {
+	ar.TermPattern = pattern
+}
+
 // Validate validates the aggregation request
 func (ar *AggregationRequest) Validate() error {
 	validTypes := map[string]bool{
@@ -345,6 +359,15 @@ func (ar *AggregationRequest) Validate() error {
 	}
 	if ar.Field == "" {
 		return fmt.Errorf("aggregation field cannot be empty")
+	}
+
+	// Validate regex pattern if provided and cache the compiled regex
+	if ar.TermPattern != "" {
+		compiled, err := regexp.Compile(ar.TermPattern)
+		if err != nil {
+			return fmt.Errorf("invalid term pattern: %v", err)
+		}
+		ar.compiledPattern = compiled
 	}
 
 	// Validate bucket-specific configuration

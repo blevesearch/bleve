@@ -20,6 +20,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -643,16 +644,31 @@ func buildAggregation(aggRequest *AggregationRequest) (search.AggregationBuilder
 		if aggRequest.Size != nil {
 			size = *aggRequest.Size
 		}
-		termsAgg, err := aggregation.NewTermsAggregation(
+		termsAgg := aggregation.NewTermsAggregation(
 			aggRequest.Field,
 			size,
-			aggRequest.TermPrefix,
-			aggRequest.TermPattern,
 			subAggBuilders,
 		)
-		if err != nil {
-			return nil, fmt.Errorf("error creating terms aggregation: %w", err)
+
+		// Set prefix filter if provided
+		if aggRequest.TermPrefix != "" {
+			termsAgg.SetPrefixFilter(aggRequest.TermPrefix)
 		}
+
+		// Set regex filter if provided
+		if aggRequest.TermPattern != "" {
+			// Use cached compiled pattern if available, otherwise compile it now
+			if aggRequest.compiledPattern != nil {
+				termsAgg.SetRegexFilter(aggRequest.compiledPattern)
+			} else {
+				regex, err := regexp.Compile(aggRequest.TermPattern)
+				if err != nil {
+					return nil, fmt.Errorf("error compiling regex pattern for aggregation: %v", err)
+				}
+				termsAgg.SetRegexFilter(regex)
+			}
+		}
+
 		return termsAgg, nil
 
 	case "range":
