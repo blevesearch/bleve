@@ -20,6 +20,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -848,10 +849,22 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				facetsBuilder.Add(facetName, facetBuilder)
 			} else {
 				// build terms facet
-				facetBuilder, err := facet.NewTermsFacetBuilder(facetRequest.Field, facetRequest.Size, facetRequest.TermPrefix, facetRequest.TermPattern)
-				if err != nil {
-					return nil, fmt.Errorf("error creating terms facet '%s': %v", facetName, err)
+				facetBuilder := facet.NewTermsFacetBuilder(facetRequest.Field, facetRequest.Size)
+
+				// Set prefix filter if provided
+				if facetRequest.TermPrefix != "" {
+					facetBuilder.SetPrefixFilter(facetRequest.TermPrefix)
 				}
+
+				// Compile and set regex filter if provided
+				if facetRequest.TermPattern != "" {
+					regex, err := regexp.Compile(facetRequest.TermPattern)
+					if err != nil {
+						return nil, fmt.Errorf("error compiling regex pattern for facet '%s': %v", facetName, err)
+					}
+					facetBuilder.SetRegexFilter(regex)
+				}
+
 				facetsBuilder.Add(facetName, facetBuilder)
 			}
 		}

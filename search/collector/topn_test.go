@@ -754,10 +754,7 @@ func TestSetFacetsBuilder(t *testing.T) {
 	}
 
 	fb := search.NewFacetsBuilder(indexReader)
-	facetBuilder, err := facet.NewTermsFacetBuilder(sortFacetsField, 100, "", "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	facetBuilder := facet.NewTermsFacetBuilder(sortFacetsField, 100)
 	fb.Add("locations_facet", facetBuilder)
 	coll.SetFacetsBuilder(fb)
 

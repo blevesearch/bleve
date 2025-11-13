@@ -17,6 +17,7 @@ package bleve
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"time"
@@ -163,7 +164,25 @@ func NewFacetRequest(field string, size int) *FacetRequest {
 	}
 }
 
+// SetPrefixFilter sets the prefix filter for term facets.
+func (fr *FacetRequest) SetPrefixFilter(prefix string) {
+	fr.TermPrefix = prefix
+}
+
+// SetRegexFilter sets the regex pattern filter for term facets.
+func (fr *FacetRequest) SetRegexFilter(pattern string) {
+	fr.TermPattern = pattern
+}
+
 func (fr *FacetRequest) Validate() error {
+	// Validate regex pattern if provided
+	if fr.TermPattern != "" {
+		_, err := regexp.Compile(fr.TermPattern)
+		if err != nil {
+			return fmt.Errorf("invalid term pattern: %v", err)
+		}
+	}
+
 	nrCount := len(fr.NumericRanges)
 	drCount := len(fr.DateTimeRanges)
 	if nrCount > 0 && drCount > 0 {

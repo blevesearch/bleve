@@ -54,10 +54,7 @@ func BenchmarkTermsFacet10000(b *testing.B) {
 func termsFacetN(b *testing.B, numTerms int) {
 	field := "test"
 	termsLen := len(terms)
-	tfb, err := NewTermsFacetBuilder(field, 3, "", "")
-	if err != nil {
-		b.Fatal(err)
-	}
+	tfb := NewTermsFacetBuilder(field, 3)
 	i := 0
 	for len(tfb.termsCount) < numTerms && i <= termsLen {
 		j := i % termsLen
@@ -76,10 +73,8 @@ func termsFacetN(b *testing.B, numTerms int) {
 
 func TestTermsFacetPrefix(t *testing.T) {
 	field := "category"
-	tfb, err := NewTermsFacetBuilder(field, 10, "prod-", "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tfb := NewTermsFacetBuilder(field, 10)
+	tfb.SetPrefixFilter("prod-")
 
 	// Add terms with various prefixes
 	terms := []string{
@@ -133,11 +128,13 @@ func TestTermsFacetPrefix(t *testing.T) {
 
 func TestTermsFacetRegex(t *testing.T) {
 	field := "product_code"
-	// Match pattern: ABC-#### (3 letters, dash, 4 digits)
-	tfb, err := NewTermsFacetBuilder(field, 10, "", "^[A-Z]{3}-\\d{4}$")
+	// Match pattern: ABC-#### (3 letters, dash, 4 digits) - pattern: ^[A-Z]{3}-\\d{4}$
+	tfb := NewTermsFacetBuilder(field, 10)
+	regex, err := regexp.Compile("^[A-Z]{3}-\\d{4}$")
 	if err != nil {
 		t.Fatal(err)
 	}
+	tfb.SetRegexFilter(regex)
 
 	// Add terms with various formats
 	terms := []string{
@@ -192,10 +189,13 @@ func TestTermsFacetRegex(t *testing.T) {
 func TestTermsFacetPrefixAndRegex(t *testing.T) {
 	field := "tag"
 	// Both prefix "env:" and regex pattern for prod/staging only
-	tfb, err := NewTermsFacetBuilder(field, 10, "env:", "^env:(prod|staging)$")
+	tfb := NewTermsFacetBuilder(field, 10)
+	tfb.SetPrefixFilter("env:")
+	regex, err := regexp.Compile("^env:(prod|staging)$")
 	if err != nil {
 		t.Fatal(err)
 	}
+	tfb.SetRegexFilter(regex)
 
 	// Add various terms
 	terms := []string{
@@ -246,9 +246,8 @@ func TestTermsFacetPrefixAndRegex(t *testing.T) {
 }
 
 func TestTermsFacetInvalidRegex(t *testing.T) {
-	field := "test"
 	// Invalid regex pattern (unmatched bracket)
-	_, err := NewTermsFacetBuilder(field, 10, "", "[invalid")
+	_, err := regexp.Compile("[invalid")
 	if err == nil {
 		t.Fatal("expected error for invalid regex, got nil")
 	}
@@ -256,10 +255,7 @@ func TestTermsFacetInvalidRegex(t *testing.T) {
 
 func TestTermsFacetNoFilter(t *testing.T) {
 	field := "tag"
-	tfb, err := NewTermsFacetBuilder(field, 2, "", "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tfb := NewTermsFacetBuilder(field, 2)
 
 	terms := []string{"apple", "banana", "cherry", "apple"}
 
