@@ -152,6 +152,9 @@ type FacetRequest struct {
 	TermPattern    string           `json:"term_pattern,omitempty"`
 	NumericRanges  []*numericRange  `json:"numeric_ranges,omitempty"`
 	DateTimeRanges []*dateTimeRange `json:"date_ranges,omitempty"`
+
+	// Compiled regex pattern (cached during validation)
+	compiledPattern *regexp.Regexp
 }
 
 // NewFacetRequest creates a facet on the specified
@@ -175,12 +178,13 @@ func (fr *FacetRequest) SetRegexFilter(pattern string) {
 }
 
 func (fr *FacetRequest) Validate() error {
-	// Validate regex pattern if provided
+	// Validate regex pattern if provided and cache the compiled regex
 	if fr.TermPattern != "" {
-		_, err := regexp.Compile(fr.TermPattern)
+		compiled, err := regexp.Compile(fr.TermPattern)
 		if err != nil {
 			return fmt.Errorf("invalid term pattern: %v", err)
 		}
+		fr.compiledPattern = compiled
 	}
 
 	nrCount := len(fr.NumericRanges)
