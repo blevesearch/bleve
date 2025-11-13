@@ -35,6 +35,7 @@ import (
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/aggregation"
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/facet"
 	"github.com/blevesearch/bleve/v2/search/highlight"
@@ -603,6 +604,67 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 	}, nil
 }
 
+// buildAggregation recursively builds an aggregation builder from a request
+func buildAggregation(aggRequest *AggregationRequest) (search.AggregationBuilder, error) {
+	// Build sub-aggregations first (if any)
+	var subAggBuilders map[string]search.AggregationBuilder
+	if aggRequest.Aggregations != nil && len(aggRequest.Aggregations) > 0 {
+		subAggBuilders = make(map[string]search.AggregationBuilder)
+		for subName, subRequest := range aggRequest.Aggregations {
+			subBuilder, err := buildAggregation(subRequest)
+			if err != nil {
+				return nil, err
+			}
+			subAggBuilders[subName] = subBuilder
+		}
+	}
+
+	// Build the aggregation based on type
+	switch aggRequest.Type {
+	// Metric aggregations
+	case "sum":
+		return aggregation.NewSumAggregation(aggRequest.Field), nil
+	case "avg":
+		return aggregation.NewAvgAggregation(aggRequest.Field), nil
+	case "min":
+		return aggregation.NewMinAggregation(aggRequest.Field), nil
+	case "max":
+		return aggregation.NewMaxAggregation(aggRequest.Field), nil
+	case "count":
+		return aggregation.NewCountAggregation(aggRequest.Field), nil
+	case "sumsquares":
+		return aggregation.NewSumSquaresAggregation(aggRequest.Field), nil
+	case "stats":
+		return aggregation.NewStatsAggregation(aggRequest.Field), nil
+
+	// Bucket aggregations
+	case "terms":
+		size := 10 // default
+		if aggRequest.Size != nil {
+			size = *aggRequest.Size
+		}
+		return aggregation.NewTermsAggregation(aggRequest.Field, size, subAggBuilders), nil
+
+	case "range":
+		if len(aggRequest.NumericRanges) == 0 {
+			return nil, fmt.Errorf("range aggregation requires numeric ranges")
+		}
+		// Convert API ranges to internal format
+		ranges := make(map[string]*aggregation.NumericRange)
+		for _, nr := range aggRequest.NumericRanges {
+			ranges[nr.Name] = &aggregation.NumericRange{
+				Name: nr.Name,
+				Min:  nr.Min,
+				Max:  nr.Max,
+			}
+		}
+		return aggregation.NewRangeAggregation(aggRequest.Field, ranges, subAggBuilders), nil
+
+	default:
+		return nil, fmt.Errorf("unknown aggregation type: %s", aggRequest.Type)
+	}
+}
+
 // SearchInContext executes a search request operation within the provided
 // Context. Returns a SearchResult object or an error.
 func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr *SearchResult, err error) {
@@ -855,6 +917,19 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		coll.SetFacetsBuilder(facetsBuilder)
 	}
 
+	// build aggregations if requested
+	if req.Aggregations != nil {
+		aggregationsBuilder := search.NewAggregationsBuilder(indexReader)
+		for aggName, aggRequest := range req.Aggregations {
+			aggBuilder, err := buildAggregation(aggRequest)
+			if err != nil {
+				return nil, err
+			}
+			aggregationsBuilder.Add(aggName, aggBuilder)
+		}
+		coll.SetAggregationsBuilder(aggregationsBuilder)
+	}
+
 	memNeeded := memNeededForSearch(req, searcher, coll)
 	if cb := ctx.Value(SearchQueryStartCallbackKey); cb != nil {
 		if cbF, ok := cb.(SearchQueryStartCallbackFn); ok {
@@ -947,11 +1022,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			Total:      1,
 			Successful: 1,
 		},
-		Hits:     hits,
-		Total:    coll.Total(),
-		MaxScore: coll.MaxScore(),
-		Took:     searchDuration,
-		Facets:   coll.FacetResults(),
+		Hits:         hits,
+		Total:        coll.Total(),
+		MaxScore:     coll.MaxScore(),
+		Took:         searchDuration,
+		Facets:       coll.FacetResults(),
+		Aggregations: coll.AggregationResults(),
 	}
 
 	// rescore if fusion flag is set
