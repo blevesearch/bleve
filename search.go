@@ -285,7 +285,7 @@ type AggregationRequest struct {
 	Aggregations AggregationsRequest `json:"aggregations,omitempty"`
 
 	// Compiled regex pattern (cached during validation)
-	compiledPattern *regexp.Regexp
+	compiledPattern *regexp.Regexp `json:"-"`
 }
 
 // NewAggregationRequest creates a simple metric aggregation request
@@ -361,13 +361,19 @@ func (ar *AggregationRequest) Validate() error {
 		return fmt.Errorf("aggregation field cannot be empty")
 	}
 
-	// Validate regex pattern if provided and cache the compiled regex
+	// Validate that TermPattern and TermPrefix are only used with "terms" aggregations
 	if ar.TermPattern != "" {
+		if ar.Type != "terms" {
+			return fmt.Errorf("term_pattern is only valid for terms aggregations, not %s", ar.Type)
+		}
 		compiled, err := regexp.Compile(ar.TermPattern)
 		if err != nil {
 			return fmt.Errorf("invalid term pattern: %v", err)
 		}
 		ar.compiledPattern = compiled
+	}
+	if ar.TermPrefix != "" && ar.Type != "terms" {
+		return fmt.Errorf("term_prefix is only valid for terms aggregations, not %s", ar.Type)
 	}
 
 	// Validate bucket-specific configuration

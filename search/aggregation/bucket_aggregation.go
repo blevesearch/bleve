@@ -152,27 +152,30 @@ func (ta *TermsAggregation) UpdateVisitor(field string, term []byte) {
 			return // Skip terms that don't match regex
 		}
 
-		ta.sawValue = true
-		// Only convert to string if term matches filters
-		termStr := string(term)
-		ta.currentTerm = termStr
+		// Only process if we haven't seen this bucket's field yet in this document
+		if !ta.sawValue {
+			ta.sawValue = true
+			// Only convert to string if term matches filters
+			termStr := string(term)
+			ta.currentTerm = termStr
 
-		// Increment count for this term
-		ta.termCounts[termStr]++
+			// Increment count for this term
+			ta.termCounts[termStr]++
 
-		// Initialize sub-aggregations for this term if needed
-		if ta.subAggBuilders != nil && len(ta.subAggBuilders) > 0 {
-			if _, exists := ta.termSubAggs[termStr]; !exists {
-				// Clone sub-aggregation builders for this bucket
-				ta.termSubAggs[termStr] = &subAggregationSet{
-					builders: ta.cloneSubAggBuilders(),
+			// Initialize sub-aggregations for this term if needed
+			if ta.subAggBuilders != nil && len(ta.subAggBuilders) > 0 {
+				if _, exists := ta.termSubAggs[termStr]; !exists {
+					// Clone sub-aggregation builders for this bucket
+					ta.termSubAggs[termStr] = &subAggregationSet{
+						builders: ta.cloneSubAggBuilders(),
+					}
 				}
-			}
-			// Start document processing for this bucket's sub-aggregations
-			// This is called once per document for the bucket it falls into
-			if subAggs, exists := ta.termSubAggs[termStr]; exists {
-				for _, subAgg := range subAggs.builders {
-					subAgg.StartDoc()
+				// Start document processing for this bucket's sub-aggregations
+				// This is called once per document when we first identify the bucket
+				if subAggs, exists := ta.termSubAggs[termStr]; exists {
+					for _, subAgg := range subAggs.builders {
+						subAgg.StartDoc()
+					}
 				}
 			}
 		}
@@ -354,40 +357,43 @@ func (ra *RangeAggregation) StartDoc() {
 func (ra *RangeAggregation) UpdateVisitor(field string, term []byte) {
 	// If this is our field, determine which ranges this document falls into
 	if field == ra.field {
-		ra.sawValue = true
+		// Only process the first occurrence of this field in the document
+		if !ra.sawValue {
+			ra.sawValue = true
 
-		// Decode numeric value
-		prefixCoded := numeric.PrefixCoded(term)
-		shift, err := prefixCoded.Shift()
-		if err == nil && shift == 0 {
-			i64, err := prefixCoded.Int64()
-			if err == nil {
-				f64 := numeric.Int64ToFloat64(i64)
+			// Decode numeric value
+			prefixCoded := numeric.PrefixCoded(term)
+			shift, err := prefixCoded.Shift()
+			if err == nil && shift == 0 {
+				i64, err := prefixCoded.Int64()
+				if err == nil {
+					f64 := numeric.Int64ToFloat64(i64)
 
-				// Check which ranges this value falls into
-				for rangeName, r := range ra.ranges {
-					if (r.Min == nil || f64 >= *r.Min) && (r.Max == nil || f64 < *r.Max) {
-						ra.rangeCounts[rangeName]++
-						ra.currentRanges = append(ra.currentRanges, rangeName)
+					// Check which ranges this value falls into
+					for rangeName, r := range ra.ranges {
+						if (r.Min == nil || f64 >= *r.Min) && (r.Max == nil || f64 < *r.Max) {
+							ra.rangeCounts[rangeName]++
+							ra.currentRanges = append(ra.currentRanges, rangeName)
 
-						// Initialize sub-aggregations for this range if needed
-						if ra.subAggBuilders != nil && len(ra.subAggBuilders) > 0 {
-							if _, exists := ra.rangeSubAggs[rangeName]; !exists {
-								ra.rangeSubAggs[rangeName] = &subAggregationSet{
-									builders: ra.cloneSubAggBuilders(),
+							// Initialize sub-aggregations for this range if needed
+							if ra.subAggBuilders != nil && len(ra.subAggBuilders) > 0 {
+								if _, exists := ra.rangeSubAggs[rangeName]; !exists {
+									ra.rangeSubAggs[rangeName] = &subAggregationSet{
+										builders: ra.cloneSubAggBuilders(),
+									}
 								}
 							}
 						}
 					}
-				}
 
-				// Start document processing for all ranges this document falls into
-				// This is called once per document for each range it falls into
-				if ra.subAggBuilders != nil && len(ra.subAggBuilders) > 0 {
-					for _, rangeName := range ra.currentRanges {
-						if subAggs, exists := ra.rangeSubAggs[rangeName]; exists {
-							for _, subAgg := range subAggs.builders {
-								subAgg.StartDoc()
+					// Start document processing for sub-aggregations in all ranges this document falls into
+					// This is called once per document when we first process the range field
+					if ra.subAggBuilders != nil && len(ra.subAggBuilders) > 0 {
+						for _, rangeName := range ra.currentRanges {
+							if subAggs, exists := ra.rangeSubAggs[rangeName]; exists {
+								for _, subAgg := range subAggs.builders {
+									subAgg.StartDoc()
+								}
 							}
 						}
 					}

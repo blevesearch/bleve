@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/numeric"
+	"github.com/blevesearch/bleve/v2/search"
 )
 
 func TestSumAggregation(t *testing.T) {
@@ -171,7 +172,7 @@ func TestStatsAggregation(t *testing.T) {
 	}
 
 	result := agg.Result()
-	stats := result.Value.(*StatsResult)
+	stats := result.Value.(*search.StatsResult)
 
 	if stats.Count != expectedCount {
 		t.Errorf("Expected count %d, got %d", expectedCount, stats.Count)

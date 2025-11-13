@@ -15,6 +15,7 @@
 package search
 
 import (
+	"math"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/size"
@@ -84,19 +85,28 @@ func (ab *AggregationsBuilder) Add(name string, aggregationBuilder AggregationBu
 	ab.aggregationNames = append(ab.aggregationNames, name)
 	ab.aggregations = append(ab.aggregations, aggregationBuilder)
 
+	// Track unique fields
+	fieldSet := make(map[string]bool)
+	for _, f := range ab.fields {
+		fieldSet[f] = true
+	}
+
 	// Register for the aggregation's own field
-	ab.aggregationsByField[aggregationBuilder.Field()] = append(
-		ab.aggregationsByField[aggregationBuilder.Field()], aggregationBuilder)
-	ab.fields = append(ab.fields, aggregationBuilder.Field())
+	field := aggregationBuilder.Field()
+	ab.aggregationsByField[field] = append(ab.aggregationsByField[field], aggregationBuilder)
+	if !fieldSet[field] {
+		ab.fields = append(ab.fields, field)
+		fieldSet[field] = true
+	}
 
 	// For bucket aggregations, also register for sub-aggregation fields
 	if bucketed, ok := aggregationBuilder.(BucketAggregation); ok {
 		subFields := bucketed.SubAggregationFields()
 		for _, subField := range subFields {
-			if subField != aggregationBuilder.Field() {
-				ab.aggregationsByField[subField] = append(
-					ab.aggregationsByField[subField], aggregationBuilder)
+			ab.aggregationsByField[subField] = append(ab.aggregationsByField[subField], aggregationBuilder)
+			if !fieldSet[subField] {
 				ab.fields = append(ab.fields, subField)
+				fieldSet[subField] = true
 			}
 		}
 	}
@@ -155,6 +165,18 @@ type AggregationResult struct {
 
 	// For bucket aggregations only
 	Buckets []*Bucket `json:"buckets,omitempty"`
+}
+
+// StatsResult contains comprehensive statistics
+type StatsResult struct {
+	Count      int64   `json:"count"`
+	Sum        float64 `json:"sum"`
+	Avg        float64 `json:"avg"`
+	Min        float64 `json:"min"`
+	Max        float64 `json:"max"`
+	SumSquares float64 `json:"sum_squares"`
+	Variance   float64 `json:"variance"`
+	StdDev     float64 `json:"std_dev"`
 }
 
 // Bucket represents a single bucket in a bucket aggregation
@@ -228,9 +250,31 @@ func (ar AggregationResults) Merge(other AggregationResults) {
 			aggResult.Value = (aggResult.Value.(float64) + otherAggResult.Value.(float64)) / 2.0
 
 		case "stats":
-			// Stats merging requires access to component values
-			// This is handled at the aggregation type level
-			// For now, keep first result (limitation)
+			// Merge stats by combining component values
+			destStats := aggResult.Value.(*StatsResult)
+			srcStats := otherAggResult.Value.(*StatsResult)
+
+			destStats.Count += srcStats.Count
+			destStats.Sum += srcStats.Sum
+			destStats.SumSquares += srcStats.SumSquares
+
+			if srcStats.Min < destStats.Min {
+				destStats.Min = srcStats.Min
+			}
+			if srcStats.Max > destStats.Max {
+				destStats.Max = srcStats.Max
+			}
+
+			// Recalculate derived values
+			if destStats.Count > 0 {
+				destStats.Avg = destStats.Sum / float64(destStats.Count)
+				avgSquares := destStats.SumSquares / float64(destStats.Count)
+				destStats.Variance = avgSquares - (destStats.Avg * destStats.Avg)
+				if destStats.Variance < 0 {
+					destStats.Variance = 0
+				}
+				destStats.StdDev = math.Sqrt(destStats.Variance)
+			}
 
 		case "terms", "range", "date_range":
 			// Merge buckets

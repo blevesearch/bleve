@@ -110,7 +110,7 @@ func (osa *OptimizedStatsAggregation) Result() *search.AggregationResult {
 }
 
 func (osa *OptimizedStatsAggregation) optimizedResult() *search.AggregationResult {
-	result := &StatsResult{}
+	result := &search.StatsResult{}
 	minInitialized := false
 	maxInitialized := false
 

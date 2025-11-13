@@ -54,7 +54,6 @@ func init() {
 type SumAggregation struct {
 	field    string
 	sum      float64
-	count    int64
 	sawValue bool
 }
 
@@ -95,7 +94,6 @@ func (sa *SumAggregation) UpdateVisitor(field string, term []byte) {
 		if err == nil {
 			f64 := numeric.Int64ToFloat64(i64)
 			sa.sum += f64
-			sa.count++
 		}
 	}
 }
@@ -384,7 +382,6 @@ func (ca *CountAggregation) Clone() search.AggregationBuilder {
 type SumSquaresAggregation struct {
 	field      string
 	sumSquares float64
-	count      int64
 	sawValue   bool
 }
 
@@ -423,7 +420,6 @@ func (ssa *SumSquaresAggregation) UpdateVisitor(field string, term []byte) {
 		if err == nil {
 			f64 := numeric.Int64ToFloat64(i64)
 			ssa.sumSquares += f64 * f64
-			ssa.count++
 		}
 	}
 }
@@ -453,18 +449,6 @@ type StatsAggregation struct {
 	min        float64
 	max        float64
 	sawValue   bool
-}
-
-// StatsResult contains comprehensive statistics
-type StatsResult struct {
-	Count      int64   `json:"count"`
-	Sum        float64 `json:"sum"`
-	Avg        float64 `json:"avg"`
-	Min        float64 `json:"min"`
-	Max        float64 `json:"max"`
-	SumSquares float64 `json:"sum_squares"`
-	Variance   float64 `json:"variance"`
-	StdDev     float64 `json:"std_dev"`
 }
 
 // NewStatsAggregation creates a comprehensive stats aggregation
@@ -521,7 +505,7 @@ func (sta *StatsAggregation) EndDoc() {
 }
 
 func (sta *StatsAggregation) Result() *search.AggregationResult {
-	result := &StatsResult{
+	result := &search.StatsResult{
 		Count:      sta.count,
 		Sum:        sta.sum,
 		SumSquares: sta.sumSquares,
