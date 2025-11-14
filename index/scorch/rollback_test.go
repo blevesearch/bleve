@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/index/scorch/vfs"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -545,7 +546,12 @@ func TestBackupRacingWithPurge(t *testing.T) {
 	}()
 
 	// if the latest snapshot was purged, the following will return error
-	err = copyReader.CopyTo(testFSDirector(backupidxConfig["path"].(string)))
+	backupPath := backupidxConfig["path"].(string)
+	backupVFSDir, err := vfs.NewFSDirectory(filepath.Join(backupPath, "store"))
+	if err != nil {
+		t.Fatalf("error creating backup VFS directory: %v", err)
+	}
+	err = copyReader.CopyTo(backupVFSDir)
 	if err != nil {
 		t.Fatalf("error copying the index: %v", err)
 	}
