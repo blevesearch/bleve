@@ -225,6 +225,7 @@ func cloneDocumentMatches(src search.DocumentMatchCollection) search.DocumentMat
 	}
 	return dst
 }
+
 func getFTSDocuments() []map[string]interface{} {
 	documents := []map[string]interface{}{
 		{

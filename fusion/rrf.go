@@ -63,7 +63,7 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 			hit := hits[i]
 			originalScore := hit.Score
 			if originalScore == 0.0 {
-				continue
+				break
 			}
 			rank := i + 1
 			if explain {
