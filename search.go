@@ -17,6 +17,7 @@ package bleve
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"time"
@@ -147,8 +148,13 @@ type numericRange struct {
 type FacetRequest struct {
 	Size           int              `json:"size"`
 	Field          string           `json:"field"`
+	TermPrefix     string           `json:"term_prefix,omitempty"`
+	TermPattern    string           `json:"term_pattern,omitempty"`
 	NumericRanges  []*numericRange  `json:"numeric_ranges,omitempty"`
 	DateTimeRanges []*dateTimeRange `json:"date_ranges,omitempty"`
+
+	// Compiled regex pattern (cached during validation)
+	compiledPattern *regexp.Regexp
 }
 
 // NewFacetRequest creates a facet on the specified
@@ -161,7 +167,26 @@ func NewFacetRequest(field string, size int) *FacetRequest {
 	}
 }
 
+// SetPrefixFilter sets the prefix filter for term facets.
+func (fr *FacetRequest) SetPrefixFilter(prefix string) {
+	fr.TermPrefix = prefix
+}
+
+// SetRegexFilter sets the regex pattern filter for term facets.
+func (fr *FacetRequest) SetRegexFilter(pattern string) {
+	fr.TermPattern = pattern
+}
+
 func (fr *FacetRequest) Validate() error {
+	// Validate regex pattern if provided and cache the compiled regex
+	if fr.TermPattern != "" {
+		compiled, err := regexp.Compile(fr.TermPattern)
+		if err != nil {
+			return fmt.Errorf("invalid term pattern: %v", err)
+		}
+		fr.compiledPattern = compiled
+	}
+
 	nrCount := len(fr.NumericRanges)
 	drCount := len(fr.DateTimeRanges)
 	if nrCount > 0 && drCount > 0 {
