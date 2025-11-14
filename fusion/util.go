@@ -21,13 +21,6 @@ import (
 	"github.com/blevesearch/bleve/v2/search"
 )
 
-// docScore captures a score for a document index, letting callers reuse
-// precomputed values without re-reading the match or its breakdown map.
-type docScore struct {
-	idx   int
-	score float64
-}
-
 // sortDocMatchesByScore orders the provided collection in-place by the primary
 // score in descending order, breaking ties with the original `HitNumber` to
 // ensure deterministic output.
@@ -46,21 +39,41 @@ func sortDocMatchesByScore(hits search.DocumentMatchCollection) {
 	})
 }
 
-// sortDocScores orders the supplied `docScore` slice in descending score order
-// while still breaking ties on `HitNumber`. It allows callers to sort cached
-// score data without rebuilding intermediate `[]*DocumentMatch` slices.
-func sortDocScores(scores []docScore, hits search.DocumentMatchCollection) {
-	if len(scores) < 2 {
+// scoreBreakdownForQuery fetches the score for a specific KNN query index from
+// the provided hit. The boolean return indicates whether the score is present.
+func scoreBreakdownForQuery(hit *search.DocumentMatch, idx int) (float64, bool) {
+	if hit == nil || hit.ScoreBreakdown == nil {
+		return 0, false
+	}
+
+	score, ok := hit.ScoreBreakdown[idx]
+	return score, ok
+}
+
+// sortDocMatchesByBreakdown orders the hits in-place using the KNN score for
+// the supplied query index (descending), breaking ties with `HitNumber` and
+// placing hits without a score at the end.
+func sortDocMatchesByBreakdown(hits search.DocumentMatchCollection, queryIdx int) {
+	if len(hits) < 2 {
 		return
 	}
 
-	sort.Slice(scores, func(a, b int) bool {
-		i := scores[a]
-		j := scores[b]
-		if i.score == j.score {
-			return hits[i.idx].HitNumber < hits[j.idx].HitNumber
+	sort.SliceStable(hits, func(a, b int) bool {
+		leftScore, leftOK := scoreBreakdownForQuery(hits[a], queryIdx)
+		rightScore, rightOK := scoreBreakdownForQuery(hits[b], queryIdx)
+
+		if leftOK && rightOK {
+			if leftScore == rightScore {
+				return hits[a].HitNumber < hits[b].HitNumber
+			}
+			return leftScore > rightScore
 		}
-		return i.score > j.score
+
+		if leftOK != rightOK {
+			return leftOK
+		}
+
+		return hits[a].HitNumber < hits[b].HitNumber
 	})
 }
 

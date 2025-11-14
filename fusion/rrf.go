@@ -17,27 +17,9 @@ package fusion
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
 )
-
-// sortDocMatchIdxsByScore orders the provided index slice in-place based on the
-// corresponding hit scores, breaking ties by `HitNumber`.
-func sortDocMatchIdxsByScore(hits search.DocumentMatchCollection, idxs []int) {
-	if len(idxs) < 2 {
-		return
-	}
-
-	sort.Slice(idxs, func(a, b int) bool {
-		left := hits[idxs[a]]
-		right := hits[idxs[b]]
-		if left.Score == right.Score {
-			return left.HitNumber < right.HitNumber
-		}
-		return left.Score > right.Score
-	})
-}
 
 // formatRRFMessage builds the explanation string for a single component of the
 // Reciprocal Rank Fusion calculation.
@@ -58,67 +40,59 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 		}
 	}
 
-	numRanks := numKNNQueries + 1
+	// The code here mainly deals with obtaining rank/score for fts hits.
+	// First sort hits by score
+	sortDocMatchesByScore(hits)
 
-	sortedIdxs := make([]int, len(hits))
-	for i := range hits {
-		sortedIdxs[i] = i
-	}
-
-	sortDocMatchIdxsByScore(hits, sortedIdxs)
-
-	limit := len(sortedIdxs)
+	// Limit to consider only min(windowSize, len(hits))
+	limit := len(hits)
 	if windowSize >= 0 && windowSize < limit {
 		limit = windowSize
 	}
 
-	scores := make([]float64, len(hits))
-
-	var ranks []int
+	// init explanations if required
+	var fusionExpl map[*search.DocumentMatch][]*search.Explanation
 	if explain {
-		ranks = make([]int, len(hits)*numRanks)
+		fusionExpl = make(map[*search.DocumentMatch][]*search.Explanation, len(hits))
 	}
 
+	// Calculate fts rank+scores
 	if limit > 0 {
 		ftsWeight := weights[0]
 		for i := 0; i < limit; i++ {
-			docIdx := sortedIdxs[i]
-			hit := hits[docIdx]
-			if hit.Score == 0.0 {
+			hit := hits[i]
+			originalScore := hit.Score
+			if originalScore == 0.0 {
 				continue
 			}
 			rank := i + 1
 			if explain {
-				ranks[docIdx*numRanks] = rank
+				contrib := ftsWeight / float64(rankConstant+rank)
+				expl := getFusionExplAt(
+					hit,
+					0,
+					contrib,
+					formatRRFMessage(ftsWeight, rank, rankConstant),
+				)
+				fusionExpl[hit] = append(fusionExpl[hit], expl)
+				hit.Score = contrib
+			} else {
+				hit.Score = ftsWeight / float64(rankConstant+rank)
 			}
-			scores[docIdx] += ftsWeight / float64(rankConstant+rank)
+		}
+		for i := limit; i < len(hits); i++ {
+			hits[i].Score = 0.0
+		}
+	} else {
+		for _, hit := range hits {
+			hit.Score = 0.0
 		}
 	}
 
-	knnDocs := make([]docScore, 0, len(hits))
-
+	// Code from here is to calculate knn ranks and scores
+	// iterate over each knn query and calculate knn rank+scores
 	for queryIdx := 0; queryIdx < numKNNQueries; queryIdx++ {
-		knnDocs = knnDocs[:0]
-
-		for idx, hit := range hits {
-			if hit.ScoreBreakdown == nil {
-				continue
-			}
-			if score, ok := hit.ScoreBreakdown[queryIdx]; ok {
-				knnDocs = append(knnDocs, docScore{
-					idx:   idx,
-					score: score,
-				})
-			}
-		}
-
-		if len(knnDocs) == 0 {
-			continue
-		}
-
-		sortDocScores(knnDocs, hits)
-
-		limit := len(knnDocs)
+		limit := len(hits)
 		if windowSize >= 0 && windowSize < limit {
 			limit = windowSize
 		}
@@ -126,45 +100,41 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 			continue
 		}
 
+		sortDocMatchesByBreakdown(hits, queryIdx)
+
 		weight := weights[queryIdx+1]
-		for rankIdx := 0; rankIdx < limit; rankIdx++ {
-			entry := knnDocs[rankIdx]
-			docIdx := entry.idx
-			rank := rankIdx + 1
-			if explain {
-				ranks[docIdx*numRanks+(queryIdx+1)] = rank
+		rank := 0
+		for _, hit := range hits {
+			if _, ok := scoreBreakdownForQuery(hit, queryIdx); !ok {
+				break
 			}
-			scores[docIdx] += weight / float64(rankConstant+rank)
+			rank++
+			contrib := weight / float64(rankConstant+rank)
+			if explain {
+				expl := getFusionExplAt(
+					hit,
+					queryIdx+1,
+					contrib,
+					formatRRFMessage(weight, rank, rankConstant),
+				)
+				fusionExpl[hit] = append(fusionExpl[hit], expl)
+			}
+			hit.Score += contrib
+			if rank == limit {
+				break
+			}
 		}
 	}
 
 	var maxScore float64
-	for idx, hit := range hits {
-		hit.Score = scores[idx]
+	for _, hit := range hits {
+		if explain {
+			finalizeFusionExpl(hit, fusionExpl[hit])
+		}
 		hit.ScoreBreakdown = nil
 
 		if hit.Score > maxScore {
 			maxScore = hit.Score
-		}
-
-		if explain {
-			base := idx * numRanks
-			explChildren := make([]*search.Explanation, 0, numRanks)
-			for i := 0; i < numRanks; i++ {
-				rank := ranks[base+i]
-				if rank == 0 {
-					continue
-				}
-				partial := weights[i] / float64(rankConstant+rank)
-				expl := getFusionExplAt(
-					hit,
-					i,
-					partial,
-					formatRRFMessage(weights[i], rank, rankConstant),
-				)
-				explChildren = append(explChildren, expl)
-			}
-			finalizeFusionExpl(hit, explChildren)
 		}
 	}
 

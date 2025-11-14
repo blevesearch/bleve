@@ -186,6 +186,10 @@ func TestRelativeScoreFusion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			for i, hit := range tt.hits {
+				hit.HitNumber = uint64(i)
+			}
+
 			if got := RelativeScoreFusion(tt.hits, tt.weights, tt.windowSize, tt.numKNNQueries, false); !compareFusionResults(got, tt.want) {
 				t.Errorf("RelativeScoreFusion() = %v, want %v", got, tt.want)
 				// Print detailed comparison for debugging

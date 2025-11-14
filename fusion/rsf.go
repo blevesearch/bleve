@@ -16,7 +16,6 @@ package fusion
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
 )
@@ -42,56 +41,45 @@ func RelativeScoreFusion(hits search.DocumentMatchCollection, weights []float64,
 		}
 	}
 
-	scores := make([]float64, len(hits))
-
-	var explChildren [][]*search.Explanation
+	var fusionExpl map[*search.DocumentMatch][]*search.Explanation
 	if explain {
-		explChildren = make([][]*search.Explanation, len(hits))
+		fusionExpl = make(map[*search.DocumentMatch][]*search.Explanation, len(hits))
 	}
 
-	scoringIdxs := make([]int, 0, len(hits))
+	// Code here for calculating fts results
+	// Sort by fts scores
+	sortDocMatchesByScore(hits)
 
-	for idx, hit := range hits {
-		if hit.Score != 0.0 {
-			scoringIdxs = append(scoringIdxs, idx)
+	// numScoring holds the total number of valid fts hits
+	numScoring := 0
+	for _, hit := range hits {
+		if hit.Score == 0.0 {
+			break
 		}
+		numScoring++
 	}
 
-	if len(scoringIdxs) > 1 {
-		sort.Slice(scoringIdxs, func(a, b int) bool {
-			left := hits[scoringIdxs[a]]
-			right := hits[scoringIdxs[b]]
-			if left.Score == right.Score {
-				return left.HitNumber < right.HitNumber
-			}
-			return left.Score > right.Score
-		})
+	// ftsLimit is min(numScoring, windowSize)
+	ftsLimit := numScoring
+	if windowSize >= 0 && windowSize < ftsLimit {
+		ftsLimit = windowSize
 	}
 
-	if limit := len(scoringIdxs); limit > 0 {
-		if windowSize >= 0 && windowSize < limit {
-			limit = windowSize
-		}
-		if limit < len(scoringIdxs) {
-			scoringIdxs = scoringIdxs[:limit]
-		}
-	}
-
-	if len(scoringIdxs) > 0 {
-		max := hits[scoringIdxs[0]].Score
-		min := hits[scoringIdxs[len(scoringIdxs)-1]].Score
+	// calculate fts rank+scores
+	if ftsLimit > 0 {
+		max := hits[0].Score
+		min := hits[ftsLimit-1].Score
 		denom := max - min
 		weight := weights[0]
 
-		for _, idx := range scoringIdxs {
-			hit := hits[idx]
+		for i := 0; i < ftsLimit; i++ {
+			hit := hits[i]
+			original := hit.Score
 			norm := 1.0
 			if denom > 0 {
-				norm = (hit.Score - min) / denom
+				norm = (original - min) / denom
 			}
-
-			scores[idx] += weight * norm
-
+			contrib := weight * norm
 			if explain {
 				expl := getFusionExplAt(
 					hit,
@@ -99,79 +87,75 @@ func RelativeScoreFusion(hits search.DocumentMatchCollection, weights []float64,
 					norm,
 					formatRSFMessage(weight, norm, min, max),
 				)
-				explChildren[idx] = append(explChildren[idx], expl)
+				fusionExpl[hit] = append(fusionExpl[hit], expl)
 			}
+			hit.Score = contrib
+		}
+		for i := ftsLimit; i < len(hits); i++ {
+			hits[i].Score = 0.0
+		}
+	} else {
+		for _, hit := range hits {
+			hit.Score = 0.0
 		}
 	}
 
-	knnDocs := make([]docScore, 0, len(hits))
-
+	// Code from here is for calculating knn ranks+scores
 	for queryIdx := 0; queryIdx < numKNNQueries; queryIdx++ {
-		knnDocs = knnDocs[:0]
+		sortDocMatchesByBreakdown(hits, queryIdx)
 
-		for idx, hit := range hits {
-			if hit.ScoreBreakdown == nil {
-				continue
+		// numWithScore holds the total number of knn hits retrieved
+		numWithScore := 0
+		for numWithScore < len(hits) {
+			if _, ok := scoreBreakdownForQuery(hits[numWithScore], queryIdx); !ok {
+				break
 			}
-			if score, ok := hit.ScoreBreakdown[queryIdx]; ok {
-				knnDocs = append(knnDocs, docScore{
-					idx:   idx,
-					score: score,
-				})
-			}
+			numWithScore++
 		}
 
-		if len(knnDocs) == 0 {
-			continue
-		}
-
-		sortDocScores(knnDocs, hits)
-
-		limit := len(knnDocs)
+		// limit holds the number of knn hits to consider
+		limit := numWithScore
 		if windowSize >= 0 && windowSize < limit {
 			limit = windowSize
 		}
-
 		if limit == 0 {
 			continue
 		}
 
-		max := knnDocs[0].score
-		min := knnDocs[limit-1].score
+		max, _ := scoreBreakdownForQuery(hits[0], queryIdx)
+		min, _ := scoreBreakdownForQuery(hits[limit-1], queryIdx)
 		denom := max - min
 		weight := weights[queryIdx+1]
 
 		for i := 0; i < limit; i++ {
-			entry := knnDocs[i]
+			hit := hits[i]
+			score, _ := scoreBreakdownForQuery(hit, queryIdx)
 			norm := 1.0
 			if denom > 0 {
-				norm = (entry.score - min) / denom
+				norm = (score - min) / denom
 			}
-
-			scores[entry.idx] += weight * norm
-
+			contrib := weight * norm
 			if explain {
-				hit := hits[entry.idx]
 				expl := getFusionExplAt(
 					hit,
 					queryIdx+1,
 					norm,
 					formatRSFMessage(weight, norm, min, max),
 				)
-				explChildren[entry.idx] = append(explChildren[entry.idx], expl)
+				fusionExpl[hit] = append(fusionExpl[hit], expl)
 			}
+			hit.Score += contrib
 		}
 	}
 
+	// Finalize scores
 	var maxScore float64
-	for idx, hit := range hits {
-		score := scores[idx]
-		hit.Score = score
-		if score > maxScore {
-			maxScore = score
+	for _, hit := range hits {
+		if explain {
+			finalizeFusionExpl(hit, fusionExpl[hit])
 		}
-		if explain && len(explChildren[idx]) > 0 {
-			finalizeFusionExpl(hit, explChildren[idx])
+		if hit.Score > maxScore {
+			maxScore = hit.Score
 		}
 		hit.ScoreBreakdown = nil
 	}
