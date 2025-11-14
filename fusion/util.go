@@ -59,12 +59,24 @@ func sortDocMatchesByBreakdown(hits search.DocumentMatchCollection, queryIdx int
 	}
 
 	sort.SliceStable(hits, func(a, b int) bool {
-		leftScore, leftOK := scoreBreakdownForQuery(hits[a], queryIdx)
-		rightScore, rightOK := scoreBreakdownForQuery(hits[b], queryIdx)
+		left := hits[a]
+		right := hits[b]
+
+		var leftScore float64
+		leftOK := false
+		if left != nil && left.ScoreBreakdown != nil {
+			leftScore, leftOK = left.ScoreBreakdown[queryIdx]
+		}
+
+		var rightScore float64
+		rightOK := false
+		if right != nil && right.ScoreBreakdown != nil {
+			rightScore, rightOK = right.ScoreBreakdown[queryIdx]
+		}
 
 		if leftOK && rightOK {
 			if leftScore == rightScore {
-				return hits[a].HitNumber < hits[b].HitNumber
+				return left.HitNumber < right.HitNumber
 			}
 			return leftScore > rightScore
 		}
@@ -73,7 +85,7 @@ func sortDocMatchesByBreakdown(hits search.DocumentMatchCollection, queryIdx int
 			return leftOK
 		}
 
-		return hits[a].HitNumber < hits[b].HitNumber
+		return left.HitNumber < right.HitNumber
 	})
 }
 

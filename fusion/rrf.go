@@ -50,6 +50,15 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 		limit = windowSize
 	}
 
+	// precompute rank+scores to prevend additional division ops later
+	var rankReciprocals []float64
+	if limit > 0 {
+		rankReciprocals = make([]float64, limit)
+		for i := range rankReciprocals {
+			rankReciprocals[i] = 1.0 / float64(rankConstant+i+1)
+		}
+	}
+
 	// init explanations if required
 	var fusionExpl map[*search.DocumentMatch][]*search.Explanation
 	if explain {
@@ -67,7 +76,7 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 			}
 			rank := i + 1
 			if explain {
-				contrib := ftsWeight / float64(rankConstant+rank)
+				contrib := ftsWeight * rankReciprocals[i]
 				expl := getFusionExplAt(
 					hit,
 					0,
@@ -77,7 +86,7 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 				fusionExpl[hit] = append(fusionExpl[hit], expl)
 				hit.Score = contrib
 			} else {
-				hit.Score = ftsWeight / float64(rankConstant+rank)
+				hit.Score = ftsWeight * rankReciprocals[i]
 			}
 		}
 		for i := limit; i < len(hits); i++ {
@@ -100,16 +109,15 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 			continue
 		}
 
-		sortDocMatchesByBreakdown(hits, queryIdx)
-
 		weight := weights[queryIdx+1]
 		rank := 0
+		sortDocMatchesByBreakdown(hits, queryIdx)
 		for _, hit := range hits {
 			if _, ok := scoreBreakdownForQuery(hit, queryIdx); !ok {
 				break
 			}
 			rank++
-			contrib := weight / float64(rankConstant+rank)
+			contrib := weight * rankReciprocals[rank-1]
 			if explain {
 				expl := getFusionExplAt(
 					hit,

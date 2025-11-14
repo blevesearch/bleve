@@ -65,7 +65,7 @@ func RelativeScoreFusion(hits search.DocumentMatchCollection, weights []float64,
 		ftsLimit = windowSize
 	}
 
-	// calculate fts rank+scores
+	// calculate fts scores
 	if ftsLimit > 0 {
 		max := hits[0].Score
 		min := hits[ftsLimit-1].Score
@@ -100,7 +100,7 @@ func RelativeScoreFusion(hits search.DocumentMatchCollection, weights []float64,
 		}
 	}
 
-	// Code from here is for calculating knn ranks+scores
+	// Code from here is for calculating knn scores
 	for queryIdx := 0; queryIdx < numKNNQueries; queryIdx++ {
 		sortDocMatchesByBreakdown(hits, queryIdx)
 
