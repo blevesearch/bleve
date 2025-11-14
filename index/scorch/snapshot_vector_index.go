@@ -37,14 +37,10 @@ func (is *IndexSnapshot) VectorReader(ctx context.Context, vector []float32,
 		snapshot:         is,
 		searchParams:     searchParams,
 		eligibleSelector: eligibleSelector,
+		postings:         make([]segment_api.VecPostingsList, len(is.segment)),
+		iterators:        make([]segment_api.VecPostingsIterator, len(is.segment)),
 	}
 
-	if rv.postings == nil {
-		rv.postings = make([]segment_api.VecPostingsList, len(is.segment))
-	}
-	if rv.iterators == nil {
-		rv.iterators = make([]segment_api.VecPostingsIterator, len(is.segment))
-	}
 	// initialize postings and iterators within the OptimizeVR's Finish()
 	return rv, nil
 }

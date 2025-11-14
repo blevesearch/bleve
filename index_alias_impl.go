@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -905,7 +904,7 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, flags *preSear
 // which would happen in the case of an alias tree and depending on the level of the tree, the preSearchData
 // needs to be redistributed to the indexes at that level
 func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]map[string]interface{}, error) {
-	rv := make(map[string]map[string]interface{})
+	rv := make(map[string]map[string]interface{}, len(indexes))
 	for _, index := range indexes {
 		rv[index.Name()] = make(map[string]interface{})
 	}
@@ -1202,23 +1201,16 @@ func (i *indexAliasImpl) TermFrequencies(field string, limit int, descending boo
 		})
 	}
 
-	if descending {
-		sort.Slice(rvTermFreqs, func(i, j int) bool {
-			if rvTermFreqs[i].Frequency == rvTermFreqs[j].Frequency {
-				// If frequencies are equal, sort by term lexicographically
-				return strings.Compare(rvTermFreqs[i].Term, rvTermFreqs[j].Term) < 0
-			}
+	sort.Slice(rvTermFreqs, func(i, j int) bool {
+		if rvTermFreqs[i].Frequency == rvTermFreqs[j].Frequency {
+			// If frequencies are equal, sort by term lexicographically
+			return rvTermFreqs[i].Term < rvTermFreqs[j].Term
+		}
+		if descending {
 			return rvTermFreqs[i].Frequency > rvTermFreqs[j].Frequency
-		})
-	} else {
-		sort.Slice(rvTermFreqs, func(i, j int) bool {
-			if rvTermFreqs[i].Frequency == rvTermFreqs[j].Frequency {
-				// If frequencies are equal, sort by term lexicographically
-				return strings.Compare(rvTermFreqs[i].Term, rvTermFreqs[j].Term) < 0
-			}
-			return rvTermFreqs[i].Frequency < rvTermFreqs[j].Frequency
-		})
-	}
+		}
+		return rvTermFreqs[i].Frequency < rvTermFreqs[j].Frequency
+	})
 
 	if limit > len(rvTermFreqs) {
 		limit = len(rvTermFreqs)
@@ -1272,25 +1264,22 @@ func (i *indexAliasImpl) CentroidCardinalities(field string, limit int, descendi
 		close(asyncResults)
 	}()
 
-	rvCentroidCardinalitiesResult := make([]index.CentroidCardinality, 0, limit)
+	rvCentroidCardinalities := make([]index.CentroidCardinality, 0, limit*len(i.indexes))
 	for asr := range asyncResults {
-		asr = append(asr, rvCentroidCardinalitiesResult...)
-		if descending {
-			sort.Slice(asr, func(i, j int) bool {
-				return asr[i].Cardinality > asr[j].Cardinality
-			})
-		} else {
-			sort.Slice(asr, func(i, j int) bool {
-				return asr[i].Cardinality < asr[j].Cardinality
-			})
-		}
-
-		if limit > len(asr) {
-			limit = len(asr)
-		}
-
-		rvCentroidCardinalitiesResult = asr[:limit]
+		rvCentroidCardinalities = append(rvCentroidCardinalities, asr...)
 	}
 
-	return rvCentroidCardinalitiesResult, nil
+	sort.Slice(rvCentroidCardinalities, func(i, j int) bool {
+		if descending {
+			return rvCentroidCardinalities[i].Cardinality > rvCentroidCardinalities[j].Cardinality
+		} else {
+			return rvCentroidCardinalities[i].Cardinality < rvCentroidCardinalities[j].Cardinality
+		}
+	})
+
+	if limit > len(rvCentroidCardinalities) {
+		limit = len(rvCentroidCardinalities)
+	}
+
+	return rvCentroidCardinalities[:limit], nil
 }
