@@ -750,10 +750,16 @@ func (sr *SearchResult) Merge(other *SearchResult) {
 	}
 	if sr.Facets == nil && len(other.Facets) != 0 {
 		sr.Facets = other.Facets
-		return
+	} else {
+		sr.Facets.Merge(other.Facets)
 	}
 
-	sr.Facets.Merge(other.Facets)
+	// Merge aggregations
+	if sr.Aggregations == nil && len(other.Aggregations) != 0 {
+		sr.Aggregations = other.Aggregations
+	} else {
+		sr.Aggregations.Merge(other.Aggregations)
+	}
 }
 
 // MemoryNeededForSearchResult is an exported helper function to determine the RAM

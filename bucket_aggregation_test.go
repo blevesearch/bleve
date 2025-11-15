@@ -126,9 +126,9 @@ func TestBucketAggregations(t *testing.T) {
 
 		// samsung avg: (799 + 899 + 599) / 3 = 765.67
 		expectedAvg := 765.67
-		actualAvg := avgPrice.Value.(float64)
-		if actualAvg < expectedAvg-1 || actualAvg > expectedAvg+1 {
-			t.Fatalf("Expected samsung avg price around %f, got %f", expectedAvg, actualAvg)
+		avgResult := avgPrice.Value.(*search.AvgResult)
+		if avgResult.Avg < expectedAvg-1 || avgResult.Avg > expectedAvg+1 {
+			t.Fatalf("Expected samsung avg price around %f, got %f", expectedAvg, avgResult.Avg)
 		}
 
 		minPrice := samsungBucket.Aggregations["min_price"]
@@ -382,9 +382,9 @@ func TestNestedBucketAggregations(t *testing.T) {
 	}
 
 	expectedAvg := 899.0 // (999 + 799) / 2
-	actualAvg := avgPrice.Value.(float64)
-	if actualAvg < expectedAvg-1 || actualAvg > expectedAvg+1 {
-		t.Fatalf("Expected US electronics avg price around %f, got %f (note: if sum is doubled, count must also be doubled to get correct avg)", expectedAvg, actualAvg)
+	avgResult := avgPrice.Value.(*search.AvgResult)
+	if avgResult.Avg < expectedAvg-1 || avgResult.Avg > expectedAvg+1 {
+		t.Fatalf("Expected US electronics avg price around %f, got %f (note: if sum is doubled, count must also be doubled to get correct avg)", expectedAvg, avgResult.Avg)
 	}
 
 	totalRevenue := electronicsCategory.Aggregations["total_revenue"]

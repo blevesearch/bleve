@@ -174,7 +174,11 @@ func (aa *AvgAggregation) Result() *search.AggregationResult {
 	return &search.AggregationResult{
 		Field: aa.field,
 		Type:  "avg",
-		Value: avg,
+		Value: &search.AvgResult{
+			Count: aa.count,
+			Sum:   aa.sum,
+			Avg:   avg,
+		},
 	}
 }
 

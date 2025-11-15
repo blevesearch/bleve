@@ -63,9 +63,12 @@ func TestAvgAggregation(t *testing.T) {
 	}
 
 	result := agg.Result()
-	actualAvg := result.Value.(float64)
-	if math.Abs(actualAvg-expectedAvg) > 0.0001 {
-		t.Errorf("Expected avg %f, got %f", expectedAvg, actualAvg)
+	avgResult := result.Value.(*search.AvgResult)
+	if math.Abs(avgResult.Avg-expectedAvg) > 0.0001 {
+		t.Errorf("Expected avg %f, got %f", expectedAvg, avgResult.Avg)
+	}
+	if avgResult.Count != int64(len(values)) {
+		t.Errorf("Expected count %d, got %d", len(values), avgResult.Count)
 	}
 }
 

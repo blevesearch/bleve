@@ -17,6 +17,8 @@ package bleve
 import (
 	"math"
 	"testing"
+
+	"github.com/blevesearch/bleve/v2/search"
 )
 
 func TestAggregations(t *testing.T) {
@@ -108,9 +110,10 @@ func TestAggregations(t *testing.T) {
 		}
 
 		avgAgg := results.Aggregations["avg_price"]
+		avgResult := avgAgg.Value.(*search.AvgResult)
 		expectedAvg := 20.2 // 101.0 / 5
-		if math.Abs(avgAgg.Value.(float64)-expectedAvg) > 0.01 {
-			t.Fatalf("Expected avg %f, got %f", expectedAvg, avgAgg.Value)
+		if math.Abs(avgResult.Avg-expectedAvg) > 0.01 {
+			t.Fatalf("Expected avg %f, got %f", expectedAvg, avgResult.Avg)
 		}
 	})
 
@@ -220,7 +223,7 @@ func TestAggregations(t *testing.T) {
 		query.SetField("price")
 		searchRequest := NewSearchRequest(query)
 		searchRequest.Aggregations = AggregationsRequest{
-			"filtered_sum": NewAggregationRequest("sum", "price"),
+			"filtered_sum":   NewAggregationRequest("sum", "price"),
 			"filtered_count": NewAggregationRequest("count", "price"),
 		}
 		searchRequest.Size = 0

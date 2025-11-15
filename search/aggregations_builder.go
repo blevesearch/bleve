@@ -167,6 +167,13 @@ type AggregationResult struct {
 	Buckets []*Bucket `json:"buckets,omitempty"`
 }
 
+// AvgResult contains average with the necessary metadata for proper merging
+type AvgResult struct {
+	Count int64   `json:"count"`
+	Sum   float64 `json:"sum"`
+	Avg   float64 `json:"avg"`
+}
+
 // StatsResult contains comprehensive statistics
 type StatsResult struct {
 	Count      int64   `json:"count"`
@@ -245,9 +252,17 @@ func (ar AggregationResults) Merge(other AggregationResults) {
 			}
 
 		case "avg":
-			// Average of averages is approximate - proper merging requires counts
-			// For now, take simple average (limitation)
-			aggResult.Value = (aggResult.Value.(float64) + otherAggResult.Value.(float64)) / 2.0
+			// Properly merge averages using counts and sums
+			destAvg := aggResult.Value.(*AvgResult)
+			srcAvg := otherAggResult.Value.(*AvgResult)
+
+			destAvg.Count += srcAvg.Count
+			destAvg.Sum += srcAvg.Sum
+
+			// Recalculate average
+			if destAvg.Count > 0 {
+				destAvg.Avg = destAvg.Sum / float64(destAvg.Count)
+			}
 
 		case "stats":
 			// Merge stats by combining component values

@@ -244,6 +244,42 @@ func TestAggregationResultsMerge(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "merge avg aggregations properly using count and sum",
+			agg1: AggregationResults{
+				"avg": &AggregationResult{
+					Field: "rating",
+					Type:  "avg",
+					Value: &AvgResult{
+						Count: 2,
+						Sum:   20.0,
+						Avg:   10.0,
+					},
+				},
+			},
+			agg2: AggregationResults{
+				"avg": &AggregationResult{
+					Field: "rating",
+					Type:  "avg",
+					Value: &AvgResult{
+						Count: 3,
+						Sum:   60.0,
+						Avg:   20.0,
+					},
+				},
+			},
+			expected: AggregationResults{
+				"avg": &AggregationResult{
+					Field: "rating",
+					Type:  "avg",
+					Value: &AvgResult{
+						Count: 5,       // 2 + 3
+						Sum:   80.0,    // 20 + 60
+						Avg:   16.0,    // 80 / 5 (weighted average, not (10+20)/2)
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -278,7 +314,20 @@ func TestAggregationResultsMerge(t *testing.T) {
 
 				// Check values for metric aggregations
 				if expectedAgg.Value != nil {
-					if actualAgg.Value != expectedAgg.Value {
+					// Special handling for avg and stats aggregations
+					if expectedAgg.Type == "avg" {
+						expectedAvg := expectedAgg.Value.(*AvgResult)
+						actualAvg := actualAgg.Value.(*AvgResult)
+						if expectedAvg.Count != actualAvg.Count {
+							t.Errorf("Expected avg count %d, got %d", expectedAvg.Count, actualAvg.Count)
+						}
+						if expectedAvg.Sum != actualAvg.Sum {
+							t.Errorf("Expected avg sum %f, got %f", expectedAvg.Sum, actualAvg.Sum)
+						}
+						if expectedAvg.Avg != actualAvg.Avg {
+							t.Errorf("Expected avg value %f, got %f", expectedAvg.Avg, actualAvg.Avg)
+						}
+					} else if actualAgg.Value != expectedAgg.Value {
 						t.Errorf("Expected value %v, got %v", expectedAgg.Value, actualAgg.Value)
 					}
 				}
