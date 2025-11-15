@@ -325,6 +325,110 @@ func TestSearchResultMerge(t *testing.T) {
 	}
 }
 
+func TestSearchResultAggregationsMerge(t *testing.T) {
+	l := &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
+		Total:    1,
+		MaxScore: 1,
+		Hits: search.DocumentMatchCollection{
+			&search.DocumentMatch{
+				ID:    "a",
+				Score: 1,
+			},
+		},
+		Aggregations: search.AggregationResults{
+			"total_price": &search.AggregationResult{
+				Field: "price",
+				Type:  "sum",
+				Value: 100.0,
+			},
+			"by_brand": &search.AggregationResult{
+				Field: "brand",
+				Type:  "terms",
+				Buckets: []*search.Bucket{
+					{Key: "Apple", Count: 5},
+				},
+			},
+		},
+	}
+
+	r := &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
+		Total:    1,
+		MaxScore: 2,
+		Hits: search.DocumentMatchCollection{
+			&search.DocumentMatch{
+				ID:    "b",
+				Score: 2,
+			},
+		},
+		Aggregations: search.AggregationResults{
+			"total_price": &search.AggregationResult{
+				Field: "price",
+				Type:  "sum",
+				Value: 50.0,
+			},
+			"by_brand": &search.AggregationResult{
+				Field: "brand",
+				Type:  "terms",
+				Buckets: []*search.Bucket{
+					{Key: "Apple", Count: 3},
+					{Key: "Samsung", Count: 2},
+				},
+			},
+		},
+	}
+
+	expected := &SearchResult{
+		Status: &SearchStatus{
+			Total:      2,
+			Successful: 2,
+			Errors:     make(map[string]error),
+		},
+		Total:    2,
+		MaxScore: 2,
+		Hits: search.DocumentMatchCollection{
+			&search.DocumentMatch{
+				ID:    "a",
+				Score: 1,
+			},
+			&search.DocumentMatch{
+				ID:    "b",
+				Score: 2,
+			},
+		},
+		Aggregations: search.AggregationResults{
+			"total_price": &search.AggregationResult{
+				Field: "price",
+				Type:  "sum",
+				Value: 150.0,
+			},
+			"by_brand": &search.AggregationResult{
+				Field: "brand",
+				Type:  "terms",
+				Buckets: []*search.Bucket{
+					{Key: "Apple", Count: 8},
+					{Key: "Samsung", Count: 2},
+				},
+			},
+		},
+	}
+
+	l.Merge(r)
+
+	if !reflect.DeepEqual(l, expected) {
+		t.Errorf("expected %#v, got %#v", expected, l)
+	}
+}
+
 func TestUnmarshalingSearchResult(t *testing.T) {
 	searchResponse := []byte(`{
     "status":{
