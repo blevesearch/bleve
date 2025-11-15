@@ -15,6 +15,7 @@
 package bleve
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -66,6 +67,163 @@ func createFTSIndex(path string) (Index, error) {
 
 	// Create index
 	return New(path, indexMapping)
+}
+
+var benchmarkResult search.DocumentMatchCollection
+
+type benchmarkConfig struct {
+	name       string
+	ftsHits    int
+	knnHits    int
+	knnQueries int
+}
+
+func BenchmarkRescorerRRF(b *testing.B) {
+	runRescorerBenchmarks(b, ScoreRRF)
+}
+
+func BenchmarkRescorerRSF(b *testing.B) {
+	runRescorerBenchmarks(b, ScoreRSF)
+}
+
+func runRescorerBenchmarks(b *testing.B, scoreMode string) {
+	configs := []benchmarkConfig{
+		{name: "small", ftsHits: 256, knnHits: 192, knnQueries: 1},
+		{name: "medium", ftsHits: 1024, knnHits: 896, knnQueries: 2},
+		{name: "large", ftsHits: 4096, knnHits: 3584, knnQueries: 3},
+	}
+
+	for _, cfg := range configs {
+		b.Run(fmt.Sprintf("%s/%s", scoreMode, cfg.name), func(b *testing.B) {
+			b.ReportAllocs()
+
+			rescorer, baseFTSHits, baseKNNHits := buildBenchmarkInputs(cfg, scoreMode)
+
+			var last search.DocumentMatchCollection
+			b.StopTimer()
+			for i := 0; i < b.N; i++ {
+				ftsHits := cloneDocumentMatches(baseFTSHits)
+				knnHits := cloneDocumentMatches(baseKNNHits)
+
+				b.StartTimer()
+				hits, _, _ := rescorer.rescore(ftsHits, knnHits)
+				b.StopTimer()
+
+				last = hits
+			}
+
+			if len(last) == 0 {
+				b.Fatalf("rescorer returned no hits for config %q", cfg.name)
+			}
+
+			benchmarkResult = last
+		})
+	}
+}
+
+func buildBenchmarkInputs(cfg benchmarkConfig, scoreMode string) (*rescorer, search.DocumentMatchCollection, search.DocumentMatchCollection) {
+	windowSize := cfg.ftsHits
+	if cfg.knnHits > windowSize {
+		windowSize = cfg.knnHits
+	}
+
+	matchQuery := query.NewMatchQuery("rescorer benchmark payload")
+	matchQuery.SetBoost(1.0)
+
+	req := &SearchRequest{
+		Query:  matchQuery,
+		Size:   cfg.ftsHits,
+		From:   0,
+		Score:  scoreMode,
+		Params: &RequestParams{ScoreRankConstant: DefaultScoreRankConstant, ScoreWindowSize: windowSize},
+	}
+
+	activeKNNQueries := cfg.knnQueries
+	if knnAdder, ok := interface{}(req).(interface {
+		AddKNN(field string, vector []float32, k int64, boost float64)
+	}); ok {
+		for i := 0; i < cfg.knnQueries; i++ {
+			knnAdder.AddKNN(fmt.Sprintf("vector_%d", i), []float32{1.0, 0.5, 0.25}, int64(cfg.knnHits), 1.0)
+		}
+	} else {
+		activeKNNQueries = 0
+	}
+
+	r := newRescorer(req)
+	r.origBoosts = make([]float64, activeKNNQueries+1)
+	for i := range r.origBoosts {
+		r.origBoosts[i] = 1.0
+	}
+
+	ftsHits, knnHits := buildBenchmarkHits(cfg, activeKNNQueries)
+	return r, ftsHits, knnHits
+}
+
+func buildBenchmarkHits(cfg benchmarkConfig, activeKNNQueries int) (search.DocumentMatchCollection, search.DocumentMatchCollection) {
+	ftsHits := make(search.DocumentMatchCollection, cfg.ftsHits)
+	for i := 0; i < cfg.ftsHits; i++ {
+		ftsHits[i] = &search.DocumentMatch{
+			ID:        fmt.Sprintf("doc-%06d", i),
+			Score:     float64(cfg.ftsHits - i),
+			HitNumber: uint64(i + 1),
+		}
+	}
+
+	knnHits := make(search.DocumentMatchCollection, cfg.knnHits)
+	for i := 0; i < cfg.knnHits; i++ {
+		id := fmt.Sprintf("doc-%06d", i)
+		if cfg.ftsHits > 0 {
+			id = fmt.Sprintf("doc-%06d", i%cfg.ftsHits)
+		}
+		if cfg.ftsHits == 0 || i%4 == 0 {
+			id = fmt.Sprintf("knn-only-%06d", i/4)
+		}
+
+		scoreBreakdown := make(map[int]float64, activeKNNQueries)
+		for q := 0; q < activeKNNQueries; q++ {
+			scoreBreakdown[q] = float64(cfg.knnHits - i + q + 1)
+		}
+
+		knnHits[i] = &search.DocumentMatch{
+			ID:             id,
+			Score:          float64(cfg.knnHits - i),
+			ScoreBreakdown: scoreBreakdown,
+			HitNumber:      uint64(i + 1),
+		}
+	}
+
+	return ftsHits, knnHits
+}
+
+func cloneDocumentMatches(src search.DocumentMatchCollection) search.DocumentMatchCollection {
+	dst := make(search.DocumentMatchCollection, len(src))
+	for i, hit := range src {
+		if hit == nil {
+			continue
+		}
+
+		cloned := *hit
+
+		if hit.ScoreBreakdown != nil {
+			cloned.ScoreBreakdown = make(map[int]float64, len(hit.ScoreBreakdown))
+			for k, v := range hit.ScoreBreakdown {
+				cloned.ScoreBreakdown[k] = v
+			}
+		}
+
+		if len(hit.Sort) > 0 {
+			cloned.Sort = append([]string(nil), hit.Sort...)
+		}
+		if len(hit.DecodedSort) > 0 {
+			cloned.DecodedSort = append([]string(nil), hit.DecodedSort...)
+		}
+		if len(hit.IndexNames) > 0 {
+			cloned.IndexNames = append([]string(nil), hit.IndexNames...)
+		}
+
+		dst[i] = &cloned
+	}
+	return dst
 }
 
 func getFTSDocuments() []map[string]interface{} {

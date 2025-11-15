@@ -17,16 +17,20 @@ package fusion
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
 )
 
+// formatRRFMessage builds the explanation string for a single component of the
+// Reciprocal Rank Fusion calculation.
 func formatRRFMessage(weight float64, rank int, rankConstant int) string {
 	return fmt.Sprintf("rrf score (weight=%.3f, rank=%d, rank_constant=%d), normalized score of", weight, rank, rankConstant)
 }
 
-// ReciprocalRankFusion performs a reciprocal rank fusion on the search results.
+// ReciprocalRankFusion applies Reciprocal Rank Fusion across the primary FTS
+// results and each KNN sub-query. Ranks are limited to `windowSize` per source,
+// weighted, and combined into a single fused score, with optional explanation
+// details.
 func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64, rankConstant int, windowSize int, numKNNQueries int, explain bool) FusionResult {
 	if len(hits) == 0 {
 		return FusionResult{
@@ -36,90 +40,113 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 		}
 	}
 
-	// Create a map of document ID to a slice of ranks.
-	// The first element of the slice is the rank from the FTS search,
-	// and the subsequent elements are the ranks from the KNN searches.
-	docRanks := make(map[string][]int)
+	// The code here mainly deals with obtaining rank/score for fts hits.
+	// First sort hits by score
+	sortDocMatchesByScore(hits)
 
-	// Pre-assign rank lists to each candidate document
-	for _, hit := range hits {
-		docRanks[hit.ID] = make([]int, numKNNQueries+1)
+	// Limit to consider only min(windowSize, len(hits))
+	limit := len(hits)
+	if windowSize >= 0 && windowSize < limit {
+		limit = windowSize
 	}
 
-	// Only a max of `window_size` elements need to be counted for. Stop
-	// calculating rank once this threshold is hit.
-	sort.Slice(hits, func(a, b int) bool {
-		return scoreSortFunc()(hits[a], hits[b]) < 0
-	})
-	// Only consider top windowSize docs for rescoring
-	for i := range min(windowSize, len(hits)) {
-		if hits[i].Score != 0.0 {
-			// Skip if Score is 0, since that means the document was not
-			// found as part of FTS, and only in KNN.
-			docRanks[hits[i].ID][0] = i + 1
+	// precompute rank+scores to prevend additional division ops later
+	var rankReciprocals []float64
+	if limit > 0 {
+		rankReciprocals = make([]float64, limit)
+		for i := range rankReciprocals {
+			rankReciprocals[i] = 1.0 / float64(rankConstant+i+1)
 		}
 	}
 
-	// Allocate knnDocs and reuse it within the loop
-	knnDocs := make([]*search.DocumentMatch, 0, len(hits))
+	// init explanations if required
+	var fusionExpl map[*search.DocumentMatch][]*search.Explanation
+	if explain {
+		fusionExpl = make(map[*search.DocumentMatch][]*search.Explanation, len(hits))
+	}
 
-	// For each KNN query, rank the documents based on their KNN score.
-	for i := range numKNNQueries {
-		knnDocs = knnDocs[:0]
-
-		for _, hit := range hits {
-			if _, ok := hit.ScoreBreakdown[i]; ok {
-				knnDocs = append(knnDocs, hit)
+	// Calculate fts rank+scores
+	if limit > 0 {
+		ftsWeight := weights[0]
+		for i := 0; i < limit; i++ {
+			hit := hits[i]
+			originalScore := hit.Score
+			if originalScore == 0.0 {
+				break
+			}
+			rank := i + 1
+			if explain {
+				contrib := ftsWeight * rankReciprocals[i]
+				expl := getFusionExplAt(
+					hit,
+					0,
+					contrib,
+					formatRRFMessage(ftsWeight, rank, rankConstant),
+				)
+				fusionExpl[hit] = append(fusionExpl[hit], expl)
+				hit.Score = contrib
+			} else {
+				hit.Score = ftsWeight * rankReciprocals[i]
 			}
 		}
-
-		// Sort the documents based on their score for this KNN query.
-		sort.Slice(knnDocs, func(a, b int) bool {
-			return scoreBreakdownSortFunc(i)(knnDocs[a], knnDocs[b]) < 0
-		})
-
-		// Update the ranks of the documents in the docRanks map.
-		// Only consider top windowSize docs for rescoring.
-		for j := range min(windowSize, len(knnDocs)) {
-			docRanks[knnDocs[j].ID][i+1] = j + 1
+		for i := limit; i < len(hits); i++ {
+			hits[i].Score = 0.0
+		}
+	} else {
+		for _, hit := range hits {
+			hit.Score = 0.0
 		}
 	}
 
-	// Calculate the RRF score for each document.
+	// Code from here is to calculate knn ranks and scores
+	// iterate over each knn query and calculate knn rank+scores
+	for queryIdx := 0; queryIdx < numKNNQueries; queryIdx++ {
+		limit := len(hits)
+		if windowSize >= 0 && windowSize < limit {
+			limit = windowSize
+		}
+		if limit == 0 {
+			continue
+		}
+
+		weight := weights[queryIdx+1]
+		rank := 0
+		sortDocMatchesByBreakdown(hits, queryIdx)
+		for _, hit := range hits {
+			if _, ok := scoreBreakdownForQuery(hit, queryIdx); !ok {
+				break
+			}
+			rank++
+			contrib := weight * rankReciprocals[rank-1]
+			if explain {
+				expl := getFusionExplAt(
+					hit,
+					queryIdx+1,
+					contrib,
+					formatRRFMessage(weight, rank, rankConstant),
+				)
+				fusionExpl[hit] = append(fusionExpl[hit], expl)
+			}
+			hit.Score += contrib
+			if rank == limit {
+				break
+			}
+		}
+	}
+
 	var maxScore float64
 	for _, hit := range hits {
-		var rrfScore float64
-		var explChildren []*search.Explanation
 		if explain {
-			explChildren = make([]*search.Explanation, 0, numKNNQueries+1)
+			finalizeFusionExpl(hit, fusionExpl[hit])
 		}
-		for i, rank := range docRanks[hit.ID] {
-			if rank > 0 {
-				partialRrfScore := weights[i] * 1.0 / float64(rankConstant+rank)
-				if explain {
-					expl := getFusionExplAt(
-						hit,
-						i,
-						partialRrfScore,
-						formatRRFMessage(weights[i], rank, rankConstant),
-					)
-					explChildren = append(explChildren, expl)
-				}
-				rrfScore += partialRrfScore
-			}
-		}
-		hit.Score = rrfScore
 		hit.ScoreBreakdown = nil
-		if rrfScore > maxScore {
-			maxScore = rrfScore
-		}
 
-		if explain {
-			finalizeFusionExpl(hit, explChildren)
+		if hit.Score > maxScore {
+			maxScore = hit.Score
 		}
 	}
 
-	sort.Sort(hits)
+	sortDocMatchesByScore(hits)
 	if len(hits) > windowSize {
 		hits = hits[:windowSize]
 	}
