@@ -142,6 +142,12 @@ type numericRange struct {
 	Max  *float64 `json:"max,omitempty"`
 }
 
+type distanceRange struct {
+	Name string   `json:"name,omitempty"`
+	From *float64 `json:"from,omitempty"` // In specified unit
+	To   *float64 `json:"to,omitempty"`   // In specified unit
+}
+
 // A FacetRequest describes a facet or aggregation
 // of the result document set you would like to be
 // built.
@@ -270,16 +276,39 @@ func (fr FacetsRequest) Validate() error {
 // Supports both metric aggregations (sum, avg, etc.) and bucket aggregations (terms, range, etc.).
 // Bucket aggregations can contain sub-aggregations via the Aggregations field.
 type AggregationRequest struct {
-	Type  string `json:"type"`  // Metric: sum, avg, min, max, count, sumsquares, stats
-	                             // Bucket: terms, range, date_range
+	Type  string `json:"type"`  // Metric: sum, avg, min, max, count, sumsquares, stats, cardinality
+	                             // Bucket: terms, range, date_range, histogram, date_histogram, geohash_grid, geo_distance, significant_terms
 	Field string `json:"field"`
 
 	// Bucket aggregation configuration
-	Size           *int             `json:"size,omitempty"`            // For terms aggregations
+	Size           *int             `json:"size,omitempty"`            // For terms, geohash_grid aggregations
 	TermPrefix     string           `json:"term_prefix,omitempty"`     // For terms aggregations - filter by prefix
 	TermPattern    string           `json:"term_pattern,omitempty"`    // For terms aggregations - filter by regex
 	NumericRanges  []*numericRange  `json:"numeric_ranges,omitempty"`  // For numeric range aggregations
 	DateTimeRanges []*dateTimeRange `json:"date_ranges,omitempty"`     // For date range aggregations
+
+	// Metric aggregation configuration
+	Precision *uint8 `json:"precision,omitempty"` // For cardinality aggregations (HyperLogLog precision: 10-18, default: 14)
+
+	// Histogram aggregation configuration
+	Interval       *float64 `json:"interval,omitempty"`         // For histogram aggregations (bucket interval)
+	MinDocCount    *int64   `json:"min_doc_count,omitempty"`    // For histogram, date_histogram aggregations
+
+	// Date histogram aggregation configuration
+	CalendarInterval string `json:"calendar_interval,omitempty"` // For date_histogram: "1m", "1h", "1d", "1w", "1M", "1q", "1y"
+	FixedInterval    string `json:"fixed_interval,omitempty"`    // For date_histogram: duration string like "30m", "1h"
+
+	// Geohash grid aggregation configuration
+	GeoHashPrecision *int `json:"geohash_precision,omitempty"` // For geohash_grid: 1-12 (default: 5)
+
+	// Geo distance aggregation configuration
+	CenterLon       *float64          `json:"center_lon,omitempty"`       // For geo_distance
+	CenterLat       *float64          `json:"center_lat,omitempty"`       // For geo_distance
+	DistanceUnit    string            `json:"distance_unit,omitempty"`    // For geo_distance: "m", "km", "mi", etc.
+	DistanceRanges  []*distanceRange  `json:"distance_ranges,omitempty"`  // For geo_distance aggregations
+
+	// Significant terms aggregation configuration
+	SignificanceAlgorithm string `json:"significance_algorithm,omitempty"` // For significant_terms: "jlh", "mutual_information", "chi_squared", "percentage"
 
 	// Sub-aggregations (for bucket aggregations)
 	Aggregations AggregationsRequest `json:"aggregations,omitempty"`
@@ -350,9 +379,11 @@ func (ar *AggregationRequest) Validate() error {
 	validTypes := map[string]bool{
 		// Metric aggregations
 		"sum": true, "avg": true, "min": true, "max": true,
-		"count": true, "sumsquares": true, "stats": true,
+		"count": true, "sumsquares": true, "stats": true, "cardinality": true,
 		// Bucket aggregations
 		"terms": true, "range": true, "date_range": true,
+		"histogram": true, "date_histogram": true,
+		"geohash_grid": true, "geo_distance": true, "significant_terms": true,
 	}
 	if !validTypes[ar.Type] {
 		return fmt.Errorf("invalid aggregation type '%s'", ar.Type)
@@ -672,6 +703,9 @@ type SearchResult struct {
 
 	// The following fields are applicable to BM25 preSearch
 	BM25Stats *search.BM25Stats `json:"bm25_stats,omitempty"`
+
+	// The following field is applicable to significant_terms aggregations pre-search
+	SignificantTermsStats map[string]*search.SignificantTermsStats `json:"significant_terms_stats,omitempty"` // field -> stats
 }
 
 func (sr *SearchResult) Size() int {

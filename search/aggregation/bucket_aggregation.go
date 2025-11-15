@@ -19,6 +19,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"time"
 
 	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/search"
@@ -493,6 +494,247 @@ func (ra *RangeAggregation) cloneSubAggBuilders() map[string]search.AggregationB
 	cloned := make(map[string]search.AggregationBuilder, len(ra.subAggBuilders))
 	for name, builder := range ra.subAggBuilders {
 		// Use Clone() method which properly handles all aggregation types including nested buckets
+		cloned[name] = builder.Clone()
+	}
+	return cloned
+}
+
+// =============================================================================
+// Date Range Aggregation
+// =============================================================================
+
+var reflectStaticSizeDateRangeAggregation int
+
+func init() {
+	var dra DateRangeAggregation
+	reflectStaticSizeDateRangeAggregation = int(reflect.TypeOf(dra).Size())
+}
+
+// DateRangeAggregation groups documents into date ranges
+type DateRangeAggregation struct {
+	field          string
+	ranges         map[string]*DateRange
+	rangeCounts    map[string]int64
+	rangeSubAggs   map[string]*subAggregationSet
+	subAggBuilders map[string]search.AggregationBuilder
+	currentRanges  []string // ranges the current value falls into
+	sawValue       bool
+}
+
+// DateRange represents a date range for date_range aggregations
+type DateRange struct {
+	Name  string
+	Start *time.Time // nil = unbounded
+	End   *time.Time // nil = unbounded
+}
+
+// NewDateRangeAggregation creates a new date range aggregation
+func NewDateRangeAggregation(field string, ranges map[string]*DateRange, subAggregations map[string]search.AggregationBuilder) *DateRangeAggregation {
+	return &DateRangeAggregation{
+		field:          field,
+		ranges:         ranges,
+		rangeCounts:    make(map[string]int64),
+		rangeSubAggs:   make(map[string]*subAggregationSet),
+		subAggBuilders: subAggregations,
+		currentRanges:  make([]string, 0, len(ranges)),
+	}
+}
+
+func (dra *DateRangeAggregation) Size() int {
+	return reflectStaticSizeDateRangeAggregation + size.SizeOfPtr + len(dra.field)
+}
+
+func (dra *DateRangeAggregation) Field() string {
+	return dra.field
+}
+
+func (dra *DateRangeAggregation) Type() string {
+	return "date_range"
+}
+
+func (dra *DateRangeAggregation) SubAggregationFields() []string {
+	if dra.subAggBuilders == nil {
+		return nil
+	}
+	// Use a map to track unique fields
+	fieldSet := make(map[string]bool)
+	for _, subAgg := range dra.subAggBuilders {
+		fieldSet[subAgg.Field()] = true
+		// If sub-agg is also a bucket, recursively collect its fields
+		if bucketed, ok := subAgg.(search.BucketAggregation); ok {
+			for _, f := range bucketed.SubAggregationFields() {
+				fieldSet[f] = true
+			}
+		}
+	}
+	// Convert map to slice
+	fields := make([]string, 0, len(fieldSet))
+	for field := range fieldSet {
+		fields = append(fields, field)
+	}
+	return fields
+}
+
+func (dra *DateRangeAggregation) StartDoc() {
+	dra.sawValue = false
+	dra.currentRanges = dra.currentRanges[:0]
+}
+
+func (dra *DateRangeAggregation) UpdateVisitor(field string, term []byte) {
+	// If this is our field, determine which ranges this document falls into
+	if field == dra.field {
+		// Only process the first occurrence of this field in the document
+		if !dra.sawValue {
+			dra.sawValue = true
+
+			// Decode datetime value (stored as nanoseconds since Unix epoch)
+			prefixCoded := numeric.PrefixCoded(term)
+			shift, err := prefixCoded.Shift()
+			if err == nil && shift == 0 {
+				i64, err := prefixCoded.Int64()
+				if err == nil {
+					t := time.Unix(0, i64)
+
+					// Check which ranges this value falls into
+					for rangeName, r := range dra.ranges {
+						inRange := true
+						if r.Start != nil && t.Before(*r.Start) {
+							inRange = false
+						}
+						if r.End != nil && !t.Before(*r.End) {
+							inRange = false
+						}
+						
+						if inRange {
+							dra.rangeCounts[rangeName]++
+							dra.currentRanges = append(dra.currentRanges, rangeName)
+
+							// Initialize sub-aggregations for this range if needed
+							if dra.subAggBuilders != nil && len(dra.subAggBuilders) > 0 {
+								if _, exists := dra.rangeSubAggs[rangeName]; !exists {
+									dra.rangeSubAggs[rangeName] = &subAggregationSet{
+										builders: dra.cloneSubAggBuilders(),
+									}
+								}
+							}
+						}
+					}
+
+					// Start document processing for sub-aggregations in all ranges this document falls into
+					if dra.subAggBuilders != nil && len(dra.subAggBuilders) > 0 {
+						for _, rangeName := range dra.currentRanges {
+							if subAggs, exists := dra.rangeSubAggs[rangeName]; exists {
+								for _, subAgg := range subAggs.builders {
+									subAgg.StartDoc()
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Forward all field values to sub-aggregations in the current ranges
+	if dra.subAggBuilders != nil {
+		for _, rangeName := range dra.currentRanges {
+			if subAggs, exists := dra.rangeSubAggs[rangeName]; exists {
+				for _, subAgg := range subAggs.builders {
+					subAgg.UpdateVisitor(field, term)
+				}
+			}
+		}
+	}
+}
+
+func (dra *DateRangeAggregation) EndDoc() {
+	// End document for sub-aggregations in all active ranges
+	if dra.subAggBuilders != nil {
+		for _, rangeName := range dra.currentRanges {
+			if subAggs, exists := dra.rangeSubAggs[rangeName]; exists {
+				for _, subAgg := range subAggs.builders {
+					subAgg.EndDoc()
+				}
+			}
+		}
+	}
+}
+
+func (dra *DateRangeAggregation) Result() *search.AggregationResult {
+	buckets := make([]*search.Bucket, 0, len(dra.rangeCounts))
+
+	for rangeName, count := range dra.rangeCounts {
+		bucket := &search.Bucket{
+			Key:   rangeName,
+			Count: count,
+		}
+
+		// Add range metadata
+		r := dra.ranges[rangeName]
+		bucket.Metadata = make(map[string]interface{})
+		if r.Start != nil {
+			bucket.Metadata["start"] = r.Start.Format(time.RFC3339Nano)
+		}
+		if r.End != nil {
+			bucket.Metadata["end"] = r.End.Format(time.RFC3339Nano)
+		}
+
+		// Collect sub-aggregation results
+		if subAggs, exists := dra.rangeSubAggs[rangeName]; exists {
+			bucket.Aggregations = make(map[string]*search.AggregationResult)
+			for subName, subAgg := range subAggs.builders {
+				bucket.Aggregations[subName] = subAgg.Result()
+			}
+		}
+
+		buckets = append(buckets, bucket)
+	}
+
+	// Sort buckets by key (range name)
+	sort.Slice(buckets, func(i, j int) bool {
+		return buckets[i].Key.(string) < buckets[j].Key.(string)
+	})
+
+	return &search.AggregationResult{
+		Field:   dra.field,
+		Type:    "date_range",
+		Buckets: buckets,
+	}
+}
+
+func (dra *DateRangeAggregation) Clone() search.AggregationBuilder {
+	// Clone sub-aggregations
+	var clonedSubAggs map[string]search.AggregationBuilder
+	if dra.subAggBuilders != nil {
+		clonedSubAggs = make(map[string]search.AggregationBuilder, len(dra.subAggBuilders))
+		for name, subAgg := range dra.subAggBuilders {
+			clonedSubAggs[name] = subAgg.Clone()
+		}
+	}
+
+	// Deep copy ranges
+	clonedRanges := make(map[string]*DateRange, len(dra.ranges))
+	for name, r := range dra.ranges {
+		clonedRange := &DateRange{
+			Name: r.Name,
+		}
+		if r.Start != nil {
+			start := *r.Start
+			clonedRange.Start = &start
+		}
+		if r.End != nil {
+			end := *r.End
+			clonedRange.End = &end
+		}
+		clonedRanges[name] = clonedRange
+	}
+
+	return NewDateRangeAggregation(dra.field, clonedRanges, clonedSubAggs)
+}
+
+func (dra *DateRangeAggregation) cloneSubAggBuilders() map[string]search.AggregationBuilder {
+	cloned := make(map[string]search.AggregationBuilder, len(dra.subAggBuilders))
+	for name, builder := range dra.subAggBuilders {
 		cloned[name] = builder.Clone()
 	}
 	return cloned

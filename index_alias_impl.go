@@ -195,9 +195,10 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// and NOT a real search
 		bm25PreSearch := isBM25Enabled(i.mapping)
 		flags := &preSearchFlags{
-			knn:      requestHasKNN(req),
-			synonyms: !isMatchNoneQuery(req.Query),
-			bm25:     bm25PreSearch,
+			knn:             requestHasKNN(req),
+			synonyms:        !isMatchNoneQuery(req.Query),
+			bm25:            bm25PreSearch,
+			significantTerms: requestHasSignificantTerms(req),
 		}
 		return preSearchDataSearch(ctx, req, flags, i.indexes...)
 	}
@@ -599,9 +600,10 @@ type asyncSearchResult struct {
 
 // preSearchFlags is a struct to hold flags indicating why preSearch is required
 type preSearchFlags struct {
-	knn      bool
-	synonyms bool
-	bm25     bool // needs presearch for this too
+	knn             bool
+	synonyms        bool
+	bm25            bool // needs presearch for this too
+	significantTerms bool // significant_terms aggregation needs background stats
 }
 
 func isBM25Enabled(m mapping.IndexMapping) bool {
@@ -610,6 +612,28 @@ func isBM25Enabled(m mapping.IndexMapping) bool {
 		rv = m.ScoringModel == index.BM25Scoring
 	}
 	return rv
+}
+
+// requestHasSignificantTerms checks if the request has significant_terms aggregations
+func requestHasSignificantTerms(req *SearchRequest) bool {
+	if req.Aggregations == nil {
+		return false
+	}
+	return hasSignificantTermsAggregation(req.Aggregations)
+}
+
+// hasSignificantTermsAggregation recursively checks for significant_terms in aggregations
+func hasSignificantTermsAggregation(aggs map[string]*AggregationRequest) bool {
+	for _, agg := range aggs {
+		if agg.Type == "significant_terms" {
+			return true
+		}
+		// Check sub-aggregations recursively
+		if agg.Aggregations != nil && hasSignificantTermsAggregation(agg.Aggregations) {
+			return true
+		}
+	}
+	return false
 }
 
 // preSearchRequired checks if preSearch is required and returns the presearch flags struct
@@ -646,11 +670,15 @@ func preSearchRequired(ctx context.Context, req *SearchRequest, m mapping.IndexM
 		}
 	}
 
-	if knn || synonyms || bm25 {
+	// Check for significant_terms aggregation
+	significantTerms := requestHasSignificantTerms(req)
+
+	if knn || synonyms || bm25 || significantTerms {
 		return &preSearchFlags{
-			knn:      knn,
-			synonyms: synonyms,
-			bm25:     bm25,
+			knn:             knn,
+			synonyms:        synonyms,
+			bm25:            bm25,
+			significantTerms: significantTerms,
 		}, nil
 	}
 	return nil, nil
@@ -767,6 +795,16 @@ func constructBM25PreSearchData(rv map[string]map[string]interface{}, sr *Search
 	return rv
 }
 
+func constructSignificantTermsPreSearchData(rv map[string]map[string]interface{}, sr *SearchResult, indexes []Index) map[string]map[string]interface{} {
+	stStats := sr.SignificantTermsStats
+	if stStats != nil {
+		for _, index := range indexes {
+			rv[index.Name()][search.SignificantTermsPreSearchDataKey] = stStats
+		}
+	}
+	return rv
+}
+
 func constructPreSearchData(req *SearchRequest, flags *preSearchFlags,
 	preSearchResult *SearchResult, indexes []Index,
 ) (map[string]map[string]interface{}, error) {
@@ -789,6 +827,9 @@ func constructPreSearchData(req *SearchRequest, flags *preSearchFlags,
 	}
 	if flags.bm25 {
 		mergedOut = constructBM25PreSearchData(mergedOut, preSearchResult, indexes)
+	}
+	if flags.significantTerms {
+		mergedOut = constructSignificantTermsPreSearchData(mergedOut, preSearchResult, indexes)
 	}
 	return mergedOut, nil
 }
@@ -932,6 +973,11 @@ func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]
 	if bm25Data, ok := req.PreSearchData[search.BM25PreSearchDataKey].(*search.BM25Stats); ok {
 		for _, index := range indexes {
 			rv[index.Name()][search.BM25PreSearchDataKey] = bm25Data
+		}
+	}
+	if stStats, ok := req.PreSearchData[search.SignificantTermsPreSearchDataKey].(map[string]*search.SignificantTermsStats); ok {
+		for _, index := range indexes {
+			rv[index.Name()][search.SignificantTermsPreSearchDataKey] = stStats
 		}
 	}
 	return rv, nil
