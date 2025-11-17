@@ -669,7 +669,7 @@ func (r *rescorer) restoreKnnRequest() {
 	}
 }
 
-func (i *indexImpl) buildKNNCollector(ctx context.Context, KNNQuery query.Query, reader index.IndexReader, kArray []int64, somOfK int64) (*collector.KNNCollector, error) {
+func (i *indexImpl) buildKNNCollector(ctx context.Context, KNNQuery query.Query, reader index.IndexReader, kArray []int64, sumOfK int64) (*collector.KNNCollector, error) {
 	// check if we are in nested mode
 	if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); ok && nestedMode {
 		// get the nested reader from the index reader
@@ -683,13 +683,13 @@ func (i *indexImpl) buildKNNCollector(ctx context.Context, KNNQuery query.Query,
 					return nil, err
 				}
 				if nm.IntersectsPrefix(fs) {
-					return collector.NewNestedKNNCollector(nr, kArray, somOfK), nil
+					return collector.NewNestedKNNCollector(nr, kArray, sumOfK), nil
 				}
 			}
 		}
 	}
 
-	return collector.NewKNNCollector(kArray, somOfK), nil
+	return collector.NewKNNCollector(kArray, sumOfK), nil
 }
 
 func (i *indexImpl) buildEligibleCollector(ctx context.Context, filterQuery query.Query, reader index.IndexReader, size int) (*collector.EligibleCollector, error) {

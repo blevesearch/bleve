@@ -5733,14 +5733,14 @@ func TestNestedConjunctionQuery(t *testing.T) {
 		t.Fatalf("search failed: %v", err)
 	}
 	if len(res.Hits) != 1 {
-		t.Fatalf("expected 1hits, got %d", len(res.Hits))
+		t.Fatalf("expected 1 hits, got %d", len(res.Hits))
 	}
 	if res.Hits[0].ID != "1" {
 		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
 	}
 
 	// Test 5a: Find companies with an employee named "Frank" AND role "Manager" whose department is
-	// handling a project titled "Project Beta" which is marked as "ongoing"
+	// handling a project titled "Project Beta" which is marked as "completed"
 	empNameQuery = query.NewMatchQuery("Frank")
 	empNameQuery.SetField("company.departments.employees.name")
 
@@ -5767,7 +5767,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	}
 
 	// Test 5b: Find companies with an employee named "Frank" AND role "Manager" whose department is
-	// handling a project titled "Project Beta" which is marked as "completed"
+	// handling a project titled "Project Beta" which is marked as "ongoing"
 	empNameQuery = query.NewMatchQuery("Frank")
 	empNameQuery.SetField("company.departments.employees.name")
 
@@ -5877,7 +5877,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 		t.Fatalf("search failed: %v", err)
 	}
 	if len(res.Hits) != 0 {
-		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+		t.Fatalf("expected 0 hit, got %d", len(res.Hits))
 	}
 
 	// Test 7b: Find companies where Ivan the Manager works London, Canada
