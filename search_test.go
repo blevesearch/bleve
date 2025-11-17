@@ -5273,7 +5273,6 @@ func createNestedIndexMapping() mapping.IndexMapping {
 
 	// Project title field
 	projTitleField := mapping.NewTextFieldMapping()
-	projTitleField.Analyzer = keyword.Name
 	projectsMapping.AddFieldMappingsAt("title", projTitleField)
 
 	// Project status field
@@ -5614,7 +5613,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 		deptBudgetQuery *query.NumericRangeQuery
 		empNameQuery    *query.MatchQuery
 		empRoleQuery    *query.MatchQuery
-		projTitleQuery  *query.MatchQuery
+		projTitleQuery  *query.MatchPhraseQuery
 		projStatusQuery *query.MatchQuery
 		countryQuery    *query.MatchQuery
 		cityQuery       *query.MatchQuery
@@ -5750,7 +5749,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 
 	empQuery := query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
 
-	projTitleQuery = query.NewMatchQuery("Project Beta")
+	projTitleQuery = query.NewMatchPhraseQuery("Project Beta")
 	projTitleQuery.SetField("company.departments.projects.title")
 
 	projStatusQuery = query.NewMatchQuery("completed")
@@ -5777,7 +5776,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 
 	empQuery = query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
 
-	projTitleQuery = query.NewMatchQuery("Project Beta")
+	projTitleQuery = query.NewMatchPhraseQuery("Project Beta")
 	projTitleQuery.SetField("company.departments.projects.title")
 
 	projStatusQuery = query.NewMatchQuery("ongoing")
