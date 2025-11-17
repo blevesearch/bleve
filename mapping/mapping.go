@@ -20,6 +20,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/search"
 )
 
 // A Classifier is an interface describing any object which knows how to
@@ -73,4 +74,19 @@ type SynonymMapping interface {
 	SynonymCount() int
 
 	SynonymSourceVisitor(visitor analysis.SynonymSourceVisitor) error
+}
+
+// A NestedMapping extends the IndexMapping interface to provide
+// additional methods for working with nested object mappings.
+type NestedMapping interface {
+	// CoveringDepth returns the deepest nested
+	// level common to all field paths
+	CoveringDepth(fieldPaths search.FieldSet) int
+
+	// IntersectsPrefix returns true if any of the given
+	// field paths intersect with a known nested prefix
+	IntersectsPrefix(fieldPaths search.FieldSet) bool
+
+	// CountNested returns the number of nested object mappings
+	CountNested() int
 }

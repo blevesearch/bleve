@@ -156,6 +156,10 @@ const (
 	// ScoreFusionKey is used to communicate whether KNN hits need to be preserved for
 	// hybrid search algorithms (like RRF)
 	ScoreFusionKey ContextKey = "_fusion_rescoring_key"
+
+	// NestedSearchKey is used to communicate whether the search is performed
+	// in an index with nested documents
+	NestedSearchKey ContextKey = "_nested_search_key"
 )
 
 func RecordSearchCost(ctx context.Context,
@@ -236,4 +240,26 @@ var (
 type BM25Stats struct {
 	DocCount         float64        `json:"doc_count"`
 	FieldCardinality map[string]int `json:"field_cardinality"`
+}
+
+// FieldSet represents a set of queried fields.
+type FieldSet map[string]struct{}
+
+// NewFieldSet creates a new FieldSet.
+func NewFieldSet() FieldSet {
+	return make(map[string]struct{})
+}
+
+// Add adds a field to the set.
+func (fs FieldSet) AddField(field string) {
+	fs[field] = struct{}{}
+}
+
+// Slice returns the fields in this set as a slice of strings.
+func (fs FieldSet) Slice() []string {
+	rv := make([]string, 0, len(fs))
+	for field := range fs {
+		rv = append(rv, field)
+	}
+	return rv
 }

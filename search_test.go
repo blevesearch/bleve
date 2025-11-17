@@ -5206,3 +5206,708 @@ func TestSearchRequestValidatePagination(t *testing.T) {
 		})
 	}
 }
+
+func createNestedIndexMapping() mapping.IndexMapping {
+
+	/*
+		company
+		├── id
+		├── name
+		├── departments[] (nested)
+		│     ├── name
+		│     ├── budget
+		│     ├── employees[] (nested)
+		│     │     ├── name
+		│     │     ├── role
+		│     └── projects[] (nested)
+		│           ├── title
+		│           ├── status
+		└── locations[] (nested)
+				├── city
+				├── country
+	*/
+
+	// Create the index mapping
+	imap := mapping.NewIndexMapping()
+
+	// Create company mapping
+	companyMapping := mapping.NewDocumentMapping()
+
+	// Company ID field
+	companyIDField := mapping.NewTextFieldMapping()
+	companyMapping.AddFieldMappingsAt("id", companyIDField)
+
+	// Company name field
+	companyNameField := mapping.NewTextFieldMapping()
+	companyMapping.AddFieldMappingsAt("name", companyNameField)
+
+	// Departments mapping
+	departmentsMapping := mapping.NewDocumentMapping()
+	departmentsMapping.Nested = true
+
+	// Department name field
+	deptNameField := mapping.NewTextFieldMapping()
+	departmentsMapping.AddFieldMappingsAt("name", deptNameField)
+
+	// Department budget field
+	deptBudgetField := mapping.NewNumericFieldMapping()
+	departmentsMapping.AddFieldMappingsAt("budget", deptBudgetField)
+
+	// Employees mapping
+	employeesMapping := mapping.NewDocumentMapping()
+	employeesMapping.Nested = true
+
+	// Employee name field
+	empNameField := mapping.NewTextFieldMapping()
+	employeesMapping.AddFieldMappingsAt("name", empNameField)
+
+	// Employee role field
+	empRoleField := mapping.NewTextFieldMapping()
+	employeesMapping.AddFieldMappingsAt("role", empRoleField)
+
+	departmentsMapping.AddSubDocumentMapping("employees", employeesMapping)
+
+	// Projects mapping
+	projectsMapping := mapping.NewDocumentMapping()
+	projectsMapping.Nested = true
+
+	// Project title field
+	projTitleField := mapping.NewTextFieldMapping()
+	projTitleField.Analyzer = keyword.Name
+	projectsMapping.AddFieldMappingsAt("title", projTitleField)
+
+	// Project status field
+	projStatusField := mapping.NewTextFieldMapping()
+	projectsMapping.AddFieldMappingsAt("status", projStatusField)
+
+	departmentsMapping.AddSubDocumentMapping("projects", projectsMapping)
+
+	companyMapping.AddSubDocumentMapping("departments", departmentsMapping)
+
+	// Locations mapping
+	locationsMapping := mapping.NewDocumentMapping()
+	locationsMapping.Nested = true
+
+	// Location city field
+	cityField := mapping.NewTextFieldMapping()
+	locationsMapping.AddFieldMappingsAt("city", cityField)
+
+	// Location country field
+	countryField := mapping.NewTextFieldMapping()
+	locationsMapping.AddFieldMappingsAt("country", countryField)
+
+	companyMapping.AddSubDocumentMapping("locations", locationsMapping)
+
+	// Add company to type mapping
+	imap.DefaultMapping.AddSubDocumentMapping("company", companyMapping)
+
+	return imap
+}
+func TestNestedPrefixes(t *testing.T) {
+	imap := createNestedIndexMapping()
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	nmap, ok := imap.(mapping.NestedMapping)
+	if !ok {
+		t.Fatal("index mapping is not a NestedMapping")
+	}
+
+	// Test 1: Employee Role AND Employee Name
+	fs := search.NewFieldSet()
+	fs.AddField("company.departments.employees.role")
+	fs.AddField("company.departments.employees.name")
+
+	// Expected depth is 2 (employees are nested within departments)
+	expectedDepth := 2
+
+	actualDepth := nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
+
+	// Test 2: Employee Role AND Employee Name AND Department Name
+	fs = search.NewFieldSet()
+	fs.AddField("company.departments.employees.role")
+	fs.AddField("company.departments.employees.name")
+	fs.AddField("company.departments.name")
+	// Expected depth is 1 (employees and department share the same department context)
+	expectedDepth = 1
+
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
+
+	// Test 3: Employee Role AND Location City
+	fs = search.NewFieldSet()
+	fs.AddField("company.departments.employees.role")
+	fs.AddField("company.locations.city")
+	// Expected depth is 0 (employees and locations are in different nested contexts)
+	expectedDepth = 0
+
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
+
+	// Test 4: Company Name AND Location Country
+	fs = search.NewFieldSet()
+	fs.AddField("company.name")
+	fs.AddField("company.locations.country")
+	fs.AddField("company.locations.city")
+	// Expected depth is 0 (company.name is at root, locations are nested)
+	expectedDepth = 0
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
+
+	// Test 5: Department Budget AND Project Status AND Employee Name
+	fs = search.NewFieldSet()
+	fs.AddField("company.departments.budget")
+	fs.AddField("company.departments.projects.status")
+	fs.AddField("company.departments.employees.name")
+	// Expected depth is 1 (all share the same department context)
+	expectedDepth = 1
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
+
+	// Test 6: Single Field - Company ID
+	fs = search.NewFieldSet()
+	fs.AddField("company.id")
+	// Expected depth is 0 (company.id is at root)
+	expectedDepth = 0
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
+
+	// Test 7: No Fields
+	fs = search.NewFieldSet()
+	// Expected depth is 0 (no fields)
+	expectedDepth = 0
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
+
+	// Test 8: All Fields
+	fs = search.NewFieldSet()
+	fs.AddField("company.id")
+	fs.AddField("company.name")
+	fs.AddField("company.departments.name")
+	fs.AddField("company.departments.budget")
+	fs.AddField("company.departments.employees.name")
+	fs.AddField("company.departments.employees.role")
+	fs.AddField("company.departments.projects.title")
+	fs.AddField("company.departments.projects.status")
+	fs.AddField("company.locations.city")
+	fs.AddField("company.locations.country")
+	// Expected depth is 0 (fields span multiple nested contexts)
+	expectedDepth = 0
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
+
+	// Test 9: Project Title AND Project Status
+	fs = search.NewFieldSet()
+	fs.AddField("company.departments.projects.title")
+	fs.AddField("company.departments.projects.status")
+	// Expected depth is 2 (projects are nested within departments)
+	expectedDepth = 2
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
+
+	// Test 10: Department Name AND Location Country
+	fs = search.NewFieldSet()
+	fs.AddField("company.departments.name")
+	fs.AddField("company.locations.country")
+	fs.AddField("company.locations.city")
+
+	// Expected depth is 0 (departments and locations are in different nested contexts)
+	expectedDepth = 0
+
+	actualDepth = nmap.CoveringDepth(fs)
+	if actualDepth != expectedDepth {
+		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	}
+}
+
+func TestNestedConjunctionQuery(t *testing.T) {
+	imap := createNestedIndexMapping()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	// Index 3 sample documents
+	docs := []struct {
+		id   string
+		data string
+	}{
+		{
+			id: "1",
+			data: `{
+				"company": {
+					"id": "c1",
+					"name": "TechCorp",
+					"departments": [
+						{
+							"name": "Engineering",
+							"budget": 2000000,
+							"employees": [
+								{"name": "Alice", "role": "Engineer"},
+								{"name": "Bob", "role": "Manager"}
+							],
+							"projects": [
+								{"title": "Project X", "status": "ongoing"},
+								{"title": "Project Y", "status": "completed"}
+							]
+						},
+						{
+							"name": "Sales",
+							"budget": 300000,
+							"employees": [
+								{"name": "Eve", "role": "Salesperson"},
+								{"name": "Mallory", "role": "Manager"}
+							],
+							"projects": [
+								{"title": "Project A", "status": "completed"},
+								{"title": "Project B", "status": "ongoing"}
+							]
+						}	
+					],
+					"locations": [
+						{"city": "Athens", "country": "Greece"},
+						{"city": "Berlin", "country": "USA"}
+					]
+				}
+			}`,
+		},
+		{
+			id: "2",
+			data: `{
+				"company" : {
+					"id": "c2",
+					"name": "BizInc",
+					"departments": [
+						{
+							"name": "Marketing",
+							"budget": 800000,
+							"employees": [
+								{"name": "Eve", "role": "Marketer"},
+								{"name": "David", "role": "Manager"}
+							],
+							"projects": [
+								{"title": "Project Z", "status": "ongoing"},
+								{"title": "Project W", "status": "planned"}
+							]
+						},
+						{
+							"name": "Engineering",
+							"budget": 800000,
+							"employees": [
+								{"name": "Frank", "role": "Manager"},
+								{"name": "Grace", "role": "Engineer"}
+							],
+							"projects": [
+								{"title": "Project Alpha", "status": "completed"},
+								{"title": "Project Beta", "status": "ongoing"}
+							]
+						}	
+					],
+					"locations": [
+						{"city": "Athens", "country": "USA"},
+						{"city": "London", "country": "UK"}
+					]
+				}
+			}`,
+		},
+		{
+			id: "3",
+			data: `{
+				"company": {
+					"id": "c3",
+					"name": "WebSolutions",
+					"departments": [
+						{
+							"name": "HR",
+							"budget": 800000,
+							"employees": [
+								{"name": "Eve", "role": "Manager"},
+								{"name": "Frank", "role": "HR"}
+							],
+							"projects": [
+								{"title": "Project Beta", "status": "completed"},
+								{"title": "Project B", "status": "ongoing"}
+							]
+						},
+						{
+							"name": "Engineering",
+							"budget": 200000,
+							"employees": [
+								{"name": "Heidi", "role": "Support Engineer"},
+								{"name": "Ivan", "role": "Manager"}
+							],
+							"projects": [
+								{"title": "Project Helpdesk", "status": "ongoing"},
+								{"title": "Project FAQ", "status": "completed"}
+							]
+						}
+					],
+					"locations": [
+						{"city": "Edinburgh", "country": "UK"},
+						{"city": "London", "country": "Canada"}
+					]
+				}
+			}`,
+		},
+	}
+
+	for _, doc := range docs {
+		var dataMap map[string]interface{}
+		err := json.Unmarshal([]byte(doc.data), &dataMap)
+		if err != nil {
+			t.Fatalf("failed to unmarshal document %s: %v", doc.id, err)
+		}
+		err = idx.Index(doc.id, dataMap)
+		if err != nil {
+			t.Fatalf("failed to index document %s: %v", doc.id, err)
+		}
+	}
+
+	var buildReq = func(subQueries []query.Query) *SearchRequest {
+		rv := NewSearchRequest(query.NewConjunctionQuery(subQueries))
+		rv.SortBy([]string{"_id"})
+		return rv
+	}
+
+	var (
+		req             *SearchRequest
+		res             *SearchResult
+		deptNameQuery   *query.MatchQuery
+		deptBudgetQuery *query.NumericRangeQuery
+		empNameQuery    *query.MatchQuery
+		empRoleQuery    *query.MatchQuery
+		projTitleQuery  *query.MatchQuery
+		projStatusQuery *query.MatchQuery
+		countryQuery    *query.MatchQuery
+		cityQuery       *query.MatchQuery
+	)
+
+	// Test 1: Find companies with a department named "Engineering" AND budget over 900000
+	deptNameQuery = query.NewMatchQuery("Engineering")
+	deptNameQuery.SetField("company.departments.name")
+
+	min := float64(800000)
+	deptBudgetQuery = query.NewNumericRangeQuery(&min, nil)
+	deptBudgetQuery.SetField("company.departments.budget")
+
+	req = buildReq([]query.Query{deptNameQuery, deptBudgetQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "1" || res.Hits[1].ID != "2" {
+		t.Fatalf("unexpected hit IDs: %v, %v", res.Hits[0].ID, res.Hits[1].ID)
+	}
+
+	// Test 2: Find companies with an employee named "Eve" AND project status "completed"
+	empNameQuery = query.NewMatchQuery("Eve")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	projStatusQuery = query.NewMatchQuery("completed")
+	projStatusQuery.SetField("company.departments.projects.status")
+
+	req = buildReq([]query.Query{empNameQuery, projStatusQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "1" || res.Hits[1].ID != "3" {
+		t.Fatalf("unexpected hit IDs: %v, %v", res.Hits[0].ID, res.Hits[1].ID)
+	}
+
+	// Test 3: Find companies located in "Athens, USA" AND with an Engineering department
+	countryQuery = query.NewMatchQuery("USA")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("Athens")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery := query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	deptNameQuery = query.NewMatchQuery("Engineering")
+	deptNameQuery.SetField("company.departments.name")
+
+	req = buildReq([]query.Query{locQuery, deptNameQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "2" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
+
+	// Test 4a: Find companies located in "Athens, USA" AND with an Engineering department with a budget over 1M
+	countryQuery = query.NewMatchQuery("USA")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("Athens")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	deptNameQuery = query.NewMatchQuery("Engineering")
+	deptNameQuery.SetField("company.departments.name")
+
+	min = float64(1000000)
+	deptBudgetQuery = query.NewNumericRangeQuery(&min, nil)
+	deptBudgetQuery.SetField("company.departments.budget")
+
+	deptQuery := query.NewConjunctionQuery([]query.Query{deptNameQuery, deptBudgetQuery})
+
+	req = buildReq([]query.Query{locQuery, deptQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 0 {
+		t.Fatalf("expected 0 hits, got %d", len(res.Hits))
+	}
+
+	// Test 4b: Find companies located in "Athens, Greece" AND with an Engineering department with a budget over 1M
+	countryQuery = query.NewMatchQuery("Greece")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("Athens")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	deptNameQuery = query.NewMatchQuery("Engineering")
+	deptNameQuery.SetField("company.departments.name")
+
+	min = float64(1000000)
+	deptBudgetQuery = query.NewNumericRangeQuery(&min, nil)
+	deptBudgetQuery.SetField("company.departments.budget")
+
+	deptQuery = query.NewConjunctionQuery([]query.Query{deptNameQuery, deptBudgetQuery})
+
+	req = buildReq([]query.Query{locQuery, deptQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1hits, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "1" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
+
+	// Test 5a: Find companies with an employee named "Frank" AND role "Manager" whose department is
+	// handling a project titled "Project Beta" which is marked as "ongoing"
+	empNameQuery = query.NewMatchQuery("Frank")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery := query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	projTitleQuery = query.NewMatchQuery("Project Beta")
+	projTitleQuery.SetField("company.departments.projects.title")
+
+	projStatusQuery = query.NewMatchQuery("completed")
+	projStatusQuery.SetField("company.departments.projects.status")
+
+	projQuery := query.NewConjunctionQuery([]query.Query{projTitleQuery, projStatusQuery})
+
+	req = buildReq([]query.Query{empQuery, projQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 0 {
+		t.Fatalf("expected 0 hit, got %d", len(res.Hits))
+	}
+
+	// Test 5b: Find companies with an employee named "Frank" AND role "Manager" whose department is
+	// handling a project titled "Project Beta" which is marked as "completed"
+	empNameQuery = query.NewMatchQuery("Frank")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery = query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	projTitleQuery = query.NewMatchQuery("Project Beta")
+	projTitleQuery.SetField("company.departments.projects.title")
+
+	projStatusQuery = query.NewMatchQuery("ongoing")
+	projStatusQuery.SetField("company.departments.projects.status")
+
+	projQuery = query.NewConjunctionQuery([]query.Query{projTitleQuery, projStatusQuery})
+
+	req = buildReq([]query.Query{empQuery, projQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "2" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
+
+	// Test 6a: Find companies with an employee named "Eve" AND role "Manager"
+	// who is working in a department located in "London, UK"
+	empNameQuery = query.NewMatchQuery("Eve")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery = query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	countryQuery = query.NewMatchQuery("UK")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("London")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	req = buildReq([]query.Query{empQuery, locQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 0 {
+		t.Fatalf("expected 0 hit, got %d", len(res.Hits))
+	}
+
+	// Test 6b: Find companies with an employee named "Eve" AND role "Manager"
+	// who is working in a department located in "London, Canada"
+	empNameQuery = query.NewMatchQuery("Eve")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery = query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	countryQuery = query.NewMatchQuery("Canada")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("London")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	req = buildReq([]query.Query{empQuery, locQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "3" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
+
+	// Test 7a: Find companies where Ivan the Manager works London, UK
+
+	empNameQuery = query.NewMatchQuery("Ivan")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery = query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	countryQuery = query.NewMatchQuery("UK")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("London")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	req = buildReq([]query.Query{empQuery, locQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 0 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+
+	// Test 7b: Find companies where Ivan the Manager works London, Canada
+
+	empNameQuery = query.NewMatchQuery("Ivan")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery = query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	countryQuery = query.NewMatchQuery("Canada")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("London")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	req = buildReq([]query.Query{empQuery, locQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "3" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
+}

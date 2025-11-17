@@ -572,8 +572,7 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 				return nil, err
 			}
 
-			fs := make(query.FieldSet)
-			fs, err := query.ExtractFields(req.Query, i.m, fs)
+			fs, err := query.ExtractFields(req.Query, i.m, search.NewFieldSet())
 			if err != nil {
 				return nil, err
 			}
@@ -642,7 +641,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	// ------------------------------------------------------------------------------------------
 	// set up additional contexts for any search operation that will proceed from
-	// here, such as presearch, collectors etc.
+	// here, such as presearch, knn collector, topn collector etc.
 
 	// Scoring model callback to be used to get scoring model
 	scoringModelCallback := func() string {
@@ -687,6 +686,13 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey, search.GeoBufferPoolCallbackFunc(getBufferPool))
+	// check if the index mapping has any nested fields, which should force
+	// all collectors and searchers to be run in nested mode
+	if nm, ok := i.m.(mapping.NestedMapping); ok {
+		if nm.CountNested() > 0 {
+			ctx = context.WithValue(ctx, search.NestedSearchKey, true)
+		}
+	}
 	// ------------------------------------------------------------------------------------------
 
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
@@ -716,11 +722,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		req.SearchBefore = nil
 	}
 
-	var coll *collector.TopNCollector
-	if req.SearchAfter != nil {
-		coll = collector.NewTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter)
-	} else {
-		coll = collector.NewTopNCollector(req.Size, req.From, req.Sort)
+	coll, err := i.buildTopNCollector(ctx, req, indexReader)
+	if err != nil {
+		return nil, err
 	}
 
 	var knnHits []*search.DocumentMatch
@@ -937,7 +941,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if i.name != "" && hit.Index == "" {
 			hit.Index = i.name
 		}
-		err, storedFieldsBytes := LoadAndHighlightFields(hit, req, i.name, indexReader, highlighter)
+		err, storedFieldsBytes := LoadAndHighlightAllFields(hit, req, i.name, indexReader, highlighter)
 		if err != nil {
 			return nil, err
 		}
@@ -1102,6 +1106,57 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 		}
 	}
 
+	return nil, totalStoredFieldsBytes
+}
+
+// LoadAndHighlightAllFields loads stored fields + highlights for root and its descendants.
+// All descendant documents are collected into a _$nested array in the root DocumentMatch.
+func LoadAndHighlightAllFields(
+	root *search.DocumentMatch,
+	req *SearchRequest,
+	indexName string,
+	r index.IndexReader,
+	highlighter highlight.Highlighter,
+) (error, uint64) {
+	var totalStoredFieldsBytes uint64
+	// load root fields/highlights
+	err, bytes := LoadAndHighlightFields(root, req, indexName, r, highlighter)
+	totalStoredFieldsBytes += bytes
+	if err != nil {
+		return err, totalStoredFieldsBytes
+	}
+	// collect all descendant documents
+	nestedDocs := make([]*search.NestedDocumentMatch, 0)
+	// create a dummy desc DocumentMatch to reuse LoadAndHighlightFields
+	desc := &search.DocumentMatch{}
+	err = root.Children.IterateDescendants(func(descID index.IndexInternalID) error {
+		extID, err := r.ExternalID(descID)
+		if err != nil {
+			return err
+		}
+		// reset desc for reuse
+		desc.ID = extID
+		desc.IndexInternalID = descID
+		desc.Locations = root.Locations
+		err, bytes := LoadAndHighlightFields(desc, req, indexName, r, highlighter)
+		totalStoredFieldsBytes += bytes
+		if err != nil {
+			return err
+		}
+		// copy fields to nested doc and append
+		if len(desc.Fields) != 0 || len(desc.Fragments) != 0 {
+			nestedDocs = append(nestedDocs, search.NewNestedDocumentMatch(desc.Fields, desc.Fragments))
+		}
+		desc.Reset()
+		return nil
+	})
+	if err != nil {
+		return err, totalStoredFieldsBytes
+	}
+	// add nested documents to root under _$nested key
+	if len(nestedDocs) > 0 {
+		root.AddFieldValue("_$nested", nestedDocs)
+	}
 	return nil, totalStoredFieldsBytes
 }
 
@@ -1486,4 +1541,40 @@ func (i *indexImpl) CentroidCardinalities(field string, limit int, descending bo
 	}
 
 	return centroidCardinalities, nil
+}
+
+func (i *indexImpl) buildTopNCollector(ctx context.Context, req *SearchRequest, reader index.IndexReader) (*collector.TopNCollector, error) {
+	newCollector := func() *collector.TopNCollector {
+		if req.SearchAfter != nil {
+			return collector.NewTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter)
+		}
+		return collector.NewTopNCollector(req.Size, req.From, req.Sort)
+	}
+
+	newNestedCollector := func(nr index.NestedReader) *collector.TopNCollector {
+		if req.SearchAfter != nil {
+			return collector.NewNestedTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter, nr)
+		}
+		return collector.NewNestedTopNCollector(req.Size, req.From, req.Sort, nr)
+	}
+
+	// check if we are in nested mode
+	if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); ok && nestedMode {
+		// get the nested reader from the index reader
+		if nr, ok := reader.(index.NestedReader); ok {
+			// check if the mapping has any nested fields that intersect
+			if nm, ok := i.m.(mapping.NestedMapping); ok {
+				var fs search.FieldSet
+				var err error
+				fs, err = query.ExtractFields(req.Query, i.m, fs)
+				if err != nil {
+					return nil, err
+				}
+				if nm.IntersectsPrefix(fs) {
+					return newNestedCollector(nr), nil
+				}
+			}
+		}
+	}
+	return newCollector(), nil
 }

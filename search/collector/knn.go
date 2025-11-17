@@ -136,12 +136,24 @@ type KNNCollector struct {
 	took     time.Duration
 	results  search.DocumentMatchCollection
 	maxScore float64
+
+	nestedStore *collectStoreNested
+	descendants [][]index.IndexInternalID
 }
 
 func NewKNNCollector(kArray []int64, size int64) *KNNCollector {
 	return &KNNCollector{
 		knnStore: GetNewKNNCollectorStore(kArray),
 		size:     int(size),
+	}
+}
+
+func NewNestedKNNCollector(nr index.NestedReader, kArray []int64, size int64) *KNNCollector {
+	return &KNNCollector{
+		knnStore: GetNewKNNCollectorStore(kArray),
+		size:     int(size),
+
+		nestedStore: newStoreNested(nr),
 	}
 }
 
@@ -191,15 +203,39 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 		}
 		hc.total++
 
-		err = dmHandler(next)
-		if err != nil {
-			break
+		if hc.nestedStore != nil {
+			doc, err := hc.nestedStore.AddDocument(next)
+			if err != nil {
+				return err
+			}
+			searchContext.DocumentMatchPool.Put(doc)
+		} else {
+			err = dmHandler(next)
+			if err != nil {
+				break
+			}
 		}
 
 		next, err = searcher.Next(searchContext)
 	}
 	if err != nil {
 		return err
+	}
+
+	if hc.nestedStore != nil {
+		var count uint64
+		err := hc.nestedStore.VisitRoots(func(doc *search.DocumentMatch) error {
+			// process the root document
+			if err := dmHandler(doc); err != nil {
+				return err
+			}
+			count++
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		hc.total = count
 	}
 
 	// help finalize/flush the results in case

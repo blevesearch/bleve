@@ -17,12 +17,14 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -363,7 +365,13 @@ func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}
 		// see if the _all field was disabled
 		allMapping, _ := docMapping.documentMappingForPath("_all")
 		if allMapping == nil || allMapping.Enabled {
-			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, index.IndexField|index.IncludeTermVectors)
+			excludedFromAll := walkContext.excludedFromAll
+			nf := doc.NestedFields()
+			if nf != nil {
+				// if the document has any nested fields, exclude them from _all
+				excludedFromAll = append(excludedFromAll, nf.Slice()...)
+			}
+			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, excludedFromAll, index.IndexField|index.IncludeTermVectors)
 			doc.AddField(field)
 		}
 		doc.SetIndexed()
@@ -570,4 +578,69 @@ func (im *IndexMappingImpl) SynonymSourceVisitor(visitor analysis.SynonymSourceV
 		return err
 	}
 	return nil
+}
+
+func (im *IndexMappingImpl) buildNestedPrefixes() {
+	var collectNestedFields func(dm *DocumentMapping, pathComponents []string, currentDepth int)
+	collectNestedFields = func(dm *DocumentMapping, pathComponents []string, currentDepth int) {
+		for name, docMapping := range dm.Properties {
+			newPathComponents := append(pathComponents, name)
+			if docMapping.Nested {
+				// This is a nested field boundary
+				path := strings.Join(newPathComponents, ".")
+				im.cache.NestedPrefixes.AddPrefix(path, currentDepth+1)
+				// Continue deeper with incremented depth
+				collectNestedFields(docMapping, newPathComponents, currentDepth+1)
+			} else {
+				// Not nested, continue with same depth
+				collectNestedFields(docMapping, newPathComponents, currentDepth)
+			}
+		}
+	}
+	// Start from depth 0 (root)
+	if im.DefaultMapping != nil && im.DefaultMapping.Enabled {
+		collectNestedFields(im.DefaultMapping, []string{}, 0)
+	}
+	// Now do this for each type mapping
+	for _, docMapping := range im.TypeMapping {
+		if docMapping.Enabled {
+			collectNestedFields(docMapping, []string{}, 0)
+		}
+	}
+}
+
+func (im *IndexMappingImpl) CoveringDepth(fs search.FieldSet) int {
+	if im.cache == nil || im.cache.NestedPrefixes == nil {
+		return 0
+	}
+
+	im.cache.NestedPrefixes.InitOnce(func() {
+		im.buildNestedPrefixes()
+	})
+
+	return im.cache.NestedPrefixes.CoveringDepth(fs)
+}
+
+func (im *IndexMappingImpl) CountNested() int {
+	if im.cache == nil || im.cache.NestedPrefixes == nil {
+		return 0
+	}
+
+	im.cache.NestedPrefixes.InitOnce(func() {
+		im.buildNestedPrefixes()
+	})
+
+	return im.cache.NestedPrefixes.CountNested()
+}
+
+func (im *IndexMappingImpl) IntersectsPrefix(fs search.FieldSet) bool {
+	if im.cache == nil || im.cache.NestedPrefixes == nil {
+		return false
+	}
+
+	im.cache.NestedPrefixes.InitOnce(func() {
+		im.buildNestedPrefixes()
+	})
+
+	return im.cache.NestedPrefixes.IntersectsPrefix(fs)
 }

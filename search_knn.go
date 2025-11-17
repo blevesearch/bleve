@@ -24,6 +24,7 @@ import (
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
@@ -372,7 +373,7 @@ func addSortAndFieldsToKNNHits(req *SearchRequest, knnHits []*search.DocumentMat
 			}
 		}
 		req.Sort.Value(hit)
-		err, _ = LoadAndHighlightFields(hit, req, "", reader, nil)
+		err, _ = LoadAndHighlightAllFields(hit, req, "", reader, nil)
 		if err != nil {
 			return err
 		}
@@ -410,7 +411,10 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 		if err != nil {
 			return nil, err
 		}
-		filterColl := collector.NewEligibleCollector(int(indexDocCount))
+		filterColl, err := i.buildEligibleCollector(ctx, filterQ, reader, int(indexDocCount))
+		if err != nil {
+			return nil, err
+		}
 		err = filterColl.Collect(ctx, filterSearcher, reader)
 		if err != nil {
 			return nil, err
@@ -429,7 +433,10 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	if err != nil {
 		return nil, err
 	}
-	knnCollector := collector.NewKNNCollector(kArray, sumOfK)
+	knnCollector, err := i.buildKNNCollector(ctx, KNNQuery, reader, kArray, sumOfK)
+	if err != nil {
+		return nil, err
+	}
 	err = knnCollector.Collect(ctx, knnSearcher, reader)
 	if err != nil {
 		return nil, err
@@ -660,4 +667,50 @@ func (r *rescorer) restoreKnnRequest() {
 		b := query.Boost(r.origBoosts[i+1])
 		r.req.KNN[i].Boost = &b
 	}
+}
+
+func (i *indexImpl) buildKNNCollector(ctx context.Context, KNNQuery query.Query, reader index.IndexReader, kArray []int64, somOfK int64) (*collector.KNNCollector, error) {
+	// check if we are in nested mode
+	if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); ok && nestedMode {
+		// get the nested reader from the index reader
+		if nr, ok := reader.(index.NestedReader); ok {
+			// check if the KNN query intersects with the nested mapping
+			if nm, ok := i.m.(mapping.NestedMapping); ok {
+				var fs search.FieldSet
+				var err error
+				fs, err = query.ExtractFields(KNNQuery, i.m, fs)
+				if err != nil {
+					return nil, err
+				}
+				if nm.IntersectsPrefix(fs) {
+					return collector.NewNestedKNNCollector(nr, kArray, somOfK), nil
+				}
+			}
+		}
+	}
+
+	return collector.NewKNNCollector(kArray, somOfK), nil
+}
+
+func (i *indexImpl) buildEligibleCollector(ctx context.Context, filterQuery query.Query, reader index.IndexReader, size int) (*collector.EligibleCollector, error) {
+	// check if we are in nested mode
+	if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); ok && nestedMode {
+		// get the nested reader from the index reader
+		if nr, ok := reader.(index.NestedReader); ok {
+			// check if the filter query intersects with the nested mapping
+			if nm, ok := i.m.(mapping.NestedMapping); ok {
+				var fs search.FieldSet
+				var err error
+				fs, err = query.ExtractFields(filterQuery, i.m, fs)
+				if err != nil {
+					return nil, err
+				}
+				if nm.IntersectsPrefix(fs) {
+					return collector.NewNestedEligibleCollector(nr, size), nil
+				}
+			}
+		}
+	}
+
+	return collector.NewEligibleCollector(size), nil
 }

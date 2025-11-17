@@ -54,14 +54,39 @@ func (q *ConjunctionQuery) AddQuery(aq ...Query) {
 
 func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	ss := make([]search.Searcher, 0, len(q.Conjuncts))
+	cleanup := func() {
+		for _, searcher := range ss {
+			if searcher != nil {
+				_ = searcher.Close()
+			}
+		}
+	}
+	nestedMode, _ := ctx.Value(search.NestedSearchKey).(bool)
+	var nm mapping.NestedMapping
+	if nestedMode {
+		var ok bool
+		// get the nested mapping
+		if nm, ok = m.(mapping.NestedMapping); !ok {
+			// shouldn't be in nested mode if no nested mapping
+			nestedMode = false
+		}
+	}
+	// set of fields used in this query
+	var qfs search.FieldSet
+	var err error
+
 	for _, conjunct := range q.Conjuncts {
+		// Gather fields when nested mode is enabled
+		if nestedMode {
+			qfs, err = ExtractFields(conjunct, m, qfs)
+			if err != nil {
+				cleanup()
+				return nil, err
+			}
+		}
 		sr, err := conjunct.Searcher(ctx, i, m, options)
 		if err != nil {
-			for _, searcher := range ss {
-				if searcher != nil {
-					_ = searcher.Close()
-				}
-			}
+			cleanup()
 			return nil, err
 		}
 		if _, ok := sr.(*searcher.MatchNoneSearcher); ok && q.queryStringMode {
@@ -73,6 +98,10 @@ func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 
 	if len(ss) < 1 {
 		return searcher.NewMatchNoneSearcher(i)
+	}
+
+	if nestedMode {
+		return searcher.NewNestedConjunctionSearcher(ctx, i, ss, nm.CoveringDepth(qfs), options)
 	}
 
 	return searcher.NewConjunctionSearcher(ctx, i, ss, options)
