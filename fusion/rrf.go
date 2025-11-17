@@ -50,7 +50,7 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 		limit = windowSize
 	}
 
-	// precompute rank+scores to prevend additional division ops later
+	// precompute rank+scores to prevent additional division ops later
 	var rankReciprocals []float64
 	if limit > 0 {
 		rankReciprocals = make([]float64, limit)
