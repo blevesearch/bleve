@@ -5603,6 +5603,11 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	var buildReq = func(subQueries []query.Query) *SearchRequest {
 		rv := NewSearchRequest(query.NewConjunctionQuery(subQueries))
 		rv.SortBy([]string{"_id"})
+		reqString, err := json.MarshalIndent(rv, "", "  ")
+		if err != nil {
+			t.Fatalf("failed to marshal search request: %v", err)
+		}
+		t.Logf("Search Request: %s", reqString)
 		return rv
 	}
 
@@ -5907,6 +5912,40 @@ func TestNestedConjunctionQuery(t *testing.T) {
 		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
 	}
 	if res.Hits[0].ID != "3" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
+
+	// Test 8: Find companies where Frank the Manager works in Engineering department located in London, UK
+	empNameQuery = query.NewMatchQuery("Frank")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery = query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	deptNameQuery = query.NewMatchQuery("Engineering")
+	deptNameQuery.SetField("company.departments.name")
+
+	deptQuery = query.NewConjunctionQuery([]query.Query{empQuery, deptNameQuery})
+
+	countryQuery = query.NewMatchQuery("UK")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("London")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	req = buildReq([]query.Query{deptQuery, locQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "2" {
 		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
 	}
 }
