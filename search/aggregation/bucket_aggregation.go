@@ -49,6 +49,13 @@ type TermsAggregation struct {
 	subAggBuilders map[string]search.AggregationBuilder
 	currentTerm    string
 	sawValue       bool
+	fieldBuffer    []fieldUpdate // Buffer for field updates received before bucket is known
+}
+
+// fieldUpdate holds a field/term pair for buffering
+type fieldUpdate struct {
+	field string
+	term  []byte
 }
 
 // subAggregationSet holds the set of sub-aggregations for a bucket
@@ -138,6 +145,7 @@ func (ta *TermsAggregation) SubAggregationFields() []string {
 func (ta *TermsAggregation) StartDoc() {
 	ta.sawValue = false
 	ta.currentTerm = ""
+	ta.fieldBuffer = ta.fieldBuffer[:0] // Clear buffer for new document
 }
 
 func (ta *TermsAggregation) UpdateVisitor(field string, term []byte) {
@@ -177,17 +185,38 @@ func (ta *TermsAggregation) UpdateVisitor(field string, term []byte) {
 					for _, subAgg := range subAggs.builders {
 						subAgg.StartDoc()
 					}
+
+					// Flush buffered field updates now that we know the bucket
+					for _, update := range ta.fieldBuffer {
+						for _, subAgg := range subAggs.builders {
+							subAgg.UpdateVisitor(update.field, update.term)
+						}
+					}
+					ta.fieldBuffer = ta.fieldBuffer[:0] // Clear buffer after flushing
 				}
 			}
 		}
 	}
 
-	// Forward all field values to sub-aggregations in the current bucket
-	if ta.currentTerm != "" && ta.subAggBuilders != nil {
-		if subAggs, exists := ta.termSubAggs[ta.currentTerm]; exists {
-			for _, subAgg := range subAggs.builders {
-				subAgg.UpdateVisitor(field, term)
+	// If we have sub-aggregations, forward this field update
+	if ta.subAggBuilders != nil && len(ta.subAggBuilders) > 0 {
+		if ta.currentTerm != "" {
+			// We know the bucket - forward directly to sub-aggregations
+			if subAggs, exists := ta.termSubAggs[ta.currentTerm]; exists {
+				for _, subAgg := range subAggs.builders {
+					subAgg.UpdateVisitor(field, term)
+				}
 			}
+		} else if field != ta.field {
+			// We don't know the bucket yet - buffer this field update
+			// (but don't buffer our own field since it defines the bucket)
+			// Make a copy of term since it may be reused by the caller
+			termCopy := make([]byte, len(term))
+			copy(termCopy, term)
+			ta.fieldBuffer = append(ta.fieldBuffer, fieldUpdate{
+				field: field,
+				term:  termCopy,
+			})
 		}
 	}
 }
