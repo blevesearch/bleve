@@ -1325,6 +1325,9 @@ func (f *indexImplFieldDict) Cardinality() int {
 
 // helper function to remove duplicate entries from slice of strings
 func deDuplicate(fields []string) []string {
+	if len(fields) == 0 {
+		return fields
+	}
 	entries := make(map[string]struct{})
 	ret := []string{}
 	for _, entry := range fields {
