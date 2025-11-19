@@ -5242,8 +5242,7 @@ func createNestedIndexMapping() mapping.IndexMapping {
 	companyMapping.AddFieldMappingsAt("name", companyNameField)
 
 	// Departments mapping
-	departmentsMapping := mapping.NewDocumentMapping()
-	departmentsMapping.Nested = true
+	departmentsMapping := mapping.NewNestedDocumentMapping()
 
 	// Department name field
 	deptNameField := mapping.NewTextFieldMapping()
@@ -5254,8 +5253,7 @@ func createNestedIndexMapping() mapping.IndexMapping {
 	departmentsMapping.AddFieldMappingsAt("budget", deptBudgetField)
 
 	// Employees mapping
-	employeesMapping := mapping.NewDocumentMapping()
-	employeesMapping.Nested = true
+	employeesMapping := mapping.NewNestedDocumentMapping()
 
 	// Employee name field
 	empNameField := mapping.NewTextFieldMapping()
@@ -5268,8 +5266,7 @@ func createNestedIndexMapping() mapping.IndexMapping {
 	departmentsMapping.AddSubDocumentMapping("employees", employeesMapping)
 
 	// Projects mapping
-	projectsMapping := mapping.NewDocumentMapping()
-	projectsMapping.Nested = true
+	projectsMapping := mapping.NewNestedDocumentMapping()
 
 	// Project title field
 	projTitleField := mapping.NewTextFieldMapping()
@@ -5284,8 +5281,7 @@ func createNestedIndexMapping() mapping.IndexMapping {
 	companyMapping.AddSubDocumentMapping("departments", departmentsMapping)
 
 	// Locations mapping
-	locationsMapping := mapping.NewDocumentMapping()
-	locationsMapping.Nested = true
+	locationsMapping := mapping.NewNestedDocumentMapping()
 
 	// Location city field
 	cityField := mapping.NewTextFieldMapping()
@@ -5603,11 +5599,6 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	var buildReq = func(subQueries []query.Query) *SearchRequest {
 		rv := NewSearchRequest(query.NewConjunctionQuery(subQueries))
 		rv.SortBy([]string{"_id"})
-		reqString, err := json.MarshalIndent(rv, "", "  ")
-		if err != nil {
-			t.Fatalf("failed to marshal search request: %v", err)
-		}
-		t.Logf("Search Request: %s", reqString)
 		return rv
 	}
 
@@ -5947,5 +5938,188 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	}
 	if res.Hits[0].ID != "2" {
 		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
+}
+
+func TestNestedArrayConjunctionQuery(t *testing.T) {
+	imap := NewIndexMapping()
+	groupsMapping := mapping.NewNestedDocumentMapping()
+
+	nameField := mapping.NewTextFieldMapping()
+	groupsMapping.AddFieldMappingsAt("first_name", nameField)
+	groupsMapping.AddFieldMappingsAt("last_name", nameField)
+
+	imap.DefaultMapping.AddSubDocumentMapping("groups", groupsMapping)
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	docs := []string{
+		`{
+			"groups": [
+				[
+					{
+						"first_name": "Alice",
+						"last_name": "Smith"
+					},
+					{
+						"first_name": "Bob",
+						"last_name": "Johnson"
+					}
+				],
+				[
+					{
+						"first_name": "Charlie",
+						"last_name": "Williams"
+					},
+					{
+						"first_name": "Diana",
+						"last_name": "Brown"
+					}
+				]
+			]
+		}`,
+		`{
+			"groups": [
+				{
+					"first_name": "Alice",
+					"last_name": "Smith"
+				},
+				{
+					"first_name": "Bob",
+					"last_name": "Johnson"
+				},
+				{
+					"first_name": "Charlie",
+					"last_name": "Williams"
+				},
+				{
+					"first_name": "Diana",
+					"last_name": "Brown"
+				}
+			]
+		}`,
+	}
+
+	for i, doc := range docs {
+		var dataMap map[string]interface{}
+		err := json.Unmarshal([]byte(doc), &dataMap)
+		if err != nil {
+			t.Fatalf("failed to unmarshal document %d: %v", i, err)
+		}
+		err = idx.Index(fmt.Sprintf("%d", i+1), dataMap)
+		if err != nil {
+			t.Fatalf("failed to index document %d: %v", i, err)
+		}
+	}
+
+	var (
+		firstNameQuery *query.MatchQuery
+		lastNameQuery  *query.MatchQuery
+		conjQuery      *query.ConjunctionQuery
+		searchReq      *SearchRequest
+		res            *SearchResult
+	)
+
+	// Search for documents where first_name is "Alice" AND last_name is "Johnson"
+	firstNameQuery = query.NewMatchQuery("Alice")
+	firstNameQuery.SetField("groups.first_name")
+
+	lastNameQuery = query.NewMatchQuery("Johnson")
+	lastNameQuery.SetField("groups.last_name")
+
+	conjQuery = query.NewConjunctionQuery([]query.Query{firstNameQuery, lastNameQuery})
+
+	searchReq = NewSearchRequest(conjQuery)
+	searchReq.SortBy([]string{"_id"})
+
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	if len(res.Hits) != 0 {
+		t.Fatalf("expected 0 hits, got %d", len(res.Hits))
+	}
+
+	// Search for documents where first_name is "Bob" AND last_name is "Johnson"
+	firstNameQuery = query.NewMatchQuery("Bob")
+	firstNameQuery.SetField("groups.first_name")
+
+	lastNameQuery = query.NewMatchQuery("Johnson")
+	lastNameQuery.SetField("groups.last_name")
+
+	conjQuery = query.NewConjunctionQuery([]query.Query{firstNameQuery, lastNameQuery})
+
+	searchReq = NewSearchRequest(conjQuery)
+	searchReq.SortBy([]string{"_id"})
+
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+
+	if res.Hits[0].ID != "1" || res.Hits[1].ID != "2" {
+		t.Fatalf("unexpected hit IDs: %v, %v", res.Hits[0].ID, res.Hits[1].ID)
+	}
+
+	// Search for documents where first_name is "Alice" AND last_name is "Williams"
+	firstNameQuery = query.NewMatchQuery("Alice")
+	firstNameQuery.SetField("groups.first_name")
+
+	lastNameQuery = query.NewMatchQuery("Williams")
+	lastNameQuery.SetField("groups.last_name")
+
+	conjQuery = query.NewConjunctionQuery([]query.Query{firstNameQuery, lastNameQuery})
+
+	searchReq = NewSearchRequest(conjQuery)
+	searchReq.SortBy([]string{"_id"})
+
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	if len(res.Hits) != 0 {
+		t.Fatalf("expected 0 hits, got %d", len(res.Hits))
+	}
+
+	// Search for documents where first_name is "Diana" AND last_name is "Brown"
+	firstNameQuery = query.NewMatchQuery("Diana")
+	firstNameQuery.SetField("groups.first_name")
+
+	lastNameQuery = query.NewMatchQuery("Brown")
+	lastNameQuery.SetField("groups.last_name")
+
+	conjQuery = query.NewConjunctionQuery([]query.Query{firstNameQuery, lastNameQuery})
+
+	searchReq = NewSearchRequest(conjQuery)
+	searchReq.SortBy([]string{"_id"})
+
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+
+	if res.Hits[0].ID != "1" || res.Hits[1].ID != "2" {
+		t.Fatalf("unexpected hit IDs: %v, %v", res.Hits[0].ID, res.Hits[1].ID)
 	}
 }

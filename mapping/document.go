@@ -236,6 +236,17 @@ func NewDocumentMapping() *DocumentMapping {
 	}
 }
 
+// NewNestedDocumentMapping returns a new document
+// mapping that treats sub-documents as nested
+// objects.
+func NewNestedDocumentMapping() *DocumentMapping {
+	return &DocumentMapping{
+		Nested:  true,
+		Enabled: true,
+		Dynamic: true,
+	}
+}
+
 // NewDocumentStaticMapping returns a new document
 // mapping that will not automatically index parts
 // of a document without an explicit mapping.
@@ -392,6 +403,18 @@ func (dm *DocumentMapping) defaultSynonymSource(path []string) string {
 	return rv
 }
 
+// baseType returns the base type of v by dereferencing pointers
+func baseType(v interface{}) reflect.Type {
+	if v == nil {
+		return nil
+	}
+	t := reflect.TypeOf(v)
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	return t
+}
+
 func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes []uint64, context *walkContext) {
 	// allow default "json" tag to be overridden
 	structTagKey := dm.StructTagKey
@@ -446,19 +469,38 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 		}
 	case reflect.Slice, reflect.Array:
 		subDocMapping, _ := dm.documentMappingForPathElements(path)
-		nestedSubObjects := subDocMapping != nil && subDocMapping.Nested
+		allowNested := subDocMapping != nil && subDocMapping.Nested
 		for i := 0; i < val.Len(); i++ {
-			if val.Index(i).CanInterface() {
-				fieldVal := val.Index(i).Interface()
-				if nestedSubObjects {
-					nestedDocument := document.NewDocument(fmt.Sprintf("%s_$%s_$%d", context.doc.ID(), encodePath(path), i))
+			// for each array element, check if it can be represented as an interface
+			idxVal := val.Index(i)
+			// skip invalid values
+			if !idxVal.CanInterface() {
+				continue
+			}
+			// get the actual value in interface form
+			actual := idxVal.Interface()
+			// if nested mapping, only create nested document for object elements
+			if allowNested && actual != nil {
+				// check the kind of the actual value, is it an object (struct or map)?
+				typ := baseType(actual)
+				if typ == nil {
+					continue
+				}
+				kind := typ.Kind()
+				// only create nested docs for real JSON objects
+				if kind == reflect.Struct || kind == reflect.Map {
+					// Create nested document only for only object elements
+					nestedDocument := document.NewDocument(
+						fmt.Sprintf("%s_$%s_$%d", context.doc.ID(), encodePath(path), i))
 					nestedContext := context.im.newWalkContext(nestedDocument, dm)
-					dm.processProperty(fieldVal, path, append(indexes, uint64(i)), nestedContext)
+					dm.processProperty(actual, path, append(indexes, uint64(i)), nestedContext)
 					context.doc.AddNestedDocument(nestedDocument)
-				} else {
-					dm.processProperty(fieldVal, path, append(indexes, uint64(i)), context)
+					continue
 				}
 			}
+			// non-nested mapping, or non-object element in nested mapping
+			// process the element normally
+			dm.processProperty(actual, path, append(indexes, uint64(i)), context)
 		}
 	case reflect.Ptr:
 		ptrElem := val.Elem()
