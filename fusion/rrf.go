@@ -90,11 +90,8 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 			}
 		}
 		for i := limit; i < len(hits); i++ {
+			// These FTS hits are not counted in the results, so set to 0
 			hits[i].Score = 0.0
-		}
-	} else {
-		for _, hit := range hits {
-			hit.Score = 0.0
 		}
 	}
 
