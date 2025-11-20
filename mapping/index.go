@@ -194,11 +194,19 @@ func (im *IndexMappingImpl) Validate() error {
 		}
 	}
 	fieldAliasCtx := make(map[string]*FieldMapping)
+	// ensure that the nested property is not set for top-level default mapping
+	if im.DefaultMapping.Nested {
+		return fmt.Errorf("default mapping cannot be nested")
+	}
 	err = im.DefaultMapping.Validate(im.cache, "", fieldAliasCtx)
 	if err != nil {
 		return err
 	}
-	for _, docMapping := range im.TypeMapping {
+	for name, docMapping := range im.TypeMapping {
+		// ensure that the nested property is not set for top-level mappings
+		if docMapping.Nested {
+			return fmt.Errorf("type mapping named: %s cannot be nested", name)
+		}
 		err = docMapping.Validate(im.cache, "", fieldAliasCtx)
 		if err != nil {
 			return err

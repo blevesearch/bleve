@@ -5298,6 +5298,7 @@ func createNestedIndexMapping() mapping.IndexMapping {
 
 	return imap
 }
+
 func TestNestedPrefixes(t *testing.T) {
 	imap := createNestedIndexMapping()
 
@@ -5448,6 +5449,10 @@ func TestNestedPrefixes(t *testing.T) {
 
 func TestNestedConjunctionQuery(t *testing.T) {
 	imap := createNestedIndexMapping()
+	err := imap.Validate()
+	if err != nil {
+		t.Fatalf("expected valid nested index mapping, got error: %v", err)
+	}
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
 	idx, err := New(tmpIndexPath, imap)
@@ -6121,5 +6126,59 @@ func TestNestedArrayConjunctionQuery(t *testing.T) {
 
 	if res.Hits[0].ID != "1" || res.Hits[1].ID != "2" {
 		t.Fatalf("unexpected hit IDs: %v, %v", res.Hits[0].ID, res.Hits[1].ID)
+	}
+}
+
+func TestValidNestedMapping(t *testing.T) {
+	// ensure that top-level mappings - DefaultMapping and any type mappings - cannot be nested mappings
+	imap := mapping.NewIndexMapping()
+	nestedMapping := mapping.NewNestedDocumentMapping()
+	imap.DefaultMapping = nestedMapping
+	err := imap.Validate()
+	if err == nil {
+		t.Fatalf("expected error for nested DefaultMapping, got nil")
+	}
+	// invalid nested type mapping
+	imap = mapping.NewIndexMapping()
+	imap.AddDocumentMapping("type1", nestedMapping)
+	err = imap.Validate()
+	if err == nil {
+		t.Fatalf("expected error for nested type mapping, got nil")
+	}
+	// valid nested mappings within DefaultMapping
+	imap = mapping.NewIndexMapping()
+	docMapping := mapping.NewDocumentMapping()
+	nestedMapping = mapping.NewNestedDocumentMapping()
+	fieldMapping := mapping.NewTextFieldMapping()
+	nestedMapping.AddFieldMappingsAt("field1", fieldMapping)
+	docMapping.AddSubDocumentMapping("nestedField", nestedMapping)
+	imap.DefaultMapping = docMapping
+	err = imap.Validate()
+	if err != nil {
+		t.Fatalf("expected valid nested mapping, got error: %v", err)
+	}
+	// valid nested mappings within type mapping
+	imap = mapping.NewIndexMapping()
+	docMapping = mapping.NewDocumentMapping()
+	nestedMapping = mapping.NewNestedDocumentMapping()
+	fieldMapping = mapping.NewTextFieldMapping()
+	nestedMapping.AddFieldMappingsAt("field1", fieldMapping)
+	docMapping.AddSubDocumentMapping("nestedField", nestedMapping)
+	imap.AddDocumentMapping("type1", docMapping)
+	err = imap.Validate()
+	if err != nil {
+		t.Fatalf("expected valid nested mapping, got error: %v", err)
+	}
+	// some nested type mappings
+	imap = mapping.NewIndexMapping()
+	nestedMapping = mapping.NewNestedDocumentMapping()
+	regularMapping := mapping.NewDocumentMapping()
+	imap.AddDocumentMapping("non_nested1", regularMapping)
+	imap.AddDocumentMapping("non_nested2", regularMapping)
+	imap.AddDocumentMapping("nested1", nestedMapping)
+	imap.AddDocumentMapping("nested2", nestedMapping)
+	err = imap.Validate()
+	if err == nil {
+		t.Fatalf("expected error for nested type mappings, got nil")
 	}
 }
