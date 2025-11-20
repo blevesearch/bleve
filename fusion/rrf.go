@@ -32,7 +32,8 @@ func formatRRFMessage(weight float64, rank int, rankConstant int) string {
 // weighted, and combined into a single fused score, with optional explanation
 // details.
 func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64, rankConstant int, windowSize int, numKNNQueries int, explain bool) FusionResult {
-	if len(hits) == 0 {
+	nHits := len(hits)
+	if nHits == 0 || windowSize == 0 {
 		return FusionResult{
 			Hits:     hits,
 			Total:    0,
@@ -40,56 +41,48 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 		}
 	}
 
-	// The code here mainly deals with obtaining rank/score for fts hits.
-	// First sort hits by score
-	sortDocMatchesByScore(hits)
-
-	// Limit to consider only min(windowSize, len(hits))
-	limit := len(hits)
-	if windowSize >= 0 && windowSize < limit {
-		limit = windowSize
-	}
+	limit := min(nHits, windowSize)
 
 	// precompute rank+scores to prevent additional division ops later
-	var rankReciprocals []float64
-	if limit > 0 {
-		rankReciprocals = make([]float64, limit)
-		for i := range rankReciprocals {
-			rankReciprocals[i] = 1.0 / float64(rankConstant+i+1)
-		}
+	rankReciprocals := make([]float64, limit)
+	for i := range rankReciprocals {
+		rankReciprocals[i] = 1.0 / float64(rankConstant+i+1)
 	}
 
 	// init explanations if required
 	var fusionExpl map[*search.DocumentMatch][]*search.Explanation
 	if explain {
-		fusionExpl = make(map[*search.DocumentMatch][]*search.Explanation, len(hits))
+		fusionExpl = make(map[*search.DocumentMatch][]*search.Explanation, nHits)
 	}
 
+	// The code here mainly deals with obtaining rank/score for fts hits.
+	// First sort hits by score
+	sortDocMatchesByScore(hits)
+
 	// Calculate fts rank+scores
-	if limit > 0 {
-		ftsWeight := weights[0]
-		for i := 0; i < limit; i++ {
+	ftsWeight := weights[0]
+	for i := 0; i < nHits; i++ {
+		if i < windowSize {
 			hit := hits[i]
-			originalScore := hit.Score
-			if originalScore == 0.0 {
+
+			// No fts scores from this hit onwards, break loop
+			if hit.Score == 0.0 {
 				break
 			}
-			rank := i + 1
+
+			contrib := ftsWeight * rankReciprocals[i]
+			hit.Score = contrib
+
 			if explain {
-				contrib := ftsWeight * rankReciprocals[i]
 				expl := getFusionExplAt(
 					hit,
 					0,
 					contrib,
-					formatRRFMessage(ftsWeight, rank, rankConstant),
+					formatRRFMessage(ftsWeight, i+1, rankConstant),
 				)
 				fusionExpl[hit] = append(fusionExpl[hit], expl)
-				hit.Score = contrib
-			} else {
-				hit.Score = ftsWeight * rankReciprocals[i]
 			}
-		}
-		for i := limit; i < len(hits); i++ {
+		} else {
 			// These FTS hits are not counted in the results, so set to 0
 			hits[i].Score = 0.0
 		}
@@ -98,35 +91,30 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 	// Code from here is to calculate knn ranks and scores
 	// iterate over each knn query and calculate knn rank+scores
 	for queryIdx := 0; queryIdx < numKNNQueries; queryIdx++ {
-		limit := len(hits)
-		if windowSize >= 0 && windowSize < limit {
-			limit = windowSize
-		}
-		if limit == 0 {
-			continue
-		}
-
-		weight := weights[queryIdx+1]
-		rank := 0
+		knnWeight := weights[queryIdx+1]
+		// Sorts hits in decreasing order of hit.ScoreBreakdown[i]
 		sortDocMatchesByBreakdown(hits, queryIdx)
-		for _, hit := range hits {
-			if _, ok := scoreBreakdownForQuery(hit, queryIdx); !ok {
+
+		for i := 0; i < nHits; i++ {
+			// break if score breakdown doesn't exist (sort function puts these hits at the end)
+			// or if we go past the windowSize
+			_, scoreBreakdownExists := scoreBreakdownForQuery(hits[i], queryIdx)
+			if i >= windowSize || !scoreBreakdownExists {
 				break
 			}
-			rank++
-			contrib := weight * rankReciprocals[rank-1]
+
+			hit := hits[i]
+			contrib := knnWeight * rankReciprocals[i]
+			hit.Score += contrib
+
 			if explain {
 				expl := getFusionExplAt(
 					hit,
 					queryIdx+1,
 					contrib,
-					formatRRFMessage(weight, rank, rankConstant),
+					formatRRFMessage(knnWeight, i+1, rankConstant),
 				)
 				fusionExpl[hit] = append(fusionExpl[hit], expl)
-			}
-			hit.Score += contrib
-			if rank == limit {
-				break
 			}
 		}
 	}
@@ -144,7 +132,7 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 	}
 
 	sortDocMatchesByScore(hits)
-	if len(hits) > windowSize {
+	if nHits > windowSize {
 		hits = hits[:windowSize]
 	}
 	return FusionResult{
