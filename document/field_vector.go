@@ -42,7 +42,6 @@ type VectorField struct {
 	value                   []float32
 	numPlainTextBytes       uint64
 	vectorIndexOptimizedFor string // Optimization applied to this index.
-	gpu                     bool   // Whether to use GPU for indexing/searching
 }
 
 func (n *VectorField) Size() int {
@@ -144,8 +143,4 @@ func (n *VectorField) Similarity() string {
 
 func (n *VectorField) IndexOptimizedFor() string {
 	return n.vectorIndexOptimizedFor
-}
-
-func (n *VectorField) GPU() bool {
-	return n.gpu
 }
