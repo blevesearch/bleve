@@ -204,7 +204,7 @@ func TestReciprocalRankFusion(t *testing.T) {
 				hit.HitNumber = uint64(i)
 			}
 
-			if got := ReciprocalRankFusion(tt.hits, tt.weights, tt.rank_constant, tt.window_size, tt.numKNNQueries, false); !compareFusionResults(got, tt.want) {
+			if got := ReciprocalRankFusion(tt.hits, tt.weights, tt.rank_constant, tt.window_size, tt.numKNNQueries, false); !compareFusionResults(*got, tt.want) {
 				t.Errorf("ReciprocalRankFusion() = %v, want %v", got, tt.want)
 			}
 		})

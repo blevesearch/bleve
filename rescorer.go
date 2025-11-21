@@ -95,7 +95,7 @@ func (r *rescorer) restoreSearchRequest() {
 func (r *rescorer) rescore(ftsHits, knnHits search.DocumentMatchCollection) (search.DocumentMatchCollection, uint64, float64) {
 	mergedHits := r.mergeDocs(ftsHits, knnHits)
 
-	var fusionResult fusion.FusionResult
+	var fusionResult *fusion.FusionResult
 
 	switch r.req.Score {
 	case ScoreRRF:

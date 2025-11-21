@@ -31,11 +31,11 @@ func formatRRFMessage(weight float64, rank int, rankConstant int) string {
 // results and each KNN sub-query. Ranks are limited to `windowSize` per source,
 // weighted, and combined into a single fused score, with optional explanation
 // details.
-func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64, rankConstant int, windowSize int, numKNNQueries int, explain bool) FusionResult {
+func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64, rankConstant int, windowSize int, numKNNQueries int, explain bool) *FusionResult {
 	nHits := len(hits)
 	if nHits == 0 || windowSize == 0 {
-		return FusionResult{
-			Hits:     hits,
+		return &FusionResult{
+			Hits:     search.DocumentMatchCollection{},
 			Total:    0,
 			MaxScore: 0.0,
 		}
@@ -135,7 +135,7 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 	if nHits > windowSize {
 		hits = hits[:windowSize]
 	}
-	return FusionResult{
+	return &FusionResult{
 		Hits:     hits,
 		Total:    uint64(len(hits)),
 		MaxScore: maxScore,

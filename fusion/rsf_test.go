@@ -190,7 +190,7 @@ func TestRelativeScoreFusion(t *testing.T) {
 				hit.HitNumber = uint64(i)
 			}
 
-			if got := RelativeScoreFusion(tt.hits, tt.weights, tt.windowSize, tt.numKNNQueries, false); !compareFusionResults(got, tt.want) {
+			if got := RelativeScoreFusion(tt.hits, tt.weights, tt.windowSize, tt.numKNNQueries, false); !compareFusionResults(*got, tt.want) {
 				t.Errorf("RelativeScoreFusion() = %v, want %v", got, tt.want)
 				// Print detailed comparison for debugging
 				t.Logf("Got hits:")

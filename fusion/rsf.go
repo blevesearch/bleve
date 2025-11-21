@@ -32,38 +32,35 @@ func formatRSFMessage(weight float64, normalizedScore float64, minScore float64,
 // weights, and combines them into a single fused score. Only the top
 // `windowSize` documents per source are considered, and explanations are
 // materialized lazily when requested.
-func RelativeScoreFusion(hits search.DocumentMatchCollection, weights []float64, windowSize int, numKNNQueries int, explain bool) FusionResult {
-	if len(hits) == 0 {
-		return FusionResult{
-			Hits:     hits,
+func RelativeScoreFusion(hits search.DocumentMatchCollection, weights []float64, windowSize int, numKNNQueries int, explain bool) *FusionResult {
+	nHits := len(hits)
+	if nHits == 0 || windowSize == 0 {
+		return &FusionResult{
+			Hits:     search.DocumentMatchCollection{},
 			Total:    0,
 			MaxScore: 0.0,
 		}
 	}
 
+	// init explanations if required
 	var fusionExpl map[*search.DocumentMatch][]*search.Explanation
 	if explain {
-		fusionExpl = make(map[*search.DocumentMatch][]*search.Explanation, len(hits))
+		fusionExpl = make(map[*search.DocumentMatch][]*search.Explanation, nHits)
 	}
 
 	// Code here for calculating fts results
 	// Sort by fts scores
 	sortDocMatchesByScore(hits)
 
-	// numScoring holds the total number of valid fts hits
-	numScoring := 0
+	// ftsLimit holds the total number of fts hits to consider for rsf
+	ftsLimit := 0
 	for _, hit := range hits {
 		if hit.Score == 0.0 {
 			break
 		}
-		numScoring++
+		ftsLimit++
 	}
-
-	// ftsLimit is min(numScoring, windowSize)
-	ftsLimit := numScoring
-	if windowSize >= 0 && windowSize < ftsLimit {
-		ftsLimit = windowSize
-	}
+	ftsLimit = min(ftsLimit, windowSize)
 
 	// calculate fts scores
 	if ftsLimit > 0 {
@@ -74,10 +71,9 @@ func RelativeScoreFusion(hits search.DocumentMatchCollection, weights []float64,
 
 		for i := 0; i < ftsLimit; i++ {
 			hit := hits[i]
-			original := hit.Score
 			norm := 1.0
 			if denom > 0 {
-				norm = (original - min) / denom
+				norm = (hit.Score - min) / denom
 			}
 			contrib := weight * norm
 			if explain {
@@ -91,7 +87,7 @@ func RelativeScoreFusion(hits search.DocumentMatchCollection, weights []float64,
 			}
 			hit.Score = contrib
 		}
-		for i := ftsLimit; i < len(hits); i++ {
+		for i := ftsLimit; i < nHits; i++ {
 			// These FTS hits are not counted in the results, so set to 0
 			hits[i].Score = 0.0
 		}
@@ -101,30 +97,27 @@ func RelativeScoreFusion(hits search.DocumentMatchCollection, weights []float64,
 	for queryIdx := 0; queryIdx < numKNNQueries; queryIdx++ {
 		sortDocMatchesByBreakdown(hits, queryIdx)
 
-		// numWithScore holds the total number of knn hits retrieved
-		numWithScore := 0
-		for numWithScore < len(hits) {
-			if _, ok := scoreBreakdownForQuery(hits[numWithScore], queryIdx); !ok {
+		// knnLimit holds the total number of knn hits retrieved for a specific knn query
+		knnLimit := 0
+		for _, hit := range hits {
+			if _, ok := scoreBreakdownForQuery(hit, queryIdx); !ok {
 				break
 			}
-			numWithScore++
+			knnLimit++
 		}
+		knnLimit = min(knnLimit, windowSize)
 
-		// limit holds the number of knn hits to consider
-		limit := numWithScore
-		if windowSize >= 0 && windowSize < limit {
-			limit = windowSize
-		}
-		if limit == 0 {
+		// if limit is 0, skip calculating
+		if knnLimit == 0 {
 			continue
 		}
 
 		max, _ := scoreBreakdownForQuery(hits[0], queryIdx)
-		min, _ := scoreBreakdownForQuery(hits[limit-1], queryIdx)
+		min, _ := scoreBreakdownForQuery(hits[knnLimit-1], queryIdx)
 		denom := max - min
 		weight := weights[queryIdx+1]
 
-		for i := 0; i < limit; i++ {
+		for i := 0; i < knnLimit; i++ {
 			hit := hits[i]
 			score, _ := scoreBreakdownForQuery(hit, queryIdx)
 			norm := 1.0
@@ -159,11 +152,11 @@ func RelativeScoreFusion(hits search.DocumentMatchCollection, weights []float64,
 
 	sortDocMatchesByScore(hits)
 
-	if len(hits) > windowSize {
+	if nHits > windowSize {
 		hits = hits[:windowSize]
 	}
 
-	return FusionResult{
+	return &FusionResult{
 		Hits:     hits,
 		Total:    uint64(len(hits)),
 		MaxScore: maxScore,
