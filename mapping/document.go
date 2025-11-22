@@ -256,6 +256,17 @@ func NewDocumentStaticMapping() *DocumentMapping {
 	}
 }
 
+// NewNestedDocumentStaticMapping returns a new document
+// mapping that treats sub-documents as nested
+// objects and will not automatically index parts
+// of the nested document without an explicit mapping.
+func NewNestedDocumentStaticMapping() *DocumentMapping {
+	return &DocumentMapping{
+		Enabled: true,
+		Nested:  true,
+	}
+}
+
 // NewDocumentDisabledMapping returns a new document
 // mapping that will not perform any indexing.
 func NewDocumentDisabledMapping() *DocumentMapping {
