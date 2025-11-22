@@ -64,6 +64,7 @@ type SearchRequest struct {
 	Score            string            `json:"score,omitempty"`
 	SearchAfter      []string          `json:"search_after"`
 	SearchBefore     []string          `json:"search_before"`
+	Collapse         *CollapseRequest  `json:"collapse,omitempty"`
 
 	// PreSearchData will be a  map that will be used
 	// in the second phase of any 2-phase search, to provide additional
@@ -98,6 +99,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Score            string            `json:"score"`
 		SearchAfter      []string          `json:"search_after"`
 		SearchBefore     []string          `json:"search_before"`
+		Collapse         *CollapseRequest  `json:"collapse"`
 		PreSearchData    json.RawMessage   `json:"pre_search_data"`
 		Params           json.RawMessage   `json:"params"`
 	}
@@ -129,6 +131,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.Score = temp.Score
 	r.SearchAfter = temp.SearchAfter
 	r.SearchBefore = temp.SearchBefore
+	r.Collapse = temp.Collapse
 	r.Query, err = query.ParseQuery(temp.Q)
 	if err != nil {
 		return err
@@ -184,6 +187,7 @@ func copySearchRequest(req *SearchRequest, preSearchData map[string]interface{})
 		Score:            req.Score,
 		SearchAfter:      req.SearchAfter,
 		SearchBefore:     req.SearchBefore,
+		Collapse:         req.Collapse,
 		PreSearchData:    preSearchData,
 	}
 	return &rv
