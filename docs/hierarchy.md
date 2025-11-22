@@ -8,110 +8,110 @@
 
 * Indexing `Arrays` allows specifying fields that contain arrays of objects. Each object in the array can have its own set of fields, enabling the representation of hierarchical data structures within a single document.
 
-    ```json
-    {
-        "id": "1",
-        "name": "John Doe",
-        "addresses": [
-            {
-                "type": "home",
-                "street": "123 Main St",
-                "city": "Hometown",
-                "zip": "12345"
-            },
-            {
-                "type": "work",
-                "street": "456 Corporate Blvd",
-                "city": "Metropolis",
-                "zip": "67890"
-            }
-        ]
-    }
-    ```
+```json
+{
+    "id": "1",
+    "name": "John Doe",
+    "addresses": [
+        {
+            "type": "home",
+            "street": "123 Main St",
+            "city": "Hometown",
+            "zip": "12345"
+        },
+        {
+            "type": "work",
+            "street": "456 Corporate Blvd",
+            "city": "Metropolis",
+            "zip": "67890"
+        }
+    ]
+}
+```
 
 * Multi-level arrays: Arrays can contain objects that themselves have array fields, allowing for deeply nested structures, such as a list of projects, each with its own list of tasks.
 
-    ```json
-    {
-        "id": "2",
-        "name": "Jane Smith",
-        "projects": [
-            {
-                "name": "Project Alpha",
-                "tasks": [
-                    {"title": "Task 1", "status": "completed"},
-                    {"title": "Task 2", "status": "in-progress"}
-                ]
-            },
-            {
-                "name": "Project Beta",
-                "tasks": [
-                    {"title": "Task A", "status": "not-started"},
-                    {"title": "Task B", "status": "completed"}
-                ]
-            }
-        ]
-    }
-    ```
+```json
+{
+    "id": "2",
+    "name": "Jane Smith",
+    "projects": [
+        {
+            "name": "Project Alpha",
+            "tasks": [
+                {"title": "Task 1", "status": "completed"},
+                {"title": "Task 2", "status": "in-progress"}
+            ]
+        },
+        {
+            "name": "Project Beta",
+            "tasks": [
+                {"title": "Task A", "status": "not-started"},
+                {"title": "Task B", "status": "completed"}
+            ]
+        }
+    ]
+}
+```
 
 * Multiple arrays: A document can have multiple fields that are arrays, each representing different hierarchical data, such as a list of phone numbers and a list of email addresses.
 
-    ```json
-    {
-        "id": "3",
-        "name": "Alice Johnson",
-        "phones": [
-            {"type": "mobile", "number": "555-1234"},
-            {"type": "home", "number": "555-5678"}
-        ],
-        "emails": [
-            {"type": "personal", "address": "alice@example.com"},
-            {"type": "work", "address": "alice@work.com"}
-        ]
-    }
-    ```
+```json
+{
+    "id": "3",
+    "name": "Alice Johnson",
+    "phones": [
+        {"type": "mobile", "number": "555-1234"},
+        {"type": "home", "number": "555-5678"}
+    ],
+    "emails": [
+        {"type": "personal", "address": "alice@example.com"},
+        {"type": "work", "address": "alice@work.com"}
+    ]
+}
+```
 
 * Hybrid arrays: Multi-level and multiple arrays can be combined within the same document to represent complex hierarchical data structures, such as a company with multiple departments, each having its own list of employees and projects.
 
-    ```json
-    {
-        "id": "doc1",
-        "company": {
-            "id": "c1",
-            "name": "TechCorp",
-            "departments": [
-                {
-                    "name": "Engineering",
-                    "budget": 2000000,
-                    "employees": [
-                        {"name": "Alice", "role": "Engineer"},
-                        {"name": "Bob", "role": "Manager"}
-                    ],
-                    "projects": [
-                        {"title": "Project X", "status": "ongoing"},
-                        {"title": "Project Y", "status": "completed"}
-                    ]
-                },
-                {
-                    "name": "Sales",
-                    "budget": 300000,
-                    "employees": [
-                        {"name": "Eve", "role": "Salesperson"},
-                        {"name": "Mallory", "role": "Manager"}
-                    ],
-                    "projects": [
-                        {"title": "Project A", "status": "completed"},
-                        {"title": "Project B", "status": "ongoing"}
-                    ]
-                }
-            ],
-            "locations": [
-                {"city": "Athens","country": "Greece"},
-                {"city": "Berlin","country": "USA"}
-            ]
-        }
+```json
+{
+    "id": "doc1",
+    "company": {
+        "id": "c1",
+        "name": "TechCorp",
+        "departments": [
+            {
+                "name": "Engineering",
+                "budget": 2000000,
+                "employees": [
+                    {"name": "Alice", "role": "Engineer"},
+                    {"name": "Bob", "role": "Manager"}
+                ],
+                "projects": [
+                    {"title": "Project X", "status": "ongoing"},
+                    {"title": "Project Y", "status": "completed"}
+                ]
+            },
+            {
+                "name": "Sales",
+                "budget": 300000,
+                "employees": [
+                    {"name": "Eve", "role": "Salesperson"},
+                    {"name": "Mallory", "role": "Manager"}
+                ],
+                "projects": [
+                    {"title": "Project A", "status": "completed"},
+                    {"title": "Project B", "status": "ongoing"}
+                ]
+            }
+        ],
+        "locations": [
+            {"city": "Athens","country": "Greece"},
+            {"city": "Berlin","country": "USA"}
+        ]
     }
-    ```
+}
+```
 
 * Earlier versions of Bleve only supported flat arrays of primitive types (e.g., strings, numbers), and would flatten nested structures, losing the hierarchical relationships, so the above complex documents could not be accurately represented or queried. For example, the "employees" and "projects" fields within each department would be flattened, making it impossible to associate employees with their respective departments.
 
@@ -119,32 +119,32 @@
 
 * The addition of `nested` document mappings enable defining fields that contain arrays of objects, giving the option to preserve the hierarchical relationships within the array during indexing. Having `nested` as false (default) will flatten the objects within the array, losing the hierarchy, which was the earlier behavior.
 
-    ```json
-    {
-        "departments": {  
-            "dynamic": false,
-            "enabled": true,
-            "nested": true,
-            "properties": {
-                "employees": {
-                    "dynamic": false,
-                    "enabled": true,
-                    "nested": true 
-                },
-                "projects": {
-                    "dynamic": false,
-                    "enabled": true,
-                    "nested": true
-                }
+```json
+{
+    "departments": {  
+        "dynamic": false,
+        "enabled": true,
+        "nested": true,
+        "properties": {
+            "employees": {
+                "dynamic": false,
+                "enabled": true,
+                "nested": true 
+            },
+            "projects": {
+                "dynamic": false,
+                "enabled": true,
+                "nested": true
             }
-        },
-        "locations": {
-            "dynamic": false,
-            "enabled": true,
-            "nested": true
         }
+    },
+    "locations": {
+        "dynamic": false,
+        "enabled": true,
+        "nested": true
     }
-   ```
+}
+```
 
 * Any Bleve query (e.g., match, phrase, term, fuzzy, numeric/date range etc.) can be executed against fields within nested documents, with no special handling required. The query processor will automatically traverse the nested structures to find matches. Additional search constructs
 like vector search, synonym search, hybrid and pre-filtered vector search integrate seamlessly with hierarchy search.
