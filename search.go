@@ -141,21 +141,6 @@ type numericRange struct {
 	Max  *float64 `json:"max,omitempty"`
 }
 
-// CollapseRequest describes field collapsing for search results.
-// Collapses search results based on a field value, returning only
-// the top-scoring document per unique field value.
-// Similar to Elasticsearch's collapse feature.
-type CollapseRequest struct {
-	Field string `json:"field"`
-}
-
-// NewCollapseRequest creates a new collapse request for the specified field.
-func NewCollapseRequest(field string) *CollapseRequest {
-	return &CollapseRequest{
-		Field: field,
-	}
-}
-
 // A FacetRequest describes a facet or aggregation
 // of the result document set you would like to be
 // built.

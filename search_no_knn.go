@@ -64,7 +64,7 @@ type SearchRequest struct {
 	Score            string            `json:"score,omitempty"`
 	SearchAfter      []string          `json:"search_after"`
 	SearchBefore     []string          `json:"search_before"`
-	Collapse         *CollapseRequest  `json:"collapse,omitempty"`
+	Collapse         *search.CollapseRequest  `json:"collapse,omitempty"`
 
 	// PreSearchData will be a  map that will be used
 	// in the second phase of any 2-phase search, to provide additional
@@ -96,12 +96,12 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Explain          bool              `json:"explain"`
 		Sort             []json.RawMessage `json:"sort"`
 		IncludeLocations bool              `json:"includeLocations"`
-		Score            string            `json:"score"`
-		SearchAfter      []string          `json:"search_after"`
-		SearchBefore     []string          `json:"search_before"`
-		Collapse         *CollapseRequest  `json:"collapse"`
-		PreSearchData    json.RawMessage   `json:"pre_search_data"`
-		Params           json.RawMessage   `json:"params"`
+		Score            string                    `json:"score"`
+		SearchAfter      []string                  `json:"search_after"`
+		SearchBefore     []string                  `json:"search_before"`
+		Collapse         *search.CollapseRequest  `json:"collapse"`
+		PreSearchData    json.RawMessage           `json:"pre_search_data"`
+		Params           json.RawMessage           `json:"params"`
 	}
 
 	err := json.Unmarshal(input, &temp)

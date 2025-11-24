@@ -51,7 +51,7 @@ type SearchRequest struct {
 	Score            string            `json:"score,omitempty"`
 	SearchAfter      []string          `json:"search_after"`
 	SearchBefore     []string          `json:"search_before"`
-	Collapse         *CollapseRequest  `json:"collapse,omitempty"`
+	Collapse         *search.CollapseRequest  `json:"collapse,omitempty"`
 
 	KNN         []*KNNRequest `json:"knn"`
 	KNNOperator knnOperator   `json:"knn_operator"`
