@@ -99,7 +99,7 @@ func (r *rescorer) rescore(ftsHits, knnHits search.DocumentMatchCollection) (sea
 
 	switch r.req.Score {
 	case ScoreRRF:
-		res := fusion.ReciprocalRankFusion(
+		fusionResult = fusion.ReciprocalRankFusion(
 			mergedHits,
 			r.origBoosts,
 			r.req.Params.ScoreRankConstant,
@@ -107,16 +107,14 @@ func (r *rescorer) rescore(ftsHits, knnHits search.DocumentMatchCollection) (sea
 			numKNNQueries(r.req),
 			r.req.Explain,
 		)
-		fusionResult = &res
 	case ScoreRSF:
-		res := fusion.RelativeScoreFusion(
+		fusionResult = fusion.RelativeScoreFusion(
 			mergedHits,
 			r.origBoosts,
 			r.req.Params.ScoreWindowSize,
 			numKNNQueries(r.req),
 			r.req.Explain,
 		)
-		fusionResult = &res
 	}
 
 	return fusionResult.Hits, fusionResult.Total, fusionResult.MaxScore
