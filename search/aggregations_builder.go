@@ -219,7 +219,7 @@ type AggregationResults map[string]*AggregationResult
 
 // Merge merges another set of aggregation results into this one
 // This is useful for combining results from multiple index shards
-// Note: avg merging is approximate without storing counts separately
+
 func (ar AggregationResults) Merge(other AggregationResults) {
 	for name, otherAggResult := range other {
 		aggResult, exists := ar[name]
