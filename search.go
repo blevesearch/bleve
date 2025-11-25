@@ -656,6 +656,7 @@ func (ss *SearchStatus) Merge(other *SearchStatus) {
 // MaxScore - The maximum score seen across all document hits seen for this query.
 // Took - The time taken to execute the search.
 // Facets - The facet results for the search.
+// Aggregations - The aggregation results for the search.
 type SearchResult struct {
 	Status       *SearchStatus                  `json:"status"`
 	Request      *SearchRequest                 `json:"request,omitempty"`
@@ -757,7 +758,7 @@ func (sr *SearchResult) Merge(other *SearchResult) {
 	// Merge aggregations
 	if sr.Aggregations == nil && len(other.Aggregations) != 0 {
 		sr.Aggregations = other.Aggregations
-	} else {
+	} else if len(other.Aggregations) != 0 {
 		sr.Aggregations.Merge(other.Aggregations)
 	}
 }

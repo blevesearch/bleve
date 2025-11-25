@@ -201,7 +201,7 @@ type AggregationResults map[string]*AggregationResult
 // Metric aggregations
 sum := results.Aggregations["total"].Value.(float64)
 count := results.Aggregations["count"].Value.(int64)
-stats := results.Aggregations["stats"].Value.(*aggregation.StatsResult)
+stats := results.Aggregations["stats"].Value.(*search.StatsResult)
 
 // Bucket aggregations
 for _, bucket := range results.Aggregations["by_brand"].Buckets {
@@ -242,7 +242,7 @@ Merge behavior by type:
 - **sum, sumsquares, count**: Values are added
 - **min**: Minimum of minimums
 - **max**: Maximum of maximums
-- **avg**: Approximate average (limitation: requires counts for exact merging)
+- **avg**: Exact weighted average (merges counts and sums, then recalculates)
 - **stats**: Component values merged, derived values recalculated
 - **Bucket aggregations**: Bucket counts summed, sub-aggregations merged recursively
 
@@ -364,14 +364,11 @@ Aggregations process documents from multiple segments concurrently. The `TopNCol
 
 ## Limitations
 
-1. **Average merging**: Merging averages from shards is approximate without storing counts
-2. **Cardinality**: Not yet implemented (planned: HyperLogLog-based)
-3. **Date range aggregations**: Not yet implemented
-4. **Pipeline aggregations**: Not yet implemented (e.g., moving average, derivative)
+1. **Cardinality**: Not yet implemented (planned: HyperLogLog-based)
+2. **Date range aggregations**: Not yet implemented
+3. **Pipeline aggregations**: Not yet implemented (e.g., moving average, derivative)
 
 ## Future Enhancements
-
-- Exact average merging (requires storing counts with averages)
 - Cardinality aggregation using HyperLogLog
 - Date histogram aggregations
 - Pipeline aggregations for time-series analysis
