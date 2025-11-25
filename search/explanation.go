@@ -70,6 +70,9 @@ func MergeExpl(first, second *Explanation) *Explanation {
 	if second == nil {
 		return first
 	}
+	if first == second {
+		return first
+	}
 	if first.Message == MergedExplMessage {
 		// reuse first explanation as the merged one
 		first.Value += second.Value

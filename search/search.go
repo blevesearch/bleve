@@ -492,6 +492,23 @@ type NestedDocumentMatch struct {
 	Fragments FieldFragmentMap       `json:"fragments,omitempty"`
 }
 
+func (ndm *NestedDocumentMatch) String() string {
+	rv := "\n"
+	for fragmentField, fragments := range ndm.Fragments {
+		rv += fmt.Sprintf("\t%s\n", fragmentField)
+		for _, fragment := range fragments {
+			rv += fmt.Sprintf("\t\t%s\n", fragment)
+		}
+	}
+	for otherFieldName, otherFieldValue := range ndm.Fields {
+		if _, ok := ndm.Fragments[otherFieldName]; !ok {
+			rv += fmt.Sprintf("\t%s\n", otherFieldName)
+			rv += fmt.Sprintf("\t\t%v\n", otherFieldValue)
+		}
+	}
+	return rv
+}
+
 // NewNestedDocumentMatch creates a new NestedDocumentMatch instance
 // with the given fields and fragments
 func NewNestedDocumentMatch(fields map[string]interface{}, fragments FieldFragmentMap) *NestedDocumentMatch {
