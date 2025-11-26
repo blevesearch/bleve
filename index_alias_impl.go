@@ -110,14 +110,13 @@ func (i *indexAliasImpl) Train(batch *Batch) error {
 	if !i.open {
 		return ErrorIndexClosed
 	}
-
 	err := i.isAliasToSingleIndex()
 	if err != nil {
 		return err
 	}
 
-	if vi, ok := i.indexes[0].(VectorIndex); ok {
-		return vi.Train(batch)
+	if vi, ok := i.indexes[0].(index.VectorIndex); ok {
+		return vi.Train(batch.internal)
 	}
 	return fmt.Errorf("not a vector index")
 }
