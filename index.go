@@ -353,6 +353,11 @@ type IndexCopyable interface {
 	CopyTo(d index.Directory) error
 }
 
+type IndexFileCopyable interface {
+	UpdateFileInBolt(key []byte, value []byte) error
+	CopyFile(file string, d index.IndexDirectory) error
+}
+
 // FileSystemDirectory is the default implementation for the
 // index.Directory interface.
 type FileSystemDirectory string

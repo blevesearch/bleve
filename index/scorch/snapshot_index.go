@@ -467,6 +467,10 @@ func (is *IndexSnapshot) Fields() ([]string, error) {
 }
 
 func (is *IndexSnapshot) GetInternal(key []byte) ([]byte, error) {
+	_, ok := is.internal[string(key)]
+	if !ok {
+		return is.parent.getInternal(key)
+	}
 	return is.internal[string(key)], nil
 }
 

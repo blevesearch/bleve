@@ -377,8 +377,8 @@ func (i *indexImpl) Train(batch *Batch) error {
 		return ErrorIndexClosed
 	}
 
-	if vi, ok := i.i.(VectorIndex); ok {
-		return vi.Train(batch)
+	if vi, ok := i.i.(index.VectorIndex); ok {
+		return vi.Train(batch.internal)
 	}
 	return fmt.Errorf("not a vector index")
 }
@@ -1430,6 +1430,38 @@ func (m *searchHitSorter) Less(i, j int) bool {
 	return c < 0
 }
 
+func (i *indexImpl) CopyFile(file string, d index.IndexDirectory) (err error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	copyIndex, ok := i.i.(index.IndexFileCopyable)
+	if !ok {
+		return fmt.Errorf("index implementation does not support copy reader")
+	}
+
+	return copyIndex.CopyFile(file, d)
+}
+
+func (i *indexImpl) UpdateFileInBolt(key []byte, value []byte) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	copyIndex, ok := i.i.(index.IndexFileCopyable)
+	if !ok {
+		return fmt.Errorf("index implementation does not support file copy")
+	}
+
+	return copyIndex.UpdateFileInBolt(key, value)
+}
+
 // CopyTo (index.Directory, filter)
 func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 	i.mutex.RLock()
@@ -1459,7 +1491,7 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 
 	err = copyReader.CopyTo(d)
 	if err != nil {
-		return fmt.Errorf("error copying index metadata: %v", err)
+		return fmt.Errorf("error copying index data: %v", err)
 	}
 
 	// copy the metadata

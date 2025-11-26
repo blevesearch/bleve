@@ -575,11 +575,6 @@ func copyToDirectory(srcPath string, d index.Directory) (int64, error) {
 		return 0, fmt.Errorf("GetWriter err: %v", err)
 	}
 
-	// skip
-	if dest == nil {
-		return 0, nil
-	}
-
 	sourceFileStat, err := os.Stat(srcPath)
 	if err != nil {
 		return 0, err
@@ -858,10 +853,34 @@ func zapFileName(epoch uint64) string {
 	return fmt.Sprintf("%012x.zap", epoch)
 }
 
+func (s *Scorch) updateCentroidIndex(bucket *bolt.Bucket) error {
+	if bucket == nil {
+		return nil
+	}
+	segmentSnapshot, err := s.loadSegment(bucket)
+	if err != nil {
+		return err
+	}
+	s.rootLock.Lock()
+	defer s.rootLock.Unlock()
+
+	s.centroidIndex = segmentSnapshot
+	return nil
+}
+
 // bolt snapshot code
 
 func (s *Scorch) loadFromBolt() error {
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
+		centroidIndexBucket := tx.Bucket(util.BoltCentroidIndexKey)
+		if centroidIndexBucket == nil {
+			return nil
+		}
+		err := s.updateCentroidIndex(centroidIndexBucket)
+		if err != nil {
+			return err
+		}
+
 		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
