@@ -20,6 +20,7 @@ import (
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/geo"
 	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/bleve_index_api/vfs"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 
 	zapv11 "github.com/blevesearch/zapx/v11"
@@ -64,6 +65,45 @@ type SegmentPlugin interface {
 	// The number of bytes written to the new segment file.
 	// An error, if any occurred.
 	Merge(segments []segment.Segment, drops []*roaring.Bitmap, path string,
+		closeCh chan struct{}, s segment.StatsReporter) (
+		[][]uint64, uint64, error)
+}
+
+// SegmentPluginVFS extends SegmentPlugin with VFS-aware methods.
+// Plugins that implement this interface can work with the vfs.Directory
+// abstraction, enabling support for remote storage backends (S3, GCS, etc.)
+// in addition to local filesystem.
+//
+// The VFS-aware methods use relative file names instead of absolute paths,
+// and all I/O operations go through the vfs.Directory interface.
+//
+// Implementations should maintain backwards compatibility by continuing to
+// implement the base SegmentPlugin interface for legacy path-based operations.
+type SegmentPluginVFS interface {
+	SegmentPlugin
+
+	// OpenVFS attempts to open a segment file through the VFS directory
+	// and return the corresponding Segment.
+	// The name parameter is a relative filename (e.g., "000000000001.zap"),
+	// not an absolute path.
+	OpenVFS(dir vfs.Directory, name string) (segment.Segment, error)
+
+	// MergeVFS takes a set of Segments and creates a new segment through
+	// the VFS directory at the specified relative name.
+	// This is the VFS-aware version of Merge() that works with the
+	// vfs.Directory abstraction instead of filesystem paths.
+	//
+	// Parameters:
+	// - dir: The VFS directory to write the merged segment to
+	// - name: Relative filename for the new segment (e.g., "000000000001.zap")
+	// - segments: Input segments to merge
+	// - drops: Bitmaps indicating which documents to drop during merge
+	// - closeCh: Channel to signal merge cancellation
+	// - s: Optional stats reporter for merge progress
+	//
+	// Returns: Same as Merge() - document mappings, bytes written, and error
+	MergeVFS(dir vfs.Directory, name string,
+		segments []segment.Segment, drops []*roaring.Bitmap,
 		closeCh chan struct{}, s segment.StatsReporter) (
 		[][]uint64, uint64, error)
 }

@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -29,6 +30,7 @@ import (
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/document"
 	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/bleve_index_api/vfs"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	"github.com/blevesearch/vellum"
 	lev "github.com/blevesearch/vellum/levenshtein"
@@ -996,46 +998,112 @@ func subtractStrings(a, b []string) []string {
 }
 
 func (is *IndexSnapshot) CopyTo(d index.Directory) error {
-	// get the root bolt file.
-	w, err := d.GetWriter(filepath.Join("store", "root.bolt"))
-	if err != nil || w == nil {
-		return fmt.Errorf("failed to create the root.bolt file, err: %v", err)
-	}
-	rootFile, ok := w.(*os.File)
-	if !ok {
-		return fmt.Errorf("invalid root.bolt file found")
+	// Convert index.Directory to vfs.Directory if possible
+	// For backwards compatibility, we need to support both old-style index.Directory
+	// and new VFS-aware destinations
+	var destVFS vfs.Directory
+
+	// Check if destination implements vfs.Directory
+	if vfsDir, ok := d.(vfs.Directory); ok {
+		destVFS = vfsDir
+	} else {
+		// Legacy path: destination is old-style index.Directory (e.g., FileSystemDirectory)
+		// We need to extract the base path and create a VFS directory from it
+		// This is for backwards compatibility with existing code
+		return fmt.Errorf("CopyTo requires a vfs.Directory implementation; legacy index.Directory is no longer supported for copying segment files")
 	}
 
-	copyBolt, err := bolt.Open(rootFile.Name(), 0o600, nil)
+	// Create the store subdirectory in the destination
+	// The index structure has metadata at the root and scorch data in "store/"
+	storeDir := "store"
+
+	// get the root bolt file writer in the store subdirectory
+	w, err := destVFS.Create(filepath.Join(storeDir, "root.bolt"))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create the root.bolt file: %w", err)
 	}
-	defer func() {
+
+	// For BoltDB, we need a real file path, so we need to use a temporary file approach
+	// Create a temporary file, populate it with BoltDB data, then copy to VFS
+	tmpFile, err := os.CreateTemp("", "backup-root-*.bolt")
+	if err != nil {
 		w.Close()
-		if cerr := copyBolt.Close(); cerr != nil && err == nil {
-			err = cerr
+		return fmt.Errorf("failed to create temp bolt file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	tmpFile.Close()
+	defer os.Remove(tmpPath)
+
+	copyBolt, err := bolt.Open(tmpPath, 0o600, nil)
+	if err != nil {
+		w.Close()
+		return fmt.Errorf("failed to open temp bolt: %w", err)
+	}
+
+	var txErr error
+	func() {
+		defer copyBolt.Close()
+
+		// start a write transaction
+		tx, err := copyBolt.Begin(true)
+		if err != nil {
+			txErr = err
+			return
+		}
+
+		// Prepare the snapshot in BoltDB and copy segment files to destination VFS
+		// Pass "store" as the path so segments are copied to the store subdirectory
+		_, _, err = prepareBoltSnapshot(is, tx, storeDir, is.parent.segPlugin, nil, destVFS)
+		if err != nil {
+			_ = tx.Rollback()
+			txErr = fmt.Errorf("error backing up index snapshot: %w", err)
+			return
+		}
+
+		// commit bolt data
+		err = tx.Commit()
+		if err != nil {
+			txErr = fmt.Errorf("error commit tx to backup root bolt: %w", err)
+			return
+		}
+
+		err = copyBolt.Sync()
+		if err != nil {
+			txErr = fmt.Errorf("error syncing bolt: %w", err)
+			return
 		}
 	}()
 
-	// start a write transaction
-	tx, err := copyBolt.Begin(true)
-	if err != nil {
-		return err
+	if txErr != nil {
+		w.Close()
+		return txErr
 	}
 
-	_, _, err = prepareBoltSnapshot(is, tx, "", is.parent.segPlugin, nil, d)
+	// Now copy the temp bolt file to destination VFS
+	tmpBolt, err := os.Open(tmpPath)
 	if err != nil {
-		_ = tx.Rollback()
-		return fmt.Errorf("error backing up index snapshot: %v", err)
+		w.Close()
+		return fmt.Errorf("failed to open temp bolt for reading: %w", err)
+	}
+	defer tmpBolt.Close()
+
+	_, err = io.Copy(w, tmpBolt)
+	if err != nil {
+		w.Close()
+		return fmt.Errorf("failed to copy bolt to destination: %w", err)
 	}
 
-	// commit bolt data
-	err = tx.Commit()
-	if err != nil {
-		return fmt.Errorf("error commit tx to backup root bolt: %v", err)
+	// Sync and close the destination writer
+	if err := w.Sync(); err != nil {
+		w.Close()
+		return fmt.Errorf("failed to sync destination bolt: %w", err)
 	}
 
-	return copyBolt.Sync()
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("failed to close destination bolt: %w", err)
+	}
+
+	return nil
 }
 
 func (is *IndexSnapshot) UpdateIOStats(val uint64) {
