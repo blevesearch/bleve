@@ -15,8 +15,6 @@
 package collector
 
 import (
-	"fmt"
-
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -24,67 +22,71 @@ import (
 type collectStoreNested struct {
 	nr index.NestedReader
 
-	interim map[uint64]*search.DocumentMatch
+	// the current root document match being built
+	currRoot *search.DocumentMatch
 }
 
 func newStoreNested(nr index.NestedReader) *collectStoreNested {
 	rv := &collectStoreNested{
-		interim: make(map[uint64]*search.DocumentMatch),
-		nr:      nr,
+		nr: nr,
 	}
 	return rv
 }
-func (c *collectStoreNested) AddDocument(doc *search.DocumentMatch) (*search.DocumentMatch, error) {
+
+// ProcessNestedDocument adds a document to the nested store, merging it into its root document
+// as needed. If the returned DocumentMatch is nil, the incoming doc has been merged
+// into its parent and should not be processed further. If the returned DocumentMatch
+// is non-nil, it represents a complete root document that should be processed further.
+// NOTE: This implementation assumes that documents are added in increasing order of their internal IDs
+// which is guaranteed by all searchers in bleve.
+func (c *collectStoreNested) ProcessNestedDocument(ctx *search.SearchContext, doc *search.DocumentMatch) (*search.DocumentMatch, error) {
 	// find ancestors for the doc
 	ancestors, err := c.nr.Ancestors(doc.IndexInternalID)
-	if err != nil || len(ancestors) == 0 {
-		return nil, fmt.Errorf("error getting ancestors for doc %v: %v", doc.IndexInternalID, err)
-	}
-	// root docID is the last ancestor
-	rootID := ancestors[len(ancestors)-1]
-	rootIDVal, err := rootID.Value()
 	if err != nil {
 		return nil, err
 	}
-	// lookup existing root
-	rootDocument, ok := c.interim[rootIDVal]
-	if !ok {
-		// no interim root yet
-		if len(ancestors) == 1 {
-			// incoming doc is the root itself
-			c.interim[rootIDVal] = doc
-			return nil, nil
-		}
-
-		// create new interim root and merge child into it
-		rootDocument = &search.DocumentMatch{IndexInternalID: rootID}
-		if err := rootDocument.MergeWith(doc); err != nil {
+	if len(ancestors) == 0 {
+		// should not happen, every doc should have at least itself as ancestor
+		return nil, nil
+	}
+	// root docID is the last ancestor
+	rootID := ancestors[len(ancestors)-1]
+	// check if there is an interim root already and if the incoming doc belongs to it
+	if c.currRoot != nil && c.currRoot.IndexInternalID.Equals(rootID) {
+		// there is an interim root already, and the incoming doc belongs to it
+		if err := c.currRoot.MergeWith(doc); err != nil {
 			return nil, err
 		}
-		c.interim[rootIDVal] = rootDocument
-
-		// return the child for recycling
-		return doc, nil
+		// recycle the child document now that it's merged into the interim root
+		ctx.DocumentMatchPool.Put(doc)
+		return nil, nil
 	}
-
-	// merge child into existing root
-	if err := rootDocument.MergeWith(doc); err != nil {
+	// completedRoot is the root document match to return, if any
+	var completedRoot *search.DocumentMatch
+	if c.currRoot != nil {
+		// we have an existing interim root, return it for processing
+		completedRoot = c.currRoot
+		// clear current root
+		c.currRoot = nil
+	}
+	// no interim root for now so either we have a root document incoming
+	// or we have a child doc and need to create an interim root
+	if len(ancestors) == 1 {
+		// incoming doc is the root itself
+		c.currRoot = doc
+		return completedRoot, nil
+	}
+	// this is a child doc, create interim root
+	c.currRoot = &search.DocumentMatch{IndexInternalID: rootID}
+	if err := c.currRoot.MergeWith(doc); err != nil {
 		return nil, err
 	}
-	return doc, nil
+	// recycle the child document now that it's merged into the interim root
+	ctx.DocumentMatchPool.Put(doc)
+	return completedRoot, nil
 }
 
-// NestedDocumentVisitor is the callback invoked for each root document.
-// root is the merged root DocumentMatch.
-type NestedDocumentVisitor func(root *search.DocumentMatch) error
-
-// VisitRoots walks over all collected interim values and calls the visitor.
-func (c *collectStoreNested) VisitRoots(visitor NestedDocumentVisitor) error {
-	for _, root := range c.interim {
-		// invoke the visitor
-		if err := visitor(root); err != nil {
-			return err
-		}
-	}
-	return nil
+// CurrentRoot returns the current interim root document match being built, if any
+func (c *collectStoreNested) CurrentRoot() *search.DocumentMatch {
+	return c.currRoot
 }

@@ -311,8 +311,13 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	default:
 		next, err = searcher.Next(searchContext)
 	}
+	// use a local totalDocs for counting total docs seen
+	// for context deadline checking, as hc.total is only
+	// incremented for actual(root) collected documents, and
+	// we need to check deadline for every document seen (root or nested)
+	var totalDocs uint64
 	for err == nil && next != nil {
-		if hc.total%CheckDoneEvery == 0 {
+		if totalDocs%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
 				search.RecordSearchCost(ctx, search.AbortM, 0)
@@ -320,16 +325,19 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			default:
 			}
 		}
-
+		totalDocs++
 		if hc.nestedStore != nil {
-			hc.total++
-			doc, err := hc.nestedStore.AddDocument(next)
+			// This may be a nested document — add it to the nested store first.
+			// If the nested store returns nil, the document was merged into its parent
+			// and should not be processed further.
+			// If it returns a non-nil document, it represents a complete root document
+			// and should be processed further.
+			next, err = hc.nestedStore.ProcessNestedDocument(searchContext, next)
 			if err != nil {
-				return err
+				break
 			}
-			// recycle
-			searchContext.DocumentMatchPool.Put(doc)
-		} else {
+		}
+		if next != nil {
 			err = hc.adjustDocumentMatch(searchContext, reader, next)
 			if err != nil {
 				break
@@ -344,7 +352,6 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			if err != nil {
 				break
 			}
-
 		}
 		next, err = searcher.Next(searchContext)
 	}
@@ -352,25 +359,26 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		return err
 	}
 
+	// if we have a nested store, we may have an interim root
+	// that needs to be returned for processing
 	if hc.nestedStore != nil {
-		var count uint64
-		err := hc.nestedStore.VisitRoots(func(doc *search.DocumentMatch) error {
-			if err := hc.adjustDocumentMatch(searchContext, reader, doc); err != nil {
+		currRoot := hc.nestedStore.CurrentRoot()
+		if currRoot != nil {
+			err = hc.adjustDocumentMatch(searchContext, reader, currRoot)
+			if err != nil {
 				return err
 			}
-			if err := hc.prepareDocumentMatch(searchContext, reader, doc, false); err != nil {
+			// no descendants at this point
+			err = hc.prepareDocumentMatch(searchContext, reader, currRoot, false)
+			if err != nil {
 				return err
 			}
-			if err := dmHandler(doc); err != nil {
+
+			err = dmHandler(currRoot)
+			if err != nil {
 				return err
 			}
-			count++
-			return nil
-		})
-		if err != nil {
-			return err
 		}
-		hc.total = count
 	}
 
 	if hc.knnHits != nil {

@@ -112,8 +112,9 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 	default:
 		next, err = searcher.Next(searchContext)
 	}
+	var totalDocs uint64
 	for err == nil && next != nil {
-		if ec.total%CheckDoneEvery == 0 {
+		if totalDocs%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
 				search.RecordSearchCost(ctx, search.AbortM, 0)
@@ -121,20 +122,20 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 			default:
 			}
 		}
-		ec.total++
+		totalDocs++
 
 		if ec.nestedStore != nil {
-			doc, err := ec.nestedStore.AddDocument(next)
+			next, err = ec.nestedStore.ProcessNestedDocument(searchContext, next)
 			if err != nil {
-				return err
+				break
 			}
-			// recycle
-			searchContext.DocumentMatchPool.Put(doc)
-		} else {
+		}
+		if next != nil {
 			err = dmHandler(next)
 			if err != nil {
 				break
 			}
+			ec.total++
 		}
 
 		next, err = searcher.Next(searchContext)
@@ -143,20 +144,16 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 		return err
 	}
 
+	// if we have a nested store, we may have an interim root
 	if ec.nestedStore != nil {
-		var count uint64
-		err := ec.nestedStore.VisitRoots(func(doc *search.DocumentMatch) error {
-			// process the root document
-			if err := dmHandler(doc); err != nil {
+		currRoot := ec.nestedStore.CurrentRoot()
+		if currRoot != nil {
+			err = dmHandler(currRoot)
+			if err != nil {
 				return err
 			}
-			count++
-			return nil
-		})
-		if err != nil {
-			return err
+			ec.total++
 		}
-		ec.total = count
 	}
 
 	// help finalize/flush the results in case

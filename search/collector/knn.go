@@ -192,8 +192,10 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 	default:
 		next, err = searcher.Next(searchContext)
 	}
+
+	var totalDocs uint64
 	for err == nil && next != nil {
-		if hc.total%CheckDoneEvery == 0 {
+		if totalDocs%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
 				search.RecordSearchCost(ctx, search.AbortM, 0)
@@ -201,41 +203,40 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 			default:
 			}
 		}
-		hc.total++
+		totalDocs++
 
 		if hc.nestedStore != nil {
-			doc, err := hc.nestedStore.AddDocument(next)
-			if err != nil {
-				return err
-			}
-			searchContext.DocumentMatchPool.Put(doc)
-		} else {
-			err = dmHandler(next)
+			next, err = hc.nestedStore.ProcessNestedDocument(searchContext, next)
 			if err != nil {
 				break
 			}
 		}
-
+		if next != nil {
+			err = dmHandler(next)
+			if err != nil {
+				break
+			}
+			// increment total only for actual(root) collected documents
+			hc.total++
+		}
 		next, err = searcher.Next(searchContext)
 	}
 	if err != nil {
 		return err
 	}
 
+	// if we have a nested store, we may have an interim root
+	// that needs to be finalized now
 	if hc.nestedStore != nil {
-		var count uint64
-		err := hc.nestedStore.VisitRoots(func(doc *search.DocumentMatch) error {
-			// process the root document
-			if err := dmHandler(doc); err != nil {
+		currRoot := hc.nestedStore.CurrentRoot()
+		if currRoot != nil {
+			// process the interim root now
+			err = dmHandler(currRoot)
+			if err != nil {
 				return err
 			}
-			count++
-			return nil
-		})
-		if err != nil {
-			return err
+			hc.total++
 		}
-		hc.total = count
 	}
 
 	// help finalize/flush the results in case
