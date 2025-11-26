@@ -325,7 +325,10 @@ func (cq *CoalesceQueue) Enqueue(it *search.DocumentMatch) (*search.DocumentMatc
 
 	if existing, ok := cq.items[val]; ok {
 		// merge with current version
-		existing.MergeWith(it)
+		existing.Score += it.Score
+		existing.Expl = existing.Expl.MergeWith(it.Expl)
+		existing.FieldTermLocations = search.MergeFieldTermLocations(
+			existing.FieldTermLocations, []*search.DocumentMatch{it})
 		// return it to caller for recycling
 		return it, nil
 	}

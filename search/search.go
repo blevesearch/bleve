@@ -180,7 +180,7 @@ type DocumentMatch struct {
 	IndexNames []string `json:"index_names,omitempty"`
 
 	// Children holds any descendant/child matches that contributed
-	// to this root (or intermediate LCA) DocumentMatch.
+	// to this root DocumentMatch.
 	Children DescendantStore `json:"-"`
 }
 
@@ -231,6 +231,12 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	for i := range ftls { // recycle the ArrayPositions of each location
 		ftls[i].Location.ArrayPositions = ftls[i].Location.ArrayPositions[:0]
 	}
+	// remember the Children backing map
+	children := dm.Children
+	// reset to empty map for Children
+	for k := range children {
+		delete(children, k)
+	}
 	// idiom to copy over from empty DocumentMatch (0 allocations)
 	*dm = DocumentMatch{}
 	// reuse the []byte already allocated (and reset len to 0)
@@ -240,6 +246,8 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	dm.DecodedSort = dm.DecodedSort[:0]
 	// reuse the FieldTermLocations already allocated (and reset len to 0)
 	dm.FieldTermLocations = ftls[:0]
+	// reuse the descendant store if it exists
+	dm.Children = children
 	return dm
 }
 
@@ -370,28 +378,26 @@ func (dm *DocumentMatch) String() string {
 	return fmt.Sprintf("[%s-%f]", dm.ID, dm.Score)
 }
 
-func (dm *DocumentMatch) MergeWith(other *DocumentMatch) error {
-	// merge score
+// AddDescendant merges another DocumentMatch into this one as a descendant.
+func (dm *DocumentMatch) AddDescendant(other *DocumentMatch) error {
+	// add descendant score to parent score
 	dm.Score += other.Score
 	// merge explanations
-	dm.Expl = MergeExpl(dm.Expl, other.Expl)
+	dm.Expl = dm.Expl.MergeWith(other.Expl)
 	// merge field term locations
 	dm.FieldTermLocations = MergeFieldTermLocations(dm.FieldTermLocations, []*DocumentMatch{other})
 	// merge score breakdown
 	dm.ScoreBreakdown = MergeScoreBreakdown(dm.ScoreBreakdown, other.ScoreBreakdown)
-	// merge Descendants/Children
-	// if the base and other have the same ID, then we are merging the same
-	// document match (from different clauses), so we need to merge their children/descendants
+	// add other as descendant only if it is not the same document
 	if !dm.IndexInternalID.Equals(other.IndexInternalID) {
 		if dm.Children == nil {
-			dm.Children = make(DescendantStore)
+			dm.Children = NewDescendantStore()
 		}
 		err := dm.Children.AddDescendant(other.IndexInternalID)
 		if err != nil {
 			return err
 		}
 	}
-	dm.Children = MergeDescendants(dm.Children, other.Children)
 	return nil
 }
 
@@ -444,17 +450,8 @@ func (sc *SearchContext) Size() int {
 
 type DescendantStore map[uint64]index.IndexInternalID
 
-func MergeDescendants(first, second DescendantStore) DescendantStore {
-	if first == nil {
-		return second
-	}
-	if second == nil {
-		return first
-	}
-	for k, v := range second {
-		first[k] = v
-	}
-	return first
+func NewDescendantStore() DescendantStore {
+	return make(DescendantStore)
 }
 
 func (ds DescendantStore) AddDescendant(descendant index.IndexInternalID) error {

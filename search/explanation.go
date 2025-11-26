@@ -29,6 +29,8 @@ func init() {
 	reflectStaticSizeExplanation = int(reflect.TypeOf(e).Size())
 }
 
+const MergedExplMessage = "sum of merged explanations:"
+
 type Explanation struct {
 	Value        float64        `json:"value"`
 	Message      string         `json:"message"`
@@ -55,55 +57,49 @@ func (expl *Explanation) Size() int {
 	return sizeInBytes
 }
 
-const MergedExplMessage = "sum of merged explanations:"
-
 // MergeExpl merges two explanations into one.
 // If either explanation is nil, the other is returned.
 // If the first explanation is already a merged explanation,
 // the second explanation is appended to its children.
 // Otherwise, a new merged explanation is created
 // with the two explanations as its children.
-func MergeExpl(first, second *Explanation) *Explanation {
-	if first == nil {
-		return second
+func (expl *Explanation) MergeWith(other *Explanation) *Explanation {
+	if expl == nil {
+		return other
 	}
-	if second == nil {
-		return first
+	if other == nil || expl == other {
+		return expl
 	}
-	if first == second {
-		return first
+
+	newScore := expl.Value + other.Value
+
+	// if both are merged explanations, combine children
+	if expl.Message == MergedExplMessage && other.Message == MergedExplMessage {
+		expl.Value = newScore
+		expl.Children = append(expl.Children, other.Children...)
+		return expl
 	}
-	if first.Message == MergedExplMessage {
-		// reuse first explanation as the merged one
-		first.Value += second.Value
-		if second.Message == MergedExplMessage {
-			// append all children from second to first
-			first.Children = append(first.Children, second.Children...)
-		} else {
-			// append second as a child to first
-			first.Children = append(first.Children, second)
-		}
-		return first
+
+	// atleast one is not a merged explanation see which one it is
+	// if expl is merged, append other
+	if expl.Message == MergedExplMessage {
+		// append other as a child to first
+		expl.Value = newScore
+		expl.Children = append(expl.Children, other)
+		return expl
+	}
+
+	// if other is merged, append expl
+	if other.Message == MergedExplMessage {
+		other.Value = newScore
+		other.Children = append(other.Children, expl)
+		return other
 	}
 	// create a new explanation to hold the merged one
 	rv := &Explanation{
-		Value:    first.Value + second.Value,
+		Value:    expl.Value + other.Value,
 		Message:  MergedExplMessage,
-		Children: []*Explanation{first, second},
+		Children: []*Explanation{expl, other},
 	}
 	return rv
-}
-
-func MergeScoreBreakdown(first, second map[int]float64) map[int]float64 {
-	if first == nil {
-		return second
-	}
-	if second == nil {
-		return first
-	}
-	// reuse first to store the union of both
-	for k, v := range second {
-		first[k] += v
-	}
-	return first
 }

@@ -57,7 +57,7 @@ func (c *collectStoreNested) ProcessNestedDocument(ctx *search.SearchContext, do
 	// check if there is an interim root already and if the incoming doc belongs to it
 	if c.currRoot != nil && c.currRootAncestorID.Equals(rootID) {
 		// there is an interim root already, and the incoming doc belongs to it
-		if err := c.currRoot.MergeWith(doc); err != nil {
+		if err := c.currRoot.AddDescendant(doc); err != nil {
 			return nil, err
 		}
 		// recycle the child document now that it's merged into the interim root
@@ -79,9 +79,12 @@ func (c *collectStoreNested) ProcessNestedDocument(ctx *search.SearchContext, do
 		return completedRoot, nil
 	}
 	// this is a child doc, create interim root
-	c.currRoot = &search.DocumentMatch{IndexInternalID: rootID.ToIndexInternalID()}
+	newDM := ctx.DocumentMatchPool.Get()
+	newDM.IndexInternalID = rootID.ToIndexInternalID()
+	// merge the incoming doc into the new interim root
+	c.currRoot = newDM
 	c.currRootAncestorID = rootID
-	if err := c.currRoot.MergeWith(doc); err != nil {
+	if err := c.currRoot.AddDescendant(doc); err != nil {
 		return nil, err
 	}
 	// recycle the child document now that it's merged into the interim root

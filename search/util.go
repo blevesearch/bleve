@@ -74,6 +74,21 @@ func MergeFieldTermLocations(dest []FieldTermLocation, matches []*DocumentMatch)
 	return dest
 }
 
+// MergeScoreBreakdown merges two score breakdown maps together
+func MergeScoreBreakdown(first, second map[int]float64) map[int]float64 {
+	if first == nil {
+		return second
+	}
+	if second == nil {
+		return first
+	}
+	// reuse first to store the union of both
+	for k, v := range second {
+		first[k] += v
+	}
+	return first
+}
+
 type SearchIOStatsCallbackFunc func(uint64)
 
 // Implementation of SearchIncrementalCostCallbackFn should handle the following messages
