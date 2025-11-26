@@ -228,7 +228,7 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	dm.DecodedSort = dm.DecodedSort[:0]
 	// reuse the FieldTermLocations already allocated (and reset len to 0)
 	dm.FieldTermLocations = ftls[:0]
-	// reuse the score breakdown map already allocated (and reset len to 0)
+	// reuse the score breakdown map already allocated (after clearing its entries)
 	dm.ScoreBreakdown = scoreBreakdown
 	return dm
 }
