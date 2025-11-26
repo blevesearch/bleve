@@ -353,6 +353,11 @@ type IndexCopyable interface {
 	CopyTo(d index.Directory) error
 }
 
+type IndexFileCopyable interface {
+	UpdateFileInBolt(key []byte, value []byte) error
+	CopyFile(file string, d index.IndexDirectory) error
+}
+
 // FileSystemDirectory is the default implementation for the
 // index.Directory interface.
 type FileSystemDirectory string
@@ -395,4 +400,8 @@ type InsightsIndex interface {
 	TermFrequencies(field string, limit int, descending bool) ([]index.TermFreq, error)
 	// CentroidCardinalities returns the centroids (clusters) from IVF indexes ordered by data density.
 	CentroidCardinalities(field string, limit int, desceding bool) ([]index.CentroidCardinality, error)
+}
+type VectorIndex interface {
+	Index
+	Train(*Batch) error
 }

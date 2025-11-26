@@ -793,7 +793,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot, exclude map[uint
 			}
 		}()
 		for segmentID, path := range newSegmentPaths {
-			newSegments[segmentID], err = s.segPlugin.Open(path)
+			newSegments[segmentID], err = s.segPlugin.OpenEx(path, s.segmentConfig)
 			if err != nil {
 				return fmt.Errorf("error opening new segment at %s, %v", path, err)
 			}
@@ -842,10 +842,34 @@ func zapFileName(epoch uint64) string {
 	return fmt.Sprintf("%012x.zap", epoch)
 }
 
+func (s *Scorch) updateCentroidIndex(bucket *bolt.Bucket) error {
+	if bucket == nil {
+		return nil
+	}
+	segmentSnapshot, err := s.loadSegment(bucket)
+	if err != nil {
+		return err
+	}
+	s.rootLock.Lock()
+	defer s.rootLock.Unlock()
+
+	s.centroidIndex = segmentSnapshot
+	return nil
+}
+
 // bolt snapshot code
 
 func (s *Scorch) loadFromBolt() error {
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
+		centroidIndexBucket := tx.Bucket(util.BoltCentroidIndexKey)
+		if centroidIndexBucket == nil {
+			return nil
+		}
+		err := s.updateCentroidIndex(centroidIndexBucket)
+		if err != nil {
+			return err
+		}
+
 		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
@@ -1005,7 +1029,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		return nil, fmt.Errorf("segment path missing")
 	}
 	segmentPath := s.path + string(os.PathSeparator) + string(pathBytes)
-	seg, err := s.segPlugin.Open(segmentPath)
+	seg, err := s.segPlugin.OpenEx(segmentPath, s.segmentConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error opening bolt segment: %v", err)
 	}
