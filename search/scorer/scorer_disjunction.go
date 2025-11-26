@@ -88,7 +88,10 @@ func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 func (s *DisjunctionQueryScorer) ScoreAndExplBreakdown(ctx *search.SearchContext, constituents []*search.DocumentMatch,
 	matchingIdxs []int, originalPositions []int, countTotal int) *search.DocumentMatch {
 
-	scoreBreakdown := make(map[int]float64)
+	rv := constituents[0]
+	if rv.ScoreBreakdown == nil {
+		rv.ScoreBreakdown = make(map[int]float64, len(constituents))
+	}
 	var childrenExplanations []*search.Explanation
 	if s.options.Explain {
 		// since we want to notify which expl belongs to which matched searcher within the disjunction searcher
@@ -104,7 +107,7 @@ func (s *DisjunctionQueryScorer) ScoreAndExplBreakdown(ctx *search.SearchContext
 			// scorer used in disjunction heap searcher
 			index = matchingIdxs[i]
 		}
-		scoreBreakdown[index] = docMatch.Score
+		rv.ScoreBreakdown[index] = docMatch.Score
 		if s.options.Explain {
 			childrenExplanations[index] = docMatch.Expl
 		}
@@ -113,9 +116,6 @@ func (s *DisjunctionQueryScorer) ScoreAndExplBreakdown(ctx *search.SearchContext
 	if s.options.Explain {
 		explBreakdown = &search.Explanation{Children: childrenExplanations}
 	}
-
-	rv := constituents[0]
-	rv.ScoreBreakdown = scoreBreakdown
 	rv.Expl = explBreakdown
 	rv.FieldTermLocations = search.MergeFieldTermLocations(
 		rv.FieldTermLocations, constituents[1:])

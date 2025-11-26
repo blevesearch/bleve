@@ -212,15 +212,24 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	for i := range ftls { // recycle the ArrayPositions of each location
 		ftls[i].Location.ArrayPositions = ftls[i].Location.ArrayPositions[:0]
 	}
+	// remember the score breakdown map
+	scoreBreakdown := dm.ScoreBreakdown
+	// clear out the score breakdown map
+	for k := range scoreBreakdown {
+		delete(scoreBreakdown, k)
+	}
 	// idiom to copy over from empty DocumentMatch (0 allocations)
 	*dm = DocumentMatch{}
 	// reuse the []byte already allocated (and reset len to 0)
 	dm.IndexInternalID = indexInternalID[:0]
 	// reuse the []interface{} already allocated (and reset len to 0)
 	dm.Sort = sort[:0]
+	// reuse the []string already allocated (and reset len to 0)
 	dm.DecodedSort = dm.DecodedSort[:0]
 	// reuse the FieldTermLocations already allocated (and reset len to 0)
 	dm.FieldTermLocations = ftls[:0]
+	// reuse the score breakdown map already allocated (and reset len to 0)
+	dm.ScoreBreakdown = scoreBreakdown
 	return dm
 }
 
