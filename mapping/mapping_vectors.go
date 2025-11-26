@@ -237,6 +237,11 @@ func validateVectorFieldAlias(field *FieldMapping, parentName string,
 				"(different similarity values %s and %s)", fieldAlias.Name,
 				field.Similarity, fieldAlias.Similarity)
 		}
+		if field.UseGPU != fieldAlias.UseGPU {
+			return fmt.Errorf("field: '%s', invalid alias "+
+				"(different useGPU values %v and %v)", fieldAlias.Name,
+				field.UseGPU, fieldAlias.UseGPU)
+		}
 
 		return nil
 	}
