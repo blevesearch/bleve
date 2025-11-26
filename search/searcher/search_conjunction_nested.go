@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"container/heap"
 	"context"
 	"fmt"
 	"math"
@@ -307,10 +308,12 @@ type CoalesceQueue struct {
 }
 
 func NewCoalesceQueue() *CoalesceQueue {
-	return &CoalesceQueue{
+	cq := &CoalesceQueue{
 		order: make([]*search.DocumentMatch, 0),
 		items: make(map[uint64]*search.DocumentMatch),
 	}
+	heap.Init(cq)
+	return cq
 }
 
 func (cq *CoalesceQueue) Enqueue(it *search.DocumentMatch) (*search.DocumentMatch, error) {
@@ -329,7 +332,7 @@ func (cq *CoalesceQueue) Enqueue(it *search.DocumentMatch) (*search.DocumentMatc
 
 	// first time we see this ID — enqueue
 	cq.items[val] = it
-	cq.order = append(cq.order, it)
+	heap.Push(cq, it)
 	// no recycling needed as we added a new item
 	return nil, nil
 }
@@ -338,8 +341,8 @@ func (cq *CoalesceQueue) Dequeue() (*search.DocumentMatch, error) {
 	if cq.Len() == 0 {
 		return nil, nil
 	}
-	rv := cq.order[0]
-	cq.order = cq.order[1:]
+
+	rv := heap.Pop(cq).(*search.DocumentMatch)
 
 	val, err := rv.IndexInternalID.Value()
 	if err != nil {
@@ -350,6 +353,28 @@ func (cq *CoalesceQueue) Dequeue() (*search.DocumentMatch, error) {
 	return rv, nil
 }
 
+// heap implementation
+
 func (cq *CoalesceQueue) Len() int {
 	return len(cq.order)
+}
+
+func (cq *CoalesceQueue) Less(i, j int) bool {
+	return cq.order[i].IndexInternalID.Compare(cq.order[j].IndexInternalID) < 0
+}
+
+func (cq *CoalesceQueue) Swap(i, j int) {
+	cq.order[i], cq.order[j] = cq.order[j], cq.order[i]
+}
+
+func (cq *CoalesceQueue) Push(x any) {
+	cq.order = append(cq.order, x.(*search.DocumentMatch))
+}
+
+func (cq *CoalesceQueue) Pop() any {
+	old := cq.order
+	n := len(old)
+	x := old[n-1]
+	cq.order = old[:n-1]
+	return x
 }

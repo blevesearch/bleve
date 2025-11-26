@@ -76,7 +76,13 @@ func MergeExpl(first, second *Explanation) *Explanation {
 	if first.Message == MergedExplMessage {
 		// reuse first explanation as the merged one
 		first.Value += second.Value
-		first.Children = append(first.Children, second)
+		if second.Message == MergedExplMessage {
+			// append all children from second to first
+			first.Children = append(first.Children, second.Children...)
+		} else {
+			// append second as a child to first
+			first.Children = append(first.Children, second)
+		}
 		return first
 	}
 	// create a new explanation to hold the merged one
