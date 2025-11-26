@@ -1277,24 +1277,19 @@ func (is *IndexSnapshot) TermFrequencies(field string, limit int, descending boo
 	return termFreqs[:limit], nil
 }
 
-func (i *IndexSnapshot) Ancestors(ID index.IndexInternalID) ([]index.IndexInternalID, error) {
+func (i *IndexSnapshot) Ancestors(ID index.IndexInternalID) ([]index.AncestorID, error) {
 	seg, ldoc, err := i.segmentIndexAndLocalDocNum(ID)
 	if err != nil {
 		return nil, err
 	}
-
+	// get ancestors from the segment
 	ancestors := i.segment[seg].Ancestors(ldoc)
-
-	// allocate space: +1 for the doc itself
-	rv := make([]index.IndexInternalID, len(ancestors)+1)
+	// get global offset for the segment (correcting factor for multi-segment indexes)
 	globalOffset := i.offsets[seg]
-
-	// first element is the doc itself
-	rv[0] = index.NewIndexInternalID(nil, ldoc+globalOffset)
-
-	// then all ancestors shifted by +1
-	for j := 0; j < len(ancestors); j++ {
-		rv[j+1] = index.NewIndexInternalID(nil, ancestors[j]+globalOffset)
+	// adjust ancestors to global doc numbers, not local to segment
+	for idx := range ancestors {
+		ancestors[idx] = ancestors[idx].Add(globalOffset)
 	}
-	return rv, nil
+	// return adjusted ancestors
+	return ancestors, nil
 }

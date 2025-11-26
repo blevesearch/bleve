@@ -24,6 +24,9 @@ type collectStoreNested struct {
 
 	// the current root document match being built
 	currRoot *search.DocumentMatch
+
+	// the ancestor ID of the current root document being built
+	currRootAncestorID index.AncestorID
 }
 
 func newStoreNested(nr index.NestedReader) *collectStoreNested {
@@ -52,7 +55,7 @@ func (c *collectStoreNested) ProcessNestedDocument(ctx *search.SearchContext, do
 	// root docID is the last ancestor
 	rootID := ancestors[len(ancestors)-1]
 	// check if there is an interim root already and if the incoming doc belongs to it
-	if c.currRoot != nil && c.currRoot.IndexInternalID.Equals(rootID) {
+	if c.currRoot != nil && c.currRootAncestorID.Equals(rootID) {
 		// there is an interim root already, and the incoming doc belongs to it
 		if err := c.currRoot.MergeWith(doc); err != nil {
 			return nil, err
@@ -66,18 +69,18 @@ func (c *collectStoreNested) ProcessNestedDocument(ctx *search.SearchContext, do
 	if c.currRoot != nil {
 		// we have an existing interim root, return it for processing
 		completedRoot = c.currRoot
-		// clear current root
-		c.currRoot = nil
 	}
 	// no interim root for now so either we have a root document incoming
 	// or we have a child doc and need to create an interim root
 	if len(ancestors) == 1 {
 		// incoming doc is the root itself
 		c.currRoot = doc
+		c.currRootAncestorID = rootID
 		return completedRoot, nil
 	}
 	// this is a child doc, create interim root
-	c.currRoot = &search.DocumentMatch{IndexInternalID: rootID}
+	c.currRoot = &search.DocumentMatch{IndexInternalID: rootID.ToIndexInternalID()}
+	c.currRootAncestorID = rootID
 	if err := c.currRoot.MergeWith(doc); err != nil {
 		return nil, err
 	}

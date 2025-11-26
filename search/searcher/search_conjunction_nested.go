@@ -38,8 +38,8 @@ type NestedConjunctionSearcher struct {
 	searchers     []search.Searcher
 	queryNorm     float64
 	currs         []*search.DocumentMatch
-	currAncestors [][]index.IndexInternalID
-	currKeys      []index.IndexInternalID
+	currAncestors [][]index.AncestorID
+	currKeys      []index.AncestorID
 	initialized   bool
 	joinIdx       int
 	options       search.SearcherOptions
@@ -61,8 +61,8 @@ func NewNestedConjunctionSearcher(ctx context.Context, indexReader index.IndexRe
 		options:       options,
 		searchers:     searchers,
 		currs:         make([]*search.DocumentMatch, len(searchers)),
-		currAncestors: make([][]index.IndexInternalID, len(searchers)),
-		currKeys:      make([]index.IndexInternalID, len(searchers)),
+		currAncestors: make([][]index.AncestorID, len(searchers)),
+		currKeys:      make([]index.AncestorID, len(searchers)),
 		joinIdx:       joinIdx,
 		docQueue:      NewCoalesceQueue(),
 	}
@@ -212,7 +212,7 @@ OUTER:
 				// not aligned, so advance this searcher to maxKey
 				var err error
 				ctx.DocumentMatchPool.Put(s.currs[i])
-				s.currs[i], err = s.searchers[i].Advance(ctx, maxKey)
+				s.currs[i], err = s.searchers[i].Advance(ctx, maxKey.ToIndexInternalID())
 				if err != nil {
 					return nil, err
 				}
@@ -281,7 +281,7 @@ OUTER:
 	}
 }
 
-func (s *NestedConjunctionSearcher) getKeyForIdx(i int) index.IndexInternalID {
+func (s *NestedConjunctionSearcher) getKeyForIdx(i int) index.AncestorID {
 	return s.currAncestors[i][len(s.currAncestors[i])-s.joinIdx-1]
 }
 
