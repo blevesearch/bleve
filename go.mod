@@ -43,3 +43,7 @@ require (
 	github.com/spf13/pflag v1.0.9 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 )
+
+replace github.com/blevesearch/scorch_segment_api/v2 => /Users/thejas.orkombu/fts/blevesearch/scorch_segment_api
+
+replace github.com/blevesearch/bleve_index_api => /Users/thejas.orkombu/fts/blevesearch/bleve_index_api

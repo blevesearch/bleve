@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/go-faiss"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	bolt "go.etcd.io/bbolt"
 )
@@ -78,6 +80,8 @@ type Scorch struct {
 	persisterNotifier        chan *epochWatcher
 	rootBolt                 *bolt.DB
 	asyncTasks               sync.WaitGroup
+	// not a real searchable segment, singleton
+	centroidIndex *SegmentSnapshot
 
 	onEvent      func(event Event) bool
 	onAsyncError func(err error, path string)
@@ -168,6 +172,12 @@ func NewScorch(storeName string,
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// "pretraining": true
+	segConfig, ok := config["segmentConfig"].(map[string]interface{})
+	if ok {
+		rv.segmentConfig = segConfig
 	}
 
 	typ, ok := config["spatialPlugin"].(string)
@@ -532,6 +542,72 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	atomic.AddUint64(&s.stats.TotIndexTime, uint64(time.Since(indexStart)))
 
 	return err
+}
+
+func (s *Scorch) Train(batch *index.Batch) error {
+	s.rootLock.Lock()
+	defer s.rootLock.Unlock()
+	if s.centroidIndex != nil {
+		// singleton API
+		return nil
+	}
+	var trainData []index.Document
+	if s.centroidIndex == nil {
+		for key, doc := range batch.IndexOps {
+			if strings.HasPrefix(key, index.TrainDataPrefix) {
+				trainData = append(trainData, doc)
+			}
+		}
+	}
+
+	// just builds a new vector index out of the train data provided
+	// it'll be an IVF index so the centroids are computed at this stage and
+	// this template will be used in the indexing down the line to index
+	// the data vectors. s.segmentConfig will mark this as a training phase
+	// and zap will handle it accordingly.
+	//
+	// note: this might index text data too, how to handle this? s.segmentConfig?
+	// todo: updates/deletes -> data drift detection
+	seg, _, err := s.segPlugin.NewEx(trainData, s.segmentConfig)
+	if err != nil {
+		return err
+	}
+	filename := "centroid_index.zap"
+	path := filepath.Join(s.path, filename)
+
+	switch seg := seg.(type) {
+	case segment.UnpersistedSegment:
+		err = persistToDirectory(seg, nil, path)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("segment is not a unpersisted segment")
+	}
+
+	// persist and open the segment mmap mode.
+	persistedSegment, err := s.segPlugin.OpenEx(path, s.segmentConfig)
+	if err != nil {
+		return err
+	}
+	s.centroidIndex = &SegmentSnapshot{
+		segment: persistedSegment,
+	}
+	s.segmentConfig["getCentroidIndexCallback"] = s.getCentroidIndex
+	return nil
+}
+
+func (s *Scorch) getCentroidIndex(field string) (*faiss.IndexImpl, error) {
+	// return the coarse quantizer of the centroid index belonging to the field
+	centroidIndexSegment, ok := s.centroidIndex.segment.(segment.CentroidIndexSegment)
+	if !ok {
+		return nil, fmt.Errorf("segment is not a centroid index segment")
+	}
+	coarseQuantizer, err := centroidIndexSegment.GetCoarseQuantizer(field)
+	if err != nil {
+		return nil, err
+	}
+	return coarseQuantizer, nil
 }
 
 func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,

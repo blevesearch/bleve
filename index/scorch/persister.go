@@ -575,6 +575,11 @@ func copyToDirectory(srcPath string, d index.Directory) (int64, error) {
 		return 0, fmt.Errorf("GetWriter err: %v", err)
 	}
 
+	// skip
+	if dest == nil {
+		return 0, nil
+	}
+
 	sourceFileStat, err := os.Stat(srcPath)
 	if err != nil {
 		return 0, err

@@ -17,9 +17,7 @@ package scorch
 import (
 	"context"
 	"fmt"
-	"math"
 	"os"
-	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -365,11 +363,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 		var seg segment.Segment
 		var filename string
-		var trainingSample []float32
-		collectTrainData := func(segTrainData []float32) {
-			// append a clone of the training sample
-			trainingSample = append(trainingSample, slices.Clone(segTrainData)...)
-		}
 		if len(segmentsToMerge) > 0 {
 			filename = zapFileName(newSegmentID)
 			s.markIneligibleForRemoval(filename)
@@ -424,7 +417,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			newCount:         seg.Count(),
 			notifyCh:         make(chan *mergeTaskIntroStatus),
 			mmaped:           1,
-			trainData:        trainingSample,
 		}
 
 		s.fireEvent(EventKindMergeTaskIntroductionStart, 0)
@@ -489,7 +481,6 @@ type mergedSegmentHistory struct {
 type segmentMerge struct {
 	id               []uint64
 	new              []segment.Segment
-	trainData        []float32
 	mergedSegHistory map[uint64]*mergedSegmentHistory
 	notifyCh         chan *mergeTaskIntroStatus
 	mmaped           uint32
@@ -535,28 +526,6 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 	var numSegments, newMergedCount uint64
 	var em sync.Mutex
 	var errs []error
-
-	var trainingSample []float32
-	collectTrainData := func(segTrainData []float32) {
-		// append a clone of the training sample
-		trainingSample = append(trainingSample, segTrainData...)
-	}
-
-	// numDocs, err := snapshot.DocCount()
-	// if err != nil {
-	// 	return nil, nil, err
-	// }
-
-	// harcoding the total docs for now, need to get it from CB level
-	numDocs := 1000000
-	trainingSampleSize := math.Ceil(4 * math.Sqrt(float64(numDocs)) * 50)
-
-	// collect train data only if needed
-	if len(snapshot.trainData)/768 < int(trainingSampleSize) {
-		s.segmentConfig["collectTrainDataCallback"] = collectTrainData
-	} else {
-		s.segmentConfig["trainData"] = snapshot.trainData
-	}
 
 	// deploy the workers to merge and flush the batches of segments concurrently
 	// and create a new file segment
@@ -632,7 +601,6 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 		mergedSegHistory: make(map[uint64]*mergedSegmentHistory, numSegments),
 		notifyCh:         make(chan *mergeTaskIntroStatus),
 		newCount:         newMergedCount,
-		trainData:        trainingSample,
 	}
 
 	// create a history map which maps the old in-memory segments with the specific

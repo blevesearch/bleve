@@ -103,6 +103,25 @@ func (i *indexAliasImpl) IndexSynonym(id string, collection string, definition *
 	return ErrorSynonymSearchNotSupported
 }
 
+func (i *indexAliasImpl) Train(batch *Batch) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	err := i.isAliasToSingleIndex()
+	if err != nil {
+		return err
+	}
+
+	if vi, ok := i.indexes[0].(VectorIndex); ok {
+		return vi.Train(batch)
+	}
+	return fmt.Errorf("not a vector index")
+}
+
 func (i *indexAliasImpl) Delete(id string) error {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
