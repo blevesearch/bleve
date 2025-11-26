@@ -110,6 +110,10 @@ func (i *indexAliasImpl) Train(batch *Batch) error {
 		return ErrorIndexClosed
 	}
 
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
 	err := i.isAliasToSingleIndex()
 	if err != nil {
 		return err
