@@ -1432,6 +1432,7 @@ func (m *searchHitSorter) Less(i, j int) bool {
 	return c < 0
 }
 
+// CopyTo (index.Directory, filter)
 func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -1444,6 +1445,8 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 	if !ok {
 		return fmt.Errorf("index implementation does not support copy reader")
 	}
+
+	// copyIndex.Copy() -> copies the centroid index
 
 	copyReader := copyIndex.CopyReader()
 	if copyReader == nil {
