@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -365,11 +364,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 		var seg segment.Segment
 		var filename string
-		var trainingSample []float32
-		collectTrainData := func(segTrainData []float32) {
-			// append a clone of the training sample
-			trainingSample = append(trainingSample, slices.Clone(segTrainData)...)
-		}
 		if len(segmentsToMerge) > 0 {
 			filename = zapFileName(newSegmentID)
 			s.markIneligibleForRemoval(filename)
@@ -424,7 +418,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			newCount:         seg.Count(),
 			notifyCh:         make(chan *mergeTaskIntroStatus),
 			mmaped:           1,
-			trainData:        trainingSample,
 		}
 
 		s.fireEvent(EventKindMergeTaskIntroductionStart, 0)
@@ -631,7 +624,6 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 		mergedSegHistory: make(map[uint64]*mergedSegmentHistory, numSegments),
 		notifyCh:         make(chan *mergeTaskIntroStatus),
 		newCount:         newMergedCount,
-		trainData:        trainingSample,
 	}
 
 	// create a history map which maps the old in-memory segments with the specific
