@@ -270,18 +270,3 @@ func NormalizeVector(vec []float32) []float32 {
 	// normalize the vector copy using in-place normalization provided by faiss
 	return faiss.NormalizeVector(vecCopy)
 }
-
-// -----------------------------------------------------------------------------
-// vector source functions
-
-func (im *IndexMappingImpl) VectorSources() []string {
-	var sources []string
-	for name, v := range im.TypeMapping {
-		for _, f := range v.Fields {
-			if f.Type == "vector" || f.Type == "vector_base64" {
-				sources = append(sources, name)
-			}
-		}
-	}
-	return sources
-}
