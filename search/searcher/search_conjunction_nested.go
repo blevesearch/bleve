@@ -164,7 +164,7 @@ func (s *NestedConjunctionSearcher) Next(ctx *search.SearchContext) (*search.Doc
 				return nil, nil
 			}
 			// get the ancestry chain for this match
-			s.currAncestors[i], err = s.nestedReader.Ancestors(s.currs[i].IndexInternalID)
+			s.currAncestors[i], err = s.nestedReader.Ancestors(s.currs[i].IndexInternalID, s.currAncestors[i][:0])
 			if err != nil {
 				return nil, err
 			}
@@ -221,7 +221,7 @@ OUTER:
 					return nil, nil
 				}
 				// recalc ancestors
-				s.currAncestors[i], err = s.nestedReader.Ancestors(s.currs[i].IndexInternalID)
+				s.currAncestors[i], err = s.nestedReader.Ancestors(s.currs[i].IndexInternalID, s.currAncestors[i][:0])
 				if err != nil {
 					return nil, err
 				}
@@ -263,7 +263,7 @@ OUTER:
 					break
 				}
 				// recalc ancestors
-				s.currAncestors[i], err = s.nestedReader.Ancestors(s.currs[i].IndexInternalID)
+				s.currAncestors[i], err = s.nestedReader.Ancestors(s.currs[i].IndexInternalID, s.currAncestors[i][:0])
 				if err != nil {
 					return nil, err
 				}

@@ -27,6 +27,9 @@ type collectStoreNested struct {
 
 	// the ancestor ID of the current root document being built
 	currRootAncestorID index.AncestorID
+
+	// prealloc slice for ancestor IDs
+	ancestors []index.AncestorID
 }
 
 func newStoreNested(nr index.NestedReader) *collectStoreNested {
@@ -44,16 +47,17 @@ func newStoreNested(nr index.NestedReader) *collectStoreNested {
 // which is guaranteed by all searchers in bleve.
 func (c *collectStoreNested) ProcessNestedDocument(ctx *search.SearchContext, doc *search.DocumentMatch) (*search.DocumentMatch, error) {
 	// find ancestors for the doc
-	ancestors, err := c.nr.Ancestors(doc.IndexInternalID)
+	var err error
+	c.ancestors, err = c.nr.Ancestors(doc.IndexInternalID, c.ancestors[:0])
 	if err != nil {
 		return nil, err
 	}
-	if len(ancestors) == 0 {
+	if len(c.ancestors) == 0 {
 		// should not happen, every doc should have at least itself as ancestor
 		return nil, nil
 	}
 	// root docID is the last ancestor
-	rootID := ancestors[len(ancestors)-1]
+	rootID := c.ancestors[len(c.ancestors)-1]
 	// check if there is an interim root already and if the incoming doc belongs to it
 	if c.currRoot != nil && c.currRootAncestorID.Equals(rootID) {
 		// there is an interim root already, and the incoming doc belongs to it
@@ -72,7 +76,7 @@ func (c *collectStoreNested) ProcessNestedDocument(ctx *search.SearchContext, do
 	}
 	// no interim root for now so either we have a root document incoming
 	// or we have a child doc and need to create an interim root
-	if len(ancestors) == 1 {
+	if len(c.ancestors) == 1 {
 		// incoming doc is the root itself
 		c.currRoot = doc
 		c.currRootAncestorID = rootID

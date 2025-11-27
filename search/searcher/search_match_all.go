@@ -37,6 +37,7 @@ type MatchAllSearcher struct {
 	scorer      *scorer.ConstantScorer
 	count       uint64
 	nested      bool
+	ancestors   []index.AncestorID
 }
 
 func NewMatchAllSearcher(ctx context.Context, indexReader index.IndexReader, boost float64, options search.SearcherOptions) (*MatchAllSearcher, error) {
@@ -86,13 +87,14 @@ func (s *MatchAllSearcher) isNested(id index.IndexInternalID) bool {
 	if !s.nested {
 		return false
 	}
+	var err error
 	// check if this doc has ancestors, if so it is nested
 	if nr, ok := s.reader.(index.NestedReader); ok {
-		anc, err := nr.Ancestors(id)
+		s.ancestors, err = nr.Ancestors(id, s.ancestors[:0])
 		if err != nil {
 			return false
 		}
-		return len(anc) > 1
+		return len(s.ancestors) > 1
 	}
 	return false
 }

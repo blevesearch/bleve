@@ -1277,19 +1277,22 @@ func (is *IndexSnapshot) TermFrequencies(field string, limit int, descending boo
 	return termFreqs[:limit], nil
 }
 
-func (i *IndexSnapshot) Ancestors(ID index.IndexInternalID) ([]index.AncestorID, error) {
+// Ancestors returns the ancestor IDs for the given document ID. The prealloc
+// slice can be provided to avoid allocations downstream, and MUST be empty.
+func (i *IndexSnapshot) Ancestors(ID index.IndexInternalID, prealloc []index.AncestorID) ([]index.AncestorID, error) {
+	// get segment and local doc num for the ID
 	seg, ldoc, err := i.segmentIndexAndLocalDocNum(ID)
 	if err != nil {
 		return nil, err
 	}
 	// get ancestors from the segment
-	ancestors := i.segment[seg].Ancestors(ldoc)
+	prealloc = i.segment[seg].Ancestors(ldoc, prealloc)
 	// get global offset for the segment (correcting factor for multi-segment indexes)
 	globalOffset := i.offsets[seg]
 	// adjust ancestors to global doc numbers, not local to segment
-	for idx := range ancestors {
-		ancestors[idx] = ancestors[idx].Add(globalOffset)
+	for idx := range prealloc {
+		prealloc[idx] = prealloc[idx].Add(globalOffset)
 	}
 	// return adjusted ancestors
-	return ancestors, nil
+	return prealloc, nil
 }

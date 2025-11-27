@@ -375,10 +375,10 @@ func (c *cachedMeta) fetchMeta(field string) (rv interface{}) {
 	return rv
 }
 
-func (s *SegmentSnapshot) Ancestors(docNum uint64) []index.AncestorID {
+func (s *SegmentSnapshot) Ancestors(docNum uint64, prealloc []index.AncestorID) []index.AncestorID {
 	nsb, ok := s.segment.(segment.NestedSegment)
 	if !ok {
-		return []index.AncestorID{index.NewAncestorID(docNum)}
+		return append(prealloc, index.NewAncestorID(docNum))
 	}
-	return nsb.Ancestors(docNum)
+	return nsb.Ancestors(docNum, prealloc)
 }
