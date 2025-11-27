@@ -233,10 +233,8 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	}
 	// remember the Descendants backing map
 	descendants := dm.Descendants
-	// reset to empty map for Children
-	for k := range descendants {
-		delete(descendants, k)
-	}
+	// reset to empty map for Descendants
+	clear(descendants)
 	// idiom to copy over from empty DocumentMatch (0 allocations)
 	*dm = DocumentMatch{}
 	// reuse the []byte already allocated (and reset len to 0)
