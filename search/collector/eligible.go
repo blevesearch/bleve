@@ -31,31 +31,16 @@ type EligibleCollector struct {
 	total            uint64
 	took             time.Duration
 	eligibleSelector index.EligibleDocumentSelector
-
-	nestedStore *collectStoreNested
 }
 
 func NewEligibleCollector(size int) *EligibleCollector {
 	return newEligibleCollector(size)
 }
 
-func NewNestedEligibleCollector(nr index.NestedReader, size int) *EligibleCollector {
-	return newNestedEligibleCollector(nr, size)
-}
-
 func newEligibleCollector(size int) *EligibleCollector {
 	// No sort order & skip always 0 since this is only to filter eligible docs.
 	ec := &EligibleCollector{
 		size: size,
-	}
-	return ec
-}
-
-func newNestedEligibleCollector(nr index.NestedReader, size int) *EligibleCollector {
-	// No sort order & skip always 0 since this is only to filter eligible docs.
-	ec := &EligibleCollector{
-		size:        size,
-		nestedStore: newStoreNested(nr),
 	}
 	return ec
 }
@@ -112,9 +97,8 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 	default:
 		next, err = searcher.Next(searchContext)
 	}
-	var totalDocs uint64
 	for err == nil && next != nil {
-		if totalDocs%CheckDoneEvery == 0 {
+		if ec.total%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
 				search.RecordSearchCost(ctx, search.AbortM, 0)
@@ -122,38 +106,17 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 			default:
 			}
 		}
-		totalDocs++
 
-		if ec.nestedStore != nil {
-			next, err = ec.nestedStore.ProcessNestedDocument(searchContext, next)
-			if err != nil {
-				break
-			}
+		err = dmHandler(next)
+		if err != nil {
+			break
 		}
-		if next != nil {
-			err = dmHandler(next)
-			if err != nil {
-				break
-			}
-			ec.total++
-		}
+		ec.total++
 
 		next, err = searcher.Next(searchContext)
 	}
 	if err != nil {
 		return err
-	}
-
-	// if we have a nested store, we may have an interim root
-	if ec.nestedStore != nil {
-		currRoot := ec.nestedStore.CurrentRoot()
-		if currRoot != nil {
-			err = dmHandler(currRoot)
-			if err != nil {
-				return err
-			}
-			ec.total++
-		}
 	}
 
 	// help finalize/flush the results in case

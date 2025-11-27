@@ -402,24 +402,29 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 			continue
 		}
 		// Applies to all supported types of queries.
-		filterSearcher, _ := filterQ.Searcher(ctx, reader, i.m, search.SearcherOptions{
+		filterSearcher, err := filterQ.Searcher(ctx, reader, i.m, search.SearcherOptions{
 			Score: "none", // just want eligible hits --> don't compute scores if not needed
 		})
+		if err != nil {
+			return nil, err
+		}
 		// Using the index doc count to determine collector size since we do not
 		// have an estimate of the number of eligible docs in the index yet.
 		indexDocCount, err := i.DocCount()
 		if err != nil {
 			return nil, err
 		}
-		filterColl, err := i.buildEligibleCollector(ctx, filterQ, reader, int(indexDocCount))
-		if err != nil {
-			return nil, err
-		}
+		filterColl := collector.NewEligibleCollector(int(indexDocCount))
 		err = filterColl.Collect(ctx, filterSearcher, reader)
 		if err != nil {
 			return nil, err
 		}
 		knnFilterResults[idx] = filterColl.EligibleSelector()
+		// Close the filter searcher once done
+		err = filterSearcher.Close()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Add the filter hits when creating the kNN query
@@ -444,6 +449,11 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	knnHits := knnCollector.Results()
 	if !preSearch {
 		knnHits = finalizeKNNResults(req, knnHits)
+	}
+	// close the knn searcher once done
+	err = knnSearcher.Close()
+	if err != nil {
+		return nil, err
 	}
 	// at this point, irrespective of whether it is a preSearch or not,
 	// the knn hits are populated with Sort and Fields.
@@ -690,27 +700,4 @@ func (i *indexImpl) buildKNNCollector(ctx context.Context, KNNQuery query.Query,
 	}
 
 	return collector.NewKNNCollector(kArray, sumOfK), nil
-}
-
-func (i *indexImpl) buildEligibleCollector(ctx context.Context, filterQuery query.Query, reader index.IndexReader, size int) (*collector.EligibleCollector, error) {
-	// check if we are in nested mode
-	if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); ok && nestedMode {
-		// get the nested reader from the index reader
-		if nr, ok := reader.(index.NestedReader); ok {
-			// check if the filter query intersects with the nested mapping
-			if nm, ok := i.m.(mapping.NestedMapping); ok {
-				var fs search.FieldSet
-				var err error
-				fs, err = query.ExtractFields(filterQuery, i.m, fs)
-				if err != nil {
-					return nil, err
-				}
-				if nm.IntersectsPrefix(fs) {
-					return collector.NewNestedEligibleCollector(nr, size), nil
-				}
-			}
-		}
-	}
-
-	return collector.NewEligibleCollector(size), nil
 }
