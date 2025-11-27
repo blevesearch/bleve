@@ -401,9 +401,12 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 			continue
 		}
 		// Applies to all supported types of queries.
-		filterSearcher, _ := filterQ.Searcher(ctx, reader, i.m, search.SearcherOptions{
+		filterSearcher, err := filterQ.Searcher(ctx, reader, i.m, search.SearcherOptions{
 			Score: "none", // just want eligible hits --> don't compute scores if not needed
 		})
+		if err != nil {
+			return nil, err
+		}
 		// Using the index doc count to determine collector size since we do not
 		// have an estimate of the number of eligible docs in the index yet.
 		indexDocCount, err := i.DocCount()
@@ -416,6 +419,11 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 			return nil, err
 		}
 		knnFilterResults[idx] = filterColl.EligibleSelector()
+		// Close the filter searcher, as we are done with it.
+		err = filterSearcher.Close()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Add the filter hits when creating the kNN query
@@ -437,6 +445,11 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	knnHits := knnCollector.Results()
 	if !preSearch {
 		knnHits = finalizeKNNResults(req, knnHits)
+	}
+	// Close the knn searcher, as we are done with it.
+	err = knnSearcher.Close()
+	if err != nil {
+		return nil, err
 	}
 	// at this point, irrespective of whether it is a preSearch or not,
 	// the knn hits are populated with Sort and Fields.
