@@ -1126,13 +1126,13 @@ func LoadAndHighlightAllFields(
 		return err, totalStoredFieldsBytes
 	}
 	// collect all descendant documents
-	nestedDocs := make([]*search.NestedDocumentMatch, 0, root.NumDescendants())
+	nestedDocs := make([]*search.NestedDocumentMatch, 0, len(root.Descendants))
 	// create a dummy desc DocumentMatch to reuse LoadAndHighlightFields
 	desc := &search.DocumentMatch{}
-	err = root.IterateDescendants(func(descID index.IndexInternalID) error {
+	for _, descID := range root.Descendants {
 		extID, err := r.ExternalID(descID)
 		if err != nil {
-			return err
+			return err, totalStoredFieldsBytes
 		}
 		// reset desc for reuse
 		desc.ID = extID
@@ -1141,7 +1141,7 @@ func LoadAndHighlightAllFields(
 		err, bytes := LoadAndHighlightFields(desc, req, indexName, r, highlighter)
 		totalStoredFieldsBytes += bytes
 		if err != nil {
-			return err
+			return err, totalStoredFieldsBytes
 		}
 		// copy fields to nested doc and append
 		if len(desc.Fields) != 0 || len(desc.Fragments) != 0 {
@@ -1149,10 +1149,6 @@ func LoadAndHighlightAllFields(
 		}
 		desc.Fields = nil
 		desc.Fragments = nil
-		return nil
-	})
-	if err != nil {
-		return err, totalStoredFieldsBytes
 	}
 	// add nested documents to root under _$nested key
 	if len(nestedDocs) > 0 {

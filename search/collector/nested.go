@@ -84,7 +84,7 @@ func (c *collectStoreNested) ProcessNestedDocument(ctx *search.SearchContext, do
 	}
 	// this is a child doc, create interim root
 	newDM := ctx.DocumentMatchPool.Get()
-	newDM.IndexInternalID = rootID.ToIndexInternalID()
+	newDM.IndexInternalID = rootID.ToIndexInternalID(newDM.IndexInternalID)
 	// merge the incoming doc into the new interim root
 	c.currRoot = newDM
 	c.currRootAncestorID = rootID

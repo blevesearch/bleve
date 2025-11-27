@@ -571,14 +571,14 @@ func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.Doc
 	}
 
 	// first visit descendants if any
-	err := d.IterateDescendants(func(descendant index.IndexInternalID) error {
-		return hc.dvReader.VisitDocValues(descendant, v)
-	})
-	if err != nil {
-		return err
+	for _, descID := range d.Descendants {
+		err := hc.dvReader.VisitDocValues(descID, v)
+		if err != nil {
+			return err
+		}
 	}
 	// now visit the doc values for this document
-	err = hc.dvReader.VisitDocValues(d.IndexInternalID, v)
+	err := hc.dvReader.VisitDocValues(d.IndexInternalID, v)
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.EndDoc()
 	}

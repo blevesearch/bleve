@@ -44,6 +44,8 @@ type NestedConjunctionSearcher struct {
 	joinIdx       int
 	options       search.SearcherOptions
 	docQueue      *CoalesceQueue
+	// reusable ID buffer for Advance() calls
+	advanceID index.IndexInternalID
 }
 
 func NewNestedConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
@@ -203,6 +205,8 @@ OUTER:
 				maxKey = currKey
 			}
 		}
+		// convert maxKey to advanceID for Advance calls
+		advanceID := s.toAdvanceID(maxKey)
 		// now try to align all other searchers to the
 		// we check if the a searchers key matches maxKey
 		// if not, we advance the pivot searcher to maxKey
@@ -212,7 +216,7 @@ OUTER:
 				// not aligned, so advance this searcher to maxKey
 				var err error
 				ctx.DocumentMatchPool.Put(s.currs[i])
-				s.currs[i], err = s.searchers[i].Advance(ctx, maxKey.ToIndexInternalID())
+				s.currs[i], err = s.searchers[i].Advance(ctx, advanceID)
 				if err != nil {
 					return nil, err
 				}
@@ -285,6 +289,16 @@ OUTER:
 
 func (s *NestedConjunctionSearcher) getKeyForIdx(i int) index.AncestorID {
 	return s.currAncestors[i][len(s.currAncestors[i])-s.joinIdx-1]
+}
+
+// toAdvanceID converts an AncestorID to IndexInternalID, reusing the advanceID buffer.
+// The returned ID is safe to pass to Advance() since Advance() never retains references.
+func (s *NestedConjunctionSearcher) toAdvanceID(key index.AncestorID) index.IndexInternalID {
+	// Reset length to 0 while preserving capacity for buffer reuse
+	s.advanceID = s.advanceID[:0]
+	// Convert key to IndexInternalID, reusing the underlying buffer
+	s.advanceID = key.ToIndexInternalID(s.advanceID)
+	return s.advanceID
 }
 
 func (s *NestedConjunctionSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {

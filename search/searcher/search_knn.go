@@ -84,7 +84,7 @@ func (s *KNNSearcher) VectorOptimize(ctx context.Context, octx index.VectorOptim
 
 func (s *KNNSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (
 	*search.DocumentMatch, error) {
-	knnMatch, err := s.vectorReader.Next(s.vd.Reset())
+	knnMatch, err := s.vectorReader.Advance(ID, s.vd.Reset())
 	if err != nil {
 		return nil, err
 	}
