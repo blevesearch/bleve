@@ -179,9 +179,9 @@ type DocumentMatch struct {
 	// of the current alias view, used in alias of aliases scenario
 	IndexNames []string `json:"index_names,omitempty"`
 
-	// Children holds any descendant/child matches that contributed
+	// Descendants holds the IDs of any child/descendant document that contributed
 	// to this root DocumentMatch.
-	Children DescendantStore `json:"-"`
+	Descendants map[uint64]index.IndexInternalID `json:"-"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
@@ -231,11 +231,11 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	for i := range ftls { // recycle the ArrayPositions of each location
 		ftls[i].Location.ArrayPositions = ftls[i].Location.ArrayPositions[:0]
 	}
-	// remember the Children backing map
-	children := dm.Children
+	// remember the Descendants backing map
+	descendants := dm.Descendants
 	// reset to empty map for Children
-	for k := range children {
-		delete(children, k)
+	for k := range descendants {
+		delete(descendants, k)
 	}
 	// idiom to copy over from empty DocumentMatch (0 allocations)
 	*dm = DocumentMatch{}
@@ -247,7 +247,7 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	// reuse the FieldTermLocations already allocated (and reset len to 0)
 	dm.FieldTermLocations = ftls[:0]
 	// reuse the descendant store if it exists
-	dm.Children = children
+	dm.Descendants = descendants
 	return dm
 }
 
@@ -292,10 +292,6 @@ func (dm *DocumentMatch) Size() int {
 	for k := range dm.Fields {
 		sizeInBytes += size.SizeOfString + len(k) +
 			size.SizeOfPtr
-	}
-
-	if dm.Children != nil {
-		sizeInBytes += dm.Children.Size()
 	}
 
 	return sizeInBytes
@@ -390,15 +386,33 @@ func (dm *DocumentMatch) AddDescendant(other *DocumentMatch) error {
 	dm.ScoreBreakdown = MergeScoreBreakdown(dm.ScoreBreakdown, other.ScoreBreakdown)
 	// add other as descendant only if it is not the same document
 	if !dm.IndexInternalID.Equals(other.IndexInternalID) {
-		if dm.Children == nil {
-			dm.Children = NewDescendantStore()
+		if dm.Descendants == nil {
+			dm.Descendants = make(map[uint64]index.IndexInternalID)
 		}
-		err := dm.Children.AddDescendant(other.IndexInternalID)
+		key, err := other.IndexInternalID.Value()
 		if err != nil {
+			return err
+		}
+		if _, exists := dm.Descendants[key]; exists {
+			return nil // already exists
+		}
+		// use clone to avoid potential issues with reusing IndexInternalID slices
+		dm.Descendants[key] = slices.Clone(other.IndexInternalID)
+	}
+	return nil
+}
+
+func (dm *DocumentMatch) IterateDescendants(fn func(id index.IndexInternalID) error) error {
+	for _, descendant := range dm.Descendants {
+		if err := fn(descendant); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (dm *DocumentMatch) NumDescendants() int {
+	return len(dm.Descendants)
 }
 
 type DocumentMatchCollection []*DocumentMatch
@@ -445,39 +459,6 @@ func (sc *SearchContext) Size() int {
 		}
 	}
 
-	return sizeInBytes
-}
-
-type DescendantStore map[uint64]index.IndexInternalID
-
-func NewDescendantStore() DescendantStore {
-	return make(DescendantStore)
-}
-
-func (ds DescendantStore) AddDescendant(descendant index.IndexInternalID) error {
-	key, err := descendant.Value()
-	if err != nil {
-		return err
-	}
-	// use clone to keep the store stateless
-	ds[key] = slices.Clone(descendant)
-	return nil
-}
-
-func (ds DescendantStore) IterateDescendants(fn func(descendant index.IndexInternalID) error) error {
-	for _, descendant := range ds {
-		if err := fn(descendant); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (ds DescendantStore) Size() int {
-	sizeInBytes := size.SizeOfMap
-	for _, entry := range ds {
-		sizeInBytes += size.SizeOfPtr + len(entry)
-	}
 	return sizeInBytes
 }
 

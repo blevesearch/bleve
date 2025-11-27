@@ -570,10 +570,8 @@ func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.Doc
 		}
 	}
 
-	// if this is a nested document, we need to visit the doc values
-	// for all its ancestors as well
-	// so that facets/sorts can be computed correctly
-	err := d.Children.IterateDescendants(func(descendant index.IndexInternalID) error {
+	// first visit descendants if any
+	err := d.IterateDescendants(func(descendant index.IndexInternalID) error {
 		return hc.dvReader.VisitDocValues(descendant, v)
 	})
 	if err != nil {
