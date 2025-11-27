@@ -19,6 +19,7 @@ package collector
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -191,10 +192,8 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 	default:
 		next, err = searcher.Next(searchContext)
 	}
-
-	var totalDocs uint64
 	for err == nil && next != nil {
-		if totalDocs%CheckDoneEvery == 0 {
+		if hc.total%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
 				search.RecordSearchCost(ctx, search.AbortM, 0)
@@ -202,40 +201,17 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 			default:
 			}
 		}
-		totalDocs++
+		hc.total++
 
-		if hc.nestedStore != nil {
-			next, err = hc.nestedStore.ProcessNestedDocument(searchContext, next)
-			if err != nil {
-				break
-			}
+		err = dmHandler(next)
+		if err != nil {
+			break
 		}
-		if next != nil {
-			err = dmHandler(next)
-			if err != nil {
-				break
-			}
-			// increment total only for actual(root) collected documents
-			hc.total++
-		}
+
 		next, err = searcher.Next(searchContext)
 	}
 	if err != nil {
 		return err
-	}
-
-	// if we have a nested store, we may have an interim root
-	// that needs to be finalized now
-	if hc.nestedStore != nil {
-		currRoot := hc.nestedStore.CurrentRoot()
-		if currRoot != nil {
-			// process the interim root now
-			err = dmHandler(currRoot)
-			if err != nil {
-				return err
-			}
-			hc.total++
-		}
 	}
 
 	// help finalize/flush the results in case
@@ -249,26 +225,74 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 	hc.took = time.Since(startTime)
 
 	// finalize actual results
-	err = hc.finalizeResults(reader)
+	err = hc.finalizeResults(searchContext, reader)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (hc *KNNCollector) finalizeResults(r index.IndexReader) error {
+func (hc *KNNCollector) finalizeResults(ctx *search.SearchContext, r index.IndexReader) error {
 	var err error
-	hc.results, err = hc.knnStore.Final(func(doc *search.DocumentMatch) error {
+	// finalize the KNN store results
+	// if collector is used in non-nested mode, then directly finalize from knnStore
+	docFixup := func(doc *search.DocumentMatch) error {
 		if doc.ID == "" {
 			// look up the id since we need it for lookup
-			var err error
 			doc.ID, err = r.ExternalID(doc.IndexInternalID)
 			if err != nil {
 				return err
 			}
 		}
 		return nil
+	}
+	if hc.nestedStore == nil {
+		hc.results, err = hc.knnStore.Final(docFixup)
+		return err
+	}
+	// knn collector is used in nested mode, this means that the documents
+	// in the knnStore need to be further processed to build the root documents
+	// first get the raw results without any fixup
+	rawResults, err := hc.knnStore.Final(nil)
+	if err != nil {
+		return err
+	}
+	// now sort all the document matches by indexInternalID to ensure that
+	// the nested processing works correctly, as it expects documents to be
+	// added in increasing order of internal IDs
+	slices.SortFunc(rawResults, func(i, j *search.DocumentMatch) int {
+		return index.IndexInternalID.Compare(i.IndexInternalID, j.IndexInternalID)
 	})
+	finalResults := make(search.DocumentMatchCollection, 0, len(rawResults))
+	// now process each document through the nested store
+	for _, doc := range rawResults {
+		// override doc with the returned root document match, if any
+		doc, err = hc.nestedStore.ProcessNestedDocument(ctx, doc)
+		if err != nil {
+			return err
+		}
+		// if doc is nil, it means the incoming doc was merged into its parent
+		// and no root document is ready yet
+		if doc != nil {
+			// completed root document match, do fixup and add to results
+			err = docFixup(doc)
+			if err != nil {
+				return err
+			}
+			finalResults = append(finalResults, doc)
+		}
+	}
+	// finally, check if there is an interim root document left to be returned
+	doc := hc.nestedStore.CurrentRoot()
+	if doc != nil {
+		// completed root document match, do fixup and add to results
+		err = docFixup(doc)
+		if err != nil {
+			return err
+		}
+		finalResults = append(finalResults, doc)
+	}
+	hc.results = finalResults
 	return err
 }
 
