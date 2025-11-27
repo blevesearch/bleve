@@ -106,12 +106,12 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 			default:
 			}
 		}
+		ec.total++
 
 		err = dmHandler(next)
 		if err != nil {
 			break
 		}
-		ec.total++
 
 		next, err = searcher.Next(searchContext)
 	}

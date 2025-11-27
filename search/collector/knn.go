@@ -138,7 +138,6 @@ type KNNCollector struct {
 	maxScore float64
 
 	nestedStore *collectStoreNested
-	descendants [][]index.IndexInternalID
 }
 
 func NewKNNCollector(kArray []int64, size int64) *KNNCollector {
