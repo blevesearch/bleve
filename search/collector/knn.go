@@ -261,7 +261,7 @@ func (hc *KNNCollector) finalizeResults(ctx *search.SearchContext, r index.Index
 	// the nested processing works correctly, as it expects documents to be
 	// added in increasing order of internal IDs
 	slices.SortFunc(rawResults, func(i, j *search.DocumentMatch) int {
-		return index.IndexInternalID.Compare(i.IndexInternalID, j.IndexInternalID)
+		return i.IndexInternalID.Compare(j.IndexInternalID)
 	})
 	finalResults := make(search.DocumentMatchCollection, 0, len(rawResults))
 	// now process each document through the nested store

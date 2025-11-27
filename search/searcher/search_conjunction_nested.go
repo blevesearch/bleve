@@ -15,11 +15,11 @@
 package searcher
 
 import (
-	"container/heap"
 	"context"
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
 
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
@@ -276,6 +276,8 @@ OUTER:
 				}
 			}
 		}
+		// finalize the docQueue for dequeueing
+		s.docQueue.Finalize()
 		// finally return the first buffered match
 		return s.docQueue.Dequeue()
 	}
@@ -312,10 +314,13 @@ func NewCoalesceQueue() *CoalesceQueue {
 		order: make([]*search.DocumentMatch, 0),
 		items: make(map[uint64]*search.DocumentMatch),
 	}
-	heap.Init(cq)
 	return cq
 }
 
+// Enqueue adds the given DocumentMatch to the queue. If a DocumentMatch with the same
+// IndexInternalID already exists in the queue, it merges the scores and explanations,
+// and returns the given DocumentMatch for recycling. If it's a new entry, it adds it
+// to the queue and returns nil.
 func (cq *CoalesceQueue) Enqueue(it *search.DocumentMatch) (*search.DocumentMatch, error) {
 	val, err := it.IndexInternalID.Value()
 	if err != nil {
@@ -335,17 +340,33 @@ func (cq *CoalesceQueue) Enqueue(it *search.DocumentMatch) (*search.DocumentMatc
 
 	// first time we see this ID — enqueue
 	cq.items[val] = it
-	heap.Push(cq, it)
+	// append to order slice (this is a stack)
+	cq.order = append(cq.order, it)
 	// no recycling needed as we added a new item
 	return nil, nil
 }
 
+// Finalize prepares the queue for dequeue operations by sorting the items based on
+// their IndexInternalID values. This MUST be called before any Dequeue operations,
+// and after all Enqueue operations are complete. The sort is done in descending order
+// so that dequeueing will basically be popping from the end of the slice, allowing for
+// slice reuse.
+func (cq *CoalesceQueue) Finalize() {
+	slices.SortFunc(cq.order, func(a, b *search.DocumentMatch) int {
+		return b.IndexInternalID.Compare(a.IndexInternalID)
+	})
+}
+
+// Dequeue removes and returns the next DocumentMatch from the queue in sorted order.
+// If the queue is empty, it returns nil.
 func (cq *CoalesceQueue) Dequeue() (*search.DocumentMatch, error) {
 	if cq.Len() == 0 {
 		return nil, nil
 	}
 
-	rv := heap.Pop(cq).(*search.DocumentMatch)
+	// pop from end of slice
+	rv := cq.order[len(cq.order)-1]
+	cq.order = cq.order[:len(cq.order)-1]
 
 	val, err := rv.IndexInternalID.Value()
 	if err != nil {
@@ -356,28 +377,7 @@ func (cq *CoalesceQueue) Dequeue() (*search.DocumentMatch, error) {
 	return rv, nil
 }
 
-// heap implementation
-
+// Len returns the number of DocumentMatch items currently in the queue.
 func (cq *CoalesceQueue) Len() int {
 	return len(cq.order)
-}
-
-func (cq *CoalesceQueue) Less(i, j int) bool {
-	return cq.order[i].IndexInternalID.Compare(cq.order[j].IndexInternalID) < 0
-}
-
-func (cq *CoalesceQueue) Swap(i, j int) {
-	cq.order[i], cq.order[j] = cq.order[j], cq.order[i]
-}
-
-func (cq *CoalesceQueue) Push(x any) {
-	cq.order = append(cq.order, x.(*search.DocumentMatch))
-}
-
-func (cq *CoalesceQueue) Pop() any {
-	old := cq.order
-	n := len(old)
-	x := old[n-1]
-	cq.order = old[:n-1]
-	return x
 }
