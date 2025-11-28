@@ -385,8 +385,16 @@ func (dm *DocumentMatch) AddDescendant(other *DocumentMatch) error {
 	dm.ScoreBreakdown = MergeScoreBreakdown(dm.ScoreBreakdown, other.ScoreBreakdown)
 	// add other as descendant only if it is not the same document
 	if !dm.IndexInternalID.Equals(other.IndexInternalID) {
-		// use clone to avoid potential issues with reusing IndexInternalID slices
-		dm.Descendants = append(dm.Descendants, slices.Clone(other.IndexInternalID))
+		// Add a copy of other.IndexInternalID to descendants, because
+		// other.IndexInternalID will be reset when 'other' is recycled.
+		var descendantID index.IndexInternalID
+		// first check if dm's descendants slice has capacity to reuse
+		if len(dm.Descendants) < cap(dm.Descendants) {
+			// reuse the buffer element at len(dm.Descendants) by reslicing
+			descendantID = dm.Descendants[:len(dm.Descendants)+1][len(dm.Descendants)]
+		}
+		// copy the contents of other.IndexInternalID into descendantID, allocating if needed
+		dm.Descendants = append(dm.Descendants, index.NewIndexInternalIDFrom(descendantID, other.IndexInternalID))
 	}
 	return nil
 }
