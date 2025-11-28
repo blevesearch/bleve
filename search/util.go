@@ -50,25 +50,50 @@ func MergeTermLocationMaps(rv, other TermLocationMap) TermLocationMap {
 func MergeFieldTermLocations(dest []FieldTermLocation, matches []*DocumentMatch) []FieldTermLocation {
 	n := len(dest)
 	for _, dm := range matches {
-		n += len(dm.FieldTermLocations)
+		if dm != nil {
+			n += len(dm.FieldTermLocations)
+		}
 	}
 	if cap(dest) < n {
 		dest = append(make([]FieldTermLocation, 0, n), dest...)
 	}
 
 	for _, dm := range matches {
-		for _, ftl := range dm.FieldTermLocations {
-			dest = append(dest, FieldTermLocation{
-				Field: ftl.Field,
-				Term:  ftl.Term,
-				Location: Location{
-					Pos:            ftl.Location.Pos,
-					Start:          ftl.Location.Start,
-					End:            ftl.Location.End,
-					ArrayPositions: append(ArrayPositions(nil), ftl.Location.ArrayPositions...),
-				},
-			})
+		if dm != nil {
+			dest = mergeFieldTermLocationFromMatch(dest, dm)
 		}
+	}
+
+	return dest
+}
+
+// MergeFieldTermLocationsFromMatch merges field term locations from a single DocumentMatch
+// into dest, returning the updated slice.
+func MergeFieldTermLocationsFromMatch(dest []FieldTermLocation, match *DocumentMatch) []FieldTermLocation {
+	if match == nil {
+		return dest
+	}
+	n := len(dest) + len(match.FieldTermLocations)
+	if cap(dest) < n {
+		dest = append(make([]FieldTermLocation, 0, n), dest...)
+	}
+	return mergeFieldTermLocationFromMatch(dest, match)
+}
+
+// mergeFieldTermLocationFromMatch appends field term locations from a DocumentMatch into dest.
+// Assumes dest has sufficient capacity.
+func mergeFieldTermLocationFromMatch(dest []FieldTermLocation, dm *DocumentMatch) []FieldTermLocation {
+	for _, ftl := range dm.FieldTermLocations {
+		dest = append(dest, FieldTermLocation{
+			Field: ftl.Field,
+			Term:  ftl.Term,
+			Location: Location{
+				Pos:            ftl.Location.Pos,
+				Start:          ftl.Location.Start,
+				End:            ftl.Location.End,
+				ArrayPositions: append(ArrayPositions(nil), ftl.Location.ArrayPositions...),
+			},
+		})
 	}
 
 	return dest

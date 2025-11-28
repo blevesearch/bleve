@@ -380,7 +380,7 @@ func (dm *DocumentMatch) AddDescendant(other *DocumentMatch) error {
 	// merge explanations
 	dm.Expl = dm.Expl.MergeWith(other.Expl)
 	// merge field term locations
-	dm.FieldTermLocations = MergeFieldTermLocations(dm.FieldTermLocations, []*DocumentMatch{other})
+	dm.FieldTermLocations = MergeFieldTermLocationsFromMatch(dm.FieldTermLocations, other)
 	// merge score breakdown
 	dm.ScoreBreakdown = MergeScoreBreakdown(dm.ScoreBreakdown, other.ScoreBreakdown)
 	// add other as descendant only if it is not the same document
