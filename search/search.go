@@ -233,8 +233,11 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	for i := range ftls { // recycle the ArrayPositions of each location
 		ftls[i].Location.ArrayPositions = ftls[i].Location.ArrayPositions[:0]
 	}
-	// remember the Descendants backing map
+	// remember the Descendants backing array
 	descendants := dm.Descendants
+	for i := range descendants { // recycle each IndexInternalID
+		descendants[i] = descendants[i][:0]
+	}
 	// idiom to copy over from empty DocumentMatch (0 allocations)
 	*dm = DocumentMatch{}
 	// reuse the []byte already allocated (and reset len to 0)
@@ -390,7 +393,7 @@ func (dm *DocumentMatch) AddDescendant(other *DocumentMatch) error {
 		var descendantID index.IndexInternalID
 		// first check if dm's descendants slice has capacity to reuse
 		if len(dm.Descendants) < cap(dm.Descendants) {
-			// reuse the buffer element at len(dm.Descendants) by reslicing
+			// reuse the buffer element at len(dm.Descendants)
 			descendantID = dm.Descendants[:len(dm.Descendants)+1][len(dm.Descendants)]
 		}
 		// copy the contents of other.IndexInternalID into descendantID, allocating if needed

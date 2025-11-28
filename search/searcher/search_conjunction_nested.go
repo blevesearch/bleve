@@ -148,41 +148,52 @@ func (s *NestedConjunctionSearcher) DocumentMatchPoolSize() int {
 	return rv
 }
 
-func (s *NestedConjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+func (s *NestedConjunctionSearcher) initialize(ctx *search.SearchContext) (bool, error) {
 	var err error
+	for i, searcher := range s.searchers {
+		if s.currs[i] != nil {
+			ctx.DocumentMatchPool.Put(s.currs[i])
+		}
+		s.currs[i], err = searcher.Next(ctx)
+		if err != nil {
+			return false, err
+		}
+		if s.currs[i] == nil {
+			// one of the searchers is exhausted, so we are done
+			return true, nil
+		}
+		// get the ancestry chain for this match
+		s.currAncestors[i], err = s.nestedReader.Ancestors(s.currs[i].IndexInternalID, s.currAncestors[i][:0])
+		if err != nil {
+			return false, err
+		}
+		// check if the ancestry chain is > joinIdx, if not we reset the joinIdx
+		// to the minimum possible value across all searchers, ideally this will be
+		// done in query construction time itself, by using the covering depth across
+		// all sub-queries, but we do this here as a fallback
+		if s.joinIdx >= len(s.currAncestors[i]) {
+			s.joinIdx = len(s.currAncestors[i]) - 1
+		}
+	}
+	// build currKeys for each searcher, do it here as we may have adjusted joinIdx
+	for i := range s.searchers {
+		s.currKeys[i] = s.getKeyForIdx(i)
+	}
+	s.initialized = true
+	return false, nil
+}
+
+func (s *NestedConjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	// initialize on first call to Next, by getting first match
 	// from each searcher and their ancestry chains
 	if !s.initialized {
-		for i, searcher := range s.searchers {
-			if s.currs[i] != nil {
-				ctx.DocumentMatchPool.Put(s.currs[i])
-			}
-			s.currs[i], err = searcher.Next(ctx)
-			if err != nil {
-				return nil, err
-			}
-			if s.currs[i] == nil {
-				// one of the searchers is exhausted, so we are done
-				return nil, nil
-			}
-			// get the ancestry chain for this match
-			s.currAncestors[i], err = s.nestedReader.Ancestors(s.currs[i].IndexInternalID, s.currAncestors[i][:0])
-			if err != nil {
-				return nil, err
-			}
-			// check if the ancestry chain is > joinIdx, if not we reset the joinIdx
-			// to the minimum possible value across all searchers, ideally this will be
-			// done in query construction time itself, by using the covering depth across
-			// all sub-queries, but we do this here as a fallback
-			if s.joinIdx >= len(s.currAncestors[i]) {
-				s.joinIdx = len(s.currAncestors[i]) - 1
-			}
+		done, err := s.initialize(ctx)
+		if err != nil {
+			return nil, err
 		}
-		// build currKeys for each searcher, do it here as we may have adjusted joinIdx
-		for i := range s.searchers {
-			s.currKeys[i] = s.getKeyForIdx(i)
+		if done {
+			return nil, nil
 		}
-		s.initialized = true
 	}
 	// check if the docQueue has any buffered matches
 	if s.docQueue.Len() > 0 {
