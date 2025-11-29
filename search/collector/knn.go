@@ -239,6 +239,7 @@ func (hc *KNNCollector) finalizeResults(ctx *search.SearchContext, r index.Index
 	docFixup := func(doc *search.DocumentMatch) error {
 		if doc.ID == "" {
 			// look up the id since we need it for lookup
+			var err error
 			doc.ID, err = r.ExternalID(doc.IndexInternalID)
 			if err != nil {
 				return err
