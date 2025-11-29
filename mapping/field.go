@@ -175,6 +175,76 @@ func newBooleanFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	return rv
 }
 
+// applyDynamicDefaults creates a copy of the field mapping and applies
+// dynamic defaults from the index mapping for fields that aren't explicitly set.
+// This is used when applying dynamic templates to ensure global dynamic settings
+// are respected unless the template explicitly overrides them.
+func applyDynamicDefaults(fm *FieldMapping, im *IndexMappingImpl) *FieldMapping {
+	// Create a copy of the field mapping
+	rv := &FieldMapping{
+		Name:                    fm.Name,
+		Type:                    fm.Type,
+		Analyzer:                fm.Analyzer,
+		Store:                   fm.Store,
+		Index:                   fm.Index,
+		IncludeTermVectors:      fm.IncludeTermVectors,
+		IncludeInAll:            fm.IncludeInAll,
+		DateFormat:              fm.DateFormat,
+		DocValues:               fm.DocValues,
+		SkipFreqNorm:            fm.SkipFreqNorm,
+		Dims:                    fm.Dims,
+		Similarity:              fm.Similarity,
+		VectorIndexOptimizedFor: fm.VectorIndexOptimizedFor,
+		SynonymSource:           fm.SynonymSource,
+	}
+
+	// If the template didn't explicitly set these values, use dynamic defaults
+	// We check the zero values to see if they were explicitly set
+	// Note: This is a simplification; ideally we'd track which fields were set
+	if !fm.Store && !fm.Index && !fm.DocValues {
+		// No explicit indexing options set, apply defaults based on type
+		switch fm.Type {
+		case "text":
+			rv.Store = im.StoreDynamic
+			rv.Index = im.IndexDynamic
+			rv.DocValues = im.DocValuesDynamic
+			rv.IncludeTermVectors = true
+			rv.IncludeInAll = true
+		case "number":
+			rv.Store = im.StoreDynamic
+			rv.Index = im.IndexDynamic
+			rv.DocValues = im.DocValuesDynamic
+			rv.IncludeInAll = true
+		case "datetime":
+			rv.Store = im.StoreDynamic
+			rv.Index = im.IndexDynamic
+			rv.DocValues = im.DocValuesDynamic
+			rv.IncludeInAll = true
+		case "boolean":
+			rv.Store = im.StoreDynamic
+			rv.Index = im.IndexDynamic
+			rv.DocValues = im.DocValuesDynamic
+			rv.IncludeInAll = true
+		case "geopoint":
+			rv.Store = im.StoreDynamic
+			rv.Index = im.IndexDynamic
+			rv.DocValues = im.DocValuesDynamic
+			rv.IncludeInAll = true
+		case "IP":
+			rv.Store = im.StoreDynamic
+			rv.Index = im.IndexDynamic
+			rv.IncludeInAll = true
+		default:
+			// For unknown types, apply basic defaults
+			rv.Store = im.StoreDynamic
+			rv.Index = im.IndexDynamic
+			rv.DocValues = im.DocValuesDynamic
+		}
+	}
+
+	return rv
+}
+
 // NewGeoPointFieldMapping returns a default field mapping for geo points
 func NewGeoPointFieldMapping() *FieldMapping {
 	return &FieldMapping{

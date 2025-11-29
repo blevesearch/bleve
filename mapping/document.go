@@ -47,6 +47,11 @@ type DocumentMapping struct {
 	DefaultAnalyzer      string                      `json:"default_analyzer,omitempty"`
 	DefaultSynonymSource string                      `json:"default_synonym_source,omitempty"`
 
+	// DynamicTemplates define rules for mapping dynamically detected fields.
+	// Templates are evaluated in order; the first matching template is used.
+	// Templates are inherited from parent mappings but can be overridden.
+	DynamicTemplates []*DynamicTemplate `json:"dynamic_templates,omitempty"`
+
 	// StructTagKey overrides "json" when looking for field names in struct tags
 	StructTagKey string `json:"struct_tag_key,omitempty"`
 }
@@ -291,6 +296,72 @@ func (dm *DocumentMapping) AddFieldMapping(fm *FieldMapping) {
 	dm.Fields = append(dm.Fields, fm)
 }
 
+// AddDynamicTemplate adds a dynamic template to this document mapping.
+// Templates are evaluated in order when mapping dynamic fields.
+func (dm *DocumentMapping) AddDynamicTemplate(template *DynamicTemplate) {
+	if dm.DynamicTemplates == nil {
+		dm.DynamicTemplates = make([]*DynamicTemplate, 0)
+	}
+	dm.DynamicTemplates = append(dm.DynamicTemplates, template)
+}
+
+// findMatchingTemplate searches for a matching dynamic template for a field.
+// It checks templates at the current mapping level first, then inherits from
+// parent templates if no local match is found.
+// Parameters:
+//   - fieldName: the name of the field (last path element)
+//   - pathStr: the full dotted path to the field
+//   - detectedType: the detected type of the field value ("string", "number", etc.)
+//   - parentTemplates: templates inherited from parent document mappings
+func (dm *DocumentMapping) findMatchingTemplate(fieldName, pathStr, detectedType string,
+	parentTemplates []*DynamicTemplate) *DynamicTemplate {
+	// Check own templates first (local templates take precedence)
+	for _, template := range dm.DynamicTemplates {
+		if template.Matches(fieldName, pathStr, detectedType) {
+			return template
+		}
+	}
+
+	// Fall back to parent templates (inheritance)
+	for _, template := range parentTemplates {
+		if template.Matches(fieldName, pathStr, detectedType) {
+			return template
+		}
+	}
+
+	return nil
+}
+
+// collectTemplatesAlongPath collects all dynamic templates along the path to a field.
+// Templates from parent mappings are collected first, so child mappings can override.
+// This collects templates from all ancestor mappings but NOT the closest mapping
+// (which is checked separately in findMatchingTemplate).
+func (dm *DocumentMapping) collectTemplatesAlongPath(pathElements []string) []*DynamicTemplate {
+	var templates []*DynamicTemplate
+
+	// Start with templates at the root
+	templates = append(templates, dm.DynamicTemplates...)
+
+	// Walk down the path, collecting templates from each level EXCEPT the closest one.
+	// For path ["a", "b", "field"], we want templates from root and "a", but not "b"
+	// because "b" is the closest mapping and will be checked separately.
+	current := dm
+	stopAt := max(0, len(pathElements)-2)
+	for i, pathElement := range pathElements {
+		if i >= stopAt {
+			break
+		}
+		if subDocMapping, exists := current.Properties[pathElement]; exists {
+			templates = append(templates, subDocMapping.DynamicTemplates...)
+			current = subDocMapping
+		} else {
+			break
+		}
+	}
+
+	return templates
+}
+
 // UnmarshalJSON offers custom unmarshaling with optional strict validation
 func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
 	var tmp map[string]json.RawMessage
@@ -338,6 +409,11 @@ func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
 			}
 		case "struct_tag_key":
 			err := util.UnmarshalJSON(v, &dm.StructTagKey)
+			if err != nil {
+				return err
+			}
+		case "dynamic_templates":
+			err := util.UnmarshalJSON(v, &dm.DynamicTemplates)
 			if err != nil {
 				return err
 			}
@@ -499,18 +575,43 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		} else if closestDocMapping.Dynamic {
 			// automatic indexing behavior
 
-			// first see if it can be parsed by the default date parser
-			dateTimeParser := context.im.DateTimeParserNamed(context.im.DefaultDateTimeParser)
-			if dateTimeParser != nil {
-				parsedDateTime, layout, err := dateTimeParser.ParseDateTime(propertyValueString)
-				if err != nil {
-					// index as text
-					fieldMapping := newTextFieldMappingDynamic(context.im)
+			// Check for a matching dynamic template first
+			fieldName := ""
+			if len(path) > 0 {
+				fieldName = path[len(path)-1]
+			}
+			parentTemplates := dm.collectTemplatesAlongPath(path)
+			template := closestDocMapping.findMatchingTemplate(fieldName, pathString, "string", parentTemplates)
+
+			if template != nil && template.Mapping != nil {
+				// Use the template's mapping with dynamic defaults
+				fieldMapping := applyDynamicDefaults(template.Mapping, context.im)
+				switch fieldMapping.Type {
+				case "datetime":
+					dateTimeParser := context.im.DateTimeParserNamed(context.im.DefaultDateTimeParser)
+					if dateTimeParser != nil {
+						parsedDateTime, layout, err := dateTimeParser.ParseDateTime(propertyValueString)
+						if err == nil {
+							fieldMapping.processTime(parsedDateTime, layout, pathString, path, indexes, context)
+						}
+					}
+				default:
 					fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
-				} else {
-					// index as datetime
-					fieldMapping := newDateTimeFieldMappingDynamic(context.im)
-					fieldMapping.processTime(parsedDateTime, layout, pathString, path, indexes, context)
+				}
+			} else {
+				// Default behavior: first see if it can be parsed by the default date parser
+				dateTimeParser := context.im.DateTimeParserNamed(context.im.DefaultDateTimeParser)
+				if dateTimeParser != nil {
+					parsedDateTime, layout, err := dateTimeParser.ParseDateTime(propertyValueString)
+					if err != nil {
+						// index as text
+						fieldMapping := newTextFieldMappingDynamic(context.im)
+						fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
+					} else {
+						// index as datetime
+						fieldMapping := newDateTimeFieldMappingDynamic(context.im)
+						fieldMapping.processTime(parsedDateTime, layout, pathString, path, indexes, context)
+					}
 				}
 			}
 		}
@@ -528,9 +629,23 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 				fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
 			}
 		} else if closestDocMapping.Dynamic {
-			// automatic indexing behavior
-			fieldMapping := newNumericFieldMappingDynamic(context.im)
-			fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
+			// Check for a matching dynamic template first
+			fieldName := ""
+			if len(path) > 0 {
+				fieldName = path[len(path)-1]
+			}
+			parentTemplates := dm.collectTemplatesAlongPath(path)
+			template := closestDocMapping.findMatchingTemplate(fieldName, pathString, "number", parentTemplates)
+
+			if template != nil && template.Mapping != nil {
+				// Use the template's mapping with dynamic defaults
+				fieldMapping := applyDynamicDefaults(template.Mapping, context.im)
+				fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
+			} else {
+				// automatic indexing behavior
+				fieldMapping := newNumericFieldMappingDynamic(context.im)
+				fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
+			}
 		}
 	case reflect.Bool:
 		propertyValBool := propertyValue.Bool()
@@ -540,9 +655,23 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 				fieldMapping.processBoolean(propertyValBool, pathString, path, indexes, context)
 			}
 		} else if closestDocMapping.Dynamic {
-			// automatic indexing behavior
-			fieldMapping := newBooleanFieldMappingDynamic(context.im)
-			fieldMapping.processBoolean(propertyValBool, pathString, path, indexes, context)
+			// Check for a matching dynamic template first
+			fieldName := ""
+			if len(path) > 0 {
+				fieldName = path[len(path)-1]
+			}
+			parentTemplates := dm.collectTemplatesAlongPath(path)
+			template := closestDocMapping.findMatchingTemplate(fieldName, pathString, "boolean", parentTemplates)
+
+			if template != nil && template.Mapping != nil {
+				// Use the template's mapping with dynamic defaults
+				fieldMapping := applyDynamicDefaults(template.Mapping, context.im)
+				fieldMapping.processBoolean(propertyValBool, pathString, path, indexes, context)
+			} else {
+				// automatic indexing behavior
+				fieldMapping := newBooleanFieldMappingDynamic(context.im)
+				fieldMapping.processBoolean(propertyValBool, pathString, path, indexes, context)
+			}
 		}
 	case reflect.Struct:
 		switch property := property.(type) {
@@ -554,8 +683,22 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 					fieldMapping.processTime(property, time.RFC3339, pathString, path, indexes, context)
 				}
 			} else if closestDocMapping.Dynamic {
-				fieldMapping := newDateTimeFieldMappingDynamic(context.im)
-				fieldMapping.processTime(property, time.RFC3339, pathString, path, indexes, context)
+				// Check for a matching dynamic template first
+				fieldName := ""
+				if len(path) > 0 {
+					fieldName = path[len(path)-1]
+				}
+				parentTemplates := dm.collectTemplatesAlongPath(path)
+				template := closestDocMapping.findMatchingTemplate(fieldName, pathString, "date", parentTemplates)
+
+				if template != nil && template.Mapping != nil {
+					// Use the template's mapping with dynamic defaults
+					fieldMapping := applyDynamicDefaults(template.Mapping, context.im)
+					fieldMapping.processTime(property, time.RFC3339, pathString, path, indexes, context)
+				} else {
+					fieldMapping := newDateTimeFieldMappingDynamic(context.im)
+					fieldMapping.processTime(property, time.RFC3339, pathString, path, indexes, context)
+				}
 			}
 		case encoding.TextMarshaler:
 			txt, err := property.MarshalText()
