@@ -46,6 +46,8 @@ type NestedConjunctionSearcher struct {
 	docQueue      *CoalesceQueue
 	// reusable ID buffer for Advance() calls
 	advanceID index.IndexInternalID
+	// reusable buffer for Advance() calls
+	ancestors []index.AncestorID
 }
 
 func NewNestedConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
@@ -177,7 +179,7 @@ func (s *NestedConjunctionSearcher) initialize(ctx *search.SearchContext) (bool,
 	}
 	// build currKeys for each searcher, do it here as we may have adjusted joinIdx
 	for i := range s.searchers {
-		s.currKeys[i] = s.getKeyForIdx(i)
+		s.currKeys[i] = ancestorFromRoot(s.currAncestors[i], s.joinIdx)
 	}
 	s.initialized = true
 	return false, nil
@@ -199,6 +201,8 @@ func (s *NestedConjunctionSearcher) Next(ctx *search.SearchContext) (*search.Doc
 	if s.docQueue.Len() > 0 {
 		return s.docQueue.Dequeue()
 	}
+	// now enter the main alignment loop
+	n := len(s.searchers)
 OUTER:
 	for {
 		// pick the pivot searcher with the highest key (ancestor at joinIdx level)
@@ -206,7 +210,7 @@ OUTER:
 			return nil, nil
 		}
 		maxKey := s.currKeys[0]
-		for i := 1; i < len(s.searchers); i++ {
+		for i := 1; i < n; i++ {
 			// currs[i] is nil means one of the searchers is exhausted
 			if s.currs[i] == nil {
 				return nil, nil
@@ -216,15 +220,22 @@ OUTER:
 				maxKey = currKey
 			}
 		}
-		// convert maxKey to advanceID for Advance calls
-		advanceID := s.toAdvanceID(maxKey)
+		// store maxkey as advanceID only once only if needed
+		var advanceID index.IndexInternalID
+		// flag to track if all searchers are aligned
+		var aligned bool = true
 		// now try to align all other searchers to the
 		// we check if the a searchers key matches maxKey
 		// if not, we advance the pivot searcher to maxKey
 		// else do nothing and move to the next searcher
-		for i := 0; i < len(s.searchers); i++ {
-			if s.currKeys[i].Compare(maxKey) < 0 {
+		for i := 0; i < n; i++ {
+			cmp := s.currKeys[i].Compare(maxKey)
+			if cmp < 0 {
 				// not aligned, so advance this searcher to maxKey
+				// convert maxKey to advanceID only once
+				if advanceID == nil {
+					advanceID = s.toAdvanceID(maxKey)
+				}
 				var err error
 				ctx.DocumentMatchPool.Put(s.currs[i])
 				s.currs[i], err = s.searchers[i].Advance(ctx, advanceID)
@@ -241,23 +252,26 @@ OUTER:
 					return nil, err
 				}
 				// recalc key
-				s.currKeys[i] = s.getKeyForIdx(i)
+				s.currKeys[i] = ancestorFromRoot(s.currAncestors[i], s.joinIdx)
+				// recalc cmp
+				cmp = s.currKeys[i].Compare(maxKey)
+			}
+			if cmp != 0 {
+				// not aligned
+				aligned = false
 			}
 		}
 		// now check if all the searchers are aligned at the same maxKey
 		// if they are not aligned, we need to restart the loop of picking
 		// the pivot searcher with the highest key
-		for i := 0; i < len(s.searchers); i++ {
-			if !s.currKeys[i].Equals(maxKey) {
-				// not aligned, so restart the outer loop
-				continue OUTER
-			}
+		if !aligned {
+			continue OUTER
 		}
 		// if we are here, all the searchers are aligned at maxKey
 		// now we need to buffer all the intermediate matches for every
 		// searcher at this key, until either the searcher's key changes
 		// or the searcher is exhausted
-		for i := 0; i < len(s.searchers); i++ {
+		for i := 0; i < n; i++ {
 			for {
 				// buffer the current match
 				recycle, err := s.docQueue.Enqueue(s.currs[i])
@@ -283,7 +297,7 @@ OUTER:
 					return nil, err
 				}
 				// recalc key
-				s.currKeys[i] = s.getKeyForIdx(i)
+				s.currKeys[i] = ancestorFromRoot(s.currAncestors[i], s.joinIdx)
 				// check if key has changed
 				if !s.currKeys[i].Equals(maxKey) {
 					// key changed, break out
@@ -298,8 +312,10 @@ OUTER:
 	}
 }
 
-func (s *NestedConjunctionSearcher) getKeyForIdx(i int) index.AncestorID {
-	return s.currAncestors[i][len(s.currAncestors[i])-s.joinIdx-1]
+// ancestorFromRoot gets the AncestorID at the given position from the root
+// if pos is 0, it returns the root AncestorID, and so on
+func ancestorFromRoot(ancestors []index.AncestorID, pos int) index.AncestorID {
+	return ancestors[len(ancestors)-pos-1]
 }
 
 // toAdvanceID converts an AncestorID to IndexInternalID, reusing the advanceID buffer.
@@ -313,6 +329,81 @@ func (s *NestedConjunctionSearcher) toAdvanceID(key index.AncestorID) index.Inde
 }
 
 func (s *NestedConjunctionSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
+	if !s.initialized {
+		done, err := s.initialize(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if done {
+			return nil, nil
+		}
+	}
+	// first check if the docQueue has any buffered matches
+	// if so we first check if any of them can satisfy the Advance(ID)
+	for s.docQueue.Len() > 0 {
+		dm, err := s.docQueue.Dequeue()
+		if err != nil {
+			return nil, err
+		}
+		if dm.IndexInternalID.Compare(ID) >= 0 {
+			return dm, nil
+		}
+		// otherwise recycle this match
+		ctx.DocumentMatchPool.Put(dm)
+	}
+	var err error
+	// now we first get the ancestry chain for the given ID
+	s.ancestors, err = s.nestedReader.Ancestors(ID, s.ancestors[:0])
+	if err != nil {
+		return nil, err
+	}
+	// we now follow the the following logic for each searcher:
+	// let S be the length of the ancestry chain for the searcher
+	// let I be the length of the ancestry chain for the given ID
+	// 1. if S > I:
+	//    then we just Advance() the searcher to the given ID if required
+	// 2. else if S <= I:
+	//    then we get the AncestorID at position (S - 1) from the root of
+	//    the given ID's ancestry chain, and Advance() the searcher to
+	//    it if required
+	for i, searcher := range s.searchers {
+		if s.currs[i] == nil {
+			return nil, nil // already exhausted, nothing to do
+		}
+		var targetID index.IndexInternalID
+		S := len(s.currAncestors[i])
+		I := len(s.ancestors)
+		if S > I {
+			// case 1: S > I
+			targetID = ID
+		} else {
+			// case 2: S <= I
+			targetID = s.toAdvanceID(ancestorFromRoot(s.ancestors, S-1))
+		}
+		if s.currs[i].IndexInternalID.Compare(targetID) < 0 {
+			// need to advance this searcher
+			ctx.DocumentMatchPool.Put(s.currs[i])
+			s.currs[i], err = searcher.Advance(ctx, targetID)
+			if err != nil {
+				return nil, err
+			}
+			if s.currs[i] == nil {
+				// one of the searchers is exhausted, so we are done
+				return nil, nil
+			}
+			// recalc ancestors
+			s.currAncestors[i], err = s.nestedReader.Ancestors(s.currs[i].IndexInternalID, s.currAncestors[i][:0])
+			if err != nil {
+				return nil, err
+			}
+			// recalc key
+			s.currKeys[i] = ancestorFromRoot(s.currAncestors[i], s.joinIdx)
+		}
+	}
+	// we need to call Next() in a loop until we reach or exceed the given ID
+	// the Next() call basically gives us a match that is aligned correctly, but
+	// if joinIdx < I, we can have multiple matches for the same joinIdx ancestor
+	// and they may be < ID, so we need to loop
 	for {
 		next, err := s.Next(ctx)
 		if err != nil {
