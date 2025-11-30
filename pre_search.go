@@ -111,6 +111,52 @@ func (b *bm25PreSearchResultProcessor) finalize(sr *SearchResult) {
 }
 
 // -----------------------------------------------------------------------------
+// SignificantTerms preSearchResultProcessor for handling significant_terms aggregations
+type significantTermsPreSearchResultProcessor struct {
+	mergedStats map[string]*search.SignificantTermsStats
+}
+
+func newSignificantTermsPreSearchResultProcessor() *significantTermsPreSearchResultProcessor {
+	return &significantTermsPreSearchResultProcessor{
+		mergedStats: make(map[string]*search.SignificantTermsStats),
+	}
+}
+
+func (st *significantTermsPreSearchResultProcessor) add(sr *SearchResult, indexName string) {
+	if sr.SignificantTermsStats == nil {
+		return
+	}
+
+	// Merge stats from this index with accumulated stats
+	for field, stats := range sr.SignificantTermsStats {
+		if st.mergedStats[field] == nil {
+			// First time seeing this field, initialize
+			st.mergedStats[field] = &search.SignificantTermsStats{
+				Field:        stats.Field,
+				TotalDocs:    stats.TotalDocs,
+				TermDocFreqs: make(map[string]int64),
+			}
+			// Copy term frequencies
+			for term, freq := range stats.TermDocFreqs {
+				st.mergedStats[field].TermDocFreqs[term] = freq
+			}
+		} else {
+			// Merge with existing stats
+			st.mergedStats[field].TotalDocs += stats.TotalDocs
+			for term, freq := range stats.TermDocFreqs {
+				st.mergedStats[field].TermDocFreqs[term] += freq
+			}
+		}
+	}
+}
+
+func (st *significantTermsPreSearchResultProcessor) finalize(sr *SearchResult) {
+	if len(st.mergedStats) > 0 {
+		sr.SignificantTermsStats = st.mergedStats
+	}
+}
+
+// -----------------------------------------------------------------------------
 // Master struct that can hold any number of presearch result processors
 type compositePreSearchResultProcessor struct {
 	presearchResultProcessors []preSearchResultProcessor
@@ -153,6 +199,12 @@ func createPreSearchResultProcessor(req *SearchRequest, flags *preSearchFlags) p
 	if flags.bm25 {
 		if bm25Processtor := newBM25PreSearchResultProcessor(); bm25Processtor != nil {
 			processors = append(processors, bm25Processtor)
+		}
+	}
+	// Add SignificantTerms processor if the request has significant_terms aggregations
+	if flags.significantTerms {
+		if stProcessor := newSignificantTermsPreSearchResultProcessor(); stProcessor != nil {
+			processors = append(processors, stProcessor)
 		}
 	}
 	// Return based on the number of processors, optimizing for the common case of 1 processor
