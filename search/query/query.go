@@ -375,6 +375,16 @@ func ParseQuery(input []byte) (Query, error) {
 		return &rv, nil
 	}
 
+	_, hasFieldExists := tmp["field_exists"]
+	if hasFieldExists {
+		var rv FieldExistsQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+
 	return nil, fmt.Errorf("unknown query type")
 }
 

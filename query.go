@@ -288,3 +288,9 @@ func NewGeoShapeCircleQuery(coordinates []float64, radius, relation string) (*qu
 func NewGeometryCollectionQuery(coordinates [][][][][]float64, types []string, relation string) (*query.GeoShapeQuery, error) {
 	return query.NewGeometryCollectionQuery(coordinates, types, relation)
 }
+
+// NewFieldExistsQuery creates a new Query for finding documents
+// that contain the specified field, regardless of the field's value.
+func NewFieldExistsQuery(field string) *query.FieldExistsQuery {
+	return query.NewFieldExistsQuery(field)
+}
