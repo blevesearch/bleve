@@ -1109,6 +1109,8 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 	return nil, totalStoredFieldsBytes
 }
 
+const NestedDocumentKey = "_$nested"
+
 // LoadAndHighlightAllFields loads stored fields + highlights for root and its descendants.
 // All descendant documents are collected into a _$nested array in the root DocumentMatch.
 func LoadAndHighlightAllFields(
@@ -1152,7 +1154,7 @@ func LoadAndHighlightAllFields(
 	}
 	// add nested documents to root under _$nested key
 	if len(nestedDocs) > 0 {
-		root.AddFieldValue("_$nested", nestedDocs)
+		root.AddFieldValue(NestedDocumentKey, nestedDocs)
 	}
 	return nil, totalStoredFieldsBytes
 }

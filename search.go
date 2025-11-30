@@ -571,26 +571,74 @@ func (sr *SearchResult) Size() int {
 }
 
 func (sr *SearchResult) String() string {
-	rv := ""
-	if sr.Total > 0 {
-		if sr.Request != nil && sr.Request.Size > 0 {
-			rv = fmt.Sprintf("%d matches, showing %d through %d, took %s\n", sr.Total, sr.Request.From+1, sr.Request.From+len(sr.Hits), sr.Took)
-			for i, hit := range sr.Hits {
-				rv += fmt.Sprintf("%5d. %s (%f)\n", i+sr.Request.From+1, hit.ID, hit.Score)
-				for fragmentField, fragments := range hit.Fragments {
-					rv += fmt.Sprintf("\t%s\n", fragmentField)
-					for _, fragment := range fragments {
-						rv += fmt.Sprintf("\t\t%s\n", fragment)
+	// Helper to format one hit
+	formatHit := func(i int, hit *search.DocumentMatch, start int) string {
+		rv := fmt.Sprintf("%5d. %s (%f)\n", start+i+1, hit.ID, hit.Score)
+		for fragmentField, fragments := range hit.Fragments {
+			rv += fmt.Sprintf("\t%s\n", fragmentField)
+			for _, fragment := range fragments {
+				rv += fmt.Sprintf("\t\t%s\n", fragment)
+			}
+		}
+		for otherFieldName, otherFieldValue := range hit.Fields {
+			if otherFieldName == NestedDocumentKey {
+				continue
+			}
+			if _, ok := hit.Fragments[otherFieldName]; !ok {
+				rv += fmt.Sprintf("\t%s\n", otherFieldName)
+				rv += fmt.Sprintf("\t\t%v\n", otherFieldValue)
+			}
+		}
+		// nested documents
+		if nested, ok := hit.Fields[NestedDocumentKey]; ok {
+			if list, ok := nested.([]*search.NestedDocumentMatch); ok {
+				rv += fmt.Sprintf("\t%s (%d nested documents)\n", NestedDocumentKey, len(list))
+				for ni, nd := range list {
+					rv += fmt.Sprintf("\t\tNested #%d:\n", ni+1)
+					for f, frags := range nd.Fragments {
+						rv += fmt.Sprintf("\t\t\t%s\n", f)
+						for _, frag := range frags {
+							rv += fmt.Sprintf("\t\t\t\t%s\n", frag)
+						}
 					}
-				}
-				for otherFieldName, otherFieldValue := range hit.Fields {
-					if _, ok := hit.Fragments[otherFieldName]; !ok {
-						rv += fmt.Sprintf("\t%s\n", otherFieldName)
-						rv += fmt.Sprintf("\t\t%v\n", otherFieldValue)
+					for f, v := range nd.Fields {
+						if _, ok := nd.Fragments[f]; !ok {
+							rv += fmt.Sprintf("\t\t\t%s\n", f)
+							rv += fmt.Sprintf("\t\t\t\t%v\n", v)
+						}
 					}
 				}
 			}
-		} else {
+		}
+		if len(hit.DecodedSort) > 0 {
+			rv += "\t_sort: ["
+			for i, v := range hit.DecodedSort {
+				if i > 0 {
+					rv += ", "
+				}
+				rv += fmt.Sprintf("%v", v)
+			}
+			rv += "]\n"
+		}
+		return rv
+	}
+	var rv string
+	// main header
+	if sr.Total > 0 {
+		switch {
+		case sr.Request != nil && sr.Request.Size > 0:
+			start := sr.Request.From
+			end := sr.Request.From + len(sr.Hits)
+			rv = fmt.Sprintf("%d matches, showing %d through %d, took %s\n", sr.Total, start+1, end, sr.Took)
+			for i, hit := range sr.Hits {
+				rv += formatHit(i, hit, start)
+			}
+		case sr.Request == nil:
+			rv = fmt.Sprintf("%d matches, took %s\n", sr.Total, sr.Took)
+			for i, hit := range sr.Hits {
+				rv += formatHit(i, hit, 0)
+			}
+		default:
 			rv = fmt.Sprintf("%d matches, took %s\n", sr.Total, sr.Took)
 		}
 	} else {

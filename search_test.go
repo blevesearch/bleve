@@ -5471,7 +5471,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 		data string
 	}{
 		{
-			id: "1",
+			id: "doc1",
 			data: `{
 				"company": {
 					"id": "c1",
@@ -5510,7 +5510,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 			}`,
 		},
 		{
-			id: "2",
+			id: "doc2",
 			data: `{
 				"company" : {
 					"id": "c2",
@@ -5549,7 +5549,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 			}`,
 		},
 		{
-			id: "3",
+			id: "doc3",
 			data: `{
 				"company": {
 					"id": "c3",
@@ -5604,6 +5604,8 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	var buildReq = func(subQueries []query.Query) *SearchRequest {
 		rv := NewSearchRequest(query.NewConjunctionQuery(subQueries))
 		rv.SortBy([]string{"_id"})
+		rv.Fields = []string{"*"}
+		rv.Highlight = NewHighlightWithStyle(ansi.Name)
 		return rv
 	}
 
@@ -5636,7 +5638,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	if len(res.Hits) != 2 {
 		t.Fatalf("expected 2 hit, got %d", len(res.Hits))
 	}
-	if res.Hits[0].ID != "1" || res.Hits[1].ID != "2" {
+	if res.Hits[0].ID != "doc1" || res.Hits[1].ID != "doc2" {
 		t.Fatalf("unexpected hit IDs: %v, %v", res.Hits[0].ID, res.Hits[1].ID)
 	}
 
@@ -5655,7 +5657,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	if len(res.Hits) != 2 {
 		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
 	}
-	if res.Hits[0].ID != "1" || res.Hits[1].ID != "3" {
+	if res.Hits[0].ID != "doc1" || res.Hits[1].ID != "doc3" {
 		t.Fatalf("unexpected hit IDs: %v, %v", res.Hits[0].ID, res.Hits[1].ID)
 	}
 
@@ -5679,7 +5681,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	if len(res.Hits) != 1 {
 		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
 	}
-	if res.Hits[0].ID != "2" {
+	if res.Hits[0].ID != "doc2" {
 		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
 	}
 
@@ -5736,7 +5738,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	if len(res.Hits) != 1 {
 		t.Fatalf("expected 1 hits, got %d", len(res.Hits))
 	}
-	if res.Hits[0].ID != "1" {
+	if res.Hits[0].ID != "doc1" {
 		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
 	}
 
@@ -5793,7 +5795,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	if len(res.Hits) != 1 {
 		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
 	}
-	if res.Hits[0].ID != "2" {
+	if res.Hits[0].ID != "doc2" {
 		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
 	}
 
@@ -5850,7 +5852,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	if len(res.Hits) != 1 {
 		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
 	}
-	if res.Hits[0].ID != "3" {
+	if res.Hits[0].ID != "doc3" {
 		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
 	}
 
@@ -5907,7 +5909,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	if len(res.Hits) != 1 {
 		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
 	}
-	if res.Hits[0].ID != "3" {
+	if res.Hits[0].ID != "doc3" {
 		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
 	}
 
@@ -5941,7 +5943,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	if len(res.Hits) != 1 {
 		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
 	}
-	if res.Hits[0].ID != "2" {
+	if res.Hits[0].ID != "doc2" {
 		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
 	}
 }
