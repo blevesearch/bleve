@@ -207,6 +207,8 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	indexInternalID := dm.IndexInternalID
 	// remember the []interface{} used for sort
 	sort := dm.Sort
+	// remember the []string used for decoded sort
+	decodedSort := dm.DecodedSort
 	// remember the FieldTermLocations backing array
 	ftls := dm.FieldTermLocations
 	for i := range ftls { // recycle the ArrayPositions of each location
@@ -223,10 +225,10 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	// reuse the []interface{} already allocated (and reset len to 0)
 	dm.Sort = sort[:0]
 	// reuse the []string already allocated (and reset len to 0)
-	dm.DecodedSort = dm.DecodedSort[:0]
+	dm.DecodedSort = decodedSort[:0]
 	// reuse the FieldTermLocations already allocated (and reset len to 0)
 	dm.FieldTermLocations = ftls[:0]
-	// reuse the score breakdown map already allocated (after clearing its entries)
+	// reuse the score breakdown map already allocated (after clearing it)
 	dm.ScoreBreakdown = scoreBreakdown
 	return dm
 }
