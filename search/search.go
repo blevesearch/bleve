@@ -215,9 +215,7 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	// remember the score breakdown map
 	scoreBreakdown := dm.ScoreBreakdown
 	// clear out the score breakdown map
-	for k := range scoreBreakdown {
-		delete(scoreBreakdown, k)
-	}
+	clear(scoreBreakdown)
 	// idiom to copy over from empty DocumentMatch (0 allocations)
 	*dm = DocumentMatch{}
 	// reuse the []byte already allocated (and reset len to 0)
