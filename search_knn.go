@@ -466,7 +466,7 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	if err != nil {
 		return nil, err
 	}
-	return knnHits, err
+	return knnHits, nil
 }
 
 func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector) {
