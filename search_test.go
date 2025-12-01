@@ -4558,11 +4558,16 @@ func TestFilteredBooleanQuery(t *testing.T) {
 	titleMapping := mapping.NewTextFieldMapping()
 	titleMapping.Analyzer = en.AnalyzerName
 
+	tagsMapping := mapping.NewNumericFieldMapping()
+	tagsMapping.Store = false
+	tagsMapping.IncludeInAll = false
+
 	priceMapping := mapping.NewNumericFieldMapping()
 	imap.DefaultMapping.AddFieldMappingsAt("genre", genreMapping)
 	imap.DefaultMapping.AddFieldMappingsAt("author", authorMapping)
 	imap.DefaultMapping.AddFieldMappingsAt("title", titleMapping)
 	imap.DefaultMapping.AddFieldMappingsAt("price", priceMapping)
+	imap.DefaultMapping.AddFieldMappingsAt("tags", tagsMapping)
 
 	idx, err := New(tmpIndexPath, imap)
 	if err != nil {
@@ -4586,36 +4591,42 @@ func TestFilteredBooleanQuery(t *testing.T) {
 			"author": "J.D. Salinger",
 			"genre":  "fiction",
 			"price":  9.99,
+			"tags":   []int{1, 2, 3},
 		},
 		{
 			"title":  "Sapiens",
 			"author": "Yuval Noah Harari",
 			"genre":  "non-fiction",
 			"price":  14.29,
+			"tags":   []int{2},
 		},
 		{
 			"title":  "To Kill a Mockingbird",
 			"author": "Harper Lee",
 			"genre":  "fiction",
 			"price":  12,
+			"tags":   []int{},
 		},
 		{
 			"title":  "The Power of Habit",
 			"author": "Charles Duhigg",
 			"genre":  "self-help",
 			"price":  26,
+			"tags":   []int{1, 2},
 		},
 		{
 			"title":  "The Great Gatsby",
 			"author": "F. Scott Fitzgerald",
 			"genre":  "fiction",
 			"price":  22,
+			"tags":   []int{1, 2},
 		},
 		{
 			"title":  "Atomic Habits",
 			"author": "James Clear",
 			"genre":  "self-help",
 			"price":  15,
+			"tags":   []int{3},
 		},
 		{
 			"title":  "Educated",
@@ -4770,6 +4781,28 @@ func TestFilteredBooleanQuery(t *testing.T) {
 		if res.Hits[i].Score != unfilteredScore {
 			t.Fatalf("expected score %f, got %f", unfilteredScore, res.Hits[i].Score)
 		}
+	}
+	// A filtered boolean query requesting all books with tag value 3
+	// The filter is in the Filter clause
+	// Two books have tag value 3
+	p := float64(3)
+	incl := true
+	eqlFilter := NewNumericRangeInclusiveQuery(&p, &p, &incl, &incl)
+	eqlFilter.SetField("tags")
+	q = NewBooleanQuery()
+	q.AddFilter(eqlFilter)
+
+	req = NewSearchRequest(q)
+	req.Fields = []string{"title"}
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Hits.Len() != 2 {
+		t.Fatalf("expected two hits, found '%d'", res.Hits.Len())
+	}
+	if res.Total != 2 {
+		t.Fatalf("expected two total, found '%d'", res.Total)
 	}
 }
 

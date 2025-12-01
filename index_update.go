@@ -92,7 +92,7 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.Update
 	// Compare both the mappings based on the document paths
 	// and create a list of index, docvalues, store differences
 	// for every single field possible
-	fieldInfo := make(map[string]*index.UpdateFieldInfo)
+	fieldInfo := make(map[string]*index.UpdateFieldInfo, len(oriPaths))
 	for path, info := range oriPaths {
 		err = addFieldInfo(fieldInfo, info, updPaths[path])
 		if err != nil {
@@ -109,13 +109,13 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.Update
 		// A field cannot be completely deleted with any dynamic value turned on
 		if info.Deleted {
 			if upd.IndexDynamic {
-				return nil, fmt.Errorf("Mapping cannot be removed when index dynamic is true")
+				return nil, fmt.Errorf("mapping cannot be removed when index dynamic is true")
 			}
 			if upd.StoreDynamic {
-				return nil, fmt.Errorf("Mapping cannot be removed when store dynamic is true")
+				return nil, fmt.Errorf("mapping cannot be removed when store dynamic is true")
 			}
 			if upd.DocValuesDynamic {
-				return nil, fmt.Errorf("Mapping cannot be removed when docvalues dynamic is true")
+				return nil, fmt.Errorf("mapping cannot be removed when docvalues dynamic is true")
 			}
 		}
 	}
@@ -191,14 +191,14 @@ func checkUpdatedMapping(ori, upd *mapping.DocumentMapping) error {
 
 	// Simple checks to ensure no new field mappings present
 	// in updated
+	// Create a map of original field names for O(1) lookup
+	oriFieldNames := make(map[string]bool, len(ori.Fields))
+	for _, fMapping := range ori.Fields {
+		oriFieldNames[fMapping.Name] = true
+	}
+
 	for _, updFMapping := range upd.Fields {
-		var oriFMapping *mapping.FieldMapping
-		for _, fMapping := range ori.Fields {
-			if updFMapping.Name == fMapping.Name {
-				oriFMapping = fMapping
-			}
-		}
-		if oriFMapping == nil {
+		if !oriFieldNames[updFMapping.Name] {
 			return fmt.Errorf("updated index mapping contains new fields")
 		}
 	}
@@ -238,10 +238,8 @@ func addPathInfo(paths map[string]*pathInfo, name string, mp *mapping.DocumentMa
 
 	// Recursively add path information for all child mappings
 	for cName, cMapping := range mp.Properties {
-		var pathName string
-		if name == "" {
-			pathName = cName
-		} else {
+		pathName := cName
+		if name != "" {
 			pathName = name + "." + cName
 		}
 		addPathInfo(paths, pathName, cMapping, im, pInfo, rootName)
@@ -460,9 +458,6 @@ func addFieldInfo(fInfo map[string]*index.UpdateFieldInfo, ori, upd *pathInfo) e
 			}
 		}
 	}
-	if err != nil {
-		return err
-	}
 
 	return nil
 }
@@ -567,19 +562,18 @@ func compareFieldMapping(original, updated *mapping.FieldMapping) (*index.Update
 // In such a situation, any conflicting changes found will abort the update process
 func validateFieldInfo(newInfo *index.UpdateFieldInfo, fInfo map[string]*index.UpdateFieldInfo,
 	ori *pathInfo, oriFMapInfo *fieldMapInfo) error {
+	// Determine field name
+	fieldName := oriFMapInfo.fieldMapping.Name
+	if fieldName == "" {
+		fieldName = oriFMapInfo.parent.path
+	}
+
+	// Construct full name with parent path
 	var name string
 	if oriFMapInfo.parent.parentPath == "" {
-		if oriFMapInfo.fieldMapping.Name == "" {
-			name = oriFMapInfo.parent.path
-		} else {
-			name = oriFMapInfo.fieldMapping.Name
-		}
+		name = fieldName
 	} else {
-		if oriFMapInfo.fieldMapping.Name == "" {
-			name = oriFMapInfo.parent.parentPath + "." + oriFMapInfo.parent.path
-		} else {
-			name = oriFMapInfo.parent.parentPath + "." + oriFMapInfo.fieldMapping.Name
-		}
+		name = oriFMapInfo.parent.parentPath + "." + fieldName
 	}
 	if (newInfo.Deleted || newInfo.Index || newInfo.DocValues || newInfo.Store) && ori.dynamic {
 		return fmt.Errorf("updated field is under a dynamic property")

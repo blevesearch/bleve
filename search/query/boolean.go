@@ -185,17 +185,36 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 		if err != nil {
 			return nil, err
 		}
+		var init bool
+		var refDoc *search.DocumentMatch
 		filterFunc = func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
-			// Attempt to advance the filter searcher to the document identified by
-			// the base searcher's (unfiltered boolean) current result (d.IndexInternalID).
-			//
-			// If the filter searcher successfully finds a document with the same
-			// internal ID, it means the document satisfies the filter and should be kept.
-			//
-			// If the filter searcher returns an error, does not find a matching document,
-			// or finds a document with a different internal ID, the document should be discarded.
-			dm, err := filterSearcher.Advance(sctx, d.IndexInternalID)
-			return err == nil && dm != nil && bytes.Equal(dm.IndexInternalID, d.IndexInternalID)
+			// Initialize the reference document to point
+			// to the first document in the filterSearcher
+			var err error
+			if !init {
+				refDoc, err = filterSearcher.Next(sctx)
+				if err != nil {
+					return false
+				}
+				init = true
+			}
+			if refDoc == nil {
+				// filterSearcher is exhausted, d is not in filter
+				return false
+			}
+			// Compare document IDs
+			cmp := bytes.Compare(refDoc.IndexInternalID, d.IndexInternalID)
+			if cmp < 0 {
+				// filterSearcher is behind the current document, Advance() it
+				refDoc, err = filterSearcher.Advance(sctx, d.IndexInternalID)
+				if err != nil || refDoc == nil {
+					return false
+				}
+				// After advance, check if they're now equal
+				return bytes.Equal(refDoc.IndexInternalID, d.IndexInternalID)
+			}
+			// cmp >= 0: either equal (match) or filterSearcher is ahead (no match)
+			return cmp == 0
 		}
 	}
 

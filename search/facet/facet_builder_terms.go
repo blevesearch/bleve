@@ -15,7 +15,9 @@
 package facet
 
 import (
+	"bytes"
 	"reflect"
+	"regexp"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -30,12 +32,14 @@ func init() {
 }
 
 type TermsFacetBuilder struct {
-	size       int
-	field      string
-	termsCount map[string]int
-	total      int
-	missing    int
-	sawValue   bool
+	size        int
+	field       string
+	prefixBytes []byte
+	regex       *regexp.Regexp
+	termsCount  map[string]int
+	total       int
+	missing     int
+	sawValue    bool
 }
 
 func NewTermsFacetBuilder(field string, size int) *TermsFacetBuilder {
@@ -48,7 +52,16 @@ func NewTermsFacetBuilder(field string, size int) *TermsFacetBuilder {
 
 func (fb *TermsFacetBuilder) Size() int {
 	sizeInBytes := reflectStaticSizeTermsFacetBuilder + size.SizeOfPtr +
-		len(fb.field)
+		len(fb.field) +
+		len(fb.prefixBytes) +
+		size.SizeOfPtr // regex pointer (does not include actual regexp.Regexp object size)
+
+	// Estimate regex object size if present.
+	if fb.regex != nil {
+		// This is only the static size of regexp.Regexp struct, not including heap allocations.
+		sizeInBytes += int(reflect.TypeOf(*fb.regex).Size())
+		// NOTE: Actual memory usage of regexp.Regexp may be higher due to internal allocations.
+	}
 
 	for k := range fb.termsCount {
 		sizeInBytes += size.SizeOfString + len(k) +
@@ -62,10 +75,39 @@ func (fb *TermsFacetBuilder) Field() string {
 	return fb.field
 }
 
+// SetPrefixFilter sets the prefix filter for term facets.
+func (fb *TermsFacetBuilder) SetPrefixFilter(prefix string) {
+	if prefix != "" {
+		fb.prefixBytes = []byte(prefix)
+	} else {
+		fb.prefixBytes = nil
+	}
+}
+
+// SetRegexFilter sets the compiled regex filter for term facets.
+func (fb *TermsFacetBuilder) SetRegexFilter(regex *regexp.Regexp) {
+	fb.regex = regex
+}
+
 func (fb *TermsFacetBuilder) UpdateVisitor(term []byte) {
-	fb.sawValue = true
-	fb.termsCount[string(term)] = fb.termsCount[string(term)] + 1
+	// Total represents all terms visited, not just matching ones.
+	// This is necessary for the "Other" calculation.
 	fb.total++
+
+	// Fast prefix check on []byte - zero allocation
+	if len(fb.prefixBytes) > 0 && !bytes.HasPrefix(term, fb.prefixBytes) {
+		return
+	}
+
+	// Fast regex check on []byte - zero allocation
+	if fb.regex != nil && !fb.regex.Match(term) {
+		return
+	}
+
+	// Only convert to string if term matches filters
+	termStr := string(term)
+	fb.sawValue = true
+	fb.termsCount[termStr] = fb.termsCount[termStr] + 1
 }
 
 func (fb *TermsFacetBuilder) StartDoc() {
