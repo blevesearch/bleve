@@ -5310,8 +5310,7 @@ func TestNestedPrefixes(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		err = idx.Close()
-		if err != nil {
+		if err := idx.Close(); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -5321,88 +5320,121 @@ func TestNestedPrefixes(t *testing.T) {
 		t.Fatal("index mapping is not a NestedMapping")
 	}
 
+	// ----------------------------------------------------------------------
 	// Test 1: Employee Role AND Employee Name
+	// ----------------------------------------------------------------------
 	fs := search.NewFieldSet()
 	fs.AddField("company.departments.employees.role")
 	fs.AddField("company.departments.employees.name")
 
-	// Expected depth is 2 (employees are nested within departments)
-	expectedDepth := 2
+	expectedCommon := 2
+	expectedMax := 2
 
-	actualDepth := nmap.CoveringDepth(fs)
-	if actualDepth != expectedDepth {
-		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	common, max := nmap.NestedDepth(fs)
+	if common != expectedCommon || max != expectedMax {
+		t.Fatalf("Test1: expected (common=%d, max=%d), got (common=%d, max=%d)",
+			expectedCommon, expectedMax, common, max)
 	}
 
+	// ----------------------------------------------------------------------
 	// Test 2: Employee Role AND Employee Name AND Department Name
+	// ----------------------------------------------------------------------
 	fs = search.NewFieldSet()
 	fs.AddField("company.departments.employees.role")
 	fs.AddField("company.departments.employees.name")
 	fs.AddField("company.departments.name")
-	// Expected depth is 1 (employees and department share the same department context)
-	expectedDepth = 1
 
-	actualDepth = nmap.CoveringDepth(fs)
-	if actualDepth != expectedDepth {
-		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	expectedCommon = 1
+	expectedMax = 2 // employees nested deeper
+
+	common, max = nmap.NestedDepth(fs)
+	if common != expectedCommon || max != expectedMax {
+		t.Fatalf("Test2: expected (common=%d, max=%d), got (common=%d, max=%d)",
+			expectedCommon, expectedMax, common, max)
 	}
 
+	// ----------------------------------------------------------------------
 	// Test 3: Employee Role AND Location City
+	// ----------------------------------------------------------------------
 	fs = search.NewFieldSet()
 	fs.AddField("company.departments.employees.role")
 	fs.AddField("company.locations.city")
-	// Expected depth is 0 (employees and locations are in different nested contexts)
-	expectedDepth = 0
 
-	actualDepth = nmap.CoveringDepth(fs)
-	if actualDepth != expectedDepth {
-		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	expectedCommon = 0
+	expectedMax = 2 // employees deeper than locations (1)
+
+	common, max = nmap.NestedDepth(fs)
+	if common != expectedCommon || max != expectedMax {
+		t.Fatalf("Test3: expected (common=%d, max=%d), got (common=%d, max=%d)",
+			expectedCommon, expectedMax, common, max)
 	}
 
+	// ----------------------------------------------------------------------
 	// Test 4: Company Name AND Location Country
+	// ----------------------------------------------------------------------
 	fs = search.NewFieldSet()
 	fs.AddField("company.name")
 	fs.AddField("company.locations.country")
 	fs.AddField("company.locations.city")
-	// Expected depth is 0 (company.name is at root, locations are nested)
-	expectedDepth = 0
-	actualDepth = nmap.CoveringDepth(fs)
-	if actualDepth != expectedDepth {
-		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+
+	expectedCommon = 0
+	expectedMax = 1 // locations.country and locations.city share depth 1
+
+	common, max = nmap.NestedDepth(fs)
+	if common != expectedCommon || max != expectedMax {
+		t.Fatalf("Test4: expected (common=%d, max=%d), got (common=%d, max=%d)",
+			expectedCommon, expectedMax, common, max)
 	}
 
+	// ----------------------------------------------------------------------
 	// Test 5: Department Budget AND Project Status AND Employee Name
+	// ----------------------------------------------------------------------
 	fs = search.NewFieldSet()
 	fs.AddField("company.departments.budget")
 	fs.AddField("company.departments.projects.status")
 	fs.AddField("company.departments.employees.name")
-	// Expected depth is 1 (all share the same department context)
-	expectedDepth = 1
-	actualDepth = nmap.CoveringDepth(fs)
-	if actualDepth != expectedDepth {
-		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+
+	expectedCommon = 1
+	expectedMax = 2 // employees + projects go deeper
+
+	common, max = nmap.NestedDepth(fs)
+	if common != expectedCommon || max != expectedMax {
+		t.Fatalf("Test5: expected (common=%d, max=%d), got (common=%d, max=%d)",
+			expectedCommon, expectedMax, common, max)
 	}
 
-	// Test 6: Single Field - Company ID
+	// ----------------------------------------------------------------------
+	// Test 6: Single Field
+	// ----------------------------------------------------------------------
 	fs = search.NewFieldSet()
 	fs.AddField("company.id")
-	// Expected depth is 0 (company.id is at root)
-	expectedDepth = 0
-	actualDepth = nmap.CoveringDepth(fs)
-	if actualDepth != expectedDepth {
-		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+
+	expectedCommon = 0
+	expectedMax = 0
+
+	common, max = nmap.NestedDepth(fs)
+	if common != expectedCommon || max != expectedMax {
+		t.Fatalf("Test6: expected (common=%d, max=%d), got (common=%d, max=%d)",
+			expectedCommon, expectedMax, common, max)
 	}
 
+	// ----------------------------------------------------------------------
 	// Test 7: No Fields
+	// ----------------------------------------------------------------------
 	fs = search.NewFieldSet()
-	// Expected depth is 0 (no fields)
-	expectedDepth = 0
-	actualDepth = nmap.CoveringDepth(fs)
-	if actualDepth != expectedDepth {
-		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+
+	expectedCommon = 0
+	expectedMax = 0
+
+	common, max = nmap.NestedDepth(fs)
+	if common != expectedCommon || max != expectedMax {
+		t.Fatalf("Test7: expected (common=%d, max=%d), got (common=%d, max=%d)",
+			expectedCommon, expectedMax, common, max)
 	}
 
+	// ----------------------------------------------------------------------
 	// Test 8: All Fields
+	// ----------------------------------------------------------------------
 	fs = search.NewFieldSet()
 	fs.AddField("company.id")
 	fs.AddField("company.name")
@@ -5414,36 +5446,47 @@ func TestNestedPrefixes(t *testing.T) {
 	fs.AddField("company.departments.projects.status")
 	fs.AddField("company.locations.city")
 	fs.AddField("company.locations.country")
-	// Expected depth is 0 (fields span multiple nested contexts)
-	expectedDepth = 0
-	actualDepth = nmap.CoveringDepth(fs)
-	if actualDepth != expectedDepth {
-		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+
+	expectedCommon = 0 // spans different contexts
+	expectedMax = 2
+
+	common, max = nmap.NestedDepth(fs)
+	if common != expectedCommon || max != expectedMax {
+		t.Fatalf("Test8: expected (common=%d, max=%d), got (common=%d, max=%d)",
+			expectedCommon, expectedMax, common, max)
 	}
 
+	// ----------------------------------------------------------------------
 	// Test 9: Project Title AND Project Status
+	// ----------------------------------------------------------------------
 	fs = search.NewFieldSet()
 	fs.AddField("company.departments.projects.title")
 	fs.AddField("company.departments.projects.status")
-	// Expected depth is 2 (projects are nested within departments)
-	expectedDepth = 2
-	actualDepth = nmap.CoveringDepth(fs)
-	if actualDepth != expectedDepth {
-		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+
+	expectedCommon = 2
+	expectedMax = 2
+
+	common, max = nmap.NestedDepth(fs)
+	if common != expectedCommon || max != expectedMax {
+		t.Fatalf("Test9: expected (common=%d, max=%d), got (common=%d, max=%d)",
+			expectedCommon, expectedMax, common, max)
 	}
 
+	// ----------------------------------------------------------------------
 	// Test 10: Department Name AND Location Country
+	// ----------------------------------------------------------------------
 	fs = search.NewFieldSet()
 	fs.AddField("company.departments.name")
 	fs.AddField("company.locations.country")
 	fs.AddField("company.locations.city")
 
-	// Expected depth is 0 (departments and locations are in different nested contexts)
-	expectedDepth = 0
+	expectedCommon = 0
+	expectedMax = 1 // locations share depth 1
 
-	actualDepth = nmap.CoveringDepth(fs)
-	if actualDepth != expectedDepth {
-		t.Fatalf("expected depth %d, got %d", expectedDepth, actualDepth)
+	common, max = nmap.NestedDepth(fs)
+	if common != expectedCommon || max != expectedMax {
+		t.Fatalf("Test10: expected (common=%d, max=%d), got (common=%d, max=%d)",
+			expectedCommon, expectedMax, common, max)
 	}
 }
 

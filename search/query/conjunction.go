@@ -101,7 +101,14 @@ func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 	}
 
 	if nestedMode {
-		return searcher.NewNestedConjunctionSearcher(ctx, i, ss, nm.CoveringDepth(qfs), options)
+		// first determine the nested depth info for the query fields
+		commonDepth, maxDepth := nm.NestedDepth(qfs)
+		// if we have common depth == max depth then we can just use
+		// the normal conjunction searcher, as all fields share the same
+		// nested context, otherwise we need to use the nested conjunction searcher
+		if commonDepth < maxDepth {
+			return searcher.NewNestedConjunctionSearcher(ctx, i, ss, commonDepth, options)
+		}
 	}
 
 	return searcher.NewConjunctionSearcher(ctx, i, ss, options)

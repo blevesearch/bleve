@@ -79,9 +79,12 @@ type SynonymMapping interface {
 // A NestedMapping extends the IndexMapping interface to provide
 // additional methods for working with nested object mappings.
 type NestedMapping interface {
-	// CoveringDepth returns the deepest nested
-	// level common to all field paths
-	CoveringDepth(fieldPaths search.FieldSet) int
+	// NestedDepth returns two values:
+	//   - common: the highest nested level that is common to all given field paths,
+	//     if 0 then there is no common nested level among the given field paths
+	//   - max: the highest nested level that applies to at least one of the given field paths
+	//     if 0 then none of the given field paths are nested
+	NestedDepth(fieldPaths search.FieldSet) (int, int)
 
 	// IntersectsPrefix returns true if any of the given
 	// field paths intersect with a known nested prefix

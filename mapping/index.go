@@ -588,17 +588,18 @@ func (im *IndexMappingImpl) SynonymSourceVisitor(visitor analysis.SynonymSourceV
 	return nil
 }
 
-func (im *IndexMappingImpl) buildNestedPrefixes() {
+func (im *IndexMappingImpl) buildNestedPrefixes() map[string]int {
+	prefixDepth := make(map[string]int)
 	var collectNestedFields func(dm *DocumentMapping, pathComponents []string, currentDepth int)
 	collectNestedFields = func(dm *DocumentMapping, pathComponents []string, currentDepth int) {
 		for name, docMapping := range dm.Properties {
 			newPathComponents := append(pathComponents, name)
 			if docMapping.Nested {
 				// This is a nested field boundary
-				path := strings.Join(newPathComponents, ".")
-				im.cache.NestedPrefixes.AddPrefix(path, currentDepth+1)
+				newDepth := currentDepth + 1
+				prefixDepth[strings.Join(newPathComponents, pathSeparator)] = newDepth
 				// Continue deeper with incremented depth
-				collectNestedFields(docMapping, newPathComponents, currentDepth+1)
+				collectNestedFields(docMapping, newPathComponents, newDepth)
 			} else {
 				// Not nested, continue with same depth
 				collectNestedFields(docMapping, newPathComponents, currentDepth)
@@ -615,18 +616,19 @@ func (im *IndexMappingImpl) buildNestedPrefixes() {
 			collectNestedFields(docMapping, []string{}, 0)
 		}
 	}
+	return prefixDepth
 }
 
-func (im *IndexMappingImpl) CoveringDepth(fs search.FieldSet) int {
+func (im *IndexMappingImpl) NestedDepth(fs search.FieldSet) (int, int) {
 	if im.cache == nil || im.cache.NestedPrefixes == nil {
-		return 0
+		return 0, 0
 	}
 
-	im.cache.NestedPrefixes.InitOnce(func() {
-		im.buildNestedPrefixes()
+	im.cache.NestedPrefixes.InitOnce(func() map[string]int {
+		return im.buildNestedPrefixes()
 	})
 
-	return im.cache.NestedPrefixes.CoveringDepth(fs)
+	return im.cache.NestedPrefixes.NestedDepth(fs)
 }
 
 func (im *IndexMappingImpl) CountNested() int {
@@ -634,8 +636,8 @@ func (im *IndexMappingImpl) CountNested() int {
 		return 0
 	}
 
-	im.cache.NestedPrefixes.InitOnce(func() {
-		im.buildNestedPrefixes()
+	im.cache.NestedPrefixes.InitOnce(func() map[string]int {
+		return im.buildNestedPrefixes()
 	})
 
 	return im.cache.NestedPrefixes.CountNested()
@@ -646,8 +648,8 @@ func (im *IndexMappingImpl) IntersectsPrefix(fs search.FieldSet) bool {
 		return false
 	}
 
-	im.cache.NestedPrefixes.InitOnce(func() {
-		im.buildNestedPrefixes()
+	im.cache.NestedPrefixes.InitOnce(func() map[string]int {
+		return im.buildNestedPrefixes()
 	})
 
 	return im.cache.NestedPrefixes.IntersectsPrefix(fs)
