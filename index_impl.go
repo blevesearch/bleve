@@ -799,7 +799,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	// if score fusion, no faceting for knn hits is done
 	// hence we can skip setting the knn hits in the collector
 	if !contextScoreFusionKeyExists {
-		setKnnHitsInCollector(knnHits, req, coll)
+		setKnnHitsInCollector(knnHits, coll)
 	}
 
 	if fts != nil {

@@ -78,7 +78,7 @@ type TopNCollector struct {
 	searchAfter               *search.DocumentMatch
 
 	knnHits             map[string]*search.DocumentMatch
-	computeNewScoreExpl search.ScoreExplCorrectionCallbackFunc
+	hybridMergeCallback search.HybridMergeCallbackFn
 
 	nestedStore *collectStoreNested
 }
@@ -385,7 +385,6 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		// we may have some knn hits left that did not match any of the top N tf-idf hits
 		// we need to add them to the collector store to consider them as well.
 		for _, knnDoc := range hc.knnHits {
-			// no descendants for knn docs
 			err = hc.prepareDocumentMatch(searchContext, reader, knnDoc, true)
 			if err != nil {
 				return err
@@ -435,7 +434,10 @@ func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 			return err
 		}
 		if knnHit, ok := hc.knnHits[d.ID]; ok {
-			d.Score, d.Expl = hc.computeNewScoreExpl(d, knnHit)
+			// we have a knn hit corresponding to this document
+			hc.hybridMergeCallback(d, knnHit)
+			// remove this knn hit from the map as it's already
+			// been merged
 			delete(hc.knnHits, d.ID)
 		}
 	}
@@ -656,10 +658,10 @@ func (hc *TopNCollector) FacetResults() search.FacetResults {
 	return nil
 }
 
-func (hc *TopNCollector) SetKNNHits(knnHits search.DocumentMatchCollection, newScoreExplComputer search.ScoreExplCorrectionCallbackFunc) {
+func (hc *TopNCollector) SetKNNHits(knnHits search.DocumentMatchCollection, hybridMergeCallback search.HybridMergeCallbackFn) {
 	hc.knnHits = make(map[string]*search.DocumentMatch, len(knnHits))
 	for _, hit := range knnHits {
 		hc.knnHits[hit.ID] = hit
 	}
-	hc.computeNewScoreExpl = newScoreExplComputer
+	hc.hybridMergeCallback = hybridMergeCallback
 }
