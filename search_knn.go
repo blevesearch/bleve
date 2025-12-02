@@ -424,7 +424,7 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 			return nil, err
 		}
 		knnFilterResults[idx] = filterColl.EligibleSelector()
-		// Close the filter searcher once done
+		// Close the filter searcher, as we are done with it.
 		err = filterSearcher.Close()
 		if err != nil {
 			return nil, err
@@ -458,11 +458,6 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	knnHits = knnCollector.Results()
 	if !preSearch {
 		knnHits = finalizeKNNResults(req, knnHits)
-	}
-	// close the knn searcher once done
-	err = knnSearcher.Close()
-	if err != nil {
-		return nil, err
 	}
 	// at this point, irrespective of whether it is a preSearch or not,
 	// the knn hits are populated with Sort and Fields.
