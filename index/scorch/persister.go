@@ -173,7 +173,9 @@ OUTER:
 				// the retry attempt
 				unpersistedCallbacks = append(unpersistedCallbacks, ourPersistedCallbacks...)
 
-				s.fireAsyncError(fmt.Errorf("got err persisting snapshot: %v", err))
+				s.fireAsyncError(&AsyncPersistError{
+					errMsg: fmt.Sprintf("got err persisting snapshot: %v", err),
+				})
 				_ = ourSnapshot.DecRef()
 				atomic.AddUint64(&s.stats.TotPersistLoopErr, 1)
 				continue OUTER

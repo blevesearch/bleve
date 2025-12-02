@@ -98,6 +98,16 @@ func (e *AsyncPanicError) Error() string {
 	return fmt.Sprintf("%s panic when processing %s", e.Source, e.Path)
 }
 
+// AsyncPersistError is an error that occurs when there is an issue with persisting segments to disk
+// It is also passed to scorch asyncErrorHandler in case of a persistence issue
+type AsyncPersistError struct {
+	errMsg string
+}
+
+func (e *AsyncPersistError) Error() string {
+	return e.errMsg
+}
+
 type internalStats struct {
 	persistEpoch          uint64
 	persistSnapshotSize   uint64
