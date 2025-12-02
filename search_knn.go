@@ -447,7 +447,10 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 			err = serr
 		}
 	}()
-	knnCollector := collector.NewKNNCollector(kArray, sumOfK)
+	knnCollector, err := i.buildKNNCollector(ctx, KNNQuery, reader, kArray, sumOfK)
+	if err != nil {
+		return nil, err
+	}
 	err = knnCollector.Collect(ctx, knnSearcher, reader)
 	if err != nil {
 		return nil, err
