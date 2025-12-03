@@ -193,12 +193,15 @@ func (im *IndexMappingImpl) Validate() error {
 			return err
 		}
 	}
+	// fieldAliasCtx is used to detect any field alias conflicts across the entire mapping
+	// the map will hold the fully qualified field name to FieldMapping, so we can
+	// check for conflicts as we validate each DocumentMapping.
 	fieldAliasCtx := make(map[string]*FieldMapping)
 	// ensure that the nested property is not set for top-level default mapping
 	if im.DefaultMapping.Nested {
 		return fmt.Errorf("default mapping cannot be nested")
 	}
-	err = im.DefaultMapping.Validate(im.cache, "", fieldAliasCtx)
+	err = im.DefaultMapping.Validate(im.cache, []string{}, fieldAliasCtx)
 	if err != nil {
 		return err
 	}
@@ -207,7 +210,7 @@ func (im *IndexMappingImpl) Validate() error {
 		if docMapping.Nested {
 			return fmt.Errorf("type mapping named: %s cannot be nested", name)
 		}
-		err = docMapping.Validate(im.cache, "", fieldAliasCtx)
+		err = docMapping.Validate(im.cache, []string{}, fieldAliasCtx)
 		if err != nil {
 			return err
 		}
