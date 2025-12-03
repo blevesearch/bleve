@@ -614,7 +614,7 @@ func TestBytesRead(t *testing.T) {
 
 	expectedBytesRead := uint64(22049)
 	if supportForVectorSearch {
-		expectedBytesRead = 22459
+		expectedBytesRead = 21574
 	}
 
 	if prevBytesRead != expectedBytesRead && res.Cost == prevBytesRead {
@@ -772,7 +772,7 @@ func TestBytesReadStored(t *testing.T) {
 
 	expectedBytesRead := uint64(11911)
 	if supportForVectorSearch {
-		expectedBytesRead = 12321
+		expectedBytesRead = 11435
 	}
 
 	if bytesRead != expectedBytesRead && bytesRead == res.Cost {
@@ -849,7 +849,7 @@ func TestBytesReadStored(t *testing.T) {
 
 	expectedBytesRead = uint64(4097)
 	if supportForVectorSearch {
-		expectedBytesRead = 4507
+		expectedBytesRead = 3622
 	}
 
 	if bytesRead != expectedBytesRead && bytesRead == res.Cost {

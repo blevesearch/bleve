@@ -2071,7 +2071,6 @@ func TestIndexInsightsCentroidCardinalities(t *testing.T) {
 		}
 	}
 }
-
 func TestVectorObjectArray(t *testing.T) {
 	// Setup 6 documents each with one vector field
 	tmpIndexPath := createTmpIndexPath(t)
@@ -2083,9 +2082,13 @@ func TestVectorObjectArray(t *testing.T) {
 	vecFieldMapping.Similarity = index.CosineSimilarity
 	indexMapping.DefaultMapping.AddFieldMappingsAt("vec", vecFieldMapping)
 
-	arrayMapping := mapping.NewDocumentMapping()
-	indexMapping.DefaultMapping.AddSubDocumentMapping("vectors", arrayMapping)
-	arrayMapping.AddFieldMappingsAt("vec", vecFieldMapping)
+	arrayFlatMapping := mapping.NewDocumentMapping()
+	arrayFlatMapping.AddFieldMappingsAt("vec", vecFieldMapping)
+	indexMapping.DefaultMapping.AddSubDocumentMapping("vectors", arrayFlatMapping)
+
+	// arrayNestedMapping := mapping.NewNestedDocumentMapping()
+	// indexMapping.DefaultMapping.AddSubDocumentMapping("vectors_nested", arrayNestedMapping)
+	// arrayNestedMapping.AddFieldMappingsAt("vec", vecFieldMapping)
 
 	index, err := New(tmpIndexPath, indexMapping)
 	if err != nil {
@@ -2105,6 +2108,10 @@ func TestVectorObjectArray(t *testing.T) {
 		`{"vec": [10, 11, 12]}`,
 		`{"vec": [13, 14, 15]}`,
 		`{"vec": [16, 17, 18]}`,
+		`{"vectors": [ {"vec": [1, 2, 3]}, {"vec": [4, 5, 6]}, {"vec": [7, 8, 9]}]}`,
+		`{"vectors": [ {"vec": [10, 11, 12]}, {"vec": [13, 14, 15]}, {"vec": [16, 17, 18]}]}`,
+		// `{"vectors_nested": [ {"vec": [1, 2, 3]}, {"vec": [4, 5, 6]}, {"vec": [7, 8, 9]}]}`,
+		// `{"vectors_nested": [ {"vec": [10, 11, 12]}, {"vec": [13, 14, 15]}, {"vec": [16, 17, 18]}]}`,
 	}
 	docs := make([]map[string]interface{}, 0, len(docsString))
 	for _, docStr := range docsString {
@@ -2132,7 +2139,6 @@ func TestVectorObjectArray(t *testing.T) {
 	// Search with simple single-vector documents
 	searchRequest := NewSearchRequest(NewMatchNoneQuery())
 	searchRequest.AddKNN("vec", []float32{1, 2, 3}, 3, 1.0)
-	searchRequest.Explain = true
 
 	result, err := index.Search(searchRequest)
 	if err != nil {
@@ -2158,39 +2164,11 @@ func TestVectorObjectArray(t *testing.T) {
 			t.Fatalf("for doc ID %s, expected score %.3f, got %.3f", hit.ID, expectedScore, hit.Score)
 		}
 	}
-
-	// Now create 2 docs with 3 vectors each
-	docsString = []string{
-		`{"vectors": [ {"vec": [1, 2, 3]}, {"vec": [4, 5, 6]}, {"vec": [7, 8, 9]}]}`,
-		`{"vectors": [ {"vec": [10, 11, 12]}, {"vec": [13, 14, 15]}, {"vec": [16, 17, 18]}]}`,
-	}
-	docs = make([]map[string]interface{}, 0, len(docsString))
-	for _, docStr := range docsString {
-		var doc map[string]interface{}
-		err = json.Unmarshal([]byte(docStr), &doc)
-		if err != nil {
-			t.Fatal(err)
-		}
-		docs = append(docs, doc)
-	}
-
-	batch = index.NewBatch()
-	for i, doc := range docs {
-		err = batch.Index(fmt.Sprintf("doc-multi-%d", i+1), doc)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	err = index.Batch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// Search again with the same vector
-	searchRequest = NewSearchRequest(NewMatchNoneQuery())
-	searchRequest.AddKNN("vectors.vec", []float32{1, 2, 3}, 3, 1.0)
+	searchRequestFlat := NewSearchRequest(NewMatchNoneQuery())
+	searchRequestFlat.AddKNN("vectors.vec", []float32{1, 2, 3}, 3, 1.0)
 
-	result, err = index.Search(searchRequest)
+	result, err = index.Search(searchRequestFlat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2200,7 +2178,7 @@ func TestVectorObjectArray(t *testing.T) {
 	}
 
 	expectedResult = map[string]float64{
-		"doc-multi-1": 1.0, // best score from the 3 vectors
+		"doc-7": 1.0, // best score from the 3 vectors
 	}
 
 	for _, hit := range result.Hits {
