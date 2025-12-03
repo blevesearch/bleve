@@ -532,6 +532,10 @@ func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*
 					// Also update the explanation for this query index if Explain is enabled.
 					// Both Expl.Children slices are of size len(req.KNN), so indexing by k is safe.
 					if req.Explain {
+						// just defensive check to ensure that the Children slice is valid
+						if len(lastUniqueHit.Expl.Children) <= k {
+							lastUniqueHit.Expl.Children = append(lastUniqueHit.Expl.Children, make([]*search.Explanation, k-len(lastUniqueHit.Expl.Children)+1)...)
+						}
 						lastUniqueHit.Expl.Children[k] = currHit.Expl.Children[k]
 					}
 				}
