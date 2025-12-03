@@ -173,11 +173,6 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	if !ok {
 		return
 	}
-
-	decodedVector, err := document.DecodeVector(encodedString)
-	if err != nil || len(decodedVector) != fm.Dims {
-		return
-	}
 	// Apply defaults for similarity and optimization if not set
 	similarity := fm.Similarity
 	if similarity == "" {
@@ -186,6 +181,10 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	vectorIndexOptimizedFor := fm.VectorIndexOptimizedFor
 	if vectorIndexOptimizedFor == "" {
 		vectorIndexOptimizedFor = index.DefaultIndexOptimization
+	}
+	decodedVector, err := document.DecodeVector(encodedString)
+	if err != nil || len(decodedVector) != fm.Dims {
+		return
 	}
 	// normalize raw vector if similarity is cosine
 	if similarity == index.CosineSimilarity {
