@@ -2129,7 +2129,7 @@ func TestVectorObjectArray(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Search with a vector that is an array of objects
+	// Search with simple single-vector documents
 	searchRequest := NewSearchRequest(NewMatchNoneQuery())
 	searchRequest.AddKNN("vec", []float32{1, 2, 3}, 3, 1.0)
 	searchRequest.Explain = true

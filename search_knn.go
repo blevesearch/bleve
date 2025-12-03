@@ -520,10 +520,19 @@ func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*
 		} else {
 			// we have encountered a duplicate document, so we need to
 			// union the score breakdowns, retaining the best score
-			// per knn query
+			// per knn query, while also merging the explanations if req.Explain is true.
 			for k, score := range currHit.ScoreBreakdown {
-				if score > lastUniqueHit.ScoreBreakdown[k] {
+				if existing, ok := lastUniqueHit.ScoreBreakdown[k]; !ok || score > existing {
 					lastUniqueHit.ScoreBreakdown[k] = score
+					// Also update the explanation for this query index if Explain is enabled.
+					// Both Expl.Children slices are of size len(req.KNN), so indexing by k is safe.
+					if req.Explain {
+						// just defensive check to ensure that the Children slice is valid
+						if len(lastUniqueHit.Expl.Children) <= k {
+							lastUniqueHit.Expl.Children = append(lastUniqueHit.Expl.Children, make([]*search.Explanation, k-len(lastUniqueHit.Expl.Children)+1)...)
+						}
+						lastUniqueHit.Expl.Children[k] = currHit.Expl.Children[k]
+					}
 				}
 			}
 		}
