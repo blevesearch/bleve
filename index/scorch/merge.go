@@ -110,7 +110,7 @@ OUTER:
 						ctrlMsg = nil
 						break OUTER
 					}
-					s.fireAsyncError(&AsyncPersistError{
+					s.fireAsyncError(&PersistError{
 						errMsg: fmt.Sprintf("merging err: %v", err),
 					})
 					_ = ourSnapshot.DecRef()

@@ -173,7 +173,7 @@ OUTER:
 				// the retry attempt
 				unpersistedCallbacks = append(unpersistedCallbacks, ourPersistedCallbacks...)
 
-				s.fireAsyncError(&AsyncPersistError{
+				s.fireAsyncError(&PersistError{
 					errMsg: fmt.Sprintf("got err persisting snapshot: %v", err),
 				})
 				_ = ourSnapshot.DecRef()
