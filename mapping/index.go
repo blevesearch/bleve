@@ -191,13 +191,16 @@ func (im *IndexMappingImpl) Validate() error {
 			return err
 		}
 	}
+	// fieldAliasCtx is used to detect any field alias conflicts across the entire mapping
+	// the map will hold the fully qualified field name to FieldMapping, so we can
+	// check for conflicts as we validate each DocumentMapping.
 	fieldAliasCtx := make(map[string]*FieldMapping)
-	err = im.DefaultMapping.Validate(im.cache, "", fieldAliasCtx)
+	err = im.DefaultMapping.Validate(im.cache, []string{}, fieldAliasCtx)
 	if err != nil {
 		return err
 	}
 	for _, docMapping := range im.TypeMapping {
-		err = docMapping.Validate(im.cache, "", fieldAliasCtx)
+		err = docMapping.Validate(im.cache, []string{}, fieldAliasCtx)
 		if err != nil {
 			return err
 		}

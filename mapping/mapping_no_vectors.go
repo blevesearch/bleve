@@ -38,7 +38,7 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVector interface{},
 // -----------------------------------------------------------------------------
 // document validation functions
 
-func validateFieldMapping(field *FieldMapping, parentName string,
+func validateFieldMapping(field *FieldMapping, path []string,
 	fieldAliasCtx map[string]*FieldMapping) error {
 	return validateFieldType(field)
 }
