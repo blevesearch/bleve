@@ -1689,7 +1689,7 @@ func TestKNNMerger(t *testing.T) {
 				{"vec": [10, 10, 10], "text": "chunk1"},
 				{"vec": [20, 20, 20], "text": "chunk2"},
 				{"vec": [30, 30, 30], "text": "chunk3"},
-				{"vec": [40, 40, 40], "text": "chunk3"}
+				{"vec": [40, 40, 40], "text": "chunk4"}
 			]
 		}`,
 		"doc6": `{

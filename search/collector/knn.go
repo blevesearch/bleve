@@ -104,7 +104,7 @@ func (c *collectStoreKNN) Final(fixup collectorFixup) (search.DocumentMatchColle
 // NOTE: This implementation assumes documents arrive in increasing order of their
 // internal IDs, which is guaranteed by all searchers in bleve.
 type knnMerger struct {
-	// curr is the current document match being merged
+	// curr holds the current document match being accumulated during the merge process.
 	curr *search.DocumentMatch
 }
 
@@ -114,8 +114,8 @@ func newKNNMerger() *knnMerger {
 
 // Merge merges duplicate document matches by combining their score breakdowns.
 // Returns nil if the incoming doc was merged into the current document.
-// Returns a non-nil DocumentMatch when a new document arrives, representing
-// the completed merge of the previous document ready for further processing.
+// Returns the completed previous document when a new document with a different ID arrives.
+// The returned DocumentMatch is ready for further processing.
 func (c *knnMerger) Merge(ctx *search.SearchContext, doc *search.DocumentMatch) (*search.DocumentMatch, error) {
 	// see if the document has been seen before
 	if c.curr != nil && c.curr.IndexInternalID.Equals(doc.IndexInternalID) {
