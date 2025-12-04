@@ -158,6 +158,9 @@ func MakeKNNDocMatchHandler(ctx *search.SearchContext) (search.DocumentMatchHand
 			if d == nil {
 				return nil
 			}
+			// increment total count as we are sure that this is a
+			// valid document match to be added to the KNN store
+			hc.total++
 			toRelease := hc.knnStore.AddDocument(d)
 			for _, doc := range toRelease {
 				ctx.DocumentMatchPool.Put(doc)
@@ -239,8 +242,10 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 	default:
 		next, err = searcher.Next(searchContext)
 	}
+	// maintain a total count of documents processed, for context cancellation checks
+	var total uint64
 	for err == nil && next != nil {
-		if hc.total%CheckDoneEvery == 0 {
+		if total%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
 				search.RecordSearchCost(ctx, search.AbortM, 0)
@@ -248,7 +253,7 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 			default:
 			}
 		}
-		hc.total++
+		total++
 
 		// since we may get duplicate document matches from the KNN searcher,
 		// we must merge them before adding to the KNN store, keeping the
