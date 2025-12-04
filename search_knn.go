@@ -496,49 +496,6 @@ func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*
 		}
 		knnHits = knnHits[:idx]
 	}
-	// early exit if there are no hits
-	if len(knnHits) == 0 {
-		return knnHits
-	}
-	// at this point, we have the final/global set of vectors that satisfy the KNN request.
-	// We may have multiple vectors per document, so we need to deduplicate the hits
-	// by document ID, and retain only the best scoring vector per knn query per document.
-	// This means that if hits have docA twice, we union the score breakdowns for docA, and
-	// retain only the best score per knn query for docA.
-	// sort by document ID
-	sort.Slice(knnHits, func(i, j int) bool {
-		return knnHits[i].ID < knnHits[j].ID
-	})
-	// now deduplicate the hits by document ID, by using the sorted order
-	uniqueHits := knnHits[:1]
-	for i := 1; i < len(knnHits); i++ {
-		lastUniqueHit := uniqueHits[len(uniqueHits)-1]
-		currHit := knnHits[i]
-		if currHit.ID != lastUniqueHit.ID {
-			// we have found a new unique document
-			uniqueHits = append(uniqueHits, currHit)
-		} else {
-			// we have encountered a duplicate document, so we need to
-			// union the score breakdowns, retaining the best score
-			// per knn query, while also merging the explanations if req.Explain is true.
-			for k, score := range currHit.ScoreBreakdown {
-				if existing, ok := lastUniqueHit.ScoreBreakdown[k]; !ok || score > existing {
-					lastUniqueHit.ScoreBreakdown[k] = score
-					// Also update the explanation for this query index if Explain is enabled.
-					// Both Expl.Children slices are of size len(req.KNN), so indexing by k is safe.
-					if req.Explain {
-						// just defensive check to ensure that the Children slice is valid
-						if len(lastUniqueHit.Expl.Children) <= k {
-							lastUniqueHit.Expl.Children = append(lastUniqueHit.Expl.Children, make([]*search.Explanation, k-len(lastUniqueHit.Expl.Children)+1)...)
-						}
-						lastUniqueHit.Expl.Children[k] = currHit.Expl.Children[k]
-					}
-				}
-			}
-		}
-	}
-	// now uniqueHits contains only unique documents, so we can set knnHits to uniqueHits
-	knnHits = uniqueHits
 
 	// if score fusion required, return early because
 	// score breakdown is retained

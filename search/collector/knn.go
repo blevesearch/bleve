@@ -95,6 +95,61 @@ func (c *collectStoreKNN) Final(fixup collectorFixup) (search.DocumentMatchColle
 	return rv, nil
 }
 
+// -----------------------------------------------------------------------------------------
+// knnMerger is a preprocessing layer on top of collectStoreKNN that merges
+// duplicate document matches before adding them to the underlying KNN store.
+// Since KNN searchers may return the same document multiple times (with different
+// scoreBreakdown values for each KNN query), we must merge these to retain the
+// best score per KNN query before adding them to the KNN store.
+// NOTE: This implementation assumes documents arrive in increasing order of their
+// internal IDs, which is guaranteed by all searchers in bleve.
+type knnMerger struct {
+	// curr is the current document match being merged
+	curr *search.DocumentMatch
+}
+
+func newKNNMerger() *knnMerger {
+	return &knnMerger{}
+}
+
+// Merge merges duplicate document matches by combining their score breakdowns.
+// Returns nil if the incoming doc was merged into the current document.
+// Returns a non-nil DocumentMatch when a new document arrives, representing
+// the completed merge of the previous document ready for further processing.
+func (c *knnMerger) Merge(ctx *search.SearchContext, doc *search.DocumentMatch) (*search.DocumentMatch, error) {
+	// see if the document has been seen before
+	if c.curr != nil && c.curr.IndexInternalID.Equals(doc.IndexInternalID) {
+		// merge the score breakdowns
+		c.curr.ScoreBreakdown, c.curr.Expl = search.MergeScoreExplBreakdown(
+			c.curr.ScoreBreakdown, doc.ScoreBreakdown,
+			c.curr.Expl, doc.Expl)
+		// recycle the incoming document now that it's merged
+		ctx.DocumentMatchPool.Put(doc)
+		// return nil since no document to process further
+		return nil, nil
+	}
+	// now we are sure that this is a new document, check if we have an existing
+	// document to return for processing
+	if c.curr != nil {
+		// we have an existing document, return it for processing
+		toReturn := c.curr
+		// set the current to the incoming document
+		c.curr = doc
+		return toReturn, nil
+	}
+	// first document seen, set it as current and return nil
+	c.curr = doc
+	return nil, nil
+}
+
+// Current returns the current document match being merged, if any.
+// Call this after processing all documents to flush the last document.
+func (c *knnMerger) Current() *search.DocumentMatch {
+	return c.curr
+}
+
+// -----------------------------------------------------------------------------------------
+
 func MakeKNNDocMatchHandler(ctx *search.SearchContext) (search.DocumentMatchHandler, error) {
 	var hc *KNNCollector
 	var ok bool
@@ -130,6 +185,9 @@ func GetNewKNNCollectorStore(kArray []int64) *collectStoreKNN {
 
 // implements Collector interface
 type KNNCollector struct {
+	// merger merges duplicate document matches before adding to knnStore
+	merger *knnMerger
+	// knnStore is the underlying store for KNN document matches
 	knnStore *collectStoreKNN
 	size     int
 	total    uint64
@@ -140,6 +198,7 @@ type KNNCollector struct {
 
 func NewKNNCollector(kArray []int64, size int64) *KNNCollector {
 	return &KNNCollector{
+		merger:   newKNNMerger(),
 		knnStore: GetNewKNNCollectorStore(kArray),
 		size:     int(size),
 	}
@@ -191,6 +250,14 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 		}
 		hc.total++
 
+		// since we may get duplicate document matches from the KNN searcher,
+		// we must merge them before adding to the KNN store, keeping the
+		// best scoreBreakdown for each KNN query per document.
+		next, err = hc.merger.Merge(searchContext, next)
+		if err != nil {
+			break
+		}
+
 		err = dmHandler(next)
 		if err != nil {
 			break
@@ -200,6 +267,14 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 	}
 	if err != nil {
 		return err
+	}
+
+	// flush the last merged document if any
+	if lastDoc := hc.merger.Current(); lastDoc != nil {
+		err = dmHandler(lastDoc)
+		if err != nil {
+			return err
+		}
 	}
 
 	// help finalize/flush the results in case
