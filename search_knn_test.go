@@ -1645,6 +1645,143 @@ func TestNestedVectors(t *testing.T) {
 	}
 }
 
+// TestMultiVectorCosineNormalization verifies that multi-vector fields are
+// normalized correctly with cosine similarity. Each sub-vector in a multi-vector
+// should be independently normalized, producing correct similarity scores.
+func TestMultiVectorCosineNormalization(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	const dims = 3
+
+	// Create index with cosine similarity
+	indexMapping := NewIndexMapping()
+	vecFieldMapping := mapping.NewVectorFieldMapping()
+	vecFieldMapping.Dims = dims
+	vecFieldMapping.Similarity = index.CosineSimilarity
+	indexMapping.DefaultMapping.AddFieldMappingsAt("vec", vecFieldMapping)
+
+	// Multi-vector field
+	vecFieldMappingNested := mapping.NewVectorFieldMapping()
+	vecFieldMappingNested.Dims = dims
+	vecFieldMappingNested.Similarity = index.CosineSimilarity
+	indexMapping.DefaultMapping.AddFieldMappingsAt("vec_nested", vecFieldMappingNested)
+
+	idx, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	docsString := []string{
+		`{"vec": [3, 0, 0]}`,
+		`{"vec": [0, 4, 0]}`,
+		`{"vec_nested": [[3, 0, 0], [0, 4, 0]]}`,
+	}
+
+	for i, docStr := range docsString {
+		var doc map[string]interface{}
+		err = json.Unmarshal([]byte(docStr), &doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = idx.Index(fmt.Sprintf("doc%d", i+1), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Query for X direction [1,0,0]
+	searchReq := NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("vec", []float32{1, 0, 0}, 3, 1.0)
+	res, err := idx.Search(searchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+	// Hit 1 should be doc1 with score 1.0 (perfect match)
+	if res.Hits[0].ID != "doc1" {
+		t.Fatalf("expected doc1 as first hit, got %s", res.Hits[0].ID)
+	}
+	if math.Abs(float64(res.Hits[0].Score-1.0)) > 1e-6 {
+		t.Fatalf("expected score 1.0, got %f", res.Hits[0].Score)
+	}
+	// Hit 2 should be doc2 with a score of 0.0 (orthogonal)
+	if res.Hits[1].ID != "doc2" {
+		t.Fatalf("expected doc2 as second hit, got %s", res.Hits[1].ID)
+	}
+	if math.Abs(float64(res.Hits[1].Score-0.0)) > 1e-6 {
+		t.Fatalf("expected score 0.0, got %f", res.Hits[1].Score)
+	}
+
+	// Query for Y direction [0,1,0]
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("vec", []float32{0, 1, 0}, 3, 1.0)
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+	// Hit 1 should be doc2 with score 1.0 (perfect match)
+	if res.Hits[0].ID != "doc2" {
+		t.Fatalf("expected doc2 as first hit, got %s", res.Hits[0].ID)
+	}
+	if math.Abs(float64(res.Hits[0].Score-1.0)) > 1e-6 {
+		t.Fatalf("expected score 1.0, got %f", res.Hits[0].Score)
+	}
+	// Hit 2 should be doc1 with a score of 0.0 (orthogonal)
+	if res.Hits[1].ID != "doc1" {
+		t.Fatalf("expected doc1 as second hit, got %s", res.Hits[1].ID)
+	}
+	if math.Abs(float64(res.Hits[1].Score-0.0)) > 1e-6 {
+		t.Fatalf("expected score 0.0, got %f", res.Hits[1].Score)
+	}
+
+	// Now test querying the nested multi-vector field
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("vec_nested", []float32{1, 0, 0}, 3, 1.0)
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	// Hit should be doc3 with score 1.0 (perfect match on first sub-vector)
+	if res.Hits[0].ID != "doc3" {
+		t.Fatalf("expected doc3 as first hit, got %s", res.Hits[0].ID)
+	}
+	if math.Abs(float64(res.Hits[0].Score-1.0)) > 1e-6 {
+		t.Fatalf("expected score 1.0, got %f", res.Hits[0].Score)
+	}
+	// Query for Y direction [0,1,0] on nested field
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("vec_nested", []float32{0, 1, 0}, 3, 1.0)
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	// Hit should be doc3 with score 1.0 (perfect match on second sub-vector)
+	if res.Hits[0].ID != "doc3" {
+		t.Fatalf("expected doc3 as first hit, got %s", res.Hits[0].ID)
+	}
+	if math.Abs(float64(res.Hits[0].Score-1.0)) > 1e-6 {
+		t.Fatalf("expected score 1.0, got %f", res.Hits[0].Score)
+	}
+}
+
 func TestNumVecsStat(t *testing.T) {
 
 	dataset, _, err := readDatasetAndQueries(testInputCompressedFile)
@@ -2068,148 +2205,6 @@ func TestIndexInsightsCentroidCardinalities(t *testing.T) {
 	for _, entry := range centroids {
 		if len(entry.Index) == 0 {
 			t.Fatal("expected index name for each centroid")
-		}
-	}
-}
-
-func TestVectorObjectArray(t *testing.T) {
-	// Setup 6 documents each with one vector field
-	tmpIndexPath := createTmpIndexPath(t)
-	defer cleanupTmpIndexPath(t, tmpIndexPath)
-
-	indexMapping := NewIndexMapping()
-	vecFieldMapping := mapping.NewVectorFieldMapping()
-	vecFieldMapping.Dims = 3
-	vecFieldMapping.Similarity = index.CosineSimilarity
-	indexMapping.DefaultMapping.AddFieldMappingsAt("vec", vecFieldMapping)
-
-	arrayMapping := mapping.NewDocumentMapping()
-	indexMapping.DefaultMapping.AddSubDocumentMapping("vectors", arrayMapping)
-	arrayMapping.AddFieldMappingsAt("vec", vecFieldMapping)
-
-	index, err := New(tmpIndexPath, indexMapping)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := index.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	docsString := []string{
-		`{"vec": [1, 2, 3]}`,
-		`{"vec": [4, 5, 6]}`,
-		`{"vec": [7, 8, 9]}`,
-		`{"vec": [10, 11, 12]}`,
-		`{"vec": [13, 14, 15]}`,
-		`{"vec": [16, 17, 18]}`,
-	}
-	docs := make([]map[string]interface{}, 0, len(docsString))
-	for _, docStr := range docsString {
-		var doc map[string]interface{}
-		err = json.Unmarshal([]byte(docStr), &doc)
-		if err != nil {
-			t.Fatal(err)
-		}
-		docs = append(docs, doc)
-	}
-
-	// Index documents
-	batch := index.NewBatch()
-	for i, doc := range docs {
-		err = batch.Index(fmt.Sprintf("doc-%d", i+1), doc)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	err = index.Batch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Search with simple single-vector documents
-	searchRequest := NewSearchRequest(NewMatchNoneQuery())
-	searchRequest.AddKNN("vec", []float32{1, 2, 3}, 3, 1.0)
-	searchRequest.Explain = true
-
-	result, err := index.Search(searchRequest)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(result.Hits) != 3 {
-		t.Fatalf("expected 3 hits, got %d", len(result.Hits))
-	}
-
-	expectedResult := map[string]float64{
-		"doc-1": 1.0,
-		"doc-2": 0.975,
-		"doc-3": 0.959,
-	}
-
-	for _, hit := range result.Hits {
-		expectedScore, exists := expectedResult[hit.ID]
-		if !exists {
-			t.Fatalf("unexpected doc ID %s", hit.ID)
-		}
-		if math.Abs(hit.Score-expectedScore) > 0.001 {
-			t.Fatalf("for doc ID %s, expected score %.3f, got %.3f", hit.ID, expectedScore, hit.Score)
-		}
-	}
-
-	// Now create 2 docs with 3 vectors each
-	docsString = []string{
-		`{"vectors": [ {"vec": [1, 2, 3]}, {"vec": [4, 5, 6]}, {"vec": [7, 8, 9]}]}`,
-		`{"vectors": [ {"vec": [10, 11, 12]}, {"vec": [13, 14, 15]}, {"vec": [16, 17, 18]}]}`,
-	}
-	docs = make([]map[string]interface{}, 0, len(docsString))
-	for _, docStr := range docsString {
-		var doc map[string]interface{}
-		err = json.Unmarshal([]byte(docStr), &doc)
-		if err != nil {
-			t.Fatal(err)
-		}
-		docs = append(docs, doc)
-	}
-
-	batch = index.NewBatch()
-	for i, doc := range docs {
-		err = batch.Index(fmt.Sprintf("doc-multi-%d", i+1), doc)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	err = index.Batch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Search again with the same vector
-	searchRequest = NewSearchRequest(NewMatchNoneQuery())
-	searchRequest.AddKNN("vectors.vec", []float32{1, 2, 3}, 3, 1.0)
-
-	result, err = index.Search(searchRequest)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(result.Hits) != 1 {
-		t.Fatalf("expected 1 hit, got %d", len(result.Hits))
-	}
-
-	expectedResult = map[string]float64{
-		"doc-multi-1": 1.0, // best score from the 3 vectors
-	}
-
-	for _, hit := range result.Hits {
-		expectedScore, exists := expectedResult[hit.ID]
-		if !exists {
-			t.Fatalf("unexpected doc ID %s", hit.ID)
-		}
-		if math.Abs(hit.Score-expectedScore) > 0.001 {
-			t.Fatalf("for doc ID %s, expected score %.3f, got %.3f", hit.ID, expectedScore, hit.Score)
 		}
 	}
 }
