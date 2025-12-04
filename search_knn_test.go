@@ -1281,23 +1281,29 @@ func TestKNNScoreBoosting(t *testing.T) {
 	searchRequest.AddKNN("vector", queryVec, 3, 1.0)
 	searchRequest.Fields = []string{"content", "vector"}
 
-	hits, _ := index.Search(searchRequest)
+	hits, err := index.Search(searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
 	hitsMap := make(map[string]float64, 0)
 	for _, hit := range hits.Hits {
 		hitsMap[hit.ID] = (hit.Score)
 	}
 
-	searchRequest2 := NewSearchRequest(NewMatchNoneQuery())
+	searchRequest = NewSearchRequest(NewMatchNoneQuery())
 	searchRequest.AddKNN("vector", queryVec, 3, 10.0)
 	searchRequest.Fields = []string{"content", "vector"}
 
-	hits2, _ := index.Search(searchRequest2)
+	hits, err = index.Search(searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
 	hitsMap2 := make(map[string]float64, 0)
-	for _, hit := range hits2.Hits {
+	for _, hit := range hits.Hits {
 		hitsMap2[hit.ID] = (hit.Score)
 	}
 
-	for _, hit := range hits2.Hits {
+	for _, hit := range hits.Hits {
 		if hitsMap[hit.ID] != hitsMap2[hit.ID]/10 {
 			t.Errorf("boosting not working: %v %v \n", hitsMap[hit.ID], hitsMap2[hit.ID])
 		}
