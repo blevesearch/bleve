@@ -258,9 +258,13 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 			break
 		}
 
-		err = dmHandler(next)
-		if err != nil {
-			break
+		// we may have stored next for merging, or we may have completed a merge
+		// and have a document ready for further processing, so next can be nil
+		if next != nil {
+			err = dmHandler(next)
+			if err != nil {
+				break
+			}
 		}
 
 		next, err = searcher.Next(searchContext)
