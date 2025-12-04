@@ -2208,3 +2208,145 @@ func TestIndexInsightsCentroidCardinalities(t *testing.T) {
 		}
 	}
 }
+
+func TestVectorObjectArray(t *testing.T) {
+	// Setup 6 documents each with one vector field
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMapping := NewIndexMapping()
+	vecFieldMapping := mapping.NewVectorFieldMapping()
+	vecFieldMapping.Dims = 3
+	vecFieldMapping.Similarity = index.CosineSimilarity
+	indexMapping.DefaultMapping.AddFieldMappingsAt("vec", vecFieldMapping)
+
+	arrayMapping := mapping.NewDocumentMapping()
+	indexMapping.DefaultMapping.AddSubDocumentMapping("vectors", arrayMapping)
+	arrayMapping.AddFieldMappingsAt("vec", vecFieldMapping)
+
+	index, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	docsString := []string{
+		`{"vec": [1, 2, 3]}`,
+		`{"vec": [4, 5, 6]}`,
+		`{"vec": [7, 8, 9]}`,
+		`{"vec": [10, 11, 12]}`,
+		`{"vec": [13, 14, 15]}`,
+		`{"vec": [16, 17, 18]}`,
+	}
+	docs := make([]map[string]interface{}, 0, len(docsString))
+	for _, docStr := range docsString {
+		var doc map[string]interface{}
+		err = json.Unmarshal([]byte(docStr), &doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		docs = append(docs, doc)
+	}
+
+	// Index documents
+	batch := index.NewBatch()
+	for i, doc := range docs {
+		err = batch.Index(fmt.Sprintf("doc-%d", i+1), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = index.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Search with simple single-vector documents
+	searchRequest := NewSearchRequest(NewMatchNoneQuery())
+	searchRequest.AddKNN("vec", []float32{1, 2, 3}, 3, 1.0)
+	searchRequest.Explain = true
+
+	result, err := index.Search(searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Hits) != 3 {
+		t.Fatalf("expected 3 hits, got %d", len(result.Hits))
+	}
+
+	expectedResult := map[string]float64{
+		"doc-1": 1.0,
+		"doc-2": 0.975,
+		"doc-3": 0.959,
+	}
+
+	for _, hit := range result.Hits {
+		expectedScore, exists := expectedResult[hit.ID]
+		if !exists {
+			t.Fatalf("unexpected doc ID %s", hit.ID)
+		}
+		if math.Abs(hit.Score-expectedScore) > 0.001 {
+			t.Fatalf("for doc ID %s, expected score %.3f, got %.3f", hit.ID, expectedScore, hit.Score)
+		}
+	}
+
+	// Now create 2 docs with 3 vectors each
+	docsString = []string{
+		`{"vectors": [ {"vec": [1, 2, 3]}, {"vec": [4, 5, 6]}, {"vec": [7, 8, 9]}]}`,
+		`{"vectors": [ {"vec": [10, 11, 12]}, {"vec": [13, 14, 15]}, {"vec": [16, 17, 18]}]}`,
+	}
+	docs = make([]map[string]interface{}, 0, len(docsString))
+	for _, docStr := range docsString {
+		var doc map[string]interface{}
+		err = json.Unmarshal([]byte(docStr), &doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		docs = append(docs, doc)
+	}
+
+	batch = index.NewBatch()
+	for i, doc := range docs {
+		err = batch.Index(fmt.Sprintf("doc-multi-%d", i+1), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = index.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Search again with the same vector
+	searchRequest = NewSearchRequest(NewMatchNoneQuery())
+	searchRequest.AddKNN("vectors.vec", []float32{1, 2, 3}, 3, 1.0)
+
+	result, err = index.Search(searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(result.Hits))
+	}
+
+	expectedResult = map[string]float64{
+		"doc-multi-1": 1.0, // best score from the 3 vectors
+	}
+
+	for _, hit := range result.Hits {
+		expectedScore, exists := expectedResult[hit.ID]
+		if !exists {
+			t.Fatalf("unexpected doc ID %s", hit.ID)
+		}
+		if math.Abs(hit.Score-expectedScore) > 0.001 {
+			t.Fatalf("for doc ID %s, expected score %.3f, got %.3f", hit.ID, expectedScore, hit.Score)
+		}
+	}
+}
