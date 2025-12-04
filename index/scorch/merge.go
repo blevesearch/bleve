@@ -110,9 +110,8 @@ OUTER:
 						ctrlMsg = nil
 						break OUTER
 					}
-					s.fireAsyncError(&PersistError{
-						errMsg: fmt.Sprintf("merging err: %v", err),
-					})
+					
+					s.fireAsyncError(NewPersistError("merging err: %v", err))
 					_ = ourSnapshot.DecRef()
 					atomic.AddUint64(&s.stats.TotFileMergeLoopErr, 1)
 					continue OUTER

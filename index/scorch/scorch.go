@@ -108,6 +108,12 @@ func (e *PersistError) Error() string {
 	return e.errMsg
 }
 
+func NewPersistError(format string, args ...interface{}) error {
+	return &PersistError{
+		errMsg: fmt.Sprintf(format, args...),
+	}
+}
+
 type internalStats struct {
 	persistEpoch          uint64
 	persistSnapshotSize   uint64
