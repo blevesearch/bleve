@@ -141,15 +141,25 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	if !ok {
 		return false
 	}
+	// Apply defaults for similarity and optimization if not set
+	similarity := fm.Similarity
+	if similarity == "" {
+		similarity = index.DefaultSimilarityMetric
+	}
+	vectorIndexOptimizedFor := fm.VectorIndexOptimizedFor
+	if vectorIndexOptimizedFor == "" {
+		vectorIndexOptimizedFor = index.DefaultIndexOptimization
+	}
 	// normalize raw vector if similarity is cosine
-	if fm.Similarity == index.CosineSimilarity {
+	if similarity == index.CosineSimilarity {
 		vector = NormalizeVector(vector)
 	}
 
 	fieldName := getFieldName(pathString, path, fm)
+
 	options := fm.Options()
 	field := document.NewVectorFieldWithIndexingOptions(fieldName, indexes, vector,
-		fm.Dims, fm.Similarity, fm.VectorIndexOptimizedFor, options)
+		fm.Dims, similarity, vectorIndexOptimizedFor, options)
 	context.doc.AddField(field)
 
 	// "_all" composite field is not applicable for vector field
@@ -163,20 +173,28 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	if !ok {
 		return
 	}
-
+	// Apply defaults for similarity and optimization if not set
+	similarity := fm.Similarity
+	if similarity == "" {
+		similarity = index.DefaultSimilarityMetric
+	}
+	vectorIndexOptimizedFor := fm.VectorIndexOptimizedFor
+	if vectorIndexOptimizedFor == "" {
+		vectorIndexOptimizedFor = index.DefaultIndexOptimization
+	}
 	decodedVector, err := document.DecodeVector(encodedString)
 	if err != nil || len(decodedVector) != fm.Dims {
 		return
 	}
 	// normalize raw vector if similarity is cosine
-	if fm.Similarity == index.CosineSimilarity {
+	if similarity == index.CosineSimilarity {
 		decodedVector = NormalizeVector(decodedVector)
 	}
 
 	fieldName := getFieldName(pathString, path, fm)
 	options := fm.Options()
 	field := document.NewVectorFieldWithIndexingOptions(fieldName, indexes, decodedVector,
-		fm.Dims, fm.Similarity, fm.VectorIndexOptimizedFor, options)
+		fm.Dims, similarity, vectorIndexOptimizedFor, options)
 	context.doc.AddField(field)
 
 	// "_all" composite field is not applicable for vector_base64 field
@@ -186,77 +204,89 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 // -----------------------------------------------------------------------------
 // document validation functions
 
-func validateFieldMapping(field *FieldMapping, parentName string,
+func validateFieldMapping(field *FieldMapping, path []string,
 	fieldAliasCtx map[string]*FieldMapping) error {
 	switch field.Type {
 	case "vector", "vector_base64":
-		return validateVectorFieldAlias(field, parentName, fieldAliasCtx)
+		return validateVectorFieldAlias(field, path, fieldAliasCtx)
 	default: // non-vector field
 		return validateFieldType(field)
 	}
 }
 
-func validateVectorFieldAlias(field *FieldMapping, parentName string,
+func validateVectorFieldAlias(field *FieldMapping, path []string,
 	fieldAliasCtx map[string]*FieldMapping) error {
-
-	if field.Name == "" {
-		field.Name = parentName
+	// fully qualified field name
+	pathString := encodePath(path)
+	// check if field has a name set, else use path to compute effective name
+	effectiveFieldName := getFieldName(pathString, path, field)
+	// Compute effective values for validation
+	effectiveSimilarity := field.Similarity
+	if effectiveSimilarity == "" {
+		effectiveSimilarity = index.DefaultSimilarityMetric
+	}
+	effectiveOptimizedFor := field.VectorIndexOptimizedFor
+	if effectiveOptimizedFor == "" {
+		effectiveOptimizedFor = index.DefaultIndexOptimization
 	}
 
-	if field.Similarity == "" {
-		field.Similarity = index.DefaultSimilarityMetric
-	}
-
-	if field.VectorIndexOptimizedFor == "" {
-		field.VectorIndexOptimizedFor = index.DefaultIndexOptimization
-	}
-	if _, exists := index.SupportedVectorIndexOptimizations[field.VectorIndexOptimizedFor]; !exists {
-		// if an unsupported config is provided, override to default
-		field.VectorIndexOptimizedFor = index.DefaultIndexOptimization
-	}
-
-	// following fields are not applicable for vector
-	// thus, we set them to default values
-	field.IncludeInAll = false
-	field.IncludeTermVectors = false
-	field.Store = false
-	field.DocValues = false
-	field.SkipFreqNorm = true
-
-	// # If alias is present, validate the field options as per the alias
+	// # If alias is present, validate the field options as per the alias.
 	// note: reading from a nil map is safe
-	if fieldAlias, ok := fieldAliasCtx[field.Name]; ok {
+	if fieldAlias, ok := fieldAliasCtx[effectiveFieldName]; ok {
 		if field.Dims != fieldAlias.Dims {
 			return fmt.Errorf("field: '%s', invalid alias "+
-				"(different dimensions %d and %d)", fieldAlias.Name, field.Dims,
+				"(different dimensions %d and %d)", effectiveFieldName, field.Dims,
 				fieldAlias.Dims)
 		}
 
-		if field.Similarity != fieldAlias.Similarity {
+		// Compare effective similarity values
+		aliasSimilarity := fieldAlias.Similarity
+		if aliasSimilarity == "" {
+			aliasSimilarity = index.DefaultSimilarityMetric
+		}
+		if effectiveSimilarity != aliasSimilarity {
 			return fmt.Errorf("field: '%s', invalid alias "+
-				"(different similarity values %s and %s)", fieldAlias.Name,
-				field.Similarity, fieldAlias.Similarity)
+				"(different similarity values %s and %s)", effectiveFieldName,
+				effectiveSimilarity, aliasSimilarity)
+		}
+
+		// Compare effective vector index optimization values
+		aliasOptimizedFor := fieldAlias.VectorIndexOptimizedFor
+		if aliasOptimizedFor == "" {
+			aliasOptimizedFor = index.DefaultIndexOptimization
+		}
+		if effectiveOptimizedFor != aliasOptimizedFor {
+			return fmt.Errorf("field: '%s', invalid alias "+
+				"(different vector index optimization values %s and %s)", effectiveFieldName,
+				effectiveOptimizedFor, aliasOptimizedFor)
 		}
 
 		return nil
 	}
 
 	// # Validate field options
-
+	// Vector dimensions must be within allowed range
 	if field.Dims < MinVectorDims || field.Dims > MaxVectorDims {
 		return fmt.Errorf("field: '%s', invalid vector dimension: %d,"+
-			" value should be in range (%d, %d)", field.Name, field.Dims,
+			" value should be in range [%d, %d]", effectiveFieldName, field.Dims,
 			MinVectorDims, MaxVectorDims)
 	}
-
-	if _, ok := index.SupportedSimilarityMetrics[field.Similarity]; !ok {
+	// Similarity metric must be supported
+	if _, ok := index.SupportedSimilarityMetrics[effectiveSimilarity]; !ok {
 		return fmt.Errorf("field: '%s', invalid similarity "+
-			"metric: '%s', valid metrics are: %+v", field.Name, field.Similarity,
+			"metric: '%s', valid metrics are: %+v", effectiveFieldName, effectiveSimilarity,
 			reflect.ValueOf(index.SupportedSimilarityMetrics).MapKeys())
+	}
+	// Vector index optimization must be supported
+	if _, ok := index.SupportedVectorIndexOptimizations[effectiveOptimizedFor]; !ok {
+		return fmt.Errorf("field: '%s', invalid vector index "+
+			"optimization: '%s', valid optimizations are: %+v", effectiveFieldName,
+			effectiveOptimizedFor,
+			reflect.ValueOf(index.SupportedVectorIndexOptimizations).MapKeys())
 	}
 
 	if fieldAliasCtx != nil { // writing to a nil map is unsafe
-		fieldAliasCtx[field.Name] = field
+		fieldAliasCtx[effectiveFieldName] = field
 	}
 
 	return nil
