@@ -33,8 +33,8 @@ func (s *Scorch) mergerLoop() {
 	defer func() {
 		if r := recover(); r != nil {
 			s.fireAsyncError(NewScorchError(
-				"merger",
-				fmt.Sprintf("path: %s", s.path),
+				SourceMerger,
+				fmt.Sprintf("panic: %v, path: %s", r, s.path),
 				ErrAsyncPanic,
 			))
 		}
@@ -47,7 +47,7 @@ func (s *Scorch) mergerLoop() {
 	mergePlannerOptions, err := s.parseMergePlannerOptions()
 	if err != nil {
 		s.fireAsyncError(NewScorchError(
-			"merger",
+			SourceMerger,
 			fmt.Sprintf("mergerPlannerOptions json parsing err: %v", err),
 			ErrOptionsParse,
 		))
@@ -117,7 +117,7 @@ OUTER:
 					}
 
 					s.fireAsyncError(NewScorchError(
-						"merger",
+						SourceMerger,
 						fmt.Sprintf("merging err: %v", err),
 						ErrPersist,
 					))

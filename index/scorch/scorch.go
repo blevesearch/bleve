@@ -16,7 +16,6 @@ package scorch
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -89,12 +88,24 @@ type Scorch struct {
 	spatialPlugin index.SpatialAnalyzerPlugin
 }
 
+const (
+	SourceIntroducer = "introducer"
+	SourcePersister  = "persister"
+	SourceMerger     = "merger"
+)
+
+type ScorchErrType string
+
+func (t ScorchErrType) Error() string {
+	return string(t)
+}
+
 // ErrType values for ScorchError
-var (
-	ErrAsyncPanic   = errors.New("async panic error")
-	ErrPersist      = errors.New("persist error")
-	ErrCleanup      = errors.New("cleanup error")
-	ErrOptionsParse = errors.New("options parse error")
+const (
+	ErrAsyncPanic   = ScorchErrType("async panic error")
+	ErrPersist      = ScorchErrType("persist error")
+	ErrCleanup      = ScorchErrType("cleanup error")
+	ErrOptionsParse = ScorchErrType("options parse error")
 )
 
 // ScorchError is passed to onAsyncError when errors are

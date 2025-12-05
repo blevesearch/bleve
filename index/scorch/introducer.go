@@ -51,8 +51,8 @@ func (s *Scorch) introducerLoop() {
 	defer func() {
 		if r := recover(); r != nil {
 			s.fireAsyncError(NewScorchError(
-				"introducer",
-				fmt.Sprintf("path: %s", s.path),
+				SourceIntroducer,
+				fmt.Sprintf("panic: %v, path: %s", r, s.path),
 				ErrAsyncPanic,
 			))
 		}
