@@ -106,7 +106,7 @@ type ScorchError struct {
 }
 
 func (e *ScorchError) Error() string {
-	return fmt.Sprintf("scorch error in %s, %v, err: %s", e.Source, e.ErrType, e.ErrMsg)
+	return fmt.Sprintf("source: %s, %v: %s", e.Source, e.ErrType, e.ErrMsg)
 }
 
 // Lets the onAsyncError function verify what type of
