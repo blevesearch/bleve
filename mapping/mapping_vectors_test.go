@@ -18,6 +18,7 @@
 package mapping
 
 import (
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -1068,4 +1069,121 @@ func TestNormalizeVector(t *testing.T) {
 			t.Errorf("[vector-%d] Expected: %v, Got: %v", i+1, expectedNormalizedVectors[i], normalizedVector)
 		}
 	}
+}
+
+func TestNormalizeMultiVectors(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []float32
+		dims     int
+		expected []float32
+	}{
+		{
+			name:     "single vector - already normalized",
+			input:    []float32{1, 0, 0},
+			dims:     3,
+			expected: []float32{1, 0, 0},
+		},
+		{
+			name:     "single vector - needs normalization",
+			input:    []float32{3, 0, 0},
+			dims:     3,
+			expected: []float32{1, 0, 0},
+		},
+		{
+			name:     "two vectors - X and Y directions",
+			input:    []float32{3, 0, 0, 0, 4, 0},
+			dims:     3,
+			expected: []float32{1, 0, 0, 0, 1, 0},
+		},
+		{
+			name:     "three vectors",
+			input:    []float32{3, 0, 0, 0, 4, 0, 0, 0, 5},
+			dims:     3,
+			expected: []float32{1, 0, 0, 0, 1, 0, 0, 0, 1},
+		},
+		{
+			name:     "two 2D vectors",
+			input:    []float32{3, 4, 5, 12},
+			dims:     2,
+			expected: []float32{0.6, 0.8, 0.38461538, 0.92307693},
+		},
+		{
+			name:     "empty vector",
+			input:    []float32{},
+			dims:     3,
+			expected: []float32{},
+		},
+		{
+			name:     "zero dims",
+			input:    []float32{1, 2, 3},
+			dims:     0,
+			expected: []float32{1, 2, 3},
+		},
+		{
+			name:     "negative dims",
+			input:    []float32{1, 2, 3},
+			dims:     -1,
+			expected: []float32{1, 2, 3},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Make a copy of input to verify original is not modified
+			inputCopy := make([]float32, len(tt.input))
+			copy(inputCopy, tt.input)
+
+			result := NormalizeMultiVector(tt.input, tt.dims)
+
+			// Check result matches expected
+			if len(result) != len(tt.expected) {
+				t.Errorf("length mismatch: expected %d, got %d", len(tt.expected), len(result))
+				return
+			}
+
+			for i := range result {
+				if !floatApproxEqual(result[i], tt.expected[i], 1e-5) {
+					t.Errorf("value mismatch at index %d: expected %v, got %v",
+						i, tt.expected[i], result[i])
+				}
+			}
+
+			// Verify original input was not modified
+			if !reflect.DeepEqual(tt.input, inputCopy) {
+				t.Errorf("original input was modified: was %v, now %v", inputCopy, tt.input)
+			}
+
+			// For valid multi-vectors, verify each sub-vector has unit magnitude
+			if tt.dims > 0 && len(tt.input) > 0 && len(tt.input)%tt.dims == 0 {
+				numVecs := len(result) / tt.dims
+				for i := 0; i < numVecs; i++ {
+					subVec := result[i*tt.dims : (i+1)*tt.dims]
+					mag := magnitude(subVec)
+					// Allow for zero vectors (magnitude 0) or unit vectors (magnitude 1)
+					if mag > 1e-6 && !floatApproxEqual(mag, 1.0, 1e-5) {
+						t.Errorf("sub-vector %d has magnitude %v, expected 1.0", i, mag)
+					}
+				}
+			}
+		})
+	}
+}
+
+// Helper to compute magnitude of a vector
+func magnitude(v []float32) float32 {
+	var sum float32
+	for _, x := range v {
+		sum += x * x
+	}
+	return float32(math.Sqrt(float64(sum)))
+}
+
+// Helper for approximate float comparison
+func floatApproxEqual(a, b, epsilon float32) bool {
+	diff := a - b
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff < epsilon
 }
