@@ -21,8 +21,10 @@ jobs:
       - name: Test
         run: |
           go test -coverprofile=profile.cov ./...
-          sed '/\.go/!d' profile.cov > profile.cov
+      - name: Remove non-GO entries from coverage profile
+        run: |
+          grep -E 'mode|\.go' profile.cov > profile_go.cov
       - name: Send coverage
         uses: shogo82148/actions-goveralls@v1
         with:
-          path-to-profile: profile.cov
+          path-to-profile: profile_go.cov
