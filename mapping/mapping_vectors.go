@@ -203,18 +203,10 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	if err != nil || len(decodedVector) != fm.Dims {
 		return
 	}
-	// Apply defaults for similarity and optimization if not set
-	similarity := fm.Similarity
-	if similarity == "" {
-		similarity = index.DefaultVectorSimilarityMetric
-	}
-	vectorIndexOptimizedFor := fm.VectorIndexOptimizedFor
-	if vectorIndexOptimizedFor == "" {
-		vectorIndexOptimizedFor = index.DefaultIndexOptimization
-	}
-	// normalize raw vector if similarity is cosine
+	// normalize raw vector if similarity is cosine, multi-vector is not supported
+	// for base64 encoded vectors, so we use NormalizeVector directly.
 	if similarity == index.CosineSimilarity {
-		decodedVector = NormalizeMultiVector(decodedVector, fm.Dims)
+		decodedVector = NormalizeVector(decodedVector)
 	}
 
 	fieldName := getFieldName(pathString, path, fm)

@@ -105,7 +105,7 @@ func (c *collectStoreKNN) Final(fixup collectorFixup) (search.DocumentMatchColle
 // NOTE: This implementation assumes documents arrive in increasing order of their
 // internal IDs, which is guaranteed by all searchers in bleve.
 type knnMerger struct {
-	// curr is the current document match being merged
+	// curr holds the current document match being accumulated during the merge process.
 	curr *search.DocumentMatch
 }
 
@@ -115,8 +115,8 @@ func newKNNMerger() *knnMerger {
 
 // Merge merges duplicate document matches by combining their score breakdowns.
 // Returns nil if the incoming doc was merged into the current document.
-// Returns a non-nil DocumentMatch when a new document arrives, representing
-// the completed merge of the previous document ready for further processing.
+// Returns the completed previous document when a new document with a different ID arrives.
+// The returned DocumentMatch is ready for further processing.
 func (c *knnMerger) Merge(ctx *search.SearchContext, doc *search.DocumentMatch) (*search.DocumentMatch, error) {
 	// see if the document has been seen before
 	if c.curr != nil && c.curr.IndexInternalID.Equals(doc.IndexInternalID) {
@@ -159,6 +159,9 @@ func MakeKNNDocMatchHandler(ctx *search.SearchContext) (search.DocumentMatchHand
 			if d == nil {
 				return nil
 			}
+			// increment total count as we are sure that this is a
+			// valid document match to be added to the KNN store
+			hc.total++
 			toRelease := hc.knnStore.AddDocument(d)
 			for _, doc := range toRelease {
 				ctx.DocumentMatchPool.Put(doc)
@@ -251,8 +254,10 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 	default:
 		next, err = searcher.Next(searchContext)
 	}
+	// maintain a total count of documents processed, for context cancellation checks
+	var total uint64
 	for err == nil && next != nil {
-		if hc.total%CheckDoneEvery == 0 {
+		if total%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
 				search.RecordSearchCost(ctx, search.AbortM, 0)
@@ -260,7 +265,7 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 			default:
 			}
 		}
-		hc.total++
+		total++
 
 		// since we may get duplicate document matches from the KNN searcher,
 		// we must merge them before adding to the KNN store, keeping the
@@ -270,9 +275,13 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 			break
 		}
 
-		err = dmHandler(next)
-		if err != nil {
-			break
+		// we may have stored next for merging, or we may have completed a merge
+		// and have a document ready for further processing, so next can be nil
+		if next != nil {
+			err = dmHandler(next)
+			if err != nil {
+				break
+			}
 		}
 
 		next, err = searcher.Next(searchContext)
