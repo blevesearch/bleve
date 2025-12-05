@@ -42,12 +42,13 @@ aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distanc
 * Multi kNN searches are supported - the `knn` object within the search request accepts an array of requests. These sub objects are unioned by default but this behavior can be overridden by setting `knn_operator` to `"and"`.
 * Previously supported pagination settings will work as they were, with size/limit being applied over the top-K hits combined with any exact search hits.
 * Pre-filtered vector and hybrid search (v2.4.3+): Apply any Bleve filter query first to narrow down candidates before running kNN search, making vector and hybrid searches faster and more relevant.
-* Multi-vector per document support (v2.5.7+):
-  * A single document can contain multiple vectors in the same vector field either as an array of vectors `[][]float32` or as nested objects with vector fields.
-  * All vectors in the same field must have the same dimensionality.
-  * For single kNN queries, the best-matching vector per document is used.
-  * For multi kNN queries, the best-matching vector per query are selected per
-    document, and the document's score is the sum of these best vector scores.
+* Fields containing multiple vectors (v2.5.7+):
+  * A single document may contain multiple vectors within the same field, in the form of either:
+    * an array of vectors (multi-vector field in the form of `[][]float32`)
+    * an array of objects each containing a vector (nested multi-vector field)
+  * **All vectors in the field must share the same dimensionality**.
+  * For single-kNN queries, each document is scored using its single best-matching vector.
+  * For multi-kNN queries, the system selects the best-matching vector for each query vector within the document.
 
 ## Indexing
 
