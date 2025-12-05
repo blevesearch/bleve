@@ -191,10 +191,10 @@ if err != nil {
 fmt.Println("Multi kNN queries result:", searchResult.Hits)
 // Document score explanation:
 // - For each query vector, Bleve selects the **closest vector** in the multi-vector field.
-// - Scores from multiple queries are **summed** to give the document score.
+// - Scores from multiple queries are then **normalized and summed** to get the final document score.
 // For example, if the closest vector to the first query has squared L2 distance 4 (score 0.25)
 // and the closest vector to the second query has squared L2 distance 1 (score 1.0),
-// then the total document score = 0.25 + 1.0 = 1.25.
+// and the normalization factor is 1/√2, then the total document score = 1/√2 * 0.25 + 1/√2 * 1.0 = 0.8839.
 
 // ------------------------------
 // Hybrid search: text + vector (v2.4.0+)
