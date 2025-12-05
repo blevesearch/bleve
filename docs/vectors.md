@@ -114,9 +114,9 @@ if err != nil {
 ## Querying
 
 ```go
-// ------------------------------
+// ------------------------------------
 // Single-vector field search (v2.4.0+)
-// ------------------------------
+// ------------------------------------
 searchRequest := bleve.NewSearchRequest(bleve.NewMatchNoneQuery())
 searchRequest.AddKNN(
     "vec",                                   // Vector field
@@ -129,10 +129,12 @@ if err != nil {
     panic(err)
 }
 fmt.Println("Single-vector field kNN result:", searchResult.Hits) // Scores are 1 / squared L2 distance, e.g., score = 0.25 for squared distance of 4
+```
 
-// ------------------------------
+```go
+// -----------------------------------
 // Multi-vector field search (v2.5.7+)
-// ------------------------------
+// -----------------------------------
 searchRequest = bleve.NewSearchRequest(bleve.NewMatchNoneQuery())
 searchRequest.AddKNN(
     "embeddings",
@@ -148,10 +150,12 @@ fmt.Println("Multi-vector field kNN result:", searchResult.Hits)
 // Scores are based on the **best-matching vector** from the multi-vector field.
 // Example: distances to doc vectors {10..19} and {20..29} → pick the closer one (smaller squared L2),
 // then score = 1 / squared L2 distance.
+```
 
-// ------------------------------
+```go
+// ------------------------------------
 // Nested-vector field search (v2.5.7+)
-// ------------------------------
+// ------------------------------------
 searchRequest = bleve.NewSearchRequest(bleve.NewMatchNoneQuery())
 searchRequest.AddKNN(
     "sections.vec",
@@ -167,10 +171,12 @@ fmt.Println("Nested-vector field kNN result:", searchResult.Hits)
 // Scores are based on the **best-matching vector** from the nested-vector field.
 // Example: distances to doc vectors {30..39} and {40..49} → pick the closer one (smaller squared L2),
 // then score = 1 / squared L2 distance.
+```
 
-// ------------------------------
+```go
+// -----------------------------------------------------
 // Multi kNN queries on multi-vector documents (v2.5.7+)
-// ------------------------------
+// -----------------------------------------------------
 searchRequest = bleve.NewSearchRequest(bleve.NewMatchNoneQuery())
 searchRequest.AddKNN(
     "embeddings",
@@ -197,10 +203,12 @@ fmt.Println("Multi kNN queries result:", searchResult.Hits)
 // and both queries use equal boost values of 1.0, the normalization factor is 1/√2 (where 2 is the number of kNN queries).
 // Then the total document score = 1/√2 * 0.25 + 1/√2 * 1.0 = 0.1768 + 0.7071 = 0.8839.
 // Note: If the boost values differ, or if more queries are used, the normalization factor and score calculation will change accordingly.
+```
 
-// ------------------------------
+```go
+// --------------------------------------
 // Hybrid search: text + vector (v2.4.0+)
-// ------------------------------
+// --------------------------------------
 hybridRequest := bleve.NewSearchRequest(bleve.NewMatchQuery("united states"))
 hybridRequest.AddKNN(
     "vec",
