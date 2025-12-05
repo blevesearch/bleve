@@ -21,6 +21,7 @@ jobs:
       - name: Test
         run: |
           go test -coverprofile=profile.cov ./...
+          sed '/\.go/!d' profile.cov > profile.cov
       - name: Send coverage
         uses: shogo82148/actions-goveralls@v1
         with:
