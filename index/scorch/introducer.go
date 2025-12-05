@@ -24,6 +24,8 @@ import (
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
 
+const sourceIntroducer = "introducer"
+
 type segmentIntroduction struct {
 	id        uint64
 	data      segment.Segment
@@ -51,7 +53,7 @@ func (s *Scorch) introducerLoop() {
 	defer func() {
 		if r := recover(); r != nil {
 			s.fireAsyncError(NewScorchError(
-				SourceIntroducer,
+				sourceIntroducer,
 				fmt.Sprintf("panic: %v, path: %s", r, s.path),
 				ErrAsyncPanic,
 			))

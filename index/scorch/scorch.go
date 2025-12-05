@@ -88,12 +88,6 @@ type Scorch struct {
 	spatialPlugin index.SpatialAnalyzerPlugin
 }
 
-const (
-	SourceIntroducer = "introducer"
-	SourcePersister  = "persister"
-	SourceMerger     = "merger"
-)
-
 type ScorchErrType string
 
 func (t ScorchErrType) Error() string {
