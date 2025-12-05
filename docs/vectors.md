@@ -42,56 +42,164 @@ aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distanc
 * Multi kNN searches are supported - the `knn` object within the search request accepts an array of requests. These sub objects are unioned by default but this behavior can be overridden by setting `knn_operator` to `"and"`.
 * Previously supported pagination settings will work as they were, with size/limit being applied over the top-K hits combined with any exact search hits.
 * Pre-filtered vector and hybrid search (v2.4.3+): Apply any Bleve filter query first to narrow down candidates before running kNN search, making vector and hybrid searches faster and more relevant.
+* Multi-vector per document support (v2.5.7+):
+  * A single document can contain multiple vectors in the same vector field either as an array of vectors `[][]float32` or as nested objects with vector fields.
+  * All vectors in the same field must have the same dimensionality.
+  * For single kNN queries, the best-matching vector per document is used.
+  * For multi kNN queries, the best-matching vector per query are selected per
+    document, and the document's score is the sum of these best vector scores.
 
 ## Indexing
 
 ```go
+// Example document with single vector, multi-vector, and nested multi-vector sections
 doc := struct {
-    Id   string    `json:"id"`
-    Text string    `json:"text"`
-    Vec  []float32 `json:"vec"`
+    Id         string      `json:"id"`
+    Text       string      `json:"text"`
+    Vec        []float32   `json:"vec"`        // Single vector field
+    Embeddings [][]float32 `json:"embeddings"` // Multi-vector field: array of vectors (v2.5.7+)
+    Sections   []struct {  // Nested multi-vector field: array of objects with vectors (v2.5.7+)
+        Text string
+        Vec  []float32
+    } `json:"sections"`
 }{
     Id:   "example",
     Text: "hello from united states",
     Vec:  []float32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+    Embeddings: [][]float32{
+        {10, 11, 12, 13, 14, 15, 16, 17, 18, 19}, // First vector
+        {20, 21, 22, 23, 24, 25, 26, 27, 28, 29}, // Second vector
+    },
+    Sections: []struct {
+        Text string
+        Vec  []float32
+    }{
+        {Text: "first section", Vec: []float32{30, 31, 32, 33, 34, 35, 36, 37, 38, 39}},
+        {Text: "second section", Vec: []float32{40, 41, 42, 43, 44, 45, 46, 47, 48, 49}},
+    },
 }
 
+// Field mappings
 textFieldMapping := bleve.NewTextFieldMapping()
 vectorFieldMapping := bleve.NewVectorFieldMapping()
 vectorFieldMapping.Dims = 10
-vectorFieldMapping.Similarity = "l2_norm" // euclidean distance
+vectorFieldMapping.Similarity = "l2_norm" // Euclidean distance
 
+// Nested sections mapping
+sectionsMapping := bleve.NewDocumentMapping()
+sectionsMapping.AddFieldMappingsAt("text", textFieldMapping)
+sectionsMapping.AddFieldMappingsAt("vec", vectorFieldMapping)
+
+// Index mapping
 bleveMapping := bleve.NewIndexMapping()
 bleveMapping.DefaultMapping.Dynamic = false
 bleveMapping.DefaultMapping.AddFieldMappingsAt("text", textFieldMapping)
-bleveMapping.DefaultMapping.AddFieldMappingsAt("vec", vectorFieldMapping)
+bleveMapping.DefaultMapping.AddFieldMappingsAt("vec", vectorFieldMapping)        // Single vector
+bleveMapping.DefaultMapping.AddFieldMappingsAt("embeddings", vectorFieldMapping) // Multi-vector
+bleveMapping.DefaultMapping.AddSubDocumentMapping("sections", sectionsMapping)   // Nested multi-vector
 
+// Create the index
 index, err := bleve.New("example.bleve", bleveMapping)
 if err != nil {
     panic(err)
 }
-index.Index(doc.Id, doc)
+
+// Index the document
+err = index.Index(doc.Id, doc)
+if err != nil {
+    panic(err)
+}
 ```
 
 ## Querying
 
 ```go
-// Vector Search: finds nearest neighbors using kNN on vectors
+// ------------------------------
+// Single-vector kNN search (v2.4.0+)
+// ------------------------------
 searchRequest := bleve.NewSearchRequest(bleve.NewMatchNoneQuery())
 searchRequest.AddKNN(
-    "vec",                                   // Vector field name in index
-    []float32{0, 1, 1, 4, 4, 5, 7, 6, 8, 9}, // Query vector (must match indexed vector dims)
-    5,                                       // Number of nearest neighbors to return (k)
-    1,                                       // Boost factor for kNN score
+    "vec",                                   // Vector field
+    []float32{0, 1, 1, 4, 4, 5, 7, 6, 8, 9}, // Query vector
+    5,                                       // top-k
+    1,                                       // boost
 )
 searchResult, err := index.Search(searchRequest)
 if err != nil {
     panic(err)
 }
-fmt.Println(searchResult.Hits) // Scores are 1 / squared L2 distance, e.g., score = 0.25 for squared distance of 4
+fmt.Println("Single-vector kNN result:", searchResult.Hits) // Scores are 1 / squared L2 distance, e.g., score = 0.25 for squared distance of 4
 
-// Hybrid Search: combining kNN vector search with Bleve search
-hybridRequest := bleve.NewSearchRequest(bleve.NewMatchQuery("united states")) // Bleve query (can be replaced with any Bleve query)
+// ------------------------------
+// Multi-vector field search (v2.5.7+)
+// ------------------------------
+searchRequest = bleve.NewSearchRequest(bleve.NewMatchNoneQuery())
+searchRequest.AddKNN(
+    "embeddings",
+    []float32{0, 1, 1, 4, 4, 5, 7, 6, 8, 9},
+    5,
+    1.0,
+)
+searchResult, err = index.Search(searchRequest)
+if err != nil {
+    panic(err)
+}
+fmt.Println("Multi-vector kNN result:", searchResult.Hits)
+// Scores are based on the **best-matching vector** from the multi-vector field.
+// Example: distances to doc vectors {10..19} and {20..29} → pick the closer one (smaller squared L2),
+// then score = 1 / squared L2 distance.
+
+// ------------------------------
+// Nested sections kNN search (v2.5.7+)
+// ------------------------------
+searchRequest = bleve.NewSearchRequest(bleve.NewMatchNoneQuery())
+searchRequest.AddKNN(
+    "sections.vec",
+    []float32{0, 1, 1, 4, 4, 5, 7, 6, 8, 9},
+    5,
+    1.0,
+)
+searchResult, err = index.Search(searchRequest)
+if err != nil {
+    panic(err)
+}
+fmt.Println("Nested sections kNN result:", searchResult.Hits)
+// Scores are based on the **best-matching vector** from the nested objects.
+// Example: distances to doc vectors {30..39} and {40..49} → pick the closer one (smaller squared L2),
+// then score = 1 / squared L2 distance.
+
+// ------------------------------
+// Multi kNN queries on multi-vector documents (v2.5.7+)
+// ------------------------------
+searchRequest = bleve.NewSearchRequest(bleve.NewMatchNoneQuery())
+searchRequest.AddKNN(
+    "embeddings",
+    []float32{0, 1, 1, 4, 4, 5, 7, 6, 8, 9},
+    5,
+    1.0,
+)
+searchRequest.AddKNN(
+    "embeddings",
+    []float32{1, 2, 2, 5, 5, 6, 8, 7, 9, 10},
+    8,
+    1.0,
+)
+searchResult, err = index.Search(searchRequest)
+if err != nil {
+    panic(err)
+}
+fmt.Println("Multi kNN queries result:", searchResult.Hits)
+// Document score explanation:
+// - For each query vector, Bleve selects the **closest vector** in the multi-vector field.
+// - Scores from multiple queries are **summed** to give the document score.
+// For example, if the closest vector to the first query has squared L2 distance 4 (score 0.25)
+// and the closest vector to the second query has squared L2 distance 1 (score 1.0),
+// then the total document score = 0.25 + 1.0 = 1.25.
+
+// ------------------------------
+// Hybrid search: text + vector (v2.4.0+)
+// ------------------------------
+hybridRequest := bleve.NewSearchRequest(bleve.NewMatchQuery("united states"))
 hybridRequest.AddKNN(
     "vec",
     []float32{0, 1, 1, 4, 4, 5, 7, 6, 8, 9},
@@ -102,7 +210,9 @@ hybridResult, err := index.Search(hybridRequest)
 if err != nil {
     panic(err)
 }
-fmt.Println(hybridResult.Hits) // Scores are the sum of text search and kNN scores, e.g., 0.25 + 0.25 = 0.50
+fmt.Println("Hybrid search result:", hybridResult.Hits)
+// Score = sum of text relevance score + kNN vector score
+// Example: text score 0.5 + vector score 0.25 = total score 0.75
 ```
 
 ## Querying with filters (v2.4.3+)
