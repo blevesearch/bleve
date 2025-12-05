@@ -50,10 +50,11 @@ type epochWatcher struct {
 func (s *Scorch) introducerLoop() {
 	defer func() {
 		if r := recover(); r != nil {
-			s.fireAsyncError(&AsyncPanicError{
-				Source: "introducer",
-				Path:   s.path,
-			})
+			s.fireAsyncError(NewScorchError(
+				"introducer",
+				fmt.Sprintf("path: %s", s.path),
+				ErrAsyncPanic,
+			))
 		}
 
 		s.asyncTasks.Done()

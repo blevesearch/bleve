@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -88,29 +89,32 @@ type Scorch struct {
 	spatialPlugin index.SpatialAnalyzerPlugin
 }
 
-// AsyncPanicError is passed to scorch asyncErrorHandler when panic occurs in scorch background process
-type AsyncPanicError struct {
-	Source string
-	Path   string
+var (
+	ErrAsyncPanic   = errors.New("async panic error")
+	ErrPersist      = errors.New("persist error")
+	ErrCleanup      = errors.New("cleanup error")
+	ErrOptionsParse = errors.New("options parse error")
+)
+
+type ScorchError struct {
+	Source  string
+	ErrMsg  string
+	ErrType error
 }
 
-func (e *AsyncPanicError) Error() string {
-	return fmt.Sprintf("%s panic when processing %s", e.Source, e.Path)
+func (e *ScorchError) Error() string {
+	return fmt.Sprintf("scorch error in %s, %v, err: %s", e.Source, e.ErrType, e.ErrMsg)
 }
 
-// PersistError is an error that occurs when there is an issue with persisting segments to disk
-// It is also passed to scorch asyncErrorHandler in case of a persistence issue
-type PersistError struct {
-	errMsg string
+func (e *ScorchError) Unwrap() error {
+	return e.ErrType
 }
 
-func (e *PersistError) Error() string {
-	return e.errMsg
-}
-
-func NewPersistError(format string, args ...interface{}) error {
-	return &PersistError{
-		errMsg: fmt.Sprintf(format, args...),
+func NewScorchError(source, errMsg string, errType error) error {
+	return &ScorchError{
+		Source:  source,
+		ErrMsg:  errMsg,
+		ErrType: errType,
 	}
 }
 

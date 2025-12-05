@@ -32,10 +32,11 @@ import (
 func (s *Scorch) mergerLoop() {
 	defer func() {
 		if r := recover(); r != nil {
-			s.fireAsyncError(&AsyncPanicError{
-				Source: "merger",
-				Path:   s.path,
-			})
+			s.fireAsyncError(NewScorchError(
+				"merger",
+				fmt.Sprintf("path: %s", s.path),
+				ErrAsyncPanic,
+			))
 		}
 
 		s.asyncTasks.Done()
@@ -45,7 +46,11 @@ func (s *Scorch) mergerLoop() {
 	var ctrlMsg *mergerCtrl
 	mergePlannerOptions, err := s.parseMergePlannerOptions()
 	if err != nil {
-		s.fireAsyncError(fmt.Errorf("mergePlannerOption json parsing err: %v", err))
+		s.fireAsyncError(NewScorchError(
+			"merger",
+			fmt.Sprintf("mergerPlannerOptions json parsing err: %v", err),
+			ErrOptionsParse,
+		))
 		return
 	}
 	ctrlMsgDflt := &mergerCtrl{ctx: context.Background(),
@@ -110,8 +115,12 @@ OUTER:
 						ctrlMsg = nil
 						break OUTER
 					}
-					
-					s.fireAsyncError(NewPersistError("merging err: %v", err))
+
+					s.fireAsyncError(NewScorchError(
+						"merger",
+						fmt.Sprintf("merging err: %v", err),
+						ErrPersist,
+					))
 					_ = ourSnapshot.DecRef()
 					atomic.AddUint64(&s.stats.TotFileMergeLoopErr, 1)
 					continue OUTER
