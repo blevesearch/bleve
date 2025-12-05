@@ -89,6 +89,7 @@ type Scorch struct {
 	spatialPlugin index.SpatialAnalyzerPlugin
 }
 
+// ErrType values for ScorchError
 var (
 	ErrAsyncPanic   = errors.New("async panic error")
 	ErrPersist      = errors.New("persist error")
@@ -96,6 +97,8 @@ var (
 	ErrOptionsParse = errors.New("options parse error")
 )
 
+// ScorchError is passed to onAsyncError when errors are
+// fired from scorch background processes
 type ScorchError struct {
 	Source  string
 	ErrMsg  string
@@ -106,6 +109,9 @@ func (e *ScorchError) Error() string {
 	return fmt.Sprintf("scorch error in %s, %v, err: %s", e.Source, e.ErrType, e.ErrMsg)
 }
 
+// Lets the onAsyncError function verify what type of
+// error is fired using errors.Is(...). This lets the function
+// handle errors differently.
 func (e *ScorchError) Unwrap() error {
 	return e.ErrType
 }
