@@ -16,7 +16,9 @@ package search
 
 import (
 	"context"
+	"slices"
 
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/s2"
 )
 
@@ -50,41 +52,54 @@ func MergeTermLocationMaps(rv, other TermLocationMap) TermLocationMap {
 func MergeFieldTermLocations(dest []FieldTermLocation, matches []*DocumentMatch) []FieldTermLocation {
 	n := len(dest)
 	for _, dm := range matches {
-		n += len(dm.FieldTermLocations)
+		if dm != nil {
+			n += len(dm.FieldTermLocations)
+		}
 	}
 	if cap(dest) < n {
 		dest = append(make([]FieldTermLocation, 0, n), dest...)
 	}
 
 	for _, dm := range matches {
-		for _, ftl := range dm.FieldTermLocations {
-			dest = append(dest, FieldTermLocation{
-				Field: ftl.Field,
-				Term:  ftl.Term,
-				Location: Location{
-					Pos:            ftl.Location.Pos,
-					Start:          ftl.Location.Start,
-					End:            ftl.Location.End,
-					ArrayPositions: append(ArrayPositions(nil), ftl.Location.ArrayPositions...),
-				},
-			})
+		if dm != nil {
+			dest = mergeFieldTermLocationFromMatch(dest, dm)
 		}
 	}
 
 	return dest
 }
 
-type SearchIOStatsCallbackFunc func(uint64)
+// MergeFieldTermLocationsFromMatch merges field term locations from a single DocumentMatch
+// into dest, returning the updated slice.
+func MergeFieldTermLocationsFromMatch(dest []FieldTermLocation, match *DocumentMatch) []FieldTermLocation {
+	if match == nil {
+		return dest
+	}
+	n := len(dest) + len(match.FieldTermLocations)
+	if cap(dest) < n {
+		dest = append(make([]FieldTermLocation, 0, n), dest...)
+	}
+	return mergeFieldTermLocationFromMatch(dest, match)
+}
 
-// Implementation of SearchIncrementalCostCallbackFn should handle the following messages
-//   - add: increment the cost of a search operation
-//     (which can be specific to a query type as well)
-//   - abort: query was aborted due to a cancel of search's context (for eg),
-//     which can be handled differently as well
-//   - done: indicates that a search was complete and the tracked cost can be
-//     handled safely by the implementation.
-type SearchIncrementalCostCallbackFn func(SearchIncrementalCostCallbackMsg,
-	SearchQueryType, uint64)
+// mergeFieldTermLocationFromMatch appends field term locations from a DocumentMatch into dest.
+// Assumes dest has sufficient capacity.
+func mergeFieldTermLocationFromMatch(dest []FieldTermLocation, dm *DocumentMatch) []FieldTermLocation {
+	for _, ftl := range dm.FieldTermLocations {
+		dest = append(dest, FieldTermLocation{
+			Field: ftl.Field,
+			Term:  ftl.Term,
+			Location: Location{
+				Pos:            ftl.Location.Pos,
+				Start:          ftl.Location.Start,
+				End:            ftl.Location.End,
+				ArrayPositions: append(ArrayPositions(nil), ftl.Location.ArrayPositions...),
+			},
+		})
+	}
+
+	return dest
+}
 
 type (
 	SearchIncrementalCostCallbackMsg uint
@@ -156,6 +171,10 @@ const (
 	// ScoreFusionKey is used to communicate whether KNN hits need to be preserved for
 	// hybrid search algorithms (like RRF)
 	ScoreFusionKey ContextKey = "_fusion_rescoring_key"
+
+	// NestedSearchKey is used to communicate whether the search is performed
+	// in an index with nested documents
+	NestedSearchKey ContextKey = "_nested_search_key"
 )
 
 func RecordSearchCost(ctx context.Context,
@@ -184,9 +203,7 @@ const (
 	MinGeoBufPoolSize = 24
 )
 
-type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
-
-// *PreSearchDataKey are used to store the data gathered during the presearch phase
+// PreSearchDataKey are used to store the data gathered during the presearch phase
 // which would be use in the actual search phase.
 const (
 	KnnPreSearchDataKey     = "_knn_pre_search_data_key"
@@ -197,13 +214,38 @@ const (
 const GlobalScoring = "_global_scoring"
 
 type (
+	// SearcherStartCallbackFn is a callback function type used to signal the start of
+	// searcher creation phase.
 	SearcherStartCallbackFn func(size uint64) error
-	SearcherEndCallbackFn   func(size uint64) error
+	// SearcherEndCallbackFn is a callback function type used to signal the end of
+	// a searcher creation phase.
+	SearcherEndCallbackFn func(size uint64) error
+	// GetScoringModelCallbackFn is a callback function type used to get the scoring model
+	// to be used for scoring documents during search.
+	GetScoringModelCallbackFn func() string
+	// HybridMergeCallbackFn is a callback function type used to merge a KNN document match
+	// into a full text search document match, of the same docID as part of hybrid search.
+	HybridMergeCallbackFn func(ftsMatch *DocumentMatch, knnMatch *DocumentMatch)
+	// DescendantAdderCallback is a callback function type used to customize how a descendant
+	// DocumentMatch is merged into its parent. This allows different descendant addition strategies for
+	// different use cases (e.g., TopN vs KNN collection).
+	DescendantAdderCallbackFn func(parent *DocumentMatch, descendant *DocumentMatch) error
+	// GeoBufferPoolCallbackFunc is a callback function type used to get the geo buffer pool
+	// to be used during geo searches.
+	GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
+	// SearchIOStatsCallbackFunc is a callback function type used to report search IO stats
+	// during search.
+	SearchIOStatsCallbackFunc func(uint64)
+	// Implementation of SearchIncrementalCostCallbackFn should handle the following messages
+	//   - add: increment the cost of a search operation
+	//     (which can be specific to a query type as well)
+	//   - abort: query was aborted due to a cancel of search's context (for eg),
+	//     which can be handled differently as well
+	//   - done: indicates that a search was complete and the tracked cost can be
+	//     handled safely by the implementation.
+	SearchIncrementalCostCallbackFn func(SearchIncrementalCostCallbackMsg,
+		SearchQueryType, uint64)
 )
-
-type GetScoringModelCallbackFn func() string
-
-type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *DocumentMatch) (float64, *Explanation)
 
 // field -> term -> synonyms
 type FieldTermSynonymMap map[string]map[string][]string
@@ -238,7 +280,58 @@ type BM25Stats struct {
 	FieldCardinality map[string]int `json:"field_cardinality"`
 }
 
-// MergeScoreExplBreakdown merges two score breakdown maps and their explanations together
+// FieldSet represents a set of queried fields.
+type FieldSet map[string]struct{}
+
+// NewFieldSet creates a new FieldSet.
+func NewFieldSet() FieldSet {
+	return make(map[string]struct{})
+}
+
+// Add adds a field to the set.
+func (fs FieldSet) AddField(field string) {
+	fs[field] = struct{}{}
+}
+
+// Slice returns the fields in this set as a slice of strings.
+func (fs FieldSet) Slice() []string {
+	rv := make([]string, 0, len(fs))
+	for field := range fs {
+		rv = append(rv, field)
+	}
+	return rv
+}
+
+// SotedUnionIDs returns the union of two sorted slices of IndexInternalID,
+// preserving order and removing duplicates, reusing the underlying array of dest
+// where possible.
+func SortedUnion(dest, src []index.IndexInternalID) []index.IndexInternalID {
+	// If dest is empty, return src
+	if len(dest) == 0 {
+		return src
+	}
+	// If src is empty, return dest
+	if len(src) == 0 {
+		return dest
+	}
+	// Append src to dest - reuses the underlying array if it has capacity
+	dest = append(dest, src...)
+	// Sort the combined slice, dest is now having atleast 2 elements
+	slices.SortFunc(dest, func(a, b index.IndexInternalID) int {
+		return a.Compare(b)
+	})
+	// Now remove duplicates, reusing the underlying array by adding the first element
+	// as the initial unique element
+	rv := dest[:1]
+	for i := 1; i < len(dest); i++ {
+		if !rv[len(rv)-1].Equals(dest[i]) {
+			rv = append(rv, dest[i])
+		}
+	}
+	return rv
+}
+
+// MergeScoreExplBreakdown merges two score breakdown maps together
 // by picking the best score per query component, and merging them
 // (and their corresponding explanations) into the first map.
 func MergeScoreExplBreakdown(first, second map[int]float64, firstExpl, secondExpl *Explanation) (map[int]float64, *Explanation) {

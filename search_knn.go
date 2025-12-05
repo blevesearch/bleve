@@ -24,6 +24,7 @@ import (
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
@@ -296,7 +297,7 @@ func createKNNQuery(req *SearchRequest, knnFilterResults map[int]index.EligibleD
 				continue
 			}
 			knnQuery := query.NewKNNQuery(knn.Vector)
-			knnQuery.SetFieldVal(knn.Field)
+			knnQuery.SetField(knn.Field)
 			knnQuery.SetK(knn.K)
 			knnQuery.SetBoost(knn.Boost.Value())
 			knnQuery.SetParams(knn.Params)
@@ -377,7 +378,7 @@ func addSortAndFieldsToKNNHits(req *SearchRequest, knnHits []*search.DocumentMat
 			}
 		}
 		req.Sort.Value(hit)
-		err, _ = LoadAndHighlightFields(hit, req, "", reader, nil)
+		err, _ = LoadAndHighlightAllFields(hit, req, "", reader, nil)
 		if err != nil {
 			return err
 		}
@@ -451,7 +452,10 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 			err = serr
 		}
 	}()
-	knnCollector := collector.NewKNNCollector(kArray, sumOfK)
+	knnCollector, err := i.buildKNNCollector(ctx, KNNQuery, reader, kArray, sumOfK)
+	if err != nil {
+		return nil, err
+	}
 	err = knnCollector.Collect(ctx, knnSearcher, reader)
 	if err != nil {
 		return nil, err
@@ -474,17 +478,18 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	return knnHits, nil
 }
 
-func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector) {
+func setKnnHitsInCollector(knnHits []*search.DocumentMatch, coll *collector.TopNCollector) {
 	if len(knnHits) > 0 {
-		newScoreExplComputer := func(queryMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) (float64, *search.Explanation) {
-			totalScore := queryMatch.Score + knnMatch.Score
-			if !req.Explain {
-				// exit early as we don't need to compute the explanation
-				return totalScore, nil
-			}
-			return totalScore, &search.Explanation{Value: totalScore, Message: "sum of:", Children: []*search.Explanation{queryMatch.Expl, knnMatch.Expl}}
+		mergeFn := func(ftsMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) {
+			// Boost the FTS score using the KNN score
+			ftsMatch.Score += knnMatch.Score
+			// Combine the FTS explanation with the KNN explanation, if present
+			ftsMatch.Expl.MergeWith(knnMatch.Expl)
+			// Add the Descendants from the KNN match to the FTS match, deduplicating them on the way
+			// The Descendants of a DocumentMatch is always sorted, and we must maintain that invariant
+			ftsMatch.Descendants = search.SortedUnion(ftsMatch.Descendants, knnMatch.Descendants)
 		}
-		coll.SetKNNHits(knnHits, search.ScoreExplCorrectionCallbackFunc(newScoreExplComputer))
+		coll.SetKNNHits(knnHits, search.HybridMergeCallbackFn(mergeFn))
 	}
 }
 
@@ -682,4 +687,27 @@ func (r *rescorer) restoreKnnRequest() {
 		b := query.Boost(r.origBoosts[i+1])
 		r.req.KNN[i].Boost = &b
 	}
+}
+
+func (i *indexImpl) buildKNNCollector(ctx context.Context, KNNQuery query.Query, reader index.IndexReader, kArray []int64, sumOfK int64) (*collector.KNNCollector, error) {
+	// check if we are in nested mode
+	if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); ok && nestedMode {
+		// get the nested reader from the index reader
+		if nr, ok := reader.(index.NestedReader); ok {
+			// check if the KNN query intersects with the nested mapping
+			if nm, ok := i.m.(mapping.NestedMapping); ok {
+				var fs search.FieldSet
+				var err error
+				fs, err = query.ExtractFields(KNNQuery, i.m, fs)
+				if err != nil {
+					return nil, err
+				}
+				if nm.IntersectsPrefix(fs) {
+					return collector.NewNestedKNNCollector(kArray, sumOfK, nr), nil
+				}
+			}
+		}
+	}
+
+	return collector.NewKNNCollector(kArray, sumOfK), nil
 }

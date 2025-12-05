@@ -49,6 +49,7 @@ type Cache struct {
 	Fragmenters        *FragmenterCache
 	Highlighters       *HighlighterCache
 	SynonymSources     *SynonymSourceCache
+	NestedPrefixes     *NestedFieldCache
 }
 
 func NewCache() *Cache {
@@ -63,6 +64,7 @@ func NewCache() *Cache {
 		Fragmenters:        NewFragmenterCache(),
 		Highlighters:       NewHighlighterCache(),
 		SynonymSources:     NewSynonymSourceCache(),
+		NestedPrefixes:     NewNestedFieldCache(),
 	}
 }
 

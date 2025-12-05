@@ -243,7 +243,7 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 		}
 	}
 
-	rv.IndexInternalID = append(rv.IndexInternalID, termMatch.ID...)
+	rv.IndexInternalID = index.NewIndexInternalIDFrom(rv.IndexInternalID, termMatch.ID)
 
 	if len(termMatch.Vectors) > 0 {
 		if cap(rv.FieldTermLocations) < len(termMatch.Vectors) {

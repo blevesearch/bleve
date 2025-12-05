@@ -197,6 +197,7 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 
 	fieldName := getFieldName(pathString, path, fm)
 	options := fm.Options()
+
 	field := document.NewVectorFieldWithIndexingOptions(fieldName, indexes, decodedVector,
 		fm.Dims, similarity, vectorIndexOptimizedFor, options)
 	context.doc.AddField(field)

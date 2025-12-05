@@ -197,14 +197,41 @@ type KNNCollector struct {
 	took     time.Duration
 	results  search.DocumentMatchCollection
 	maxScore float64
+
+	nestedStore *collectStoreNested
 }
 
+// NewKNNCollector creates a new KNNCollector for the given K values and size.
 func NewKNNCollector(kArray []int64, size int64) *KNNCollector {
-	return &KNNCollector{
+	return newKNNCollector(kArray, size, nil)
+}
+
+// NewNestedKNNCollector creates a new KNNCollector for the given K values and size,
+// with support for nested documents using the provided NestedReader.
+func NewNestedKNNCollector(kArray []int64, size int64, nr index.NestedReader) *KNNCollector {
+	return newKNNCollector(kArray, size, nr)
+}
+
+// internal constructor for KNNCollector, with optional NestedReader
+func newKNNCollector(kArray []int64, size int64, nr index.NestedReader) *KNNCollector {
+	knnCollector := &KNNCollector{
 		merger:   newKNNMerger(),
 		knnStore: GetNewKNNCollectorStore(kArray),
 		size:     int(size),
 	}
+	if nr != nil {
+		descAdder := func(parent *search.DocumentMatch, child *search.DocumentMatch) error {
+			// here we merge the child's score and explanation breakdowns into the parent
+			parent.ScoreBreakdown, parent.Expl = search.MergeScoreExplBreakdown(
+				parent.ScoreBreakdown, child.ScoreBreakdown,
+				parent.Expl, child.Expl)
+			// add the child's internal ID as a descendant ID to the parent
+			parent.AddDescendantID(child.IndexInternalID)
+			return nil
+		}
+		knnCollector.nestedStore = newStoreNested(nr, search.DescendantAdderCallbackFn(descAdder))
+	}
+	return knnCollector
 }
 
 func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, reader index.IndexReader) error {
@@ -263,8 +290,21 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 			break
 		}
 
-		// we may have stored next for merging, or we may have completed a merge
-		// and have a document ready for further processing, so next can be nil
+		// if the collector is used in nested mode and if next is non-nil,
+		// we must further process next to merge it into its root document
+		// via the nested store, if needed.
+		if hc.nestedStore != nil && next != nil {
+			// override next with the returned root document match, if any
+			next, err = hc.nestedStore.ProcessNestedDocument(searchContext, next)
+			if err != nil {
+				break
+			}
+			// if next is nil, it means the incoming doc was merged into its parent
+			// and no root document is ready yet
+		}
+
+		// if next is non-nil at this point we finally have a document match ready
+		// to be added to the KNN store via the document match handler
 		if next != nil {
 			err = dmHandler(next)
 			if err != nil {
@@ -280,9 +320,30 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 
 	// flush the last merged document if any
 	if lastDoc := hc.merger.Current(); lastDoc != nil {
-		err = dmHandler(lastDoc)
-		if err != nil {
-			return err
+		// if the collector is used in nested mode, we must further process lastDoc
+		// to merge it into its root document via the nested store, if needed.
+		if hc.nestedStore != nil {
+			var err error
+			lastDoc, err = hc.nestedStore.ProcessNestedDocument(searchContext, lastDoc)
+			if err != nil {
+				return err
+			}
+			// if lastDoc is nil, it means the incoming doc was merged into its parent
+			// and no root document is ready yet
+		}
+		if lastDoc != nil {
+			if err = dmHandler(lastDoc); err != nil {
+				return err
+			}
+		}
+	}
+	// double check if there is an interim root document left to be returned
+	if hc.nestedStore != nil {
+		doc := hc.nestedStore.Current()
+		if doc != nil {
+			if err = dmHandler(doc); err != nil {
+				return err
+			}
 		}
 	}
 

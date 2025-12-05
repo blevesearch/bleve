@@ -18,7 +18,6 @@
 package scorch
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -96,7 +95,7 @@ func (i *IndexSnapshotVectorReader) Next(preAlloced *index.VectorDoc) (
 			// make segment number into global number by adding offset
 			globalOffset := i.snapshot.offsets[i.segmentOffset]
 			nnum := next.Number()
-			rv.ID = docNumberToBytes(rv.ID, nnum+globalOffset)
+			rv.ID = index.NewIndexInternalID(rv.ID, nnum+globalOffset)
 			rv.Score = float64(next.Score())
 
 			i.currID = rv.ID
@@ -113,7 +112,7 @@ func (i *IndexSnapshotVectorReader) Next(preAlloced *index.VectorDoc) (
 func (i *IndexSnapshotVectorReader) Advance(ID index.IndexInternalID,
 	preAlloced *index.VectorDoc) (*index.VectorDoc, error) {
 
-	if i.currPosting != nil && bytes.Compare(i.currID, ID) >= 0 {
+	if i.currPosting != nil && i.currID.Compare(ID) >= 0 {
 		i2, err := i.snapshot.VectorReader(i.ctx, i.vector, i.field, i.k,
 			i.searchParams, i.eligibleSelector)
 		if err != nil {
@@ -124,7 +123,7 @@ func (i *IndexSnapshotVectorReader) Advance(ID index.IndexInternalID,
 		*i = *(i2.(*IndexSnapshotVectorReader))
 	}
 
-	num, err := docInternalToNumber(ID)
+	num, err := ID.Value()
 	if err != nil {
 		return nil, fmt.Errorf("error converting to doc number % x - %v", ID, err)
 	}
@@ -149,7 +148,7 @@ func (i *IndexSnapshotVectorReader) Advance(ID index.IndexInternalID,
 	if preAlloced == nil {
 		preAlloced = &index.VectorDoc{}
 	}
-	preAlloced.ID = docNumberToBytes(preAlloced.ID, next.Number()+
+	preAlloced.ID = index.NewIndexInternalID(preAlloced.ID, next.Number()+
 		i.snapshot.offsets[segIndex])
 	i.currID = preAlloced.ID
 	i.currPosting = next
