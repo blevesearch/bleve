@@ -297,7 +297,7 @@ func createKNNQuery(req *SearchRequest, knnFilterResults map[int]index.EligibleD
 				continue
 			}
 			knnQuery := query.NewKNNQuery(knn.Vector)
-			knnQuery.SetFieldVal(knn.Field)
+			knnQuery.SetField(knn.Field)
 			knnQuery.SetK(knn.K)
 			knnQuery.SetBoost(knn.Boost.Value())
 			knnQuery.SetParams(knn.Params)
