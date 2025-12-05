@@ -194,7 +194,9 @@ fmt.Println("Multi kNN queries result:", searchResult.Hits)
 // - Scores from multiple queries are then **normalized and summed** to get the final document score.
 // For example, if the closest vector to the first query has squared L2 distance 4 (score 0.25)
 // and the closest vector to the second query has squared L2 distance 1 (score 1.0),
-// and the normalization factor is 1/√2, then the total document score = 1/√2 * 0.25 + 1/√2 * 1.0 = 0.8839.
+// and both queries use equal boost values of 1.0, the normalization factor is 1/√2 (where 2 is the number of kNN queries).
+// Then the total document score = 1/√2 * 0.25 + 1/√2 * 1.0 = 0.1768 + 0.7071 = 0.8839.
+// Note: If the boost values differ, or if more queries are used, the normalization factor and score calculation will change accordingly.
 
 // ------------------------------
 // Hybrid search: text + vector (v2.4.0+)
