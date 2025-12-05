@@ -60,8 +60,8 @@ doc := struct {
     Vec        []float32   `json:"vec"`        // Single-vector field
     Embeddings [][]float32 `json:"embeddings"` // Multi-vector field: array of vectors (v2.5.7+)
     Sections   []struct {  // Nested-vector field: array of objects with vectors (v2.5.7+)
-        Text string
-        Vec  []float32
+        Text string `json:"text"`
+        Vec  []float32 `json:"vec"`
     } `json:"sections"`
 }{
     Id:   "example",
@@ -72,8 +72,8 @@ doc := struct {
         {20, 21, 22, 23, 24, 25, 26, 27, 28, 29}, // Second vector
     },
     Sections: []struct { // Nested-vector field containing 2 objects each with a vector of dimensionality 10
-        Text string
-        Vec  []float32
+        Text string `json:"text"`
+        Vec  []float32 `json:"vec"`
     }{
         {Text: "first section", Vec: []float32{30, 31, 32, 33, 34, 35, 36, 37, 38, 39}},
         {Text: "second section", Vec: []float32{40, 41, 42, 43, 44, 45, 46, 47, 48, 49}},
@@ -128,7 +128,8 @@ searchResult, err := index.Search(searchRequest)
 if err != nil {
     panic(err)
 }
-fmt.Println("Single-vector field kNN result:", searchResult.Hits) // Scores are 1 / squared L2 distance, e.g., score = 0.25 for squared distance of 4
+// Scores are 1 / squared L2 distance, e.g., score = 0.25 for squared distance of 4
+fmt.Printf("Single-vector field kNN result:\n%s\n", searchResult)
 ```
 
 ```go
@@ -146,10 +147,10 @@ searchResult, err = index.Search(searchRequest)
 if err != nil {
     panic(err)
 }
-fmt.Println("Multi-vector field kNN result:", searchResult.Hits)
 // Scores are based on the **best-matching vector** from the multi-vector field.
 // Example: distances to doc vectors {10..19} and {20..29} → pick the closer one (smaller squared L2),
 // then score = 1 / squared L2 distance.
+fmt.Printf("Multi-vector field kNN result:\n%s\n", searchResult)
 ```
 
 ```go
@@ -167,10 +168,10 @@ searchResult, err = index.Search(searchRequest)
 if err != nil {
     panic(err)
 }
-fmt.Println("Nested-vector field kNN result:", searchResult.Hits)
 // Scores are based on the **best-matching vector** from the nested-vector field.
 // Example: distances to doc vectors {30..39} and {40..49} → pick the closer one (smaller squared L2),
 // then score = 1 / squared L2 distance.
+fmt.Printf("Nested-vector field kNN result:\n%s\n", searchResult)
 ```
 
 ```go
@@ -194,7 +195,6 @@ searchResult, err = index.Search(searchRequest)
 if err != nil {
     panic(err)
 }
-fmt.Println("Multi kNN queries result:", searchResult.Hits)
 // Document score explanation:
 // - For each query vector, Bleve selects the **closest vector** in the multi-vector field.
 // - Scores from multiple queries are then **normalized and summed** to get the final document score.
@@ -203,34 +203,35 @@ fmt.Println("Multi kNN queries result:", searchResult.Hits)
 // and both queries use equal boost values of 1.0, the normalization factor is 1/√2 (where 2 is the number of kNN queries).
 // Then the total document score = 1/√2 * 0.25 + 1/√2 * 1.0 = 0.1768 + 0.7071 = 0.8839.
 // Note: If the boost values differ, or if more queries are used, the normalization factor and score calculation will change accordingly.
+fmt.Printf("Multi kNN queries result:\n%s\n", searchResult)
 ```
 
 ```go
 // --------------------------------------
 // Hybrid search: text + vector (v2.4.0+)
 // --------------------------------------
-hybridRequest := bleve.NewSearchRequest(bleve.NewMatchQuery("united states"))
-hybridRequest.AddKNN(
+searchRequest = bleve.NewSearchRequest(bleve.NewMatchQuery("united states"))
+searchRequest.AddKNN(
     "vec",
     []float32{0, 1, 1, 4, 4, 5, 7, 6, 8, 9},
     5,
     1,
 )
-hybridResult, err := index.Search(hybridRequest)
+searchResult, err = index.Search(searchRequest)
 if err != nil {
     panic(err)
 }
-fmt.Println("Hybrid search result:", hybridResult.Hits)
 // Score = sum of text relevance score + kNN vector score
 // Example: text score 0.5 + vector score 0.25 = total score 0.75
+fmt.Printf("Hybrid search result:\n%s\n", searchResult)
 ```
 
 ## Querying with filters (v2.4.3+)
 
 ```go
 // Pre-filtered vector/hybrid search: filter query narrows candidates before KNN search
-searchRequest := bleve.NewSearchRequest(bleve.NewMatchNoneQuery()) // replace with any Bleve query for Pre-filtered Hybrid Search
-filterQuery := bleve.NewTermQuery("hello") // Filter query to narrow candidates
+searchRequest = bleve.NewSearchRequest(bleve.NewMatchNoneQuery()) // replace with any Bleve query for Pre-filtered Hybrid Search
+filterQuery := bleve.NewTermQuery("hello")                        // Filter query to narrow candidates
 searchRequest.AddKNNWithFilter(
     "vec",                                   // Vector field name
     []float32{0, 1, 1, 4, 4, 5, 7, 6, 8, 9}, // Query vector (must match indexed vector dims)
@@ -238,11 +239,14 @@ searchRequest.AddKNNWithFilter(
     1,                                       // Boost factor for KNN score
     filterQuery,                             // Filter query applied before KNN search
 )
-searchResult, err := index.Search(searchRequest)
+searchResult, err = index.Search(searchRequest)
 if err != nil {
     panic(err)
 }
-fmt.Println(searchResult.Hits)
+// Scores are computed only among documents matching the filter query
+// Example: if only one document matches the filter and has squared L2 distance 4 to the query vector,
+// its score will be 0.25 (1 / 4) and returned as the top result.
+fmt.Printf("Pre-filtered kNN search result:\n%s\n", searchResult)
 ```
 
 ## Setup Instructions
