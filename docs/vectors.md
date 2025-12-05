@@ -44,8 +44,8 @@ aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distanc
 * Pre-filtered vector and hybrid search (v2.4.3+): Apply any Bleve filter query first to narrow down candidates before running kNN search, making vector and hybrid searches faster and more relevant.
 * Fields containing multiple vectors (v2.5.7+):
   * A single document may contain multiple vectors within the same field, in the form of either:
-    * an array of vectors (multi-vector field in the form of `[][]float32`)
-    * an array of objects each containing a vector (nested multi-vector field)
+    * an array of vectors (multi-vector field)
+    * an array of objects each containing a vector (nested-vector field)
   * **All vectors in the field must share the same dimensionality**.
   * For single-kNN queries, each document is scored using its single best-matching vector.
   * For multi-kNN queries, the system selects the best-matching vector for each query vector within the document.
@@ -53,25 +53,25 @@ aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distanc
 ## Indexing
 
 ```go
-// Example document with single vector, multi-vector, and nested multi-vector sections
+// Example document with single vector, multi-vector, and nested-vector fields
 doc := struct {
     Id         string      `json:"id"`
     Text       string      `json:"text"`
     Vec        []float32   `json:"vec"`        // Single vector field
     Embeddings [][]float32 `json:"embeddings"` // Multi-vector field: array of vectors (v2.5.7+)
-    Sections   []struct {  // Nested multi-vector field: array of objects with vectors (v2.5.7+)
+    Sections   []struct {  // Nested-vector field: array of objects with vectors (v2.5.7+)
         Text string
         Vec  []float32
     } `json:"sections"`
 }{
     Id:   "example",
     Text: "hello from united states",
-    Vec:  []float32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-    Embeddings: [][]float32{
+    Vec:  []float32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, // Single vector of dimensionality 10
+    Embeddings: [][]float32{ // Multi-vector field containing 2 vectors of dimensionality 10
         {10, 11, 12, 13, 14, 15, 16, 17, 18, 19}, // First vector
         {20, 21, 22, 23, 24, 25, 26, 27, 28, 29}, // Second vector
     },
-    Sections: []struct {
+    Sections: []struct { // Nested-vector field containing 2 objects each with a vector of dimensionality 10
         Text string
         Vec  []float32
     }{
@@ -83,21 +83,20 @@ doc := struct {
 // Field mappings
 textFieldMapping := bleve.NewTextFieldMapping()
 vectorFieldMapping := bleve.NewVectorFieldMapping()
-vectorFieldMapping.Dims = 10
+vectorFieldMapping.Dims = 10              // Set vector dimensionality
 vectorFieldMapping.Similarity = "l2_norm" // Euclidean distance
 
-// Nested sections mapping
+// Sub-document mappings
 sectionsMapping := bleve.NewDocumentMapping()
 sectionsMapping.AddFieldMappingsAt("text", textFieldMapping)
 sectionsMapping.AddFieldMappingsAt("vec", vectorFieldMapping)
 
 // Index mapping
 bleveMapping := bleve.NewIndexMapping()
-bleveMapping.DefaultMapping.Dynamic = false
 bleveMapping.DefaultMapping.AddFieldMappingsAt("text", textFieldMapping)
 bleveMapping.DefaultMapping.AddFieldMappingsAt("vec", vectorFieldMapping)        // Single vector
 bleveMapping.DefaultMapping.AddFieldMappingsAt("embeddings", vectorFieldMapping) // Multi-vector
-bleveMapping.DefaultMapping.AddSubDocumentMapping("sections", sectionsMapping)   // Nested multi-vector
+bleveMapping.DefaultMapping.AddSubDocumentMapping("sections", sectionsMapping)   // Nested-vector
 
 // Create the index
 index, err := bleve.New("example.bleve", bleveMapping)
@@ -151,7 +150,7 @@ fmt.Println("Multi-vector kNN result:", searchResult.Hits)
 // then score = 1 / squared L2 distance.
 
 // ------------------------------
-// Nested sections kNN search (v2.5.7+)
+// Nested-vector field search (v2.5.7+)
 // ------------------------------
 searchRequest = bleve.NewSearchRequest(bleve.NewMatchNoneQuery())
 searchRequest.AddKNN(
@@ -164,8 +163,8 @@ searchResult, err = index.Search(searchRequest)
 if err != nil {
     panic(err)
 }
-fmt.Println("Nested sections kNN result:", searchResult.Hits)
-// Scores are based on the **best-matching vector** from the nested objects.
+fmt.Println("Nested-vector field kNN result:", searchResult.Hits)
+// Scores are based on the **best-matching vector** from the nested-vector field.
 // Example: distances to doc vectors {30..39} and {40..49} → pick the closer one (smaller squared L2),
 // then score = 1 / squared L2 distance.
 
