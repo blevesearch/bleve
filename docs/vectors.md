@@ -53,11 +53,11 @@ aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distanc
 ## Indexing
 
 ```go
-// Example document with single vector, multi-vector, and nested-vector fields
+// Example document with single-vector, multi-vector, and nested-vector fields
 doc := struct {
     Id         string      `json:"id"`
     Text       string      `json:"text"`
-    Vec        []float32   `json:"vec"`        // Single vector field
+    Vec        []float32   `json:"vec"`        // Single-vector field
     Embeddings [][]float32 `json:"embeddings"` // Multi-vector field: array of vectors (v2.5.7+)
     Sections   []struct {  // Nested-vector field: array of objects with vectors (v2.5.7+)
         Text string
@@ -66,7 +66,7 @@ doc := struct {
 }{
     Id:   "example",
     Text: "hello from united states",
-    Vec:  []float32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, // Single vector of dimensionality 10
+    Vec:  []float32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, // Single-vector field of dimensionality 10
     Embeddings: [][]float32{ // Multi-vector field containing 2 vectors of dimensionality 10
         {10, 11, 12, 13, 14, 15, 16, 17, 18, 19}, // First vector
         {20, 21, 22, 23, 24, 25, 26, 27, 28, 29}, // Second vector
@@ -94,7 +94,7 @@ sectionsMapping.AddFieldMappingsAt("vec", vectorFieldMapping)
 // Index mapping
 bleveMapping := bleve.NewIndexMapping()
 bleveMapping.DefaultMapping.AddFieldMappingsAt("text", textFieldMapping)
-bleveMapping.DefaultMapping.AddFieldMappingsAt("vec", vectorFieldMapping)        // Single vector
+bleveMapping.DefaultMapping.AddFieldMappingsAt("vec", vectorFieldMapping)        // Single-vector
 bleveMapping.DefaultMapping.AddFieldMappingsAt("embeddings", vectorFieldMapping) // Multi-vector
 bleveMapping.DefaultMapping.AddSubDocumentMapping("sections", sectionsMapping)   // Nested-vector
 
@@ -115,7 +115,7 @@ if err != nil {
 
 ```go
 // ------------------------------
-// Single-vector kNN search (v2.4.0+)
+// Single-vector field search (v2.4.0+)
 // ------------------------------
 searchRequest := bleve.NewSearchRequest(bleve.NewMatchNoneQuery())
 searchRequest.AddKNN(
@@ -128,7 +128,7 @@ searchResult, err := index.Search(searchRequest)
 if err != nil {
     panic(err)
 }
-fmt.Println("Single-vector kNN result:", searchResult.Hits) // Scores are 1 / squared L2 distance, e.g., score = 0.25 for squared distance of 4
+fmt.Println("Single-vector field kNN result:", searchResult.Hits) // Scores are 1 / squared L2 distance, e.g., score = 0.25 for squared distance of 4
 
 // ------------------------------
 // Multi-vector field search (v2.5.7+)
@@ -144,7 +144,7 @@ searchResult, err = index.Search(searchRequest)
 if err != nil {
     panic(err)
 }
-fmt.Println("Multi-vector kNN result:", searchResult.Hits)
+fmt.Println("Multi-vector field kNN result:", searchResult.Hits)
 // Scores are based on the **best-matching vector** from the multi-vector field.
 // Example: distances to doc vectors {10..19} and {20..29} → pick the closer one (smaller squared L2),
 // then score = 1 / squared L2 distance.
