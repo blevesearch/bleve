@@ -255,6 +255,19 @@ func TestSearchResultString(t *testing.T) {
 			},
 			str: "No matches",
 		},
+		// no search request
+		{
+			result: &SearchResult{
+				Total: 3,
+				Took:  500 * time.Millisecond,
+				Hits: search.DocumentMatchCollection{
+					&search.DocumentMatch{},
+					&search.DocumentMatch{},
+					&search.DocumentMatch{},
+				},
+			},
+			str: "3 matches, took 500ms",
+		},
 	}
 
 	for _, test := range tests {

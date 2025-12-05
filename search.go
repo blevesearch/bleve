@@ -572,25 +572,22 @@ func (sr *SearchResult) Size() int {
 
 func (sr *SearchResult) String() string {
 	rv := ""
+	// main header
 	if sr.Total > 0 {
-		if sr.Request != nil && sr.Request.Size > 0 {
-			rv = fmt.Sprintf("%d matches, showing %d through %d, took %s\n", sr.Total, sr.Request.From+1, sr.Request.From+len(sr.Hits), sr.Took)
+		switch {
+		case sr.Request != nil && sr.Request.Size > 0:
+			start := sr.Request.From
+			end := sr.Request.From + len(sr.Hits)
+			rv = fmt.Sprintf("%d matches, showing %d through %d, took %s\n", sr.Total, start+1, end, sr.Took)
 			for i, hit := range sr.Hits {
-				rv += fmt.Sprintf("%5d. %s (%f)\n", i+sr.Request.From+1, hit.ID, hit.Score)
-				for fragmentField, fragments := range hit.Fragments {
-					rv += fmt.Sprintf("\t%s\n", fragmentField)
-					for _, fragment := range fragments {
-						rv += fmt.Sprintf("\t\t%s\n", fragment)
-					}
-				}
-				for otherFieldName, otherFieldValue := range hit.Fields {
-					if _, ok := hit.Fragments[otherFieldName]; !ok {
-						rv += fmt.Sprintf("\t%s\n", otherFieldName)
-						rv += fmt.Sprintf("\t\t%v\n", otherFieldValue)
-					}
-				}
+				rv += formatHit(i, hit, start)
 			}
-		} else {
+		case sr.Request == nil:
+			rv = fmt.Sprintf("%d matches, took %s\n", sr.Total, sr.Took)
+			for i, hit := range sr.Hits {
+				rv += formatHit(i, hit, 0)
+			}
+		default:
 			rv = fmt.Sprintf("%d matches, took %s\n", sr.Total, sr.Took)
 		}
 	} else {
@@ -613,6 +610,35 @@ func (sr *SearchResult) String() string {
 				rv += fmt.Sprintf("\tOther(%d)\n", f.Other)
 			}
 		}
+	}
+	return rv
+}
+
+// formatHit is a helper function to format a single hit in the search result for
+// the String() method of SearchResult
+func formatHit(i int, hit *search.DocumentMatch, start int) string {
+	rv := fmt.Sprintf("%5d. %s (%f)\n", start+i+1, hit.ID, hit.Score)
+	for fragmentField, fragments := range hit.Fragments {
+		rv += fmt.Sprintf("\t%s\n", fragmentField)
+		for _, fragment := range fragments {
+			rv += fmt.Sprintf("\t\t%s\n", fragment)
+		}
+	}
+	for otherFieldName, otherFieldValue := range hit.Fields {
+		if _, ok := hit.Fragments[otherFieldName]; !ok {
+			rv += fmt.Sprintf("\t%s\n", otherFieldName)
+			rv += fmt.Sprintf("\t\t%v\n", otherFieldValue)
+		}
+	}
+	if len(hit.DecodedSort) > 0 {
+		rv += "\t_sort: ["
+		for k, v := range hit.DecodedSort {
+			if k > 0 {
+				rv += ", "
+			}
+			rv += fmt.Sprintf("%v", v)
+		}
+		rv += "]\n"
 	}
 	return rv
 }
