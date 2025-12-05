@@ -38,6 +38,8 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+const persister = "persister"
+
 // DefaultPersisterNapTimeMSec is kept to zero as this helps in direct
 // persistence of segments with the default safe batch option.
 // If the default safe batch option results in high number of
@@ -95,10 +97,11 @@ type notificationChan chan struct{}
 func (s *Scorch) persisterLoop() {
 	defer func() {
 		if r := recover(); r != nil {
-			s.fireAsyncError(&AsyncPanicError{
-				Source: "persister",
-				Path:   s.path,
-			})
+			s.fireAsyncError(NewScorchError(
+				persister,
+				fmt.Sprintf("panic: %v, path: %s", r, s.path),
+				ErrAsyncPanic,
+			))
 		}
 
 		s.asyncTasks.Done()
@@ -112,7 +115,11 @@ func (s *Scorch) persisterLoop() {
 
 	po, err := s.parsePersisterOptions()
 	if err != nil {
-		s.fireAsyncError(fmt.Errorf("persisterOptions json parsing err: %v", err))
+		s.fireAsyncError(NewScorchError(
+			persister,
+			fmt.Sprintf("persisterOptions json parsing err: %v", err),
+			ErrOptionsParse,
+		))
 		return
 	}
 
@@ -173,7 +180,11 @@ OUTER:
 				// the retry attempt
 				unpersistedCallbacks = append(unpersistedCallbacks, ourPersistedCallbacks...)
 
-				s.fireAsyncError(fmt.Errorf("got err persisting snapshot: %v", err))
+				s.fireAsyncError(NewScorchError(
+					persister,
+					fmt.Sprintf("got err persisting snapshot: %v", err),
+					ErrPersist,
+				))
 				_ = ourSnapshot.DecRef()
 				atomic.AddUint64(&s.stats.TotPersistLoopErr, 1)
 				continue OUTER
@@ -1060,13 +1071,21 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 func (s *Scorch) removeOldData() {
 	removed, err := s.removeOldBoltSnapshots()
 	if err != nil {
-		s.fireAsyncError(fmt.Errorf("got err removing old bolt snapshots: %v", err))
+		s.fireAsyncError(NewScorchError(
+			persister,
+			fmt.Sprintf("got err removing old bolt snapshots: %v", err),
+			ErrCleanup,
+		))
 	}
 	atomic.AddUint64(&s.stats.TotSnapshotsRemovedFromMetaStore, uint64(removed))
 
 	err = s.removeOldZapFiles()
 	if err != nil {
-		s.fireAsyncError(fmt.Errorf("got err removing old zap files: %v", err))
+		s.fireAsyncError(NewScorchError(
+			persister,
+			fmt.Sprintf("got err removing old zap files: %v", err),
+			ErrCleanup,
+		))
 	}
 }
 
