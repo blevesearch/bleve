@@ -88,18 +88,18 @@ type Scorch struct {
 	spatialPlugin index.SpatialAnalyzerPlugin
 }
 
-type ScorchErrType string
+type ScorchErrorType string
 
-func (t ScorchErrType) Error() string {
+func (t ScorchErrorType) Error() string {
 	return string(t)
 }
 
 // ErrType values for ScorchError
 const (
-	ErrAsyncPanic   = ScorchErrType("async panic error")
-	ErrPersist      = ScorchErrType("persist error")
-	ErrCleanup      = ScorchErrType("cleanup error")
-	ErrOptionsParse = ScorchErrType("options parse error")
+	ErrAsyncPanic   = ScorchErrorType("async panic error")
+	ErrPersist      = ScorchErrorType("persist error")
+	ErrCleanup      = ScorchErrorType("cleanup error")
+	ErrOptionsParse = ScorchErrorType("options parse error")
 )
 
 // ScorchError is passed to onAsyncError when errors are
