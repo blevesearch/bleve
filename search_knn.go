@@ -703,7 +703,7 @@ func (i *indexImpl) buildKNNCollector(ctx context.Context, KNNQuery query.Query,
 					return nil, err
 				}
 				if nm.IntersectsPrefix(fs) {
-					return collector.NewNestedKNNCollector(nr, kArray, sumOfK), nil
+					return collector.NewNestedKNNCollector(kArray, sumOfK, nr), nil
 				}
 			}
 		}

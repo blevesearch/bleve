@@ -151,15 +151,6 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	if vectorIndexOptimizedFor == "" {
 		vectorIndexOptimizedFor = index.DefaultIndexOptimization
 	}
-	// Apply defaults for similarity and optimization if not set
-	similarity := fm.Similarity
-	if similarity == "" {
-		similarity = index.DefaultVectorSimilarityMetric
-	}
-	vectorIndexOptimizedFor := fm.VectorIndexOptimizedFor
-	if vectorIndexOptimizedFor == "" {
-		vectorIndexOptimizedFor = index.DefaultIndexOptimization
-	}
 	// normalize raw vector if similarity is cosine
 	// Since the vector can be multi-vector (flattened array of multiple vectors),
 	// we use NormalizeMultiVector to normalize each sub-vector independently.
@@ -170,11 +161,6 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	fieldName := getFieldName(pathString, path, fm)
 
 	options := fm.Options()
-	// ensure the options are set to not store/index term vectors/doc values
-	options &^= index.StoreField | index.IncludeTermVectors | index.DocValues
-	// skip freq/norms for vector field
-	options |= index.SkipFreqNorm
-
 	field := document.NewVectorFieldWithIndexingOptions(fieldName, indexes, vector,
 		fm.Dims, similarity, vectorIndexOptimizedFor, options)
 	context.doc.AddField(field)
@@ -211,11 +197,6 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 
 	fieldName := getFieldName(pathString, path, fm)
 	options := fm.Options()
-
-	// ensure the options are set to not store/index term vectors/doc values
-	options &^= index.StoreField | index.IncludeTermVectors | index.DocValues
-	// skip freq/norms for vector field
-	options |= index.SkipFreqNorm
 
 	field := document.NewVectorFieldWithIndexingOptions(fieldName, indexes, decodedVector,
 		fm.Dims, similarity, vectorIndexOptimizedFor, options)

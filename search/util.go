@@ -101,21 +101,6 @@ func mergeFieldTermLocationFromMatch(dest []FieldTermLocation, dm *DocumentMatch
 	return dest
 }
 
-// MergeScoreBreakdown merges two score breakdown maps together
-func MergeScoreBreakdown(first, second map[int]float64) map[int]float64 {
-	if first == nil {
-		return second
-	}
-	if second == nil {
-		return first
-	}
-	// reuse first to store the union of both
-	for k, v := range second {
-		first[k] += v
-	}
-	return first
-}
-
 type (
 	SearchIncrementalCostCallbackMsg uint
 	SearchQueryType                  uint
@@ -241,6 +226,10 @@ type (
 	// HybridMergeCallbackFn is a callback function type used to merge a KNN document match
 	// into a full text search document match, of the same docID as part of hybrid search.
 	HybridMergeCallbackFn func(ftsMatch *DocumentMatch, knnMatch *DocumentMatch)
+	// DescendantAdderCallback is a callback function type used to customize how a descendant
+	// DocumentMatch is merged into its parent. This allows different descendant addition strategies for
+	// different use cases (e.g., TopN vs KNN collection).
+	DescendantAdderCallbackFn func(parent *DocumentMatch, descendant *DocumentMatch) error
 	// GeoBufferPoolCallbackFunc is a callback function type used to get the geo buffer pool
 	// to be used during geo searches.
 	GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
@@ -342,7 +331,7 @@ func SortedUnion(dest, src []index.IndexInternalID) []index.IndexInternalID {
 	return rv
 }
 
-// MergeScoreBreakdown merges two score breakdown maps together
+// MergeScoreExplBreakdown merges two score breakdown maps together
 // by picking the best score per query component, and merging them
 // (and their corresponding explanations) into the first map.
 func MergeScoreExplBreakdown(first, second map[int]float64, firstExpl, secondExpl *Explanation) (map[int]float64, *Explanation) {

@@ -382,30 +382,19 @@ func (dm *DocumentMatch) String() string {
 	return fmt.Sprintf("[%s-%f]", dm.ID, dm.Score)
 }
 
-// AddDescendant merges another DocumentMatch into this one as a descendant.
-func (dm *DocumentMatch) AddDescendant(other *DocumentMatch) error {
-	// add descendant score to parent score
-	dm.Score += other.Score
-	// merge explanations
-	dm.Expl = dm.Expl.MergeWith(other.Expl)
-	// merge field term locations
-	dm.FieldTermLocations = MergeFieldTermLocationsFromMatch(dm.FieldTermLocations, other)
-	// merge score breakdown
-	dm.ScoreBreakdown = MergeScoreBreakdown(dm.ScoreBreakdown, other.ScoreBreakdown)
+func (dm *DocumentMatch) AddDescendantID(id index.IndexInternalID) {
 	// add other as descendant only if it is not the same document
-	if !dm.IndexInternalID.Equals(other.IndexInternalID) {
-		// Add a copy of other.IndexInternalID to descendants, because
-		// other.IndexInternalID will be reset when 'other' is recycled.
+	if !dm.IndexInternalID.Equals(id) {
+		// Add a copy of id to descendants
 		var descendantID index.IndexInternalID
 		// first check if dm's descendants slice has capacity to reuse
 		if len(dm.Descendants) < cap(dm.Descendants) {
 			// reuse the buffer element at len(dm.Descendants)
 			descendantID = dm.Descendants[:len(dm.Descendants)+1][len(dm.Descendants)]
 		}
-		// copy the contents of other.IndexInternalID into descendantID, allocating if needed
-		dm.Descendants = append(dm.Descendants, index.NewIndexInternalIDFrom(descendantID, other.IndexInternalID))
+		// copy the contents of id into descendantID, allocating if needed
+		dm.Descendants = append(dm.Descendants, index.NewIndexInternalIDFrom(descendantID, id))
 	}
-	return nil
 }
 
 type DocumentMatchCollection []*DocumentMatch

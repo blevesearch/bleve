@@ -20,21 +20,22 @@ import (
 )
 
 type collectStoreNested struct {
+	// descAdder is used to customize how descendants are merged into their parent
+	descAdder search.DescendantAdderCallbackFn
+	// nested reader to retrieve ancestor information
 	nr index.NestedReader
-
 	// the current root document match being built
 	currRoot *search.DocumentMatch
-
 	// the ancestor ID of the current root document being built
 	currRootAncestorID index.AncestorID
-
 	// prealloc slice for ancestor IDs
 	ancestors []index.AncestorID
 }
 
-func newStoreNested(nr index.NestedReader) *collectStoreNested {
+func newStoreNested(nr index.NestedReader, descAdder search.DescendantAdderCallbackFn) *collectStoreNested {
 	rv := &collectStoreNested{
-		nr: nr,
+		descAdder: descAdder,
+		nr:        nr,
 	}
 	return rv
 }
@@ -61,7 +62,7 @@ func (c *collectStoreNested) ProcessNestedDocument(ctx *search.SearchContext, do
 	// check if there is an interim root already and if the incoming doc belongs to it
 	if c.currRoot != nil && c.currRootAncestorID.Equals(rootID) {
 		// there is an interim root already, and the incoming doc belongs to it
-		if err := c.currRoot.AddDescendant(doc); err != nil {
+		if err := c.descAdder(c.currRoot, doc); err != nil {
 			return nil, err
 		}
 		// recycle the child document now that it's merged into the interim root
@@ -88,7 +89,7 @@ func (c *collectStoreNested) ProcessNestedDocument(ctx *search.SearchContext, do
 	// merge the incoming doc into the new interim root
 	c.currRoot = newDM
 	c.currRootAncestorID = rootID
-	if err := c.currRoot.AddDescendant(doc); err != nil {
+	if err := c.descAdder(c.currRoot, doc); err != nil {
 		return nil, err
 	}
 	// recycle the child document now that it's merged into the interim root
@@ -96,7 +97,7 @@ func (c *collectStoreNested) ProcessNestedDocument(ctx *search.SearchContext, do
 	return completedRoot, nil
 }
 
-// CurrentRoot returns the current interim root document match being built, if any
-func (c *collectStoreNested) CurrentRoot() *search.DocumentMatch {
+// Current returns the current interim root document match being built, if any
+func (c *collectStoreNested) Current() *search.DocumentMatch {
 	return c.currRoot
 }

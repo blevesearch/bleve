@@ -132,7 +132,18 @@ func newTopNCollector(size int, skip int, sort search.SortOrder, nr index.Nested
 	})
 
 	if nr != nil {
-		hc.nestedStore = newStoreNested(nr)
+		descAdder := func(parent, child *search.DocumentMatch) error {
+			// add descendant score to parent score
+			parent.Score += child.Score
+			// merge explanations
+			parent.Expl = parent.Expl.MergeWith(child.Expl)
+			// merge field term locations
+			parent.FieldTermLocations = search.MergeFieldTermLocationsFromMatch(parent.FieldTermLocations, child)
+			// add child's ID to parent's Descendants
+			parent.AddDescendantID(child.IndexInternalID)
+			return nil
+		}
+		hc.nestedStore = newStoreNested(nr, search.DescendantAdderCallbackFn(descAdder))
 	}
 
 	// these lookups traverse an interface, so do once up-front
@@ -342,12 +353,10 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			if err != nil {
 				break
 			}
-			// no descendants at this point
 			err = hc.prepareDocumentMatch(searchContext, reader, next, false)
 			if err != nil {
 				break
 			}
-
 			err = dmHandler(next)
 			if err != nil {
 				break
@@ -362,7 +371,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	// if we have a nested store, we may have an interim root
 	// that needs to be returned for processing
 	if hc.nestedStore != nil {
-		currRoot := hc.nestedStore.CurrentRoot()
+		currRoot := hc.nestedStore.Current()
 		if currRoot != nil {
 			err = hc.adjustDocumentMatch(searchContext, reader, currRoot)
 			if err != nil {
