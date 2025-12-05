@@ -2,7 +2,7 @@
 
 ## Why pagination matters
 
-Search queries can match many documents. Pagination lets you fetch and display results in chunks, keeping responses small and fast. 
+Search queries can match many documents. Pagination lets you fetch and display results in chunks, keeping responses small and fast.
 
 By default, Bleve returns the first 10 hits sorted by relevance (score), highest first.
 
@@ -48,7 +48,7 @@ Rules:
 
 Where do sort keys come from?
 
-- Each hit includes `Sort` (and `DecodedSort` from Bleve v2.5.2). Take the last hit’s sort keys for `SearchAfter`, or the first hit’s sort keys for `SearchBefore`.
+- Each hit includes `Sort` (and `DecodedSort` from Bleve v2.5.2). Take the last hit's sort keys for `SearchAfter`, or the first hit's sort keys for `SearchBefore`.
 - If the field/fields to be searched over is numeric, datetime or geo, the values in the `Sort` field may have garbled values; this is because of how Bleve represents such data types internally. To use such fields as sort keys, use the `DecodedSort` field, which decodes the internal representations. This feature is available from Bleve v2.5.4.
 
 > When using `DecodedSort`, the `Sort` array in the search request needs to explicitly declare the type of the field for proper decoding. Hence, the `Sort` array must contain either `SortField` objects (for numeric and datetime) or `SortGeoDistance` objects (for geo) rather than just the field names. More info on `SortField` and `SortGeoDistance` can be found in [sort_facet.md](sort_facet.md).
@@ -76,6 +76,7 @@ Backward pagination over `_id` and `_score`:
 ```
 
 Pagination using numeric, datetime and geo fields. Notice how we specify the sort objects, with the "type" field explicitly declared in case of numeric and datetime:
+
 ```json
 {
   "query": {
@@ -89,8 +90,8 @@ Pagination using numeric, datetime and geo fields. Notice how we specify the sor
   ],
   "search_after": ["99.99", "2023-10-15T10:30:00Z", "5.2"]
 }
-
 ```
+
 ## Total Sort Order
 
 Pagination is deterministic. Ensure your `Sort` defines a total order, so that documents with the same sort keys are not left out:
