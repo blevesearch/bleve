@@ -588,8 +588,8 @@ func (sr *SearchResult) String() string {
 		}
 		if len(hit.DecodedSort) > 0 {
 			rv += "\t_sort: ["
-			for i, v := range hit.DecodedSort {
-				if i > 0 {
+			for k, v := range hit.DecodedSort {
+				if k > 0 {
 					rv += ", "
 				}
 				rv += fmt.Sprintf("%v", v)
