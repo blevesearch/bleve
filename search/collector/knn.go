@@ -103,9 +103,6 @@ func MakeKNNDocMatchHandler(ctx *search.SearchContext) (search.DocumentMatchHand
 			if d == nil {
 				return nil
 			}
-			// increment total count as we are sure that this is a
-			// valid document match to be added to the KNN store
-			hc.total++
 			toRelease := hc.knnStore.AddDocument(d)
 			for _, doc := range toRelease {
 				ctx.DocumentMatchPool.Put(doc)
@@ -133,7 +130,6 @@ func GetNewKNNCollectorStore(kArray []int64) *collectStoreKNN {
 
 // implements Collector interface
 type KNNCollector struct {
-	// knnStore is the underlying store for KNN document matches
 	knnStore *collectStoreKNN
 	size     int
 	total    uint64
@@ -184,10 +180,8 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 	default:
 		next, err = searcher.Next(searchContext)
 	}
-	// maintain a total count of documents processed, for context cancellation checks
-	var total uint64
 	for err == nil && next != nil {
-		if total%CheckDoneEvery == 0 {
+		if hc.total%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
 				search.RecordSearchCost(ctx, search.AbortM, 0)
@@ -195,15 +189,11 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 			default:
 			}
 		}
-		total++
+		hc.total++
 
-		// we may have stored next for merging, or we may have completed a merge
-		// and have a document ready for further processing, so next can be nil
-		if next != nil {
-			err = dmHandler(next)
-			if err != nil {
-				break
-			}
+		err = dmHandler(next)
+		if err != nil {
+			break
 		}
 
 		next, err = searcher.Next(searchContext)
