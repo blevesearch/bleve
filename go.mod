@@ -30,6 +30,7 @@ require (
 	github.com/couchbase/moss v0.2.0
 	github.com/spf13/cobra v1.8.1
 	go.etcd.io/bbolt v1.4.0
+	golang.org/x/sys v0.29.0
 	golang.org/x/text v0.8.0
 	google.golang.org/protobuf v1.36.6
 )
@@ -42,5 +43,10 @@ require (
 	github.com/json-iterator/go v0.0.0-20171115153421-f7279a603ede // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
-	golang.org/x/sys v0.29.0 // indirect
 )
+
+// Use bleve_index_api branch with VFS support
+replace github.com/blevesearch/bleve_index_api => github.com/ajroetker/bleve_index_api v0.0.0-20251111010750-7b3692d79f01
+
+// Use VFS-enabled zapx from ajroetker fork
+replace github.com/blevesearch/zapx/v16 => github.com/ajroetker/zapx/v16 v16.0.0-20251111234330-70822381ed85

@@ -41,6 +41,7 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 
 	"github.com/blevesearch/bleve/v2/index/scorch"
+	"github.com/blevesearch/bleve/v2/index/scorch/vfs"
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
 )
 
@@ -3125,7 +3126,13 @@ func TestCopyIndex(t *testing.T) {
 	backupIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, backupIndexPath)
 
-	err = copyableIndex.CopyTo(FileSystemDirectory(backupIndexPath))
+	// Create a VFS-compatible directory for the backup
+	backupVFSDir, err := vfs.NewFSDirectory(backupIndexPath)
+	if err != nil {
+		t.Fatalf("error creating backup VFS directory: %v", err)
+	}
+
+	err = copyableIndex.CopyTo(backupVFSDir)
 	if err != nil {
 		t.Fatalf("error copying the index: %v", err)
 	}
