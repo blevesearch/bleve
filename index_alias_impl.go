@@ -946,7 +946,16 @@ func finalizePreSearchResult(req *SearchRequest, flags *preSearchFlags, preSearc
 		return
 	}
 	if flags.knn {
-		preSearchResult.Hits = finalizeKNNResults(req, preSearchResult.Hits)
+		knnHits := preSearchResult.Hits
+		// we are done calculating the final top K vectors, so we need to prepare
+		// the payload for returning the final results.
+		knnHits = prepareKNNResults(req, knnHits)
+		// if score fusion is not requested, then finalize the KNN results now.
+		// else, defer the finalization to the score fusion phase.
+		if !IsScoreFusionRequested(req) {
+			knnHits = finalizeKNNResults(req, knnHits)
+		}
+		preSearchResult.Hits = knnHits
 	}
 }
 
