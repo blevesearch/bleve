@@ -107,7 +107,7 @@ const (
 type ScorchError struct {
 	Source  string
 	ErrMsg  string
-	ErrType error
+	ErrType ScorchErrorType
 }
 
 func (e *ScorchError) Error() string {
@@ -121,7 +121,7 @@ func (e *ScorchError) Unwrap() error {
 	return e.ErrType
 }
 
-func NewScorchError(source, errMsg string, errType error) error {
+func NewScorchError(source, errMsg string, errType ScorchErrorType) error {
 	return &ScorchError{
 		Source:  source,
 		ErrMsg:  errMsg,
