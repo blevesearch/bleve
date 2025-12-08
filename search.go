@@ -591,7 +591,7 @@ func (sr *SearchResult) String() string {
 			fmt.Fprintf(rv, "%d matches, took %s\n", sr.Total, sr.Took)
 		}
 	} else {
-		fmt.Fprintf(rv, "No matches, took %s\n", sr.Took)
+		fmt.Fprintf(rv, "No matches\n")
 	}
 	if len(sr.Facets) > 0 {
 		fmt.Fprintf(rv, "Facets:\n")
