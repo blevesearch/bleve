@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis"
@@ -571,48 +572,73 @@ func (sr *SearchResult) Size() int {
 }
 
 func (sr *SearchResult) String() string {
-	rv := ""
+	rv := &strings.Builder{}
 	if sr.Total > 0 {
-		if sr.Request != nil && sr.Request.Size > 0 {
-			rv = fmt.Sprintf("%d matches, showing %d through %d, took %s\n", sr.Total, sr.Request.From+1, sr.Request.From+len(sr.Hits), sr.Took)
+		switch {
+		case sr.Request != nil && sr.Request.Size > 0:
+			start := sr.Request.From + 1
+			end := sr.Request.From + len(sr.Hits)
+			fmt.Fprintf(rv, "%d matches, showing %d through %d, took %s\n", sr.Total, start, end, sr.Took)
 			for i, hit := range sr.Hits {
-				rv += fmt.Sprintf("%5d. %s (%f)\n", i+sr.Request.From+1, hit.ID, hit.Score)
-				for fragmentField, fragments := range hit.Fragments {
-					rv += fmt.Sprintf("\t%s\n", fragmentField)
-					for _, fragment := range fragments {
-						rv += fmt.Sprintf("\t\t%s\n", fragment)
-					}
-				}
-				for otherFieldName, otherFieldValue := range hit.Fields {
-					if _, ok := hit.Fragments[otherFieldName]; !ok {
-						rv += fmt.Sprintf("\t%s\n", otherFieldName)
-						rv += fmt.Sprintf("\t\t%v\n", otherFieldValue)
-					}
-				}
+				rv = formatHit(rv, hit, start+i)
 			}
-		} else {
-			rv = fmt.Sprintf("%d matches, took %s\n", sr.Total, sr.Took)
+		case sr.Request == nil:
+			fmt.Fprintf(rv, "%d matches, took %s\n", sr.Total, sr.Took)
+			for i, hit := range sr.Hits {
+				rv = formatHit(rv, hit, i+1)
+			}
+		default:
+			fmt.Fprintf(rv, "%d matches, took %s\n", sr.Total, sr.Took)
 		}
 	} else {
-		rv = "No matches"
+		fmt.Fprintf(rv, "No matches\n")
 	}
 	if len(sr.Facets) > 0 {
-		rv += "Facets:\n"
+		fmt.Fprintf(rv, "Facets:\n")
 		for fn, f := range sr.Facets {
-			rv += fmt.Sprintf("%s(%d)\n", fn, f.Total)
+			fmt.Fprintf(rv, "%s(%d)\n", fn, f.Total)
 			for _, t := range f.Terms.Terms() {
-				rv += fmt.Sprintf("\t%s(%d)\n", t.Term, t.Count)
+				fmt.Fprintf(rv, "\t%s(%d)\n", t.Term, t.Count)
 			}
 			for _, n := range f.NumericRanges {
-				rv += fmt.Sprintf("\t%s(%d)\n", n.Name, n.Count)
+				fmt.Fprintf(rv, "\t%s(%d)\n", n.Name, n.Count)
 			}
 			for _, d := range f.DateRanges {
-				rv += fmt.Sprintf("\t%s(%d)\n", d.Name, d.Count)
+				fmt.Fprintf(rv, "\t%s(%d)\n", d.Name, d.Count)
 			}
 			if f.Other != 0 {
-				rv += fmt.Sprintf("\tOther(%d)\n", f.Other)
+				fmt.Fprintf(rv, "\tOther(%d)\n", f.Other)
 			}
 		}
+	}
+	return rv.String()
+}
+
+// formatHit is a helper function to format a single hit in the search result for
+// the String() method of SearchResult
+func formatHit(rv *strings.Builder, hit *search.DocumentMatch, hitNumber int) *strings.Builder {
+	fmt.Fprintf(rv, "%5d. %s (%f)\n", hitNumber, hit.ID, hit.Score)
+	for fragmentField, fragments := range hit.Fragments {
+		fmt.Fprintf(rv, "\t%s\n", fragmentField)
+		for _, fragment := range fragments {
+			fmt.Fprintf(rv, "\t\t%s\n", fragment)
+		}
+	}
+	for otherFieldName, otherFieldValue := range hit.Fields {
+		if _, ok := hit.Fragments[otherFieldName]; !ok {
+			fmt.Fprintf(rv, "\t%s\n", otherFieldName)
+			fmt.Fprintf(rv, "\t\t%v\n", otherFieldValue)
+		}
+	}
+	if len(hit.DecodedSort) > 0 {
+		fmt.Fprintf(rv, "\t_sort: [")
+		for k, v := range hit.DecodedSort {
+			if k > 0 {
+				fmt.Fprintf(rv, ", ")
+			}
+			fmt.Fprintf(rv, "%v", v)
+		}
+		fmt.Fprintf(rv, "]\n")
 	}
 	return rv
 }
