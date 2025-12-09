@@ -88,14 +88,45 @@ type Scorch struct {
 	spatialPlugin index.SpatialAnalyzerPlugin
 }
 
-// AsyncPanicError is passed to scorch asyncErrorHandler when panic occurs in scorch background process
-type AsyncPanicError struct {
-	Source string
-	Path   string
+type ScorchErrorType string
+
+func (t ScorchErrorType) Error() string {
+	return string(t)
 }
 
-func (e *AsyncPanicError) Error() string {
-	return fmt.Sprintf("%s panic when processing %s", e.Source, e.Path)
+// ErrType values for ScorchError
+const (
+	ErrAsyncPanic   = ScorchErrorType("async panic error")
+	ErrPersist      = ScorchErrorType("persist error")
+	ErrCleanup      = ScorchErrorType("cleanup error")
+	ErrOptionsParse = ScorchErrorType("options parse error")
+)
+
+// ScorchError is passed to onAsyncError when errors are
+// fired from scorch background processes
+type ScorchError struct {
+	Source  string
+	ErrMsg  string
+	ErrType ScorchErrorType
+}
+
+func (e *ScorchError) Error() string {
+	return fmt.Sprintf("source: %s, %v: %s", e.Source, e.ErrType, e.ErrMsg)
+}
+
+// Lets the onAsyncError function verify what type of
+// error is fired using errors.Is(...). This lets the function
+// handle errors differently.
+func (e *ScorchError) Unwrap() error {
+	return e.ErrType
+}
+
+func NewScorchError(source, errMsg string, errType ScorchErrorType) error {
+	return &ScorchError{
+		Source:  source,
+		ErrMsg:  errMsg,
+		ErrType: errType,
+	}
 }
 
 type internalStats struct {
