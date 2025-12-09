@@ -17,7 +17,6 @@ package scorch
 import (
 	"container/heap"
 	"context"
-	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -59,11 +58,11 @@ func init() {
 	var err error
 	lb1, err = lev.NewLevenshteinAutomatonBuilder(1, true)
 	if err != nil {
-		panic(fmt.Errorf("Levenshtein automaton ed1 builder err: %v", err))
+		panic(fmt.Errorf("levenshtein automaton ed1 builder err: %v", err))
 	}
 	lb2, err = lev.NewLevenshteinAutomatonBuilder(2, true)
 	if err != nil {
-		panic(fmt.Errorf("Levenshtein automaton ed2 builder err: %v", err))
+		panic(fmt.Errorf("levenshtein automaton ed2 builder err: %v", err))
 	}
 }
 
@@ -501,7 +500,7 @@ func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		return nil, nil
 	}
 
-	docNum, err := docInternalToNumber(next.ID)
+	docNum, err := next.ID.Value()
 	if err != nil {
 		return nil, err
 	}
@@ -571,7 +570,7 @@ func (is *IndexSnapshot) segmentIndexAndLocalDocNumFromGlobal(docNum uint64) (in
 }
 
 func (is *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
-	docNum, err := docInternalToNumber(id)
+	docNum, err := id.Value()
 	if err != nil {
 		return "", err
 	}
@@ -589,7 +588,7 @@ func (is *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
 }
 
 func (is *IndexSnapshot) segmentIndexAndLocalDocNum(id index.IndexInternalID) (int, uint64, error) {
-	docNum, err := docInternalToNumber(id)
+	docNum, err := id.Value()
 	if err != nil {
 		return 0, 0, err
 	}
@@ -776,25 +775,6 @@ func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReade
 	is.m2.Unlock()
 }
 
-func docNumberToBytes(buf []byte, in uint64) []byte {
-	if len(buf) != 8 {
-		if cap(buf) >= 8 {
-			buf = buf[0:8]
-		} else {
-			buf = make([]byte, 8)
-		}
-	}
-	binary.BigEndian.PutUint64(buf, in)
-	return buf
-}
-
-func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
-	if len(in) != 8 {
-		return 0, fmt.Errorf("wrong len for IndexInternalID: %q", in)
-	}
-	return binary.BigEndian.Uint64(in), nil
-}
-
 func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	segmentIndex int, localDocNum uint64, fields []string, cFields []string,
 	visitor index.DocValueVisitor, dvs segment.DocVisitState) (
@@ -897,7 +877,7 @@ func (dvr *DocValueReader) BytesRead() uint64 {
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
 	visitor index.DocValueVisitor,
 ) (err error) {
-	docNum, err := docInternalToNumber(id)
+	docNum, err := id.Value()
 	if err != nil {
 		return err
 	}

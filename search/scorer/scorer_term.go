@@ -213,8 +213,8 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 			childrenExplanations := s.scoreExplanation(tf, termMatch)
 			scoreExplanation = &search.Explanation{
 				Value: score,
-				Message: fmt.Sprintf("fieldWeight(%s:%s in %s), as per %s model, "+
-					"product of:", s.queryField, s.queryTerm, termMatch.ID, scoringModel),
+				Message: fmt.Sprintf("fieldWeight(%s:%s in %s), as per %s model, product of:",
+					s.queryField, s.queryTerm, termMatch.ID, scoringModel),
 				Children: childrenExplanations,
 			}
 		}
@@ -243,7 +243,7 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 		}
 	}
 
-	rv.IndexInternalID = append(rv.IndexInternalID, termMatch.ID...)
+	rv.IndexInternalID = index.NewIndexInternalIDFrom(rv.IndexInternalID, termMatch.ID)
 
 	if len(termMatch.Vectors) > 0 {
 		if cap(rv.FieldTermLocations) < len(termMatch.Vectors) {
