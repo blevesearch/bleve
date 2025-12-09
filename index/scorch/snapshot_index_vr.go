@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
@@ -166,4 +167,53 @@ func (i *IndexSnapshotVectorReader) Count() uint64 {
 func (i *IndexSnapshotVectorReader) Close() error {
 	// TODO Consider if any scope of recycling here.
 	return nil
+}
+
+func (i *IndexSnapshot) CentroidCardinalities(field string, limit int, descending bool) (
+	[]index.CentroidCardinality, error) {
+	if len(i.segment) == 0 {
+		return nil, nil
+	}
+
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be positive")
+	}
+
+	centroids := make([]index.CentroidCardinality, 0, limit*len(i.segment))
+
+	for _, segment := range i.segment {
+		if sv, ok := segment.segment.(segment_api.VectorSegment); ok {
+			vecIndex, err := sv.InterpretVectorIndex(field,
+				false /* does not require filtering */, segment.deleted)
+			if err != nil {
+				return nil, fmt.Errorf("failed to interpret vector index for field %s in segment: %v", field, err)
+			}
+
+			centroidCardinalities, err := vecIndex.ObtainKCentroidCardinalitiesFromIVFIndex(limit, descending)
+			if err != nil {
+				return nil, fmt.Errorf("failed to obtain top k centroid cardinalities for field %s in segment: %v", field, err)
+			}
+
+			if len(centroidCardinalities) > 0 {
+				centroids = append(centroids, centroidCardinalities...)
+			}
+		}
+	}
+
+	if len(centroids) == 0 {
+		return nil, nil
+	}
+
+	sort.Slice(centroids, func(i, j int) bool {
+		if descending {
+			return centroids[i].Cardinality > centroids[j].Cardinality
+		}
+		return centroids[i].Cardinality < centroids[j].Cardinality
+	})
+
+	if limit >= len(centroids) {
+		return centroids, nil
+	}
+
+	return centroids[:limit], nil
 }

@@ -16,145 +16,147 @@ package fusion
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
 )
 
+// formatRSFMessage builds the explanation string associated with a single
+// component of the Relative Score Fusion calculation.
 func formatRSFMessage(weight float64, normalizedScore float64, minScore float64, maxScore float64) string {
 	return fmt.Sprintf("rsf score (weight=%.3f, normalized=%.6f, min=%.6f, max=%.6f), normalized score of",
 		weight, normalizedScore, minScore, maxScore)
 }
 
-// RelativeScoreFusion normalizes scores based on min/max values for FTS and each KNN query, then applies weights.
-func RelativeScoreFusion(hits search.DocumentMatchCollection, weights []float64, windowSize int, numKNNQueries int, explain bool) FusionResult {
-	if len(hits) == 0 {
-		return FusionResult{
-			Hits:     hits,
+// RelativeScoreFusion normalizes the best-scoring documents from the primary
+// FTS query and each KNN query, scales those normalized values by the supplied
+// weights, and combines them into a single fused score. Only the top
+// `windowSize` documents per source are considered, and explanations are
+// materialized lazily when requested.
+func RelativeScoreFusion(hits search.DocumentMatchCollection, weights []float64, windowSize int, numKNNQueries int, explain bool) *FusionResult {
+	nHits := len(hits)
+	if nHits == 0 || windowSize == 0 {
+		return &FusionResult{
+			Hits:     search.DocumentMatchCollection{},
 			Total:    0,
 			MaxScore: 0.0,
 		}
 	}
 
-	rsfScores := make(map[string]float64)
-
-	// contains the docs under consideration for scoring.
-	// Reused for fts and knn hits
-	scoringDocs := make([]*search.DocumentMatch, 0, len(hits))
-	var explMap map[string][]*search.Explanation
+	// init explanations if required
+	var fusionExpl map[*search.DocumentMatch][]*search.Explanation
 	if explain {
-		explMap = make(map[string][]*search.Explanation)
+		fusionExpl = make(map[*search.DocumentMatch][]*search.Explanation, nHits)
 	}
-	// remove non-fts hits
+
+	// Code here for calculating fts results
+	// Sort by fts scores
+	sortDocMatchesByScore(hits)
+
+	// ftsLimit holds the total number of fts hits to consider for rsf
+	ftsLimit := 0
 	for _, hit := range hits {
-		if hit.Score != 0.0 {
-			scoringDocs = append(scoringDocs, hit)
+		if hit.Score == 0.0 {
+			break
 		}
+		ftsLimit++
 	}
-	// sort hits by fts score
-	sort.Slice(scoringDocs, func(a, b int) bool {
-		return scoreSortFunc()(scoringDocs[a], scoringDocs[b]) < 0
-	})
-	// Reslice to correct size
-	if len(scoringDocs) > windowSize {
-		scoringDocs = scoringDocs[:windowSize]
-	}
+	ftsLimit = min(ftsLimit, windowSize)
 
-	var min, max float64
-	if len(scoringDocs) > 0 {
-		min, max = scoringDocs[len(scoringDocs)-1].Score, scoringDocs[0].Score
-	}
+	// calculate fts scores
+	if ftsLimit > 0 {
+		max := hits[0].Score
+		min := hits[ftsLimit-1].Score
+		denom := max - min
+		weight := weights[0]
 
-	for _, hit := range scoringDocs {
-		var tempRsfScore float64
-		if max > min {
-			tempRsfScore = (hit.Score - min) / (max - min)
-		} else {
-			tempRsfScore = 1.0
-		}
-
-		if explain {
-			// create and replace new explanation
-			expl := getFusionExplAt(
-				hit,
-				0,
-				tempRsfScore,
-				formatRSFMessage(weights[0], tempRsfScore, min, max),
-			)
-			explMap[hit.ID] = append(explMap[hit.ID], expl)
-		}
-
-		rsfScores[hit.ID] = weights[0] * tempRsfScore
-	}
-
-	for i := range numKNNQueries {
-		scoringDocs = scoringDocs[:0]
-		for _, hit := range hits {
-			if _, exists := hit.ScoreBreakdown[i]; exists {
-				scoringDocs = append(scoringDocs, hit)
+		for i := 0; i < ftsLimit; i++ {
+			hit := hits[i]
+			norm := 1.0
+			if denom > 0 {
+				norm = (hit.Score - min) / denom
 			}
-		}
-
-		sort.Slice(scoringDocs, func(a, b int) bool {
-			return scoreBreakdownSortFunc(i)(scoringDocs[a], scoringDocs[b]) < 0
-		})
-
-		if len(scoringDocs) > windowSize {
-			scoringDocs = scoringDocs[:windowSize]
-		}
-
-		if len(scoringDocs) > 0 {
-			min, max = scoringDocs[len(scoringDocs)-1].ScoreBreakdown[i], scoringDocs[0].ScoreBreakdown[i]
-		} else {
-			min, max = 0.0, 0.0
-		}
-
-		for _, hit := range scoringDocs {
-			var tempRsfScore float64
-			if max > min {
-				tempRsfScore = (hit.ScoreBreakdown[i] - min) / (max - min)
-			} else {
-				tempRsfScore = 1.0
-			}
-
+			contrib := weight * norm
 			if explain {
 				expl := getFusionExplAt(
 					hit,
-					i+1,
-					tempRsfScore,
-					formatRSFMessage(weights[i+1], tempRsfScore, min, max),
+					0,
+					norm,
+					formatRSFMessage(weight, norm, min, max),
 				)
-				explMap[hit.ID] = append(explMap[hit.ID], expl)
+				fusionExpl[hit] = append(fusionExpl[hit], expl)
 			}
-
-			rsfScores[hit.ID] += weights[i+1] * tempRsfScore
+			hit.Score = contrib
+		}
+		for i := ftsLimit; i < nHits; i++ {
+			// These FTS hits are not counted in the results, so set to 0
+			hits[i].Score = 0.0
 		}
 	}
 
-	var maxScore float64
-	for _, hit := range hits {
-		if rsfScore, exists := rsfScores[hit.ID]; exists {
-			hit.Score = rsfScore
-			if rsfScore > maxScore {
-				maxScore = rsfScore
+	// Code from here is for calculating knn scores
+	for queryIdx := 0; queryIdx < numKNNQueries; queryIdx++ {
+		sortDocMatchesByBreakdown(hits, queryIdx)
+
+		// knnLimit holds the total number of knn hits retrieved for a specific knn query
+		knnLimit := 0
+		for _, hit := range hits {
+			if _, ok := scoreBreakdownForQuery(hit, queryIdx); !ok {
+				break
 			}
-			if explain {
-				finalizeFusionExpl(hit, explMap[hit.ID])
-			}
-		} else {
-			hit.Score = 0.0
+			knnLimit++
+		}
+		knnLimit = min(knnLimit, windowSize)
+
+		// if limit is 0, skip calculating
+		if knnLimit == 0 {
+			continue
 		}
 
+		max, _ := scoreBreakdownForQuery(hits[0], queryIdx)
+		min, _ := scoreBreakdownForQuery(hits[knnLimit-1], queryIdx)
+		denom := max - min
+		weight := weights[queryIdx+1]
+
+		for i := 0; i < knnLimit; i++ {
+			hit := hits[i]
+			score, _ := scoreBreakdownForQuery(hit, queryIdx)
+			norm := 1.0
+			if denom > 0 {
+				norm = (score - min) / denom
+			}
+			contrib := weight * norm
+			if explain {
+				expl := getFusionExplAt(
+					hit,
+					queryIdx+1,
+					norm,
+					formatRSFMessage(weight, norm, min, max),
+				)
+				fusionExpl[hit] = append(fusionExpl[hit], expl)
+			}
+			hit.Score += contrib
+		}
+	}
+
+	// Finalize scores
+	var maxScore float64
+	for _, hit := range hits {
+		if explain {
+			finalizeFusionExpl(hit, fusionExpl[hit])
+		}
+		if hit.Score > maxScore {
+			maxScore = hit.Score
+		}
 		hit.ScoreBreakdown = nil
 	}
 
-	sort.Sort(hits)
+	sortDocMatchesByScore(hits)
 
-	if len(hits) > windowSize {
+	if nHits > windowSize {
 		hits = hits[:windowSize]
 	}
 
-	return FusionResult{
+	return &FusionResult{
 		Hits:     hits,
 		Total:    uint64(len(hits)),
 		MaxScore: maxScore,

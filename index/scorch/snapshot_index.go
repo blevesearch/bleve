@@ -146,7 +146,7 @@ func (is *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 	makeItr func(i segment.TermDictionary) segment.DictionaryIterator,
 	randomLookup bool,
 ) (*IndexSnapshotFieldDict, error) {
-	results := make(chan *asynchSegmentResult)
+	results := make(chan *asynchSegmentResult, len(is.segment))
 	var totalBytesRead uint64
 	var fieldCardinality int64
 	for _, s := range is.segment {
@@ -280,10 +280,13 @@ func (is *IndexSnapshot) FieldDictRange(field string, startTerm []byte,
 // to use as the end key in a traditional (inclusive, exclusive]
 // start/end range
 func calculateExclusiveEndFromPrefix(in []byte) []byte {
+	if len(in) == 0 {
+		return nil
+	}
 	rv := make([]byte, len(in))
 	copy(rv, in)
 	for i := len(rv) - 1; i >= 0; i-- {
-		rv[i] = rv[i] + 1
+		rv[i]++
 		if rv[i] != 0 {
 			return rv // didn't overflow, so stop
 		}
@@ -390,7 +393,7 @@ func (is *IndexSnapshot) FieldDictContains(field string) (index.FieldDictContain
 }
 
 func (is *IndexSnapshot) DocIDReaderAll() (index.DocIDReader, error) {
-	results := make(chan *asynchSegmentResult)
+	results := make(chan *asynchSegmentResult, len(is.segment))
 	for index, segment := range is.segment {
 		go func(index int, segment *SegmentSnapshot) {
 			results <- &asynchSegmentResult{
@@ -404,7 +407,7 @@ func (is *IndexSnapshot) DocIDReaderAll() (index.DocIDReader, error) {
 }
 
 func (is *IndexSnapshot) DocIDReaderOnly(ids []string) (index.DocIDReader, error) {
-	results := make(chan *asynchSegmentResult)
+	results := make(chan *asynchSegmentResult, len(is.segment))
 	for index, segment := range is.segment {
 		go func(index int, segment *SegmentSnapshot) {
 			docs, err := segment.DocNumbers(ids)
@@ -450,7 +453,7 @@ func (is *IndexSnapshot) newDocIDReader(results chan *asynchSegmentResult) (inde
 func (is *IndexSnapshot) Fields() ([]string, error) {
 	// FIXME not making this concurrent for now as it's not used in hot path
 	// of any searches at the moment (just a debug aid)
-	fieldsMap := map[string]struct{}{}
+	fieldsMap := make(map[string]struct{})
 	for _, segment := range is.segment {
 		fields := segment.Fields()
 		for _, field := range fields {
@@ -764,7 +767,7 @@ func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReade
 
 	is.m2.Lock()
 	if is.fieldTFRs == nil {
-		is.fieldTFRs = map[string][]*IndexSnapshotTermFieldReader{}
+		is.fieldTFRs = make(map[string][]*IndexSnapshotTermFieldReader)
 	}
 	if len(is.fieldTFRs[tfr.field]) < is.getFieldTFRCacheThreshold() {
 		tfr.bytesRead = 0
@@ -812,7 +815,7 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	// Filter out fields that have been completely deleted or had their
 	// docvalues data deleted from both visitable fields and required fields
 	filterUpdatedFields := func(fields []string) []string {
-		filteredFields := make([]string, 0)
+		filteredFields := make([]string, 0, len(fields))
 		for _, field := range fields {
 			if info, ok := is.updatedFields[field]; ok &&
 				(info.DocValues || info.Deleted) {
@@ -977,15 +980,17 @@ func subtractStrings(a, b []string) []string {
 		return a
 	}
 
+	// Create a map for O(1) lookups
+	bMap := make(map[string]struct{}, len(b))
+	for _, bs := range b {
+		bMap[bs] = struct{}{}
+	}
+
 	rv := make([]string, 0, len(a))
-OUTER:
 	for _, as := range a {
-		for _, bs := range b {
-			if as == bs {
-				continue OUTER
-			}
+		if _, exists := bMap[as]; !exists {
+			rv = append(rv, as)
 		}
-		rv = append(rv, as)
 	}
 	return rv
 }
@@ -1233,4 +1238,62 @@ func (is *IndexSnapshot) MergeUpdateFieldsInfo(updatedFields map[string]*index.U
 			}
 		}
 	}
+}
+
+// TermFrequencies returns the top N terms ordered by the frequencies
+// for a given field across all segments in the index snapshot.
+func (is *IndexSnapshot) TermFrequencies(field string, limit int, descending bool) (
+	termFreqs []index.TermFreq, err error) {
+	if len(is.segment) == 0 {
+		return nil, nil
+	}
+
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be positive")
+	}
+
+	// Use FieldDict which aggregates term frequencies across all segments
+	fieldDict, err := is.FieldDict(field)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get field dictionary for field %s: %v", field, err)
+	}
+	defer fieldDict.Close()
+
+	// Preallocate slice with capacity equal to the number of unique terms
+	// in the field dictionary
+	termFreqs = make([]index.TermFreq, 0, fieldDict.Cardinality())
+
+	// Iterate through all terms using FieldDict
+	for {
+		dictEntry, err := fieldDict.Next()
+		if err != nil {
+			return nil, fmt.Errorf("error iterating field dictionary: %v", err)
+		}
+		if dictEntry == nil {
+			break // End of terms
+		}
+
+		termFreqs = append(termFreqs, index.TermFreq{
+			Term:      dictEntry.Term,
+			Frequency: dictEntry.Count,
+		})
+	}
+
+	// Sort by frequency (descending or ascending)
+	sort.Slice(termFreqs, func(i, j int) bool {
+		if termFreqs[i].Frequency == termFreqs[j].Frequency {
+			// If frequencies are equal, sort by term lexicographically
+			return termFreqs[i].Term < termFreqs[j].Term
+		}
+		if descending {
+			return termFreqs[i].Frequency > termFreqs[j].Frequency
+		}
+		return termFreqs[i].Frequency < termFreqs[j].Frequency
+	})
+
+	if limit >= len(termFreqs) {
+		return termFreqs, nil
+	}
+
+	return termFreqs[:limit], nil
 }

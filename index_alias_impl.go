@@ -17,6 +17,7 @@ package bleve
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -903,7 +904,7 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, flags *preSear
 // which would happen in the case of an alias tree and depending on the level of the tree, the preSearchData
 // needs to be redistributed to the indexes at that level
 func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]map[string]interface{}, error) {
-	rv := make(map[string]map[string]interface{})
+	rv := make(map[string]map[string]interface{}, len(indexes))
 	for _, index := range indexes {
 		rv[index.Name()] = make(map[string]interface{})
 	}
@@ -1135,4 +1136,150 @@ func (f *indexAliasImplFieldDict) Close() error {
 
 func (f *indexAliasImplFieldDict) Cardinality() int {
 	return f.fieldDict.Cardinality()
+}
+
+// -----------------------------------------------------------------------------
+
+func (i *indexAliasImpl) TermFrequencies(field string, limit int, descending bool) (
+	[]index.TermFreq, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
+	if len(i.indexes) < 1 {
+		return nil, ErrorAliasEmpty
+	}
+
+	// short circuit the simple case
+	if len(i.indexes) == 1 {
+		if idx, ok := i.indexes[0].(InsightsIndex); ok {
+			return idx.TermFrequencies(field, limit, descending)
+		}
+		return nil, nil
+	}
+
+	// run search on each index in separate go routine
+	var waitGroup sync.WaitGroup
+	asyncResults := make(chan []index.TermFreq, len(i.indexes))
+
+	searchChildIndex := func(in Index, field string, limit int, descending bool) {
+		var rv []index.TermFreq
+		if idx, ok := in.(InsightsIndex); ok {
+			// over sample for higher accuracy
+			rv, _ = idx.TermFrequencies(field, limit*5, descending)
+		}
+		asyncResults <- rv
+		waitGroup.Done()
+	}
+
+	waitGroup.Add(len(i.indexes))
+	for _, in := range i.indexes {
+		go searchChildIndex(in, field, limit, descending)
+	}
+
+	// on another go routine, close after finished
+	go func() {
+		waitGroup.Wait()
+		close(asyncResults)
+	}()
+
+	rvTermFreqsMap := make(map[string]uint64)
+	for asr := range asyncResults {
+		for _, entry := range asr {
+			rvTermFreqsMap[entry.Term] += entry.Frequency
+		}
+	}
+
+	rvTermFreqs := make([]index.TermFreq, 0, len(rvTermFreqsMap))
+	for term, freq := range rvTermFreqsMap {
+		rvTermFreqs = append(rvTermFreqs, index.TermFreq{
+			Term:      term,
+			Frequency: freq,
+		})
+	}
+
+	sort.Slice(rvTermFreqs, func(i, j int) bool {
+		if rvTermFreqs[i].Frequency == rvTermFreqs[j].Frequency {
+			// If frequencies are equal, sort by term lexicographically
+			return rvTermFreqs[i].Term < rvTermFreqs[j].Term
+		}
+		if descending {
+			return rvTermFreqs[i].Frequency > rvTermFreqs[j].Frequency
+		}
+		return rvTermFreqs[i].Frequency < rvTermFreqs[j].Frequency
+	})
+
+	if limit > len(rvTermFreqs) {
+		limit = len(rvTermFreqs)
+	}
+
+	return rvTermFreqs[:limit], nil
+}
+
+func (i *indexAliasImpl) CentroidCardinalities(field string, limit int, descending bool) (
+	[]index.CentroidCardinality, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
+	if len(i.indexes) < 1 {
+		return nil, ErrorAliasEmpty
+	}
+
+	// short circuit the simple case
+	if len(i.indexes) == 1 {
+		if idx, ok := i.indexes[0].(InsightsIndex); ok {
+			return idx.CentroidCardinalities(field, limit, descending)
+		}
+		return nil, nil
+	}
+
+	// run search on each index in separate go routine
+	var waitGroup sync.WaitGroup
+	asyncResults := make(chan []index.CentroidCardinality, len(i.indexes))
+
+	searchChildIndex := func(in Index, field string, limit int, descending bool) {
+		var rv []index.CentroidCardinality
+		if idx, ok := in.(InsightsIndex); ok {
+			rv, _ = idx.CentroidCardinalities(field, limit, descending)
+		}
+		asyncResults <- rv
+		waitGroup.Done()
+	}
+
+	waitGroup.Add(len(i.indexes))
+	for _, in := range i.indexes {
+		go searchChildIndex(in, field, limit, descending)
+	}
+
+	// on another go routine, close after finished
+	go func() {
+		waitGroup.Wait()
+		close(asyncResults)
+	}()
+
+	rvCentroidCardinalities := make([]index.CentroidCardinality, 0, limit*len(i.indexes))
+	for asr := range asyncResults {
+		rvCentroidCardinalities = append(rvCentroidCardinalities, asr...)
+	}
+
+	sort.Slice(rvCentroidCardinalities, func(i, j int) bool {
+		if descending {
+			return rvCentroidCardinalities[i].Cardinality > rvCentroidCardinalities[j].Cardinality
+		} else {
+			return rvCentroidCardinalities[i].Cardinality < rvCentroidCardinalities[j].Cardinality
+		}
+	})
+
+	if limit > len(rvCentroidCardinalities) {
+		limit = len(rvCentroidCardinalities)
+	}
+
+	return rvCentroidCardinalities[:limit], nil
 }

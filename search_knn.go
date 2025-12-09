@@ -381,7 +381,7 @@ func addSortAndFieldsToKNNHits(req *SearchRequest, knnHits []*search.DocumentMat
 	return nil
 }
 
-func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, reader index.IndexReader, preSearch bool) ([]*search.DocumentMatch, error) {
+func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, reader index.IndexReader, preSearch bool) (knnHits []*search.DocumentMatch, err error) {
 	// Maps the index of a KNN query in the request to its pre-filter result:
 	// - If the KNN query is **not filtered**, the value will be `nil`.
 	// - If the KNN query **is filtered**, the value will be an eligible document selector
@@ -401,21 +401,33 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 			continue
 		}
 		// Applies to all supported types of queries.
-		filterSearcher, _ := filterQ.Searcher(ctx, reader, i.m, search.SearcherOptions{
+		filterSearcher, err := filterQ.Searcher(ctx, reader, i.m, search.SearcherOptions{
 			Score: "none", // just want eligible hits --> don't compute scores if not needed
 		})
+		if err != nil {
+			return nil, err
+		}
 		// Using the index doc count to determine collector size since we do not
 		// have an estimate of the number of eligible docs in the index yet.
 		indexDocCount, err := i.DocCount()
 		if err != nil {
+			// close the searcher before returning
+			filterSearcher.Close()
 			return nil, err
 		}
 		filterColl := collector.NewEligibleCollector(int(indexDocCount))
 		err = filterColl.Collect(ctx, filterSearcher, reader)
 		if err != nil {
+			// close the searcher before returning
+			filterSearcher.Close()
 			return nil, err
 		}
 		knnFilterResults[idx] = filterColl.EligibleSelector()
+		// Close the filter searcher, as we are done with it.
+		err = filterSearcher.Close()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Add the filter hits when creating the kNN query
@@ -429,12 +441,17 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if serr := knnSearcher.Close(); err == nil && serr != nil {
+			err = serr
+		}
+	}()
 	knnCollector := collector.NewKNNCollector(kArray, sumOfK)
 	err = knnCollector.Collect(ctx, knnSearcher, reader)
 	if err != nil {
 		return nil, err
 	}
-	knnHits := knnCollector.Results()
+	knnHits = knnCollector.Results()
 	if !preSearch {
 		knnHits = finalizeKNNResults(req, knnHits)
 	}
