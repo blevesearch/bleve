@@ -224,10 +224,6 @@ func constructKnnPreSearchData(mergedOut map[string]map[string]interface{}, preS
 	return mergedOut, nil
 }
 
-func prepareKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*search.DocumentMatch {
-	return knnHits
-}
-
 func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*search.DocumentMatch {
 	return knnHits
 }

@@ -1652,15 +1652,14 @@ func TestNestedVectors(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// TestKNNMerger tests the KNN merger functionality which handles duplicate
-// document matches from the KNN searcher. When a document has multiple vectors
+// TestMultiVector tests the KNN functionality which handles duplicate
+// vectors being matched within the same document. When a document has multiple vectors
 // (via [[]] array of vectors or [{}] array of objects with vectors), the KNN
-// searcher may return the same document multiple times with different scores.
-// The merger must:
-// 1. Detect duplicates by IndexInternalID
-// 2. Merge score breakdowns, keeping the best score per KNN query
-// 3. Properly flush the last document after iteration completes
-func TestKNNMerger(t *testing.T) {
+// searcher must pick the best scoring vector match for that document. This test covers these scenarios:
+// - Single vector field (baseline)
+// - [[]] style: array of vectors (same doc appears multiple times)
+// - [{}] style: array of objects with vector field (chunks pattern)
+func TestMultiVector(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
