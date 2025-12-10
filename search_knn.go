@@ -501,6 +501,7 @@ func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*
 		}
 		knnHits = knnHits[:idx]
 	}
+
 	// if score fusion required, return early because
 	// score breakdown is retained
 	if IsScoreFusionRequested(req) {
