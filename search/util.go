@@ -237,39 +237,3 @@ type BM25Stats struct {
 	DocCount         float64        `json:"doc_count"`
 	FieldCardinality map[string]int `json:"field_cardinality"`
 }
-
-// MergeScoreExplBreakdown merges two score breakdown maps and their explanations together
-// by picking the best score per query component, and merging them
-// (and their corresponding explanations) into the first map.
-func MergeScoreExplBreakdown(first, second map[int]float64, firstExpl, secondExpl *Explanation) (map[int]float64, *Explanation) {
-	if first == nil {
-		return second, secondExpl
-	}
-	if second == nil {
-		return first, firstExpl
-	}
-	// pick the best score per query component between the two maps
-	for k, score := range second {
-		if existing, ok := first[k]; !ok || existing < score {
-			first[k] = score
-			if firstExpl != nil && secondExpl != nil {
-				// Ensure Children slices are non-nil and long enough
-				if firstExpl.Children == nil || len(firstExpl.Children) <= k {
-					newLen := k + 1
-					newChildren := make([]*Explanation, newLen)
-					if firstExpl.Children != nil {
-						copy(newChildren, firstExpl.Children)
-					}
-					firstExpl.Children = newChildren
-				}
-				if secondExpl.Children == nil || len(secondExpl.Children) <= k {
-					// If secondExpl.Children is nil or too short, skip assignment
-					// (or could set to nil, but here we skip)
-					continue
-				}
-				firstExpl.Children[k] = secondExpl.Children[k]
-			}
-		}
-	}
-	return first, firstExpl
-}

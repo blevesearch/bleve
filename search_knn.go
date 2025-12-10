@@ -458,14 +458,7 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	}
 	knnHits = knnCollector.Results()
 	if !preSearch {
-		// we are done calculating the final top K vectors, so we need to prepare
-		// the payload for returning the final results.
-		knnHits = prepareKNNResults(req, knnHits)
-		// if score fusion is not requested, then finalize the KNN results now.
-		// else, defer the finalization to the score fusion phase.
-		if !IsScoreFusionRequested(req) {
-			knnHits = finalizeKNNResults(req, knnHits)
-		}
+		knnHits = finalizeKNNResults(req, knnHits)
 	}
 	// at this point, irrespective of whether it is a preSearch or not,
 	// the knn hits are populated with Sort and Fields.
@@ -495,7 +488,7 @@ func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, 
 	}
 }
 
-func prepareKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*search.DocumentMatch {
+func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*search.DocumentMatch {
 	// if the KNN operator is AND, then we need to filter out the hits that
 	// do not have match the KNN queries.
 	if req.KNNOperator == knnOperatorAnd {
@@ -508,35 +501,11 @@ func prepareKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*s
 		}
 		knnHits = knnHits[:idx]
 	}
-	if len(knnHits) == 0 {
+	// if score fusion required, return early because
+	// score breakdown is retained
+	if IsScoreFusionRequested(req) {
 		return knnHits
 	}
-	// we may be getting multiple vectors for the same document, so
-	// we need to deduplicate the hits based on the Document ID.
-	// sort the hits based on the Document ID.
-	sort.Slice(knnHits, func(i, j int) bool {
-		return knnHits[i].ID < knnHits[j].ID
-	})
-	rv := knnHits[:1]
-	lastUnique := rv[0]
-	for i := 1; i < len(knnHits); i++ {
-		current := knnHits[i]
-		if current.ID != lastUnique.ID {
-			rv = append(rv, current)
-			lastUnique = current
-		} else {
-			// we have a duplicate document, so we take the best score breakdown
-			// for each KNN query.
-			lastUnique.ScoreBreakdown, lastUnique.Expl = search.MergeScoreExplBreakdown(
-				lastUnique.ScoreBreakdown, current.ScoreBreakdown,
-				lastUnique.Expl, current.Expl)
-		}
-	}
-	knnHits = rv
-	return knnHits
-}
-
-func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*search.DocumentMatch {
 	// fix the score using score breakdown now
 	// if the score is none, then we need to set the score to 0.0
 	// if req.Explain is true, then we need to use the expl breakdown to
