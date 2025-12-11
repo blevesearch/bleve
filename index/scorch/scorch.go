@@ -555,8 +555,6 @@ func (s *Scorch) getInternal(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-// min 39 per centroid, recommeded 50
-// max 256
 func (s *Scorch) Train(batch *index.Batch) error {
 	// is the lock really needed?
 	s.rootLock.Lock()
@@ -588,6 +586,7 @@ func (s *Scorch) Train(batch *index.Batch) error {
 	//
 	// note: this might index text data too, how to handle this? s.segmentConfig?
 	// todo: updates/deletes -> data drift detection
+
 	s.segmentConfig["training"] = true
 	seg, n, err := s.segPlugin.NewEx(trainData, s.segmentConfig)
 	if err != nil {
@@ -620,33 +619,14 @@ func (s *Scorch) Train(batch *index.Batch) error {
 	}
 
 	fmt.Println("number of bytes written to centroid index", n)
-	// s.segmentConfig["getCentroidIndexCallback"] = s.getCentroidIndex
-	// updateBolt(tx, cetntroid)
-	// filename := "centroid_index"
-	// path := filepath.Join(s.path, filename)
-	// f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0600)
-	// if err != nil {
-	// 	return err
-	// }
+	s.segmentConfig["getCentroidIndexCallback"] = s.getCentroidIndex
 
-	// bufw := bufio.NewWriter(f)
-	// _, err = bufw.Write([]byte(strings.Join([]string{"centroid_index1", path}, " ")))
-	// if err != nil {
-	// 	return err
-	// }
-	// err = bufw.Flush()
-	// if err != nil {
-	// 	return err
-	// }
-	// err = f.Sync()
-	// if err != nil {
-	// 	return err
-	// }
-	// err = f.Close()
-	// if err != nil {
-	// 	return err
-	// }
-
+	// a bolt transaction is necessary for failover-recovery scenario and also serves as a checkpoint
+	// where we can be sure that the centroid index is available for the indexing operations downstream
+	//
+	// note: when the scale increases massively especially with real world dimensions of 1536+, this API
+	// will have to be refactored to persist in a more resource efficient way. so having this bolt related
+	// code will help in tracking the progress a lot better and avoid any redudant data streaming operations.
 	tx, err := s.rootBolt.Begin(true)
 	if err != nil {
 		return err
@@ -658,7 +638,11 @@ func (s *Scorch) Train(batch *index.Batch) error {
 		return err
 	}
 
-	err = snapshotsBucket.Put(util.BoltCentroidIndexKey, []byte(path))
+	centroidBucket, err := snapshotsBucket.CreateBucketIfNotExists(util.BoltCentroidIndexKey)
+	if err != nil {
+		return err
+	}
+	err = centroidBucket.Put(util.BoltPathKey, []byte(filename))
 	if err != nil {
 		return err
 	}
@@ -675,7 +659,7 @@ func (s *Scorch) getCentroidIndex(field string) (*faiss.IndexImpl, error) {
 	// return the coarse quantizer of the centroid index belonging to the field
 	centroidIndexSegment, ok := s.centroidIndex.segment.(segment.CentroidIndexSegment)
 	if !ok {
-		return nil, fmt.Errorf("segment is not a centroid index segment")
+		return nil, fmt.Errorf("segment is not a centroid index segment", s.centroidIndex.segment != nil)
 	}
 	coarseQuantizer, err := centroidIndexSegment.GetCoarseQuantizer(field)
 	if err != nil {
@@ -1129,20 +1113,6 @@ func (s *Scorch) CopyReader() index.CopyReader {
 	return rv
 }
 
-func (s *Scorch) updateCentroidIndexInBolt(tx *bolt.Tx) error {
-	centroidIndexBucket, err := tx.CreateBucketIfNotExists(util.BoltCentroidIndexKey)
-	if err != nil {
-		return err
-	}
-
-	err = centroidIndexBucket.Put(util.BoltPathKey, []byte("centroid_index.zap"))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (s *Scorch) UpdateFileInBolt(key []byte, value []byte) error {
 	tx, err := s.rootBolt.Begin(true)
 	if err != nil {
@@ -1157,13 +1127,20 @@ func (s *Scorch) UpdateFileInBolt(key []byte, value []byte) error {
 
 	// currently this is specific to centroid index file update
 	if bytes.Equal(key, util.BoltCentroidIndexKey) {
-		// guard against duplicate updates
-		existingValue := snapshotsBucket.Get(key)
+		// todo: guard against duplicate updates
+		centroidBucket, err := snapshotsBucket.CreateBucketIfNotExists(util.BoltCentroidIndexKey)
+		if err != nil {
+			return err
+		}
+		if centroidBucket == nil {
+			return fmt.Errorf("centroid bucket not found")
+		}
+		existingValue := centroidBucket.Get(util.BoltPathKey)
 		if existingValue != nil {
-			return fmt.Errorf("key already exists")
+			return fmt.Errorf("key already exists %v %v", s.path, string(existingValue))
 		}
 
-		err = snapshotsBucket.Put(key, value)
+		err = centroidBucket.Put(util.BoltPathKey, value)
 		if err != nil {
 			return err
 		}
@@ -1194,7 +1171,7 @@ func (s *Scorch) CopyFile(file string, d index.IndexDirectory) error {
 		// centroid index file - this is outside the snapshots domain so the bolt update is different
 		err := d.UpdateFileInBolt(util.BoltCentroidIndexKey, []byte(file))
 		if err != nil {
-			return err
+			return fmt.Errorf("error updating dest index bolt: %w", err)
 		}
 	}
 

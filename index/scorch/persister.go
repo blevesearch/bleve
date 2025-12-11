@@ -857,13 +857,14 @@ func (s *Scorch) updateCentroidIndex(bucket *bolt.Bucket) error {
 	if bucket == nil {
 		return nil
 	}
+	fmt.Println("updateCentroidIndex bucket", bucket != nil)
 	segmentSnapshot, err := s.loadSegment(bucket)
 	if err != nil {
 		return err
 	}
 	s.rootLock.Lock()
 	defer s.rootLock.Unlock()
-
+	fmt.Println("updateCentroidIndex", segmentSnapshot.segment != nil)
 	s.centroidIndex = segmentSnapshot
 	return nil
 }
@@ -872,15 +873,6 @@ func (s *Scorch) updateCentroidIndex(bucket *bolt.Bucket) error {
 
 func (s *Scorch) loadFromBolt() error {
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
-		centroidIndexBucket := tx.Bucket(util.BoltCentroidIndexKey)
-		if centroidIndexBucket == nil {
-			return nil
-		}
-		err := s.updateCentroidIndex(centroidIndexBucket)
-		if err != nil {
-			return err
-		}
-
 		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
@@ -897,6 +889,12 @@ func (s *Scorch) loadFromBolt() error {
 				s.AddEligibleForRemoval(snapshotEpoch)
 				continue
 			}
+			// fmt.Println("loadFromBolt key %s", k)
+			// if k[0] == util.BoltCentroidIndexKey[0] {
+			// 	fmt.Println("loadFromBolt centroid index key", string(k))
+
+			// 	continue
+			// }
 			snapshot := snapshots.Bucket(k)
 			if snapshot == nil {
 				log.Printf("snapshot key, but bucket missing %x, continuing", k)
@@ -927,6 +925,12 @@ func (s *Scorch) loadFromBolt() error {
 			}
 
 			foundRoot = true
+		}
+
+		centroidIndexBucket := snapshots.Bucket(util.BoltCentroidIndexKey)
+		err := s.updateCentroidIndex(centroidIndexBucket)
+		if err != nil {
+			return err
 		}
 		return nil
 	})
