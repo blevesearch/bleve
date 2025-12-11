@@ -382,21 +382,6 @@ func (dm *DocumentMatch) String() string {
 	return fmt.Sprintf("[%s-%f]", dm.ID, dm.Score)
 }
 
-func (dm *DocumentMatch) AddDescendantID(id index.IndexInternalID) {
-	// add other as descendant only if it is not the same document
-	if !dm.IndexInternalID.Equals(id) {
-		// Add a copy of id to descendants
-		var descendantID index.IndexInternalID
-		// first check if dm's descendants slice has capacity to reuse
-		if len(dm.Descendants) < cap(dm.Descendants) {
-			// reuse the buffer element at len(dm.Descendants)
-			descendantID = dm.Descendants[:len(dm.Descendants)+1][len(dm.Descendants)]
-		}
-		// copy the contents of id into descendantID, allocating if needed
-		dm.Descendants = append(dm.Descendants, index.NewIndexInternalIDFrom(descendantID, id))
-	}
-}
-
 type DocumentMatchCollection []*DocumentMatch
 
 func (c DocumentMatchCollection) Len() int           { return len(c) }

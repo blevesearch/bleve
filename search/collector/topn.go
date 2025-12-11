@@ -140,7 +140,19 @@ func newTopNCollector(size int, skip int, sort search.SortOrder, nr index.Nested
 			// merge field term locations
 			parent.FieldTermLocations = search.MergeFieldTermLocationsFromMatch(parent.FieldTermLocations, child)
 			// add child's ID to parent's Descendants
-			parent.AddDescendantID(child.IndexInternalID)
+			// add other as descendant only if it is not the same document
+			if !parent.IndexInternalID.Equals(child.IndexInternalID) {
+				// Add a copy of child.IndexInternalID to descendants, because
+				// child.IndexInternalID will be reset when 'child' is recycled.
+				var descendantID index.IndexInternalID
+				// first check if parent's descendants slice has capacity to reuse
+				if len(parent.Descendants) < cap(parent.Descendants) {
+					// reuse the buffer element at len(parent.Descendants)
+					descendantID = parent.Descendants[:len(parent.Descendants)+1][len(parent.Descendants)]
+				}
+				// copy the contents of id into descendantID, allocating if needed
+				parent.Descendants = append(parent.Descendants, index.NewIndexInternalIDFrom(descendantID, child.IndexInternalID))
+			}
 			return nil
 		}
 		hc.nestedStore = newStoreNested(nr, search.DescendantAdderCallbackFn(descAdder))

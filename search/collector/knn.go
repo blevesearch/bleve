@@ -136,11 +136,8 @@ type KNNCollector struct {
 	took     time.Duration
 	results  search.DocumentMatchCollection
 	maxScore float64
-
-	nestedStore *collectStoreNested
 }
 
-// NewKNNCollector creates a new KNNCollector for the given K values and size.
 func NewKNNCollector(kArray []int64, size int64) *KNNCollector {
 	return &KNNCollector{
 		knnStore: GetNewKNNCollectorStore(kArray),
