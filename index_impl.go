@@ -326,11 +326,13 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 
 	i.FireIndexEvent()
 
+	// fmt.Printf("data is %#v\n", data)
 	doc := document.NewDocument(id)
 	err = i.m.MapDocument(doc, data)
 	if err != nil {
 		return
 	}
+	// fmt.Printf("data is after mapping %#v\n", doc)
 	err = i.i.Update(doc)
 	return
 }
@@ -367,6 +369,20 @@ func (i *indexImpl) IndexSynonym(id string, collection string, definition *Synon
 	}
 	err = i.i.Update(doc)
 	return err
+}
+
+func (i *indexImpl) Train(batch *Batch) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	if vi, ok := i.i.(index.VectorIndex); ok {
+		return vi.Train(batch.internal)
+	}
+	return fmt.Errorf("not a vector index")
 }
 
 // IndexAdvanced takes a document.Document object
@@ -1362,6 +1378,39 @@ func (m *searchHitSorter) Less(i, j int) bool {
 	return c < 0
 }
 
+func (i *indexImpl) CopyFile(file string, d index.IndexDirectory) (err error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	copyIndex, ok := i.i.(index.IndexFileCopyable)
+	if !ok {
+		return fmt.Errorf("index implementation does not support copy reader")
+	}
+
+	return copyIndex.CopyFile(file, d)
+}
+
+func (i *indexImpl) UpdateFileInBolt(key []byte, value []byte) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	copyIndex, ok := i.i.(index.IndexFileCopyable)
+	if !ok {
+		return fmt.Errorf("index implementation does not support file copy")
+	}
+
+	return copyIndex.UpdateFileInBolt(key, value)
+}
+
+// CopyTo (index.Directory, filter)
 func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -1374,6 +1423,8 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 	if !ok {
 		return fmt.Errorf("index implementation does not support copy reader")
 	}
+
+	// copyIndex.Copy() -> copies the centroid index
 
 	copyReader := copyIndex.CopyReader()
 	if copyReader == nil {
@@ -1388,7 +1439,7 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 
 	err = copyReader.CopyTo(d)
 	if err != nil {
-		return fmt.Errorf("error copying index metadata: %v", err)
+		return fmt.Errorf("error copying index data: %v", err)
 	}
 
 	// copy the metadata
