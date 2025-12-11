@@ -328,11 +328,13 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 
 	i.FireIndexEvent()
 
+	// fmt.Printf("data is %#v\n", data)
 	doc := document.NewDocument(id)
 	err = i.m.MapDocument(doc, data)
 	if err != nil {
 		return
 	}
+	// fmt.Printf("data is after mapping %#v\n", doc)
 	err = i.i.Update(doc)
 	return
 }

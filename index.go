@@ -51,10 +51,12 @@ func (b *Batch) Index(id string, data interface{}) error {
 		eventIndex.FireIndexEvent()
 	}
 	doc := document.NewDocument(id)
+	// fmt.Printf("data is before mapping %#v\n", data)
 	err := b.index.Mapping().MapDocument(doc, data)
 	if err != nil {
 		return err
 	}
+	// fmt.Printf("data is after mapping %#v\n", doc)
 	b.internal.Update(doc)
 
 	b.lastDocSize = uint64(doc.Size() +
