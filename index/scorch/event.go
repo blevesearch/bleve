@@ -35,43 +35,45 @@ type Event struct {
 // EventKind represents an event code for OnEvent() callbacks.
 type EventKind int
 
-// EventKindCloseStart is fired when a Scorch.Close() has begun.
-var EventKindCloseStart = EventKind(1)
+const (
+	// EventKindCloseStart is fired when a Scorch.Close() has begun.
+	EventKindCloseStart EventKind = iota
 
-// EventKindClose is fired when a scorch index has been fully closed.
-var EventKindClose = EventKind(2)
+	// EventKindClose is fired when a scorch index has been fully closed.
+	EventKindClose
 
-// EventKindMergerProgress is fired when the merger has completed a
-// round of merge processing.
-var EventKindMergerProgress = EventKind(3)
+	// EventKindMergerProgress is fired when the merger has completed a
+	// round of merge processing.
+	EventKindMergerProgress
 
-// EventKindPersisterProgress is fired when the persister has completed
-// a round of persistence processing.
-var EventKindPersisterProgress = EventKind(4)
+	// EventKindPersisterProgress is fired when the persister has completed
+	// a round of persistence processing.
+	EventKindPersisterProgress
 
-// EventKindBatchIntroductionStart is fired when Batch() is invoked which
-// introduces a new segment.
-var EventKindBatchIntroductionStart = EventKind(5)
+	// EventKindBatchIntroductionStart is fired when Batch() is invoked which
+	// introduces a new segment.
+	EventKindBatchIntroductionStart
 
-// EventKindBatchIntroduction is fired when Batch() completes.
-var EventKindBatchIntroduction = EventKind(6)
+	// EventKindBatchIntroduction is fired when Batch() completes.
+	EventKindBatchIntroduction
 
-// EventKindMergeTaskIntroductionStart is fired when the merger is about to
-// start the introduction of merged segment from a single merge task.
-var EventKindMergeTaskIntroductionStart = EventKind(7)
+	// EventKindMergeTaskIntroductionStart is fired when the merger is about to
+	// start the introduction of merged segment from a single merge task.
+	EventKindMergeTaskIntroductionStart
 
-// EventKindMergeTaskIntroduction is fired when the merger has completed
-// the introduction of merged segment from a single merge task.
-var EventKindMergeTaskIntroduction = EventKind(8)
+	// EventKindMergeTaskIntroduction is fired when the merger has completed
+	// the introduction of merged segment from a single merge task.
+	EventKindMergeTaskIntroduction
 
-// EventKindPreMergeCheck is fired before the merge begins to check if
-// the caller should proceed with the merge.
-var EventKindPreMergeCheck = EventKind(9)
+	// EventKindPreMergeCheck is fired before the merge begins to check if
+	// the caller should proceed with the merge.
+	EventKindPreMergeCheck
 
-// EventKindIndexStart is fired when Index() is invoked which
-// creates a new Document object from an interface using the index mapping.
-var EventKindIndexStart = EventKind(10)
+	// EventKindIndexStart is fired when Index() is invoked which
+	// creates a new Document object from an interface using the index mapping.
+	EventKindIndexStart
 
-// EventKindPurgerCheck is fired before the purge code is invoked and decides
-// whether to execute or not. For unit test purposes
-var EventKindPurgerCheck = EventKind(11)
+	// EventKindPurgerCheck is fired before the purge code is invoked and decides
+	// whether to execute or not. For unit test purposes
+	EventKindPurgerCheck
+)

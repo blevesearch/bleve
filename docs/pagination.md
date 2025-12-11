@@ -48,7 +48,7 @@ Rules:
 
 Where do sort keys come from?
 
-- Each hit includes `Sort` (and `DecodedSort` from Bleve v2.5.2). Take the last hit’s sort keys for `SearchAfter`, or the first hit's sort keys for `SearchBefore`.
+- Each hit includes `Sort` (and `DecodedSort` from Bleve v2.5.2). Take the last hit's sort keys for `SearchAfter`, or the first hit's sort keys for `SearchBefore`.
 - If the field/fields to be searched over is numeric, datetime or geo, the values in the `Sort` field may have garbled values; this is because of how Bleve represents such data types internally. To use such fields as sort keys, use the `DecodedSort` field, which decodes the internal representations. This feature is available from Bleve v2.5.4.
 
 > When using `DecodedSort`, the `Sort` array in the search request needs to explicitly declare the type of the field for proper decoding. Hence, the `Sort` array must contain either `SortField` objects (for numeric and datetime) or `SortGeoDistance` objects (for geo) rather than just the field names. More info on `SortField` and `SortGeoDistance` can be found in [sort_facet.md](sort_facet.md).

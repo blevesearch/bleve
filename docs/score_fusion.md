@@ -28,6 +28,7 @@ RRF\_score = w_{\text{fts}} \cdot \frac{1}{k + \text{rank}_{\text{fts}}} + \sum_
 ```
 
 Where:
+
 * $\text{rank}_{\text{fts}}$: 1-indexed rank of the document in the FTS result list (or 0 if not present)
 * $\text{rank}_{\text{knn}_i}$: 1-indexed rank of the document in the i-th kNN result list (or 0 if not present)
 * $k$: rank constant (default: 60) that dampens the impact of rank differences
@@ -36,12 +37,14 @@ Where:
 * $\sum_{i=1}^{n}$: summation over all kNN queries (you can add multiple kNN queries)
 
 **Advantages:**
-* Distribution-agnostic – no need for score normalization
+
+* Distribution-agnostic - no need for score normalization
 * Works out of the box with minimal tuning
 * Prioritizes documents appearing in both result lists
 * Robust to outliers since only ranks matter
 
 **Disadvantages:**
+
 * Ignores score magnitude (loses some information)
 * May be sensitive to imbalanced result list sizes
 
@@ -86,28 +89,31 @@ Relative Score Fusion is a **score-based** strategy that normalizes scores from 
 
 1. **Min-max normalize** each result set independently:
 
-```math
-\text{normalized\_score} = \frac{\text{score} - \text{min\_score}}{\text{max\_score} - \text{min\_score}}
-```
+    ```math
+    \text{normalized\_score} = \frac{\text{score} - \text{min\_score}}{\text{max\_score} - \text{min\_score}}
+    ```
 
 2. **Combine** normalized scores using weighted addition:
 
-```math
-RSF\_score = w_{\text{fts}} \cdot \text{normalized\_score\_fts} + \sum_{i=1}^{n} w_{\text{knn}_i} \cdot \text{normalized\_score\_knn}_i
-```
+    ```math
+    RSF\_score = w_{\text{fts}} \cdot \text{normalized\_score\_fts} + \sum_{i=1}^{n} w_{\text{knn}_i} \cdot \text{normalized\_score\_knn}_i
+    ```
 
 Where:
+
 * $w_{\text{fts}}$: weight from the FTS query boost value
 * $w_{\text{knn}_i}$: weight from the i-th kNN query boost value
 * $\sum_{i=1}^{n}$: summation over all kNN queries (you can add multiple kNN queries)
 
 **Advantages:**
-* Score-aware – retains relevance magnitude information
+
+* Score-aware - retains relevance magnitude information
 * Resolves incompatible score ranges
 * Easy to understand
 
 **Disadvantages:**
-* Sensitive to outliers – a single extreme score can skew normalization
+
+* Sensitive to outliers - a single extreme score can skew normalization
 * Doesn't account for the shape or distribution of scores
 
 **Usage:**
@@ -171,6 +177,7 @@ From + Size <= ScoreWindowSize
 ```
 
 **Example:**
+
 ```json
 {
   "score": "rrf",
@@ -195,6 +202,7 @@ With window size set to 150, you can paginate through up to 150 results. If you 
 * **Effect**: Higher values dampen the impact of rank differences
 
 **Example:**
+
 ```json
 {
   "score": "rrf",

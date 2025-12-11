@@ -19,7 +19,7 @@ However, if any of the following conditions are met, the index is considered non
 
 * Any additional fields or enabled document mappings in the new index mapping
 * Any changes to IncludeInAll, type, IncludeTermVectors and SkipFreqNorm
-* Any document mapping having it's enabled value changing from false to true
+* Any document mapping having its enabled value changing from false to true
 * Text fields with a different analyser or date time fields with a different date time format
 * Vector and VectorBase64 fields changing dims, similarity or vectorIndexOptimizedFor
 * Any changes when field is part of `_all`

@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis"
@@ -571,96 +572,97 @@ func (sr *SearchResult) Size() int {
 }
 
 func (sr *SearchResult) String() string {
-	// Helper to format one hit
-	formatHit := func(i int, hit *search.DocumentMatch, start int) string {
-		rv := fmt.Sprintf("%5d. %s (%f)\n", start+i+1, hit.ID, hit.Score)
-		for fragmentField, fragments := range hit.Fragments {
-			rv += fmt.Sprintf("\t%s\n", fragmentField)
-			for _, fragment := range fragments {
-				rv += fmt.Sprintf("\t\t%s\n", fragment)
-			}
-		}
-		for otherFieldName, otherFieldValue := range hit.Fields {
-			if otherFieldName == NestedDocumentKey {
-				continue
-			}
-			if _, ok := hit.Fragments[otherFieldName]; !ok {
-				rv += fmt.Sprintf("\t%s\n", otherFieldName)
-				rv += fmt.Sprintf("\t\t%v\n", otherFieldValue)
-			}
-		}
-		// nested documents
-		if nested, ok := hit.Fields[NestedDocumentKey]; ok {
-			if list, ok := nested.([]*search.NestedDocumentMatch); ok {
-				rv += fmt.Sprintf("\t%s (%d nested documents)\n", NestedDocumentKey, len(list))
-				for ni, nd := range list {
-					rv += fmt.Sprintf("\t\tNested #%d:\n", ni+1)
-					for f, frags := range nd.Fragments {
-						rv += fmt.Sprintf("\t\t\t%s\n", f)
-						for _, frag := range frags {
-							rv += fmt.Sprintf("\t\t\t\t%s\n", frag)
-						}
-					}
-					for f, v := range nd.Fields {
-						if _, ok := nd.Fragments[f]; !ok {
-							rv += fmt.Sprintf("\t\t\t%s\n", f)
-							rv += fmt.Sprintf("\t\t\t\t%v\n", v)
-						}
-					}
-				}
-			}
-		}
-		if len(hit.DecodedSort) > 0 {
-			rv += "\t_sort: ["
-			for i, v := range hit.DecodedSort {
-				if i > 0 {
-					rv += ", "
-				}
-				rv += fmt.Sprintf("%v", v)
-			}
-			rv += "]\n"
-		}
-		return rv
-	}
-	var rv string
-	// main header
+	rv := &strings.Builder{}
 	if sr.Total > 0 {
 		switch {
 		case sr.Request != nil && sr.Request.Size > 0:
-			start := sr.Request.From
+			start := sr.Request.From + 1
 			end := sr.Request.From + len(sr.Hits)
-			rv = fmt.Sprintf("%d matches, showing %d through %d, took %s\n", sr.Total, start+1, end, sr.Took)
+			fmt.Fprintf(rv, "%d matches, showing %d through %d, took %s\n", sr.Total, start, end, sr.Took)
 			for i, hit := range sr.Hits {
-				rv += formatHit(i, hit, start)
+				rv = formatHit(rv, hit, start+i)
 			}
 		case sr.Request == nil:
-			rv = fmt.Sprintf("%d matches, took %s\n", sr.Total, sr.Took)
+			fmt.Fprintf(rv, "%d matches, took %s\n", sr.Total, sr.Took)
 			for i, hit := range sr.Hits {
-				rv += formatHit(i, hit, 0)
+				rv = formatHit(rv, hit, i+1)
 			}
 		default:
-			rv = fmt.Sprintf("%d matches, took %s\n", sr.Total, sr.Took)
+			fmt.Fprintf(rv, "%d matches, took %s\n", sr.Total, sr.Took)
 		}
 	} else {
-		rv = "No matches"
+		fmt.Fprintf(rv, "No matches\n")
 	}
 	if len(sr.Facets) > 0 {
-		rv += "Facets:\n"
+		fmt.Fprintf(rv, "Facets:\n")
 		for fn, f := range sr.Facets {
-			rv += fmt.Sprintf("%s(%d)\n", fn, f.Total)
+			fmt.Fprintf(rv, "%s(%d)\n", fn, f.Total)
 			for _, t := range f.Terms.Terms() {
-				rv += fmt.Sprintf("\t%s(%d)\n", t.Term, t.Count)
+				fmt.Fprintf(rv, "\t%s(%d)\n", t.Term, t.Count)
 			}
 			for _, n := range f.NumericRanges {
-				rv += fmt.Sprintf("\t%s(%d)\n", n.Name, n.Count)
+				fmt.Fprintf(rv, "\t%s(%d)\n", n.Name, n.Count)
 			}
 			for _, d := range f.DateRanges {
-				rv += fmt.Sprintf("\t%s(%d)\n", d.Name, d.Count)
+				fmt.Fprintf(rv, "\t%s(%d)\n", d.Name, d.Count)
 			}
 			if f.Other != 0 {
-				rv += fmt.Sprintf("\tOther(%d)\n", f.Other)
+				fmt.Fprintf(rv, "\tOther(%d)\n", f.Other)
 			}
 		}
+	}
+	return rv.String()
+}
+
+// formatHit is a helper function to format a single hit in the search result for
+// the String() method of SearchResult
+func formatHit(rv *strings.Builder, hit *search.DocumentMatch, hitNumber int) *strings.Builder {
+	fmt.Fprintf(rv, "%5d. %s (%f)\n", hitNumber, hit.ID, hit.Score)
+	for fragmentField, fragments := range hit.Fragments {
+		fmt.Fprintf(rv, "\t%s\n", fragmentField)
+		for _, fragment := range fragments {
+			fmt.Fprintf(rv, "\t\t%s\n", fragment)
+		}
+	}
+	for otherFieldName, otherFieldValue := range hit.Fields {
+		if otherFieldName == NestedDocumentKey {
+			continue
+		}
+		if _, ok := hit.Fragments[otherFieldName]; !ok {
+			fmt.Fprintf(rv, "\t%s\n", otherFieldName)
+			fmt.Fprintf(rv, "\t\t%v\n", otherFieldValue)
+		}
+	}
+	// nested documents
+	if nested, ok := hit.Fields[NestedDocumentKey]; ok {
+		if list, ok := nested.([]*search.NestedDocumentMatch); ok {
+			fmt.Fprintf(rv, "\t%s (%d nested documents)\n", NestedDocumentKey, len(list))
+			for ni, nd := range list {
+				fmt.Fprintf(rv, "\t\tNested #%d:\n", ni+1)
+				for f, frags := range nd.Fragments {
+					fmt.Fprintf(rv, "\t\t\t%s\n", f)
+					for _, frag := range frags {
+						fmt.Fprintf(rv, "\t\t\t\t%s\n", frag)
+					}
+				}
+				for f, v := range nd.Fields {
+					if _, ok := nd.Fragments[f]; !ok {
+						fmt.Fprintf(rv, "\t\t\t%s\n", f)
+						fmt.Fprintf(rv, "\t\t\t\t%v\n", v)
+					}
+				}
+			}
+		}
+	}
+	if len(hit.DecodedSort) > 0 {
+		fmt.Fprintf(rv, "\t_sort: [")
+		for k, v := range hit.DecodedSort {
+			if k > 0 {
+				fmt.Fprintf(rv, ", ")
+			}
+			fmt.Fprintf(rv, "%v", v)
+		}
+		fmt.Fprintf(rv, "]\n")
 	}
 	return rv
 }

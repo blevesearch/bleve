@@ -39,19 +39,19 @@ Starting with v2.5.0, this first-tier size is dependent on the file size using t
 The configs are set via the `kvConfig` parameter in the `NewUsing()` or `OpenUsing()` API:
 
 ```go
-    // setting the persister and merger configs
-    kvConfig := map[string]interface{}{
-        "scorchPersisterOptions": map[string]interface{}{
-            "NumPersisterWorkers":           4,
-            "MaxSizeInMemoryMergePerWorker": 20000000,
-        },
-        "scorchMergePlanOptions": map[string]interface{}{
-            "FloorSegmentFileSize": 10000000,
-        },
-    }
-    // passing the config to the index
-    index, err := bleve.NewUsing("example.bleve", bleve.NewIndexMapping(), bleve.Config.DefaultIndexType, bleve.Config.DefaultMemKVStore, kvConfig)
-    if err != nil {
-        panic(err)
-    }
+// setting the persister and merger configs
+kvConfig := map[string]interface{}{
+    "scorchPersisterOptions": map[string]interface{}{
+        "NumPersisterWorkers":           4,
+        "MaxSizeInMemoryMergePerWorker": 20000000,
+    },
+    "scorchMergePlanOptions": map[string]interface{}{
+        "FloorSegmentFileSize": 10000000,
+    },
+}
+// passing the config to the index
+index, err := bleve.NewUsing("example.bleve", bleve.NewIndexMapping(), bleve.Config.DefaultIndexType, bleve.Config.DefaultMemKVStore, kvConfig)
+if err != nil {
+    panic(err)
+}
 ```
