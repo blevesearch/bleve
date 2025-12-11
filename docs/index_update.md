@@ -40,6 +40,6 @@ config := map[string]interface{}{
 }
 index, err := bleve.OpenUsing("<Path to Index>", config)
 if err != nil {
-    panic(err)
+    return err
 }
 ```

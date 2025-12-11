@@ -168,7 +168,6 @@ func (d *Document) NestedFields() search.FieldSet {
 	if len(d.NestedDocuments) == 0 {
 		return nil
 	}
-
 	fieldSet := search.NewFieldSet()
 	var collectFields func(index.Document)
 	collectFields = func(doc index.Document) {
