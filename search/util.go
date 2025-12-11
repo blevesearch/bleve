@@ -16,9 +16,7 @@ package search
 
 import (
 	"context"
-	"slices"
 
-	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/s2"
 )
 
@@ -300,69 +298,4 @@ func (fs FieldSet) Slice() []string {
 		rv = append(rv, field)
 	}
 	return rv
-}
-
-// SotedUnionIDs returns the union of two sorted slices of IndexInternalID,
-// preserving order and removing duplicates, reusing the underlying array of dest
-// where possible.
-func SortedUnion(dest, src []index.IndexInternalID) []index.IndexInternalID {
-	// If dest is empty, return src
-	if len(dest) == 0 {
-		return src
-	}
-	// If src is empty, return dest
-	if len(src) == 0 {
-		return dest
-	}
-	// Append src to dest - reuses the underlying array if it has capacity
-	dest = append(dest, src...)
-	// Sort the combined slice, dest is now having atleast 2 elements
-	slices.SortFunc(dest, func(a, b index.IndexInternalID) int {
-		return a.Compare(b)
-	})
-	// Now remove duplicates, reusing the underlying array by adding the first element
-	// as the initial unique element
-	rv := dest[:1]
-	for i := 1; i < len(dest); i++ {
-		if !rv[len(rv)-1].Equals(dest[i]) {
-			rv = append(rv, dest[i])
-		}
-	}
-	return rv
-}
-
-// MergeScoreExplBreakdown merges two score breakdown maps together
-// by picking the best score per query component, and merging them
-// (and their corresponding explanations) into the first map.
-func MergeScoreExplBreakdown(first, second map[int]float64, firstExpl, secondExpl *Explanation) (map[int]float64, *Explanation) {
-	if first == nil {
-		return second, secondExpl
-	}
-	if second == nil {
-		return first, firstExpl
-	}
-	// pick the best score per query component between the two maps
-	for k, score := range second {
-		if existing, ok := first[k]; !ok || existing < score {
-			first[k] = score
-			if firstExpl != nil && secondExpl != nil {
-				// Ensure Children slices are non-nil and long enough
-				if firstExpl.Children == nil || len(firstExpl.Children) <= k {
-					newLen := k + 1
-					newChildren := make([]*Explanation, newLen)
-					if firstExpl.Children != nil {
-						copy(newChildren, firstExpl.Children)
-					}
-					firstExpl.Children = newChildren
-				}
-				if secondExpl.Children == nil || len(secondExpl.Children) <= k {
-					// If secondExpl.Children is nil or too short, skip assignment
-					// (or could set to nil, but here we skip)
-					continue
-				}
-				firstExpl.Children[k] = secondExpl.Children[k]
-			}
-		}
-	}
-	return first, firstExpl
 }

@@ -95,61 +95,6 @@ func (c *collectStoreKNN) Final(fixup collectorFixup) (search.DocumentMatchColle
 	return rv, nil
 }
 
-// -----------------------------------------------------------------------------------------
-// knnMerger is a preprocessing layer on top of collectStoreKNN that merges
-// duplicate document matches before adding them to the underlying KNN store.
-// Since KNN searchers may return the same document multiple times (with different
-// scoreBreakdown values for each KNN query), we must merge these to retain the
-// best score per KNN query before adding them to the KNN store.
-// NOTE: This implementation assumes documents arrive in increasing order of their
-// internal IDs, which is guaranteed by all searchers in bleve.
-type knnMerger struct {
-	// curr holds the current document match being accumulated during the merge process.
-	curr *search.DocumentMatch
-}
-
-func newKNNMerger() *knnMerger {
-	return &knnMerger{}
-}
-
-// Merge merges duplicate document matches by combining their score breakdowns.
-// Returns nil if the incoming doc was merged into the current document.
-// Returns the completed previous document when a new document with a different ID arrives.
-// The returned DocumentMatch is ready for further processing.
-func (c *knnMerger) Merge(ctx *search.SearchContext, doc *search.DocumentMatch) (*search.DocumentMatch, error) {
-	// see if the document has been seen before
-	if c.curr != nil && c.curr.IndexInternalID.Equals(doc.IndexInternalID) {
-		// merge the score breakdowns
-		c.curr.ScoreBreakdown, c.curr.Expl = search.MergeScoreExplBreakdown(
-			c.curr.ScoreBreakdown, doc.ScoreBreakdown,
-			c.curr.Expl, doc.Expl)
-		// recycle the incoming document now that it's merged
-		ctx.DocumentMatchPool.Put(doc)
-		// return nil since no document to process further
-		return nil, nil
-	}
-	// now we are sure that this is a new document, check if we have an existing
-	// document to return for processing
-	if c.curr != nil {
-		// we have an existing document, return it for processing
-		toReturn := c.curr
-		// set the current to the incoming document
-		c.curr = doc
-		return toReturn, nil
-	}
-	// first document seen, set it as current and return nil
-	c.curr = doc
-	return nil, nil
-}
-
-// Current returns the current document match being merged, if any.
-// Call this after processing all documents to flush the last document.
-func (c *knnMerger) Current() *search.DocumentMatch {
-	return c.curr
-}
-
-// -----------------------------------------------------------------------------------------
-
 func MakeKNNDocMatchHandler(ctx *search.SearchContext) (search.DocumentMatchHandler, error) {
 	var hc *KNNCollector
 	var ok bool
@@ -158,9 +103,6 @@ func MakeKNNDocMatchHandler(ctx *search.SearchContext) (search.DocumentMatchHand
 			if d == nil {
 				return nil
 			}
-			// increment total count as we are sure that this is a
-			// valid document match to be added to the KNN store
-			hc.total++
 			toRelease := hc.knnStore.AddDocument(d)
 			for _, doc := range toRelease {
 				ctx.DocumentMatchPool.Put(doc)
@@ -188,9 +130,6 @@ func GetNewKNNCollectorStore(kArray []int64) *collectStoreKNN {
 
 // implements Collector interface
 type KNNCollector struct {
-	// merger merges duplicate document matches before adding to knnStore
-	merger *knnMerger
-	// knnStore is the underlying store for KNN document matches
 	knnStore *collectStoreKNN
 	size     int
 	total    uint64
@@ -203,35 +142,10 @@ type KNNCollector struct {
 
 // NewKNNCollector creates a new KNNCollector for the given K values and size.
 func NewKNNCollector(kArray []int64, size int64) *KNNCollector {
-	return newKNNCollector(kArray, size, nil)
-}
-
-// NewNestedKNNCollector creates a new KNNCollector for the given K values and size,
-// with support for nested documents using the provided NestedReader.
-func NewNestedKNNCollector(kArray []int64, size int64, nr index.NestedReader) *KNNCollector {
-	return newKNNCollector(kArray, size, nr)
-}
-
-// internal constructor for KNNCollector, with optional NestedReader
-func newKNNCollector(kArray []int64, size int64, nr index.NestedReader) *KNNCollector {
-	knnCollector := &KNNCollector{
-		merger:   newKNNMerger(),
+	return &KNNCollector{
 		knnStore: GetNewKNNCollectorStore(kArray),
 		size:     int(size),
 	}
-	if nr != nil {
-		descAdder := func(parent *search.DocumentMatch, child *search.DocumentMatch) error {
-			// here we merge the child's score and explanation breakdowns into the parent
-			parent.ScoreBreakdown, parent.Expl = search.MergeScoreExplBreakdown(
-				parent.ScoreBreakdown, child.ScoreBreakdown,
-				parent.Expl, child.Expl)
-			// add the child's internal ID as a descendant ID to the parent
-			parent.AddDescendantID(child.IndexInternalID)
-			return nil
-		}
-		knnCollector.nestedStore = newStoreNested(nr, search.DescendantAdderCallbackFn(descAdder))
-	}
-	return knnCollector
 }
 
 func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, reader index.IndexReader) error {
@@ -269,10 +183,8 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 	default:
 		next, err = searcher.Next(searchContext)
 	}
-	// maintain a total count of documents processed, for context cancellation checks
-	var total uint64
 	for err == nil && next != nil {
-		if total%CheckDoneEvery == 0 {
+		if hc.total%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
 				search.RecordSearchCost(ctx, search.AbortM, 0)
@@ -280,71 +192,17 @@ func (hc *KNNCollector) Collect(ctx context.Context, searcher search.Searcher, r
 			default:
 			}
 		}
-		total++
+		hc.total++
 
-		// since we may get duplicate document matches from the KNN searcher,
-		// we must merge them before adding to the KNN store, keeping the
-		// best scoreBreakdown for each KNN query per document.
-		next, err = hc.merger.Merge(searchContext, next)
+		err = dmHandler(next)
 		if err != nil {
 			break
-		}
-
-		// if the collector is used in nested mode and if next is non-nil,
-		// we must further process next to merge it into its root document
-		// via the nested store, if needed.
-		if hc.nestedStore != nil && next != nil {
-			// override next with the returned root document match, if any
-			next, err = hc.nestedStore.ProcessNestedDocument(searchContext, next)
-			if err != nil {
-				break
-			}
-			// if next is nil, it means the incoming doc was merged into its parent
-			// and no root document is ready yet
-		}
-
-		// if next is non-nil at this point we finally have a document match ready
-		// to be added to the KNN store via the document match handler
-		if next != nil {
-			err = dmHandler(next)
-			if err != nil {
-				break
-			}
 		}
 
 		next, err = searcher.Next(searchContext)
 	}
 	if err != nil {
 		return err
-	}
-
-	// flush the last merged document if any
-	if lastDoc := hc.merger.Current(); lastDoc != nil {
-		// if the collector is used in nested mode, we must further process lastDoc
-		// to merge it into its root document via the nested store, if needed.
-		if hc.nestedStore != nil {
-			var err error
-			lastDoc, err = hc.nestedStore.ProcessNestedDocument(searchContext, lastDoc)
-			if err != nil {
-				return err
-			}
-			// if lastDoc is nil, it means the incoming doc was merged into its parent
-			// and no root document is ready yet
-		}
-		if lastDoc != nil {
-			if err = dmHandler(lastDoc); err != nil {
-				return err
-			}
-		}
-	}
-	// double check if there is an interim root document left to be returned
-	if hc.nestedStore != nil {
-		doc := hc.nestedStore.Current()
-		if doc != nil {
-			if err = dmHandler(doc); err != nil {
-				return err
-			}
-		}
 	}
 
 	// help finalize/flush the results in case
