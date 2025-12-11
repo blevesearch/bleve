@@ -107,17 +107,7 @@ func (i *indexAliasImpl) Train(batch *Batch) error {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
-	if !i.open {
-		return ErrorIndexClosed
-	}
-	err := i.isAliasToSingleIndex()
-	if err != nil {
-		return err
-	}
-
-	if vi, ok := i.indexes[0].(index.VectorIndex); ok {
-		return vi.Train(batch.internal)
-	}
+	// TODO: implement this
 	return fmt.Errorf("not a vector index")
 }
 
