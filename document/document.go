@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -30,8 +31,9 @@ func init() {
 }
 
 type Document struct {
-	id               string  `json:"id"`
-	Fields           []Field `json:"fields"`
+	id               string
+	Fields           []Field     `json:"fields"`
+	NestedDocuments  []*Document `json:"nested_documents"`
 	CompositeFields  []*CompositeField
 	StoredFieldsSize uint64
 	indexed          bool
@@ -156,4 +158,35 @@ func (d *Document) SetIndexed() {
 
 func (d *Document) Indexed() bool {
 	return d.indexed
+}
+
+func (d *Document) AddNestedDocument(doc *Document) {
+	d.NestedDocuments = append(d.NestedDocuments, doc)
+}
+
+func (d *Document) NestedFields() search.FieldSet {
+	if len(d.NestedDocuments) == 0 {
+		return nil
+	}
+	fieldSet := search.NewFieldSet()
+	var collectFields func(index.Document)
+	collectFields = func(doc index.Document) {
+		// Add all field names from this nested document
+		doc.VisitFields(func(field index.Field) {
+			fieldSet.AddField(field.Name())
+		})
+		// Recursively collect from this document's nested documents
+		if nd, ok := doc.(index.NestedDocument); ok {
+			nd.VisitNestedDocuments(collectFields)
+		}
+	}
+	// Start collection from nested documents only (not root document)
+	d.VisitNestedDocuments(collectFields)
+	return fieldSet
+}
+
+func (d *Document) VisitNestedDocuments(visitor func(doc index.Document)) {
+	for _, doc := range d.NestedDocuments {
+		visitor(doc)
+	}
 }

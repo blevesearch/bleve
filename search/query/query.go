@@ -455,13 +455,10 @@ func DumpQuery(m mapping.IndexMapping, query Query) (string, error) {
 	return string(data), err
 }
 
-// FieldSet represents a set of queried fields.
-type FieldSet map[string]struct{}
-
 // ExtractFields returns a set of fields referenced by the query.
 // The returned set may be nil if the query does not explicitly reference any field
 // and the DefaultSearchField is unset in the index mapping.
-func ExtractFields(q Query, m mapping.IndexMapping, fs FieldSet) (FieldSet, error) {
+func ExtractFields(q Query, m mapping.IndexMapping, fs search.FieldSet) (search.FieldSet, error) {
 	if q == nil || m == nil {
 		return fs, nil
 	}
@@ -474,9 +471,9 @@ func ExtractFields(q Query, m mapping.IndexMapping, fs FieldSet) (FieldSet, erro
 		}
 		if f != "" {
 			if fs == nil {
-				fs = make(FieldSet)
+				fs = search.NewFieldSet()
 			}
-			fs[f] = struct{}{}
+			fs.AddField(f)
 		}
 	case *QueryStringQuery:
 		var expandedQuery Query

@@ -78,7 +78,9 @@ type TopNCollector struct {
 	searchAfter               *search.DocumentMatch
 
 	knnHits             map[string]*search.DocumentMatch
-	computeNewScoreExpl search.ScoreExplCorrectionCallbackFunc
+	hybridMergeCallback search.HybridMergeCallbackFn
+
+	nestedStore *collectStoreNested
 }
 
 // CheckDoneEvery controls how frequently we check the context deadline
@@ -88,24 +90,73 @@ const CheckDoneEvery = uint64(1024)
 // skipping over the first 'skip' hits
 // ordering hits by the provided sort order
 func NewTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector {
-	return newTopNCollector(size, skip, sort)
+	return newTopNCollector(size, skip, sort, nil)
 }
 
 // NewTopNCollectorAfter builds a collector to find the top 'size' hits
 // skipping over the first 'skip' hits
 // ordering hits by the provided sort order
+// starting after the provided 'after' sort values
 func NewTopNCollectorAfter(size int, sort search.SortOrder, after []string) *TopNCollector {
-	rv := newTopNCollector(size, 0, sort)
+	rv := newTopNCollector(size, 0, sort, nil)
 	rv.searchAfter = createSearchAfterDocument(sort, after)
 	return rv
 }
 
-func newTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector {
+// NewNestedTopNCollector builds a collector to find the top 'size' hits
+// skipping over the first 'skip' hits
+// ordering hits by the provided sort order
+// while ensuring the nested documents are handled correctly
+// (i.e. parent document is returned instead of nested document)
+func NewNestedTopNCollector(size int, skip int, sort search.SortOrder, nr index.NestedReader) *TopNCollector {
+	return newTopNCollector(size, skip, sort, nr)
+}
+
+// NewNestedTopNCollectorAfter builds a collector to find the top 'size' hits
+// skipping over the first 'skip' hits
+// ordering hits by the provided sort order
+// starting after the provided 'after' sort values
+// while ensuring the nested documents are handled correctly
+// (i.e. parent document is returned instead of nested document)
+func NewNestedTopNCollectorAfter(size int, sort search.SortOrder, after []string, nr index.NestedReader) *TopNCollector {
+	rv := newTopNCollector(size, 0, sort, nr)
+	rv.searchAfter = createSearchAfterDocument(sort, after)
+	return rv
+}
+
+func newTopNCollector(size int, skip int, sort search.SortOrder, nr index.NestedReader) *TopNCollector {
 	hc := &TopNCollector{size: size, skip: skip, sort: sort}
 
 	hc.store = getOptimalCollectorStore(size, skip, func(i, j *search.DocumentMatch) int {
 		return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
 	})
+
+	if nr != nil {
+		descAdder := func(parent, child *search.DocumentMatch) error {
+			// add descendant score to parent score
+			parent.Score += child.Score
+			// merge explanations
+			parent.Expl = parent.Expl.MergeWith(child.Expl)
+			// merge field term locations
+			parent.FieldTermLocations = search.MergeFieldTermLocationsFromMatch(parent.FieldTermLocations, child)
+			// add child's ID to parent's Descendants
+			// add other as descendant only if it is not the same document
+			if !parent.IndexInternalID.Equals(child.IndexInternalID) {
+				// Add a copy of child.IndexInternalID to descendants, because
+				// child.IndexInternalID will be reset when 'child' is recycled.
+				var descendantID index.IndexInternalID
+				// first check if parent's descendants slice has capacity to reuse
+				if len(parent.Descendants) < cap(parent.Descendants) {
+					// reuse the buffer element at len(parent.Descendants)
+					descendantID = parent.Descendants[:len(parent.Descendants)+1][len(parent.Descendants)]
+				}
+				// copy the contents of id into descendantID, allocating if needed
+				parent.Descendants = append(parent.Descendants, index.NewIndexInternalIDFrom(descendantID, child.IndexInternalID))
+			}
+			return nil
+		}
+		hc.nestedStore = newStoreNested(nr, search.DescendantAdderCallbackFn(descAdder))
+	}
 
 	// these lookups traverse an interface, so do once up-front
 	if sort.RequiresDocID() {
@@ -283,8 +334,13 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	default:
 		next, err = searcher.Next(searchContext)
 	}
+	// use a local totalDocs for counting total docs seen
+	// for context deadline checking, as hc.total is only
+	// incremented for actual(root) collected documents, and
+	// we need to check deadline for every document seen (root or nested)
+	var totalDocs uint64
 	for err == nil && next != nil {
-		if hc.total%CheckDoneEvery == 0 {
+		if totalDocs%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
 				search.RecordSearchCost(ctx, search.AbortM, 0)
@@ -292,27 +348,60 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			default:
 			}
 		}
-
-		err = hc.adjustDocumentMatch(searchContext, reader, next)
-		if err != nil {
-			break
+		totalDocs++
+		if hc.nestedStore != nil {
+			// This may be a nested document — add it to the nested store first.
+			// If the nested store returns nil, the document was merged into its parent
+			// and should not be processed further.
+			// If it returns a non-nil document, it represents a complete root document
+			// and should be processed further.
+			next, err = hc.nestedStore.ProcessNestedDocument(searchContext, next)
+			if err != nil {
+				break
+			}
 		}
-
-		err = hc.prepareDocumentMatch(searchContext, reader, next, false)
-		if err != nil {
-			break
+		if next != nil {
+			err = hc.adjustDocumentMatch(searchContext, reader, next)
+			if err != nil {
+				break
+			}
+			err = hc.prepareDocumentMatch(searchContext, reader, next, false)
+			if err != nil {
+				break
+			}
+			err = dmHandler(next)
+			if err != nil {
+				break
+			}
 		}
-
-		err = dmHandler(next)
-		if err != nil {
-			break
-		}
-
 		next, err = searcher.Next(searchContext)
 	}
 	if err != nil {
 		return err
 	}
+
+	// if we have a nested store, we may have an interim root
+	// that needs to be returned for processing
+	if hc.nestedStore != nil {
+		currRoot := hc.nestedStore.Current()
+		if currRoot != nil {
+			err = hc.adjustDocumentMatch(searchContext, reader, currRoot)
+			if err != nil {
+				return err
+			}
+			// no descendants at this point
+			err = hc.prepareDocumentMatch(searchContext, reader, currRoot, false)
+			if err != nil {
+				return err
+			}
+
+			err = dmHandler(currRoot)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	if hc.knnHits != nil {
 		// we may have some knn hits left that did not match any of the top N tf-idf hits
 		// we need to add them to the collector store to consider them as well.
@@ -366,7 +455,10 @@ func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 			return err
 		}
 		if knnHit, ok := hc.knnHits[d.ID]; ok {
-			d.Score, d.Expl = hc.computeNewScoreExpl(d, knnHit)
+			// we have a knn hit corresponding to this document
+			hc.hybridMergeCallback(d, knnHit)
+			// remove this knn hit from the map as it's already
+			// been merged
 			delete(hc.knnHits, d.ID)
 		}
 	}
@@ -501,6 +593,14 @@ func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.Doc
 		}
 	}
 
+	// first visit descendants if any
+	for _, descID := range d.Descendants {
+		err := hc.dvReader.VisitDocValues(descID, v)
+		if err != nil {
+			return err
+		}
+	}
+	// now visit the doc values for this document
 	err := hc.dvReader.VisitDocValues(d.IndexInternalID, v)
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.EndDoc()
@@ -579,10 +679,10 @@ func (hc *TopNCollector) FacetResults() search.FacetResults {
 	return nil
 }
 
-func (hc *TopNCollector) SetKNNHits(knnHits search.DocumentMatchCollection, newScoreExplComputer search.ScoreExplCorrectionCallbackFunc) {
+func (hc *TopNCollector) SetKNNHits(knnHits search.DocumentMatchCollection, hybridMergeCallback search.HybridMergeCallbackFn) {
 	hc.knnHits = make(map[string]*search.DocumentMatch, len(knnHits))
 	for _, hit := range knnHits {
 		hc.knnHits[hit.ID] = hit
 	}
-	hc.computeNewScoreExpl = newScoreExplComputer
+	hc.hybridMergeCallback = hybridMergeCallback
 }

@@ -625,9 +625,33 @@ func formatHit(rv *strings.Builder, hit *search.DocumentMatch, hitNumber int) *s
 		}
 	}
 	for otherFieldName, otherFieldValue := range hit.Fields {
+		if otherFieldName == NestedDocumentKey {
+			continue
+		}
 		if _, ok := hit.Fragments[otherFieldName]; !ok {
 			fmt.Fprintf(rv, "\t%s\n", otherFieldName)
 			fmt.Fprintf(rv, "\t\t%v\n", otherFieldValue)
+		}
+	}
+	// nested documents
+	if nested, ok := hit.Fields[NestedDocumentKey]; ok {
+		if list, ok := nested.([]*search.NestedDocumentMatch); ok {
+			fmt.Fprintf(rv, "\t%s (%d nested documents)\n", NestedDocumentKey, len(list))
+			for ni, nd := range list {
+				fmt.Fprintf(rv, "\t\tNested #%d:\n", ni+1)
+				for f, frags := range nd.Fragments {
+					fmt.Fprintf(rv, "\t\t\t%s\n", f)
+					for _, frag := range frags {
+						fmt.Fprintf(rv, "\t\t\t\t%s\n", frag)
+					}
+				}
+				for f, v := range nd.Fields {
+					if _, ok := nd.Fragments[f]; !ok {
+						fmt.Fprintf(rv, "\t\t\t%s\n", f)
+						fmt.Fprintf(rv, "\t\t\t\t%v\n", v)
+					}
+				}
+			}
 		}
 	}
 	if len(hit.DecodedSort) > 0 {
