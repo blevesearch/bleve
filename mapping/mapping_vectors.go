@@ -20,6 +20,7 @@ package mapping
 import (
 	"fmt"
 	"reflect"
+	"slices"
 
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/util"
@@ -151,8 +152,10 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 		vectorIndexOptimizedFor = index.DefaultIndexOptimization
 	}
 	// normalize raw vector if similarity is cosine
+	// Since the vector can be multi-vector (flattened array of multiple vectors),
+	// we use NormalizeMultiVector to normalize each sub-vector independently.
 	if similarity == index.CosineSimilarity {
-		vector = NormalizeVector(vector)
+		vector = NormalizeMultiVector(vector, fm.Dims)
 	}
 
 	fieldName := getFieldName(pathString, path, fm)
@@ -186,7 +189,8 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	if err != nil || len(decodedVector) != fm.Dims {
 		return
 	}
-	// normalize raw vector if similarity is cosine
+	// normalize raw vector if similarity is cosine, multi-vector is not supported
+	// for base64 encoded vectors, so we use NormalizeVector directly.
 	if similarity == index.CosineSimilarity {
 		decodedVector = NormalizeVector(decodedVector)
 	}
@@ -292,11 +296,33 @@ func validateVectorFieldAlias(field *FieldMapping, path []string,
 	return nil
 }
 
+// NormalizeVector normalizes a single vector to unit length.
+// It makes a copy of the input vector to avoid modifying it in-place.
 func NormalizeVector(vec []float32) []float32 {
 	// make a copy of the vector to avoid modifying the original
 	// vector in-place
-	vecCopy := make([]float32, len(vec))
-	copy(vecCopy, vec)
+	vecCopy := slices.Clone(vec)
 	// normalize the vector copy using in-place normalization provided by faiss
 	return faiss.NormalizeVector(vecCopy)
+}
+
+// NormalizeMultiVector normalizes each sub-vector of size `dims` independently.
+// For a flattened array containing multiple vectors, each sub-vector is
+// normalized separately to unit length.
+// It makes a copy of the input vector to avoid modifying it in-place.
+func NormalizeMultiVector(vec []float32, dims int) []float32 {
+	if len(vec) == 0 || dims <= 0 || len(vec)%dims != 0 {
+		return vec
+	}
+	// Single vector - delegate to NormalizeVector
+	if len(vec) == dims {
+		return NormalizeVector(vec)
+	}
+	// Multi-vector - make a copy to avoid modifying the original
+	result := slices.Clone(vec)
+	// Normalize each sub-vector in-place
+	for i := 0; i < len(result); i += dims {
+		faiss.NormalizeVector(result[i : i+dims])
+	}
+	return result
 }
