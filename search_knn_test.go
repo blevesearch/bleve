@@ -1659,13 +1659,11 @@ func TestMultiVectorCosineNormalization(t *testing.T) {
 	vecFieldMapping := mapping.NewVectorFieldMapping()
 	vecFieldMapping.Dims = dims
 	vecFieldMapping.Similarity = index.CosineSimilarity
-	indexMapping.DefaultMapping.AddFieldMappingsAt("vec", vecFieldMapping)
 
+	// Single-vector field
+	indexMapping.DefaultMapping.AddFieldMappingsAt("vec", vecFieldMapping)
 	// Multi-vector field
-	vecFieldMappingNested := mapping.NewVectorFieldMapping()
-	vecFieldMappingNested.Dims = dims
-	vecFieldMappingNested.Similarity = index.CosineSimilarity
-	indexMapping.DefaultMapping.AddFieldMappingsAt("vec_nested", vecFieldMappingNested)
+	indexMapping.DefaultMapping.AddFieldMappingsAt("multi_vec", vecFieldMapping)
 
 	idx, err := New(tmpIndexPath, indexMapping)
 	if err != nil {
@@ -1681,7 +1679,7 @@ func TestMultiVectorCosineNormalization(t *testing.T) {
 	docsString := []string{
 		`{"vec": [3, 0, 0]}`,
 		`{"vec": [0, 4, 0]}`,
-		`{"vec_nested": [[3, 0, 0], [0, 4, 0]]}`,
+		`{"multi_vec": [[3, 0, 0], [0, 4, 0]]}`,
 	}
 
 	for i, docStr := range docsString {
@@ -1748,7 +1746,7 @@ func TestMultiVectorCosineNormalization(t *testing.T) {
 
 	// Now test querying the nested multi-vector field
 	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
-	searchReq.AddKNN("vec_nested", []float32{1, 0, 0}, 3, 1.0)
+	searchReq.AddKNN("multi_vec", []float32{1, 0, 0}, 3, 1.0)
 	res, err = idx.Search(searchReq)
 	if err != nil {
 		t.Fatal(err)
@@ -1765,7 +1763,7 @@ func TestMultiVectorCosineNormalization(t *testing.T) {
 	}
 	// Query for Y direction [0,1,0] on nested field
 	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
-	searchReq.AddKNN("vec_nested", []float32{0, 1, 0}, 3, 1.0)
+	searchReq.AddKNN("multi_vec", []float32{0, 1, 0}, 3, 1.0)
 	res, err = idx.Search(searchReq)
 	if err != nil {
 		t.Fatal(err)
