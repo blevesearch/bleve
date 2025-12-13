@@ -288,10 +288,15 @@ func createKNNQuery(req *SearchRequest, knnFilterResults map[int]index.EligibleD
 			// If it's a filtered kNN but has no eligible filter hits, then
 			// do not run the kNN query.
 			if selector, exists := knnFilterResults[i]; exists && selector == nil {
+				// if the kNN query is filtered and has no eligible filter hits, then
+				// do not run the kNN query, so we add a match_none query to the subQueries.
+				// this will ensure that the score breakdown is set to 0 for this kNN query.
+				subQueries = append(subQueries, NewMatchNoneQuery())
+				kArray = append(kArray, 0)
 				continue
 			}
 			knnQuery := query.NewKNNQuery(knn.Vector)
-			knnQuery.SetFieldVal(knn.Field)
+			knnQuery.SetField(knn.Field)
 			knnQuery.SetK(knn.K)
 			knnQuery.SetBoost(knn.Boost.Value())
 			knnQuery.SetParams(knn.Params)

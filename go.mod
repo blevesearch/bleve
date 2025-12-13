@@ -26,7 +26,7 @@ require (
 	github.com/blevesearch/zapx/v13 v13.4.2
 	github.com/blevesearch/zapx/v14 v14.4.2
 	github.com/blevesearch/zapx/v15 v15.4.2
-	github.com/blevesearch/zapx/v16 v16.2.7
+	github.com/blevesearch/zapx/v16 v16.2.8
 	github.com/couchbase/moss v0.2.0
 	github.com/spf13/cobra v1.8.1
 	go.etcd.io/bbolt v1.4.0

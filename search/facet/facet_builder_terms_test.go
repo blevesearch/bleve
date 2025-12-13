@@ -201,11 +201,11 @@ func TestTermsFacetPrefixAndRegex(t *testing.T) {
 	terms := []string{
 		"env:prod",
 		"env:staging",
-		"env:dev",      // has prefix but doesn't match regex
-		"env:test",     // has prefix but doesn't match regex
-		"type:server",  // no prefix
-		"env:prod",     // duplicate
-		"env:staging",  // duplicate
+		"env:dev",     // has prefix but doesn't match regex
+		"env:test",    // has prefix but doesn't match regex
+		"type:server", // no prefix
+		"env:prod",    // duplicate
+		"env:staging", // duplicate
 	}
 
 	for _, term := range terms {
