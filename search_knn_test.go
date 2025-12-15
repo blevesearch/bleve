@@ -1855,6 +1855,141 @@ func TestMultiVector(t *testing.T) {
 	})
 }
 
+// TestMultiVectorCosineNormalization verifies that multi-vector fields are
+// normalized correctly with cosine similarity. Each sub-vector in a multi-vector
+// should be independently normalized, producing correct similarity scores.
+func TestMultiVectorCosineNormalization(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	const dims = 3
+
+	// Create index with cosine similarity
+	indexMapping := NewIndexMapping()
+	vecFieldMapping := mapping.NewVectorFieldMapping()
+	vecFieldMapping.Dims = dims
+	vecFieldMapping.Similarity = index.CosineSimilarity
+
+	// Single-vector field
+	indexMapping.DefaultMapping.AddFieldMappingsAt("vec", vecFieldMapping)
+	// Multi-vector field
+	indexMapping.DefaultMapping.AddFieldMappingsAt("multi_vec", vecFieldMapping)
+
+	idx, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	docsString := []string{
+		`{"vec": [3, 0, 0]}`,
+		`{"vec": [0, 4, 0]}`,
+		`{"multi_vec": [[3, 0, 0], [0, 4, 0]]}`,
+	}
+
+	for i, docStr := range docsString {
+		var doc map[string]interface{}
+		err = json.Unmarshal([]byte(docStr), &doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = idx.Index(fmt.Sprintf("doc%d", i+1), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Query for X direction [1,0,0]
+	searchReq := NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("vec", []float32{1, 0, 0}, 3, 1.0)
+	res, err := idx.Search(searchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+	// Hit 1 should be doc1 with score 1.0 (perfect match)
+	if res.Hits[0].ID != "doc1" {
+		t.Fatalf("expected doc1 as first hit, got %s", res.Hits[0].ID)
+	}
+	if math.Abs(float64(res.Hits[0].Score-1.0)) > 1e-6 {
+		t.Fatalf("expected score 1.0, got %f", res.Hits[0].Score)
+	}
+	// Hit 2 should be doc2 with a score of 0.0 (orthogonal)
+	if res.Hits[1].ID != "doc2" {
+		t.Fatalf("expected doc2 as second hit, got %s", res.Hits[1].ID)
+	}
+	if math.Abs(float64(res.Hits[1].Score-0.0)) > 1e-6 {
+		t.Fatalf("expected score 0.0, got %f", res.Hits[1].Score)
+	}
+
+	// Query for Y direction [0,1,0]
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("vec", []float32{0, 1, 0}, 3, 1.0)
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+	// Hit 1 should be doc2 with score 1.0 (perfect match)
+	if res.Hits[0].ID != "doc2" {
+		t.Fatalf("expected doc2 as first hit, got %s", res.Hits[0].ID)
+	}
+	if math.Abs(float64(res.Hits[0].Score-1.0)) > 1e-6 {
+		t.Fatalf("expected score 1.0, got %f", res.Hits[0].Score)
+	}
+	// Hit 2 should be doc1 with a score of 0.0 (orthogonal)
+	if res.Hits[1].ID != "doc1" {
+		t.Fatalf("expected doc1 as second hit, got %s", res.Hits[1].ID)
+	}
+	if math.Abs(float64(res.Hits[1].Score-0.0)) > 1e-6 {
+		t.Fatalf("expected score 0.0, got %f", res.Hits[1].Score)
+	}
+
+	// Now test querying the nested multi-vector field
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("multi_vec", []float32{1, 0, 0}, 3, 1.0)
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	// Hit should be doc3 with score 1.0 (perfect match on first sub-vector)
+	if res.Hits[0].ID != "doc3" {
+		t.Fatalf("expected doc3 as first hit, got %s", res.Hits[0].ID)
+	}
+	if math.Abs(float64(res.Hits[0].Score-1.0)) > 1e-6 {
+		t.Fatalf("expected score 1.0, got %f", res.Hits[0].Score)
+	}
+	// Query for Y direction [0,1,0] on nested field
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("multi_vec", []float32{0, 1, 0}, 3, 1.0)
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	// Hit should be doc3 with score 1.0 (perfect match on second sub-vector)
+	if res.Hits[0].ID != "doc3" {
+		t.Fatalf("expected doc3 as first hit, got %s", res.Hits[0].ID)
+	}
+	if math.Abs(float64(res.Hits[0].Score-1.0)) > 1e-6 {
+		t.Fatalf("expected score 1.0, got %f", res.Hits[0].Score)
+	}
+}
+
 func TestNumVecsStat(t *testing.T) {
 
 	dataset, _, err := readDatasetAndQueries(testInputCompressedFile)
