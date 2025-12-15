@@ -637,6 +637,8 @@ func (s *Scorch) trainerLoop() {
 }
 
 func (s *Scorch) Train(batch *index.Batch) error {
+	// regulate the Train function
+	s.FireIndexEvent()
 
 	// is the lock really needed?
 	s.rootLock.Lock()
