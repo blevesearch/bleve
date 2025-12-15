@@ -123,7 +123,7 @@ func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 	if sqs.options.Explain {
 		rv.Expl = scoreExplanation
 	}
-	rv.IndexInternalID = append(rv.IndexInternalID, knnMatch.ID...)
+	rv.IndexInternalID = index.NewIndexInternalIDFrom(rv.IndexInternalID, knnMatch.ID)
 	return rv
 }
 
