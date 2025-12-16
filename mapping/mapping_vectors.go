@@ -20,6 +20,7 @@ package mapping
 import (
 	"fmt"
 	"reflect"
+	"slices"
 
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/util"
@@ -141,15 +142,27 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	if !ok {
 		return false
 	}
+	// Apply defaults for similarity and optimization if not set
+	similarity := fm.Similarity
+	if similarity == "" {
+		similarity = index.DefaultVectorSimilarityMetric
+	}
+	vectorIndexOptimizedFor := fm.VectorIndexOptimizedFor
+	if vectorIndexOptimizedFor == "" {
+		vectorIndexOptimizedFor = index.DefaultIndexOptimization
+	}
 	// normalize raw vector if similarity is cosine
-	if fm.Similarity == index.CosineSimilarity {
-		vector = NormalizeVector(vector)
+	// Since the vector can be multi-vector (flattened array of multiple vectors),
+	// we use NormalizeMultiVector to normalize each sub-vector independently.
+	if similarity == index.CosineSimilarity {
+		vector = NormalizeMultiVector(vector, fm.Dims)
 	}
 
 	fieldName := getFieldName(pathString, path, fm)
+
 	options := fm.Options()
 	field := document.NewVectorFieldWithIndexingOptions(fieldName, indexes, vector,
-		fm.Dims, fm.Similarity, fm.VectorIndexOptimizedFor, options)
+		fm.Dims, similarity, vectorIndexOptimizedFor, options)
 	context.doc.AddField(field)
 
 	// "_all" composite field is not applicable for vector field
@@ -163,20 +176,29 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	if !ok {
 		return
 	}
-
+	// Apply defaults for similarity and optimization if not set
+	similarity := fm.Similarity
+	if similarity == "" {
+		similarity = index.DefaultVectorSimilarityMetric
+	}
+	vectorIndexOptimizedFor := fm.VectorIndexOptimizedFor
+	if vectorIndexOptimizedFor == "" {
+		vectorIndexOptimizedFor = index.DefaultIndexOptimization
+	}
 	decodedVector, err := document.DecodeVector(encodedString)
 	if err != nil || len(decodedVector) != fm.Dims {
 		return
 	}
-	// normalize raw vector if similarity is cosine
-	if fm.Similarity == index.CosineSimilarity {
+	// normalize raw vector if similarity is cosine, multi-vector is not supported
+	// for base64 encoded vectors, so we use NormalizeVector directly.
+	if similarity == index.CosineSimilarity {
 		decodedVector = NormalizeVector(decodedVector)
 	}
 
 	fieldName := getFieldName(pathString, path, fm)
 	options := fm.Options()
 	field := document.NewVectorFieldWithIndexingOptions(fieldName, indexes, decodedVector,
-		fm.Dims, fm.Similarity, fm.VectorIndexOptimizedFor, options)
+		fm.Dims, similarity, vectorIndexOptimizedFor, options)
 	context.doc.AddField(field)
 
 	// "_all" composite field is not applicable for vector_base64 field
@@ -186,87 +208,121 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 // -----------------------------------------------------------------------------
 // document validation functions
 
-func validateFieldMapping(field *FieldMapping, parentName string,
+func validateFieldMapping(field *FieldMapping, path []string,
 	fieldAliasCtx map[string]*FieldMapping) error {
 	switch field.Type {
 	case "vector", "vector_base64":
-		return validateVectorFieldAlias(field, parentName, fieldAliasCtx)
+		return validateVectorFieldAlias(field, path, fieldAliasCtx)
 	default: // non-vector field
 		return validateFieldType(field)
 	}
 }
 
-func validateVectorFieldAlias(field *FieldMapping, parentName string,
+func validateVectorFieldAlias(field *FieldMapping, path []string,
 	fieldAliasCtx map[string]*FieldMapping) error {
-
-	if field.Name == "" {
-		field.Name = parentName
+	// fully qualified field name
+	pathString := encodePath(path)
+	// check if field has a name set, else use path to compute effective name
+	effectiveFieldName := getFieldName(pathString, path, field)
+	// Compute effective values for validation
+	effectiveSimilarity := field.Similarity
+	if effectiveSimilarity == "" {
+		effectiveSimilarity = index.DefaultVectorSimilarityMetric
+	}
+	effectiveOptimizedFor := field.VectorIndexOptimizedFor
+	if effectiveOptimizedFor == "" {
+		effectiveOptimizedFor = index.DefaultIndexOptimization
 	}
 
-	if field.Similarity == "" {
-		field.Similarity = index.DefaultVectorSimilarityMetric
-	}
-
-	if field.VectorIndexOptimizedFor == "" {
-		field.VectorIndexOptimizedFor = index.DefaultIndexOptimization
-	}
-	if _, exists := index.SupportedVectorIndexOptimizations[field.VectorIndexOptimizedFor]; !exists {
-		// if an unsupported config is provided, override to default
-		field.VectorIndexOptimizedFor = index.DefaultIndexOptimization
-	}
-
-	// following fields are not applicable for vector
-	// thus, we set them to default values
-	field.IncludeInAll = false
-	field.IncludeTermVectors = false
-	field.Store = false
-	field.DocValues = false
-	field.SkipFreqNorm = true
-
-	// # If alias is present, validate the field options as per the alias
+	// # If alias is present, validate the field options as per the alias.
 	// note: reading from a nil map is safe
-	if fieldAlias, ok := fieldAliasCtx[field.Name]; ok {
+	if fieldAlias, ok := fieldAliasCtx[effectiveFieldName]; ok {
 		if field.Dims != fieldAlias.Dims {
 			return fmt.Errorf("field: '%s', invalid alias "+
-				"(different dimensions %d and %d)", fieldAlias.Name, field.Dims,
+				"(different dimensions %d and %d)", effectiveFieldName, field.Dims,
 				fieldAlias.Dims)
 		}
 
-		if field.Similarity != fieldAlias.Similarity {
+		// Compare effective similarity values
+		aliasSimilarity := fieldAlias.Similarity
+		if aliasSimilarity == "" {
+			aliasSimilarity = index.DefaultVectorSimilarityMetric
+		}
+		if effectiveSimilarity != aliasSimilarity {
 			return fmt.Errorf("field: '%s', invalid alias "+
-				"(different similarity values %s and %s)", fieldAlias.Name,
-				field.Similarity, fieldAlias.Similarity)
+				"(different similarity values %s and %s)", effectiveFieldName,
+				effectiveSimilarity, aliasSimilarity)
+		}
+
+		// Compare effective vector index optimization values
+		aliasOptimizedFor := fieldAlias.VectorIndexOptimizedFor
+		if aliasOptimizedFor == "" {
+			aliasOptimizedFor = index.DefaultIndexOptimization
+		}
+		if effectiveOptimizedFor != aliasOptimizedFor {
+			return fmt.Errorf("field: '%s', invalid alias "+
+				"(different vector index optimization values %s and %s)", effectiveFieldName,
+				effectiveOptimizedFor, aliasOptimizedFor)
 		}
 
 		return nil
 	}
 
 	// # Validate field options
-
+	// Vector dimensions must be within allowed range
 	if field.Dims < MinVectorDims || field.Dims > MaxVectorDims {
 		return fmt.Errorf("field: '%s', invalid vector dimension: %d,"+
-			" value should be in range (%d, %d)", field.Name, field.Dims,
+			" value should be in range [%d, %d]", effectiveFieldName, field.Dims,
 			MinVectorDims, MaxVectorDims)
 	}
-
-	if _, ok := index.SupportedVectorSimilarityMetrics[field.Similarity]; !ok {
+	// Similarity metric must be supported
+	if _, ok := index.SupportedVectorSimilarityMetrics[effectiveSimilarity]; !ok {
 		return fmt.Errorf("field: '%s', invalid similarity "+
-			"metric: '%s', valid metrics are: %+v", field.Name, field.Similarity,
+			"metric: '%s', valid metrics are: %+v", effectiveFieldName, effectiveSimilarity,
 			reflect.ValueOf(index.SupportedVectorSimilarityMetrics).MapKeys())
+	}
+	// Vector index optimization must be supported
+	if _, ok := index.SupportedVectorIndexOptimizations[effectiveOptimizedFor]; !ok {
+		return fmt.Errorf("field: '%s', invalid vector index "+
+			"optimization: '%s', valid optimizations are: %+v", effectiveFieldName,
+			effectiveOptimizedFor,
+			reflect.ValueOf(index.SupportedVectorIndexOptimizations).MapKeys())
 	}
 
 	if fieldAliasCtx != nil { // writing to a nil map is unsafe
-		fieldAliasCtx[field.Name] = field
+		fieldAliasCtx[effectiveFieldName] = field
 	}
 
 	return nil
 }
 
+// NormalizeVector normalizes a single vector to unit length.
+// It makes a copy of the input vector to avoid modifying it in-place.
 func NormalizeVector(vec []float32) []float32 {
 	// make a copy of the vector to avoid modifying the original
 	// vector in-place
-	vecCopy := make([]float32, len(vec))
-	copy(vecCopy, vec)
+	vecCopy := slices.Clone(vec)
 	// normalize the vector copy using in-place normalization provided by faiss
 	return faiss.NormalizeVector(vecCopy)
+}
+
+// NormalizeMultiVector normalizes each sub-vector of size `dims` independently.
+// For a flattened array containing multiple vectors, each sub-vector is
+// normalized separately to unit length.
+// It makes a copy of the input vector to avoid modifying it in-place.
+func NormalizeMultiVector(vec []float32, dims int) []float32 {
+	if len(vec) == 0 || dims <= 0 || len(vec)%dims != 0 {
+		return vec
+	}
+	// Single vector - delegate to NormalizeVector
+	if len(vec) == dims {
+		return NormalizeVector(vec)
+	}
+	// Multi-vector - make a copy to avoid modifying the original
+	result := slices.Clone(vec)
+	// Normalize each sub-vector in-place
+	for i := 0; i < len(result); i += dims {
+		faiss.NormalizeVector(result[i : i+dims])
+	}
+	return result
 }
