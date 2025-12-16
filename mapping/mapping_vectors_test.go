@@ -18,7 +18,9 @@
 package mapping
 
 import (
+	"math"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -175,6 +177,740 @@ func TestVectorFieldAliasValidation(t *testing.T) {
 			expValidity: false,
 			errMsgs:     []string{`field: 'vecData', invalid alias (different dimensions 4 and 3)`},
 		},
+		// Test 6: Different vector index optimization values (alias case)
+		{
+			name: "different_optimization_alias",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"type": "vector",
+										"dims": 3,
+										"vector_index_optimized_for": "recall"
+									},
+									{
+										"name": "cityVec",
+										"type": "vector",
+										"dims": 3,
+										"vector_index_optimized_for": "latency"
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: false,
+			errMsgs:     []string{`field: 'cityVec', invalid alias (different vector index optimization values latency and recall)`},
+		},
+		// Test 7: Invalid dimensions - below minimum
+		{
+			name: "dims_below_minimum",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"type": "vector",
+										"dims": 0
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: false,
+			errMsgs:     []string{`field: 'cityVec', invalid vector dimension: 0, value should be in range [1, 4096]`},
+		},
+		// Test 8: Invalid dimensions - above maximum
+		{
+			name: "dims_above_maximum",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"type": "vector",
+										"dims": 5000
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: false,
+			errMsgs:     []string{`field: 'cityVec', invalid vector dimension: 5000, value should be in range [1, 4096]`},
+		},
+		// Test 9: Invalid similarity metric
+		{
+			name: "invalid_similarity_metric",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"type": "vector",
+										"dims": 3,
+										"similarity": "invalid_metric"
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: false,
+			// Note: error message contains map keys which have non-deterministic order
+			errMsgs: []string{`invalid similarity metric: 'invalid_metric'`},
+		},
+		// Test 10: Invalid vector index optimization
+		{
+			name: "invalid_optimization",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"type": "vector",
+										"dims": 3,
+										"vector_index_optimized_for": "invalid_opt"
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: false,
+			// Note: error message contains map keys which have non-deterministic order
+			errMsgs: []string{`invalid vector index optimization: 'invalid_opt'`},
+		},
+		// Test 11: vector_base64 type with valid dimensions
+		{
+			name: "vector_base64_valid",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"type": "vector_base64",
+										"dims": 128
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: true,
+			errMsgs:     []string{},
+		},
+		// Test 12: vector_base64 alias with different dimensions
+		{
+			name: "vector_base64_different_dims_alias",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"type": "vector_base64",
+										"dims": 128
+									},
+									{
+										"name": "cityVec",
+										"type": "vector_base64",
+										"dims": 256
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: false,
+			errMsgs:     []string{`field: 'cityVec', invalid alias (different dimensions 256 and 128)`},
+		},
+		// Test 13: Default similarity matching explicit similarity in alias
+		{
+			name: "default_similarity_matches_explicit",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"type": "vector",
+										"dims": 3
+									},
+									{
+										"name": "cityVec",
+										"type": "vector",
+										"dims": 3,
+										"similarity": "l2_norm"
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: true,
+			errMsgs:     []string{},
+		},
+		// Test 14: Default optimization matching explicit optimization in alias
+		{
+			name: "default_optimization_matches_explicit",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"type": "vector",
+										"dims": 3
+									},
+									{
+										"name": "cityVec",
+										"type": "vector",
+										"dims": 3,
+										"vector_index_optimized_for": "recall"
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: true,
+			errMsgs:     []string{},
+		},
+		// Test 15: Valid alias with all explicit matching values
+		{
+			name: "valid_alias_all_explicit_matching",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"type": "vector",
+										"dims": 64,
+										"similarity": "dot_product",
+										"vector_index_optimized_for": "latency"
+									},
+									{
+										"name": "cityVec",
+										"type": "vector",
+										"dims": 64,
+										"similarity": "dot_product",
+										"vector_index_optimized_for": "latency"
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: true,
+			errMsgs:     []string{},
+		},
+		// Test 16: Cross-property alias with different similarity
+		{
+			name: "cross_property_different_similarity",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"name": "vecData",
+										"type": "vector",
+										"dims": 3,
+										"similarity": "cosine"
+									}
+								]
+							},
+							"countryVec": {
+								"fields": [
+									{
+										"name": "vecData",
+										"type": "vector",
+										"dims": 3,
+										"similarity": "l2_norm"
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: false,
+			errMsgs: []string{
+				`field: 'vecData', invalid alias (different similarity values l2_norm and cosine)`,
+				`field: 'vecData', invalid alias (different similarity values cosine and l2_norm)`,
+			},
+		},
+		// Test 17: Cross-property alias with different optimization
+		{
+			name: "cross_property_different_optimization",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"name": "vecData",
+										"type": "vector",
+										"dims": 3,
+										"vector_index_optimized_for": "recall"
+									}
+								]
+							},
+							"countryVec": {
+								"fields": [
+									{
+										"name": "vecData",
+										"type": "vector",
+										"dims": 3,
+										"vector_index_optimized_for": "memory-efficient"
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: false,
+			errMsgs: []string{
+				`field: 'vecData', invalid alias (different vector index optimization values memory-efficient and recall)`,
+				`field: 'vecData', invalid alias (different vector index optimization values recall and memory-efficient)`,
+			},
+		},
+		// Test 18: Valid cross-property alias with matching values
+		{
+			name: "valid_cross_property_alias",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"name": "vecData",
+										"type": "vector",
+										"dims": 64,
+										"similarity": "dot_product",
+										"vector_index_optimized_for": "latency"
+									}
+								]
+							},
+							"countryVec": {
+								"fields": [
+									{
+										"name": "vecData",
+										"type": "vector",
+										"dims": 64,
+										"similarity": "dot_product",
+										"vector_index_optimized_for": "latency"
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: true,
+			errMsgs:     []string{},
+		},
+		// Test 20: Different fully qualified paths - a.b.c.f vs f (different effective names, no conflict)
+		{
+			name: "different_fq_paths_no_conflict",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"a": {
+								"properties": {
+									"b": {
+										"properties": {
+											"c": {
+												"fields": [
+													{
+														"name": "f",
+														"type": "vector",
+														"dims": 64
+													}
+												]
+											}
+										}
+									}
+								}
+							},
+							"x": {
+								"fields": [
+									{
+										"name": "f",
+										"type": "vector",
+										"dims": 128
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: true,
+			errMsgs:     []string{},
+		},
+		// Test 21: Same leaf property name at different paths (a.b.vec vs x.y.vec) - no conflict
+		{
+			name: "same_leaf_different_paths_no_conflict",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"a": {
+								"properties": {
+									"b": {
+										"properties": {
+											"vec": {
+												"fields": [
+													{
+														"type": "vector",
+														"dims": 64
+													}
+												]
+											}
+										}
+									}
+								}
+							},
+							"x": {
+								"properties": {
+									"y": {
+										"properties": {
+											"vec": {
+												"fields": [
+													{
+														"type": "vector",
+														"dims": 128
+													}
+												]
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}`,
+			expValidity: true,
+			errMsgs:     []string{},
+		},
+		// Test 22: Field name override creates same effective name - alias conflict
+		// a.b with name "data" → effective "a.data"
+		// a with name "data" → effective "data"
+		// These are different, so no conflict
+		{
+			name: "field_name_override_different_parents_no_conflict",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"a": {
+								"properties": {
+									"b": {
+										"fields": [
+											{
+												"name": "data",
+												"type": "vector",
+												"dims": 64
+											}
+										]
+									}
+								}
+							},
+							"a2": {
+								"fields": [
+									{
+										"name": "data",
+										"type": "vector",
+										"dims": 128
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: true,
+			errMsgs:     []string{},
+		},
+		// Test 23: Same effective field name via name override - should conflict
+		// a.b with name "sharedVec" → effective "a.sharedVec"
+		// a.c with name "sharedVec" → effective "a.sharedVec"
+		// Both resolve to same effective name with different dims → conflict
+		{
+			name: "same_effective_name_via_override_conflict",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"a": {
+								"properties": {
+									"b": {
+										"fields": [
+											{
+												"name": "sharedVec",
+												"type": "vector",
+												"dims": 64
+											}
+										]
+									},
+									"c": {
+										"fields": [
+											{
+												"name": "sharedVec",
+												"type": "vector",
+												"dims": 128
+											}
+										]
+									}
+								}
+							}
+						}
+					}
+				}`,
+			expValidity: false,
+			errMsgs: []string{
+				`field: 'a.sharedVec', invalid alias (different dimensions 128 and 64)`,
+				`field: 'a.sharedVec', invalid alias (different dimensions 64 and 128)`,
+			},
+		},
+		// Test 24: Deep nesting with same effective name via name override - should conflict
+		// level1.level2.propA with name "vec" → effective "level1.level2.vec"
+		// level1.level2.propB with name "vec" → effective "level1.level2.vec"
+		{
+			name: "deep_nesting_same_effective_name_conflict",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"level1": {
+								"properties": {
+									"level2": {
+										"properties": {
+											"propA": {
+												"fields": [
+													{
+														"name": "vec",
+														"type": "vector",
+														"dims": 64
+													}
+												]
+											},
+											"propB": {
+												"fields": [
+													{
+														"name": "vec",
+														"type": "vector",
+														"dims": 128
+													}
+												]
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}`,
+			expValidity: false,
+			errMsgs: []string{
+				`field: 'level1.level2.vec', invalid alias (different dimensions 128 and 64)`,
+				`field: 'level1.level2.vec', invalid alias (different dimensions 64 and 128)`,
+			},
+		},
+		// Test 25: Root level field vs nested field with same name - no conflict
+		// Root: "embedding" → effective "embedding"
+		// Nested: a.b.embedding → effective "a.b.embedding"
+		{
+			name: "root_vs_nested_same_name_no_conflict",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"embedding": {
+								"fields": [
+									{
+										"type": "vector",
+										"dims": 64
+									}
+								]
+							},
+							"nested": {
+								"properties": {
+									"deep": {
+										"properties": {
+											"embedding": {
+												"fields": [
+													{
+														"type": "vector",
+														"dims": 256
+													}
+												]
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}`,
+			expValidity: true,
+			errMsgs:     []string{},
+		},
+		// Test 26: Multiple levels with name override targeting same effective path
+		// a.b.x with name "target" → effective "a.b.target"
+		// a.b.target (no override) → effective "a.b.target"
+		// Same effective name, different dims → conflict
+		{
+			name: "name_override_matches_sibling_path_conflict",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"a": {
+								"properties": {
+									"b": {
+										"properties": {
+											"x": {
+												"fields": [
+													{
+														"name": "target",
+														"type": "vector",
+														"dims": 64
+													}
+												]
+											},
+											"target": {
+												"fields": [
+													{
+														"type": "vector",
+														"dims": 128
+													}
+												]
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}`,
+			expValidity: false,
+			errMsgs: []string{
+				`field: 'a.b.target', invalid alias (different dimensions 128 and 64)`,
+				`field: 'a.b.target', invalid alias (different dimensions 64 and 128)`,
+			},
+		},
+		// Test 27: Valid alias at deep nesting level
+		{
+			name: "valid_alias_deep_nesting",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"a": {
+								"properties": {
+									"b": {
+										"properties": {
+											"c": {
+												"properties": {
+													"vec": {
+														"fields": [
+															{
+																"type": "vector",
+																"dims": 128,
+																"similarity": "dot_product"
+															},
+															{
+																"name": "vec",
+																"type": "vector",
+																"dims": 128,
+																"similarity": "dot_product"
+															}
+														]
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}`,
+			expValidity: true,
+			errMsgs:     []string{},
+		},
+		// Test 28: Valid alias with different paths but same effective field name
+		// vectors.vec with name "vec" → effective "vectors.vec"
+		// vec with name "vec" → effective "vec"
+		// Different effective names, so no conflict
+		{
+			name: "valid_alias_different_paths_same_field_name",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"dynamic": false,
+						"enabled": true,
+						"properties": {
+							"vectors": {
+								"dynamic": true,
+								"enabled": true,
+								"properties": {
+									"vec": {
+										"enabled": true,
+										"dynamic": false,
+										"fields": [
+											{
+												"dims": 3,
+												"index": true,
+												"name": "vec",
+												"type": "vector"
+											}
+										]
+									}
+								}
+							},
+							"vec": {
+								"enabled": true,
+								"dynamic": false,
+								"fields": [
+									{
+										"dims": 3,
+										"index": true,
+										"name": "vec",
+										"similarity": "l2_norm",
+										"type": "vector",
+										"vector_index_optimized_for": "recall"
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: true,
+			errMsgs:     []string{},
+		},
 	}
 
 	for _, test := range tests {
@@ -195,7 +931,9 @@ func TestVectorFieldAliasValidation(t *testing.T) {
 			if !isValid {
 				errStringMatched := false
 				for _, possibleErrMsg := range test.errMsgs {
-					if err.Error() == possibleErrMsg {
+					// Use Contains for matching since some error messages include
+					// map keys which have non-deterministic ordering
+					if err.Error() == possibleErrMsg || strings.Contains(err.Error(), possibleErrMsg) {
 						errStringMatched = true
 						break
 					}
@@ -331,4 +1069,121 @@ func TestNormalizeVector(t *testing.T) {
 			t.Errorf("[vector-%d] Expected: %v, Got: %v", i+1, expectedNormalizedVectors[i], normalizedVector)
 		}
 	}
+}
+
+func TestNormalizeMultiVectors(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []float32
+		dims     int
+		expected []float32
+	}{
+		{
+			name:     "single vector - already normalized",
+			input:    []float32{1, 0, 0},
+			dims:     3,
+			expected: []float32{1, 0, 0},
+		},
+		{
+			name:     "single vector - needs normalization",
+			input:    []float32{3, 0, 0},
+			dims:     3,
+			expected: []float32{1, 0, 0},
+		},
+		{
+			name:     "two vectors - X and Y directions",
+			input:    []float32{3, 0, 0, 0, 4, 0},
+			dims:     3,
+			expected: []float32{1, 0, 0, 0, 1, 0},
+		},
+		{
+			name:     "three vectors",
+			input:    []float32{3, 0, 0, 0, 4, 0, 0, 0, 5},
+			dims:     3,
+			expected: []float32{1, 0, 0, 0, 1, 0, 0, 0, 1},
+		},
+		{
+			name:     "two 2D vectors",
+			input:    []float32{3, 4, 5, 12},
+			dims:     2,
+			expected: []float32{0.6, 0.8, 0.38461538, 0.92307693},
+		},
+		{
+			name:     "empty vector",
+			input:    []float32{},
+			dims:     3,
+			expected: []float32{},
+		},
+		{
+			name:     "zero dims",
+			input:    []float32{1, 2, 3},
+			dims:     0,
+			expected: []float32{1, 2, 3},
+		},
+		{
+			name:     "negative dims",
+			input:    []float32{1, 2, 3},
+			dims:     -1,
+			expected: []float32{1, 2, 3},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Make a copy of input to verify original is not modified
+			inputCopy := make([]float32, len(tt.input))
+			copy(inputCopy, tt.input)
+
+			result := NormalizeMultiVector(tt.input, tt.dims)
+
+			// Check result matches expected
+			if len(result) != len(tt.expected) {
+				t.Errorf("length mismatch: expected %d, got %d", len(tt.expected), len(result))
+				return
+			}
+
+			for i := range result {
+				if !floatApproxEqual(result[i], tt.expected[i], 1e-5) {
+					t.Errorf("value mismatch at index %d: expected %v, got %v",
+						i, tt.expected[i], result[i])
+				}
+			}
+
+			// Verify original input was not modified
+			if !reflect.DeepEqual(tt.input, inputCopy) {
+				t.Errorf("original input was modified: was %v, now %v", inputCopy, tt.input)
+			}
+
+			// For valid multi-vectors, verify each sub-vector has unit magnitude
+			if tt.dims > 0 && len(tt.input) > 0 && len(tt.input)%tt.dims == 0 {
+				numVecs := len(result) / tt.dims
+				for i := 0; i < numVecs; i++ {
+					subVec := result[i*tt.dims : (i+1)*tt.dims]
+					mag := magnitude(subVec)
+					// Allow for zero vectors (magnitude 0) or unit vectors (magnitude 1)
+					if mag > 1e-6 && !floatApproxEqual(mag, 1.0, 1e-5) {
+						t.Errorf("sub-vector %d has magnitude %v, expected 1.0", i, mag)
+					}
+				}
+			}
+		})
+	}
+}
+
+// Helper to compute magnitude of a vector
+func magnitude(v []float32) float32 {
+	var sum float32
+	for _, x := range v {
+		sum += x * x
+	}
+	return float32(math.Sqrt(float64(sum)))
+}
+
+// Helper for approximate float comparison
+func floatApproxEqual(a, b, epsilon float32) bool {
+	diff := a - b
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff < epsilon
 }

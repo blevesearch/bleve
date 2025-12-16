@@ -51,7 +51,8 @@ type DocumentMapping struct {
 }
 
 func (dm *DocumentMapping) Validate(cache *registry.Cache,
-	parentName string, fieldAliasCtx map[string]*FieldMapping) error {
+	path []string, fieldAliasCtx map[string]*FieldMapping,
+) error {
 	var err error
 	if dm.DefaultAnalyzer != "" {
 		_, err := cache.AnalyzerNamed(dm.DefaultAnalyzer)
@@ -60,11 +61,7 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache,
 		}
 	}
 	for propertyName, property := range dm.Properties {
-		newParent := propertyName
-		if parentName != "" {
-			newParent = fmt.Sprintf("%s.%s", parentName, propertyName)
-		}
-		err = property.Validate(cache, newParent, fieldAliasCtx)
+		err = property.Validate(cache, append(path, propertyName), fieldAliasCtx)
 		if err != nil {
 			return err
 		}
@@ -83,7 +80,7 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache,
 			}
 		}
 
-		err := validateFieldMapping(field, parentName, fieldAliasCtx)
+		err := validateFieldMapping(field, path, fieldAliasCtx)
 		if err != nil {
 			return err
 		}
