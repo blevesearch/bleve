@@ -290,6 +290,151 @@ func (fr FacetsRequest) Validate() error {
 	return nil
 }
 
+// An AggregationRequest describes an aggregation
+// to be computed over the result set.
+// Supports both metric aggregations (sum, avg, etc.) and bucket aggregations (terms, range, etc.).
+// Bucket aggregations can contain sub-aggregations via the Aggregations field.
+type AggregationRequest struct {
+	Type  string `json:"type"`  // Metric: sum, avg, min, max, count, sumsquares, stats
+	                             // Bucket: terms, range, date_range
+	Field string `json:"field"`
+
+	// Bucket aggregation configuration
+	Size           *int             `json:"size,omitempty"`            // For terms aggregations
+	TermPrefix     string           `json:"term_prefix,omitempty"`     // For terms aggregations - filter by prefix
+	TermPattern    string           `json:"term_pattern,omitempty"`    // For terms aggregations - filter by regex
+	NumericRanges  []*numericRange  `json:"numeric_ranges,omitempty"`  // For numeric range aggregations
+	DateTimeRanges []*dateTimeRange `json:"date_ranges,omitempty"`     // For date range aggregations
+
+	// Sub-aggregations (for bucket aggregations)
+	Aggregations AggregationsRequest `json:"aggregations,omitempty"`
+
+	// Compiled regex pattern (cached during validation)
+	compiledPattern *regexp.Regexp `json:"-"`
+}
+
+// NewAggregationRequest creates a simple metric aggregation request
+func NewAggregationRequest(aggType, field string) *AggregationRequest {
+	return &AggregationRequest{
+		Type:  aggType,
+		Field: field,
+	}
+}
+
+// NewTermsAggregation creates a terms bucket aggregation
+func NewTermsAggregation(field string, size int) *AggregationRequest {
+	return &AggregationRequest{
+		Type:  "terms",
+		Field: field,
+		Size:  &size,
+	}
+}
+
+// NewTermsAggregationWithFilter creates a filtered terms bucket aggregation
+// prefix filters terms by prefix (fast, zero-allocation byte comparison)
+// pattern filters terms by regex (flexible but slower)
+func NewTermsAggregationWithFilter(field string, size int, prefix, pattern string) *AggregationRequest {
+	return &AggregationRequest{
+		Type:        "terms",
+		Field:       field,
+		Size:        &size,
+		TermPrefix:  prefix,
+		TermPattern: pattern,
+	}
+}
+
+// NewRangeAggregation creates a numeric range bucket aggregation
+func NewRangeAggregation(field string, ranges []*numericRange) *AggregationRequest {
+	return &AggregationRequest{
+		Type:          "range",
+		Field:         field,
+		NumericRanges: ranges,
+	}
+}
+
+// AddSubAggregation adds a sub-aggregation to a bucket aggregation
+func (ar *AggregationRequest) AddSubAggregation(name string, subAgg *AggregationRequest) {
+	if ar.Aggregations == nil {
+		ar.Aggregations = make(AggregationsRequest)
+	}
+	ar.Aggregations[name] = subAgg
+}
+
+// SetPrefixFilter sets the prefix filter for terms aggregations.
+func (ar *AggregationRequest) SetPrefixFilter(prefix string) {
+	ar.TermPrefix = prefix
+}
+
+// SetRegexFilter sets the regex pattern filter for terms aggregations.
+func (ar *AggregationRequest) SetRegexFilter(pattern string) {
+	ar.TermPattern = pattern
+}
+
+// Validate validates the aggregation request
+func (ar *AggregationRequest) Validate() error {
+	validTypes := map[string]bool{
+		// Metric aggregations
+		"sum": true, "avg": true, "min": true, "max": true,
+		"count": true, "sumsquares": true, "stats": true,
+		// Bucket aggregations
+		"terms": true, "range": true, "date_range": true,
+	}
+	if !validTypes[ar.Type] {
+		return fmt.Errorf("invalid aggregation type '%s'", ar.Type)
+	}
+	if ar.Field == "" {
+		return fmt.Errorf("aggregation field cannot be empty")
+	}
+
+	// Validate that TermPattern and TermPrefix are only used with "terms" aggregations
+	if ar.TermPattern != "" {
+		if ar.Type != "terms" {
+			return fmt.Errorf("term_pattern is only valid for terms aggregations, not %s", ar.Type)
+		}
+		compiled, err := regexp.Compile(ar.TermPattern)
+		if err != nil {
+			return fmt.Errorf("invalid term pattern: %v", err)
+		}
+		ar.compiledPattern = compiled
+	}
+	if ar.TermPrefix != "" && ar.Type != "terms" {
+		return fmt.Errorf("term_prefix is only valid for terms aggregations, not %s", ar.Type)
+	}
+
+	// Validate bucket-specific configuration
+	if ar.Type == "terms" {
+		if ar.Size != nil && *ar.Size < 0 {
+			return fmt.Errorf("terms aggregation size must be non-negative")
+		}
+	}
+
+	if ar.Type == "range" {
+		if len(ar.NumericRanges) == 0 {
+			return fmt.Errorf("range aggregation must have at least one range")
+		}
+	}
+
+	// Validate sub-aggregations
+	if ar.Aggregations != nil {
+		return ar.Aggregations.Validate()
+	}
+
+	return nil
+}
+
+// AggregationsRequest groups together all aggregation requests
+type AggregationsRequest map[string]*AggregationRequest
+
+// Validate validates all aggregation requests
+func (ar AggregationsRequest) Validate() error {
+	for _, v := range ar {
+		if err := v.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // HighlightRequest describes how field matches
 // should be highlighted.
 type HighlightRequest struct {
@@ -536,15 +681,17 @@ func (ss *SearchStatus) Merge(other *SearchStatus) {
 // MaxScore - The maximum score seen across all document hits seen for this query.
 // Took - The time taken to execute the search.
 // Facets - The facet results for the search.
+// Aggregations - The aggregation results for the search.
 type SearchResult struct {
-	Status   *SearchStatus                  `json:"status"`
-	Request  *SearchRequest                 `json:"request,omitempty"`
-	Hits     search.DocumentMatchCollection `json:"hits"`
-	Total    uint64                         `json:"total_hits"`
-	Cost     uint64                         `json:"cost"`
-	MaxScore float64                        `json:"max_score"`
-	Took     time.Duration                  `json:"took"`
-	Facets   search.FacetResults            `json:"facets"`
+	Status       *SearchStatus                  `json:"status"`
+	Request      *SearchRequest                 `json:"request,omitempty"`
+	Hits         search.DocumentMatchCollection `json:"hits"`
+	Total        uint64                         `json:"total_hits"`
+	Cost         uint64                         `json:"cost"`
+	MaxScore     float64                        `json:"max_score"`
+	Took         time.Duration                  `json:"took"`
+	Facets       search.FacetResults       `json:"facets"`
+	Aggregations search.AggregationResults `json:"aggregations,omitempty"`
 	// special fields that are applicable only for search
 	// results that are obtained from a presearch
 	SynonymResult search.FieldTermSynonymMap `json:"synonym_result,omitempty"`
@@ -654,10 +801,16 @@ func (sr *SearchResult) Merge(other *SearchResult) {
 	}
 	if sr.Facets == nil && len(other.Facets) != 0 {
 		sr.Facets = other.Facets
-		return
+	} else {
+		sr.Facets.Merge(other.Facets)
 	}
 
-	sr.Facets.Merge(other.Facets)
+	// Merge aggregations
+	if sr.Aggregations == nil && len(other.Aggregations) != 0 {
+		sr.Aggregations = other.Aggregations
+	} else if len(other.Aggregations) != 0 {
+		sr.Aggregations.Merge(other.Aggregations)
+	}
 }
 
 // MemoryNeededForSearchResult is an exported helper function to determine the RAM
