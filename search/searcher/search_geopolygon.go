@@ -85,28 +85,37 @@ func almostEqual(a, b float64) bool {
 // here: https://wrf.ecse.rpi.edu/nikola/pubdetails/pnpoly.html
 func buildPolygonFilter(ctx context.Context, dvReader index.DocValueReader, field string,
 	coordinates []geo.Point) FilterFunc {
+	// reuse the following for each document match that is checked using the filter
+	var lons, lats []float64
+	var found bool
+	dvVisitor := func(_ string, term []byte) {
+		if found {
+			// avoid redundant work if already found
+			return
+		}
+		// only consider the values which are shifted 0
+		prefixCoded := numeric.PrefixCoded(term)
+		shift, err := prefixCoded.Shift()
+		if err == nil && shift == 0 {
+			i64, err := prefixCoded.Int64()
+			if err == nil {
+				lons = append(lons, geo.MortonUnhashLon(uint64(i64)))
+				lats = append(lats, geo.MortonUnhashLat(uint64(i64)))
+				found = true
+			}
+		}
+	}
+	rayIntersectsSegment := func(point, a, b geo.Point) bool {
+		return (a.Lat > point.Lat) != (b.Lat > point.Lat) &&
+			point.Lon < (b.Lon-a.Lon)*(point.Lat-a.Lat)/(b.Lat-a.Lat)+a.Lon
+	}
 	return func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
 		// check geo matches against all numeric type terms indexed
-		var lons, lats []float64
-		var found bool
-
-		err := dvReader.VisitDocValues(d.IndexInternalID, func(field string, term []byte) {
-			// only consider the values which are shifted 0
-			prefixCoded := numeric.PrefixCoded(term)
-			shift, err := prefixCoded.Shift()
-			if err == nil && shift == 0 {
-				i64, err := prefixCoded.Int64()
-				if err == nil {
-					lons = append(lons, geo.MortonUnhashLon(uint64(i64)))
-					lats = append(lats, geo.MortonUnhashLat(uint64(i64)))
-					found = true
-				}
-			}
-		})
-
+		lons, lats = lons[:0], lats[:0]
+		found = false
 		// Note: this approach works for points which are strictly inside
 		// the polygon. ie it might fail for certain points on the polygon boundaries.
-		if err == nil && found {
+		if err := dvReader.VisitDocValues(d.IndexInternalID, dvVisitor); err == nil && found {
 			bytes := dvReader.BytesRead()
 			if bytes > 0 {
 				reportIOStats(ctx, bytes)
@@ -115,10 +124,6 @@ func buildPolygonFilter(ctx context.Context, dvReader index.DocValueReader, fiel
 			nVertices := len(coordinates)
 			if len(coordinates) < 3 {
 				return false
-			}
-			rayIntersectsSegment := func(point, a, b geo.Point) bool {
-				return (a.Lat > point.Lat) != (b.Lat > point.Lat) &&
-					point.Lon < (b.Lon-a.Lon)*(point.Lat-a.Lat)/(b.Lat-a.Lat)+a.Lon
 			}
 
 			for i := range lons {

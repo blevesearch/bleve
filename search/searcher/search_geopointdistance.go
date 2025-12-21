@@ -119,6 +119,10 @@ func buildDistFilter(ctx context.Context, dvReader index.DocValueReader,
 	var lons, lats []float64
 	var found bool
 	dvVisitor := func(_ string, term []byte) {
+		if found {
+			// avoid redundant work if already found
+			return
+		}
 		// only consider the values which are shifted 0
 		prefixCoded := numeric.PrefixCoded(term)
 		shift, err := prefixCoded.Shift()
