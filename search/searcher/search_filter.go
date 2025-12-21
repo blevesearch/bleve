@@ -60,6 +60,9 @@ func (f *FilteringSearcher) Next(ctx *search.SearchContext) (*search.DocumentMat
 		if f.accept(ctx, next) {
 			return next, nil
 		}
+		// recycle this document match now, since
+		// we do not need it anymore
+		ctx.DocumentMatchPool.Put(next)
 		next, err = f.child.Next(ctx)
 	}
 	return nil, err
@@ -76,6 +79,9 @@ func (f *FilteringSearcher) Advance(ctx *search.SearchContext, ID index.IndexInt
 	if f.accept(ctx, adv) {
 		return adv, nil
 	}
+	// recycle this document match now, since
+	// we do not need it anymore
+	ctx.DocumentMatchPool.Put(adv)
 	return f.Next(ctx)
 }
 

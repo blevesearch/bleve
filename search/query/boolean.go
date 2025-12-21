@@ -204,6 +204,8 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 			// Compare document IDs
 			cmp := refDoc.IndexInternalID.Compare(d.IndexInternalID)
 			if cmp < 0 {
+				// recycle refDoc now that we do not need it
+				sctx.DocumentMatchPool.Put(refDoc)
 				// filterSearcher is behind the current document, Advance() it
 				refDoc, err = filterSearcher.Advance(sctx, d.IndexInternalID)
 				if err != nil || refDoc == nil {
