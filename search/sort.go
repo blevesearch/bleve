@@ -687,6 +687,7 @@ type SortGeoDistance struct {
 	Lon      float64
 	Lat      float64
 	unitMult float64
+	tmp      []byte
 }
 
 // UpdateVisitor notifies this sort field that in this document
@@ -722,7 +723,8 @@ func (s *SortGeoDistance) Value(i *DocumentMatch) string {
 		dist /= s.unitMult
 	}
 	distInt64 := numeric.Float64ToInt64(dist)
-	return string(numeric.MustNewPrefixCodedInt64(distInt64, 0))
+	s.tmp = numeric.MustNewPrefixCodedInt64Prealloc(distInt64, 0, s.tmp)
+	return string(s.tmp)
 }
 
 func (s *SortGeoDistance) DecodeValue(value string) string {
