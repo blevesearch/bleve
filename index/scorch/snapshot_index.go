@@ -815,6 +815,10 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	// Filter out fields that have been completely deleted or had their
 	// docvalues data deleted from both visitable fields and required fields
 	filterUpdatedFields := func(fields []string) []string {
+		// fast path: if no updatedFields just return the input
+		if len(is.updatedFields) == 0 {
+			return fields
+		}
 		filteredFields := make([]string, 0, len(fields))
 		for _, field := range fields {
 			if info, ok := is.updatedFields[field]; ok &&
@@ -826,8 +830,8 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 		return filteredFields
 	}
 
-	fieldsFiltered := filterUpdatedFields(fields)
-	vFieldsFiltered := filterUpdatedFields(vFields)
+	fields = filterUpdatedFields(fields)
+	vFields = filterUpdatedFields(vFields)
 
 	var errCh chan error
 
@@ -836,9 +840,9 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	// if the caller happens to know we're on the same segmentIndex
 	// from a previous invocation
 	if cFields == nil {
-		cFields = subtractStrings(fieldsFiltered, vFieldsFiltered)
+		cFields = subtractStrings(fields, vFields)
 
-		if !ss.cachedDocs.hasFields(cFields) {
+		if len(cFields) > 0 && !ss.cachedDocs.hasFields(cFields) {
 			errCh = make(chan error, 1)
 
 			go func() {
@@ -851,8 +855,8 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 		}
 	}
 
-	if ssvOk && ssv != nil && len(vFieldsFiltered) > 0 {
-		dvs, err = ssv.VisitDocValues(localDocNum, fieldsFiltered, visitor, dvs)
+	if ssvOk && ssv != nil && len(vFields) > 0 {
+		dvs, err = ssv.VisitDocValues(localDocNum, fields, visitor, dvs)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -980,17 +984,15 @@ func subtractStrings(a, b []string) []string {
 		return a
 	}
 
-	// Create a map for O(1) lookups
-	bMap := make(map[string]struct{}, len(b))
-	for _, bs := range b {
-		bMap[bs] = struct{}{}
-	}
-
 	rv := make([]string, 0, len(a))
+OUTER:
 	for _, as := range a {
-		if _, exists := bMap[as]; !exists {
-			rv = append(rv, as)
+		for _, bs := range b {
+			if as == bs {
+				continue OUTER
+			}
 		}
+		rv = append(rv, as)
 	}
 	return rv
 }
