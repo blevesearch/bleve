@@ -842,7 +842,7 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	if cFields == nil {
 		cFields = subtractStrings(fields, vFields)
 
-		if !ss.cachedDocs.hasFields(cFields) {
+		if len(cFields) > 0 && !ss.cachedDocs.hasFields(cFields) {
 			errCh = make(chan error, 1)
 
 			go func() {
@@ -984,17 +984,15 @@ func subtractStrings(a, b []string) []string {
 		return a
 	}
 
-	// Create a map for O(1) lookups
-	bMap := make(map[string]struct{}, len(b))
-	for _, bs := range b {
-		bMap[bs] = struct{}{}
-	}
-
 	rv := make([]string, 0, len(a))
+OUTER:
 	for _, as := range a {
-		if _, exists := bMap[as]; !exists {
-			rv = append(rv, as)
+		for _, bs := range b {
+			if as == bs {
+				continue OUTER
+			}
 		}
+		rv = append(rv, as)
 	}
 	return rv
 }
