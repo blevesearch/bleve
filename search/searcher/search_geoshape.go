@@ -123,7 +123,11 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 	}
 
 	return func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
+		// reset state variables for each document
 		found = false
+		startReading = false
+		finishReading = false
+		dvShapeValue = dvShapeValue[:0]
 		if err := dvReader.VisitDocValues(d.IndexInternalID, dvVisitor); err == nil && found {
 			bytes := dvReader.BytesRead()
 			if bytes > 0 {

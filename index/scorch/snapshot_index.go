@@ -819,16 +819,15 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 		if len(is.updatedFields) == 0 {
 			return fields
 		}
-		n := 0
+		filteredFields := make([]string, 0, len(fields))
 		for _, field := range fields {
 			if info, ok := is.updatedFields[field]; ok &&
 				(info.DocValues || info.Deleted) {
 				continue
 			}
-			fields[n] = field
-			n++
+			filteredFields = append(filteredFields, field)
 		}
-		return fields[:n]
+		return filteredFields
 	}
 
 	fields = filterUpdatedFields(fields)
