@@ -180,6 +180,10 @@ func NewGeoPointField(name string, arrayPositions []uint64, lon, lat float64) *G
 func NewGeoPointFieldWithIndexingOptions(name string, arrayPositions []uint64, lon, lat float64, options index.FieldIndexingOptions) *GeoPointField {
 	mhash := geo.MortonHash(lon, lat)
 	prefixCoded := numeric.MustNewPrefixCodedInt64(int64(mhash), 0)
+
+	options |= index.SkipSnappy
+	options |= index.SkipChunking
+
 	return &GeoPointField{
 		name:           name,
 		arrayPositions: arrayPositions,

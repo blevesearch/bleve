@@ -181,6 +181,8 @@ func NewGeoShapeFieldFromShapeWithIndexingOptions(name string, arrayPositions []
 	// docvalues are always enabled for geoshape fields, even if the
 	// indexing options are set to not include docvalues.
 	options |= index.DocValues
+	options |= index.SkipSnappy
+	options |= index.SkipChunking
 
 	return &GeoShapeField{
 		shape:             shape,
@@ -233,6 +235,8 @@ func NewGeometryCollectionFieldFromShapesWithIndexingOptions(name string,
 	// docvalues are always enabled for geoshape fields, even if the
 	// indexing options are set to not include docvalues.
 	options |= index.DocValues
+	options |= index.SkipSnappy
+	options |= index.SkipChunking
 
 	return &GeoShapeField{
 		shape:             shape,
