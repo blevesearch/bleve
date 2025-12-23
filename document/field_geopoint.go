@@ -183,7 +183,6 @@ func NewGeoPointFieldWithIndexingOptions(name string, arrayPositions []uint64, l
 
 	options |= index.DocValues
 	options |= index.SkipSnappy
-	options |= index.SkipChunking
 
 	return &GeoPointField{
 		name:           name,
