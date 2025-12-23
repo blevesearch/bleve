@@ -181,6 +181,7 @@ func NewGeoPointFieldWithIndexingOptions(name string, arrayPositions []uint64, l
 	mhash := geo.MortonHash(lon, lat)
 	prefixCoded := numeric.MustNewPrefixCodedInt64(int64(mhash), 0)
 
+	options |= index.DocValues
 	options |= index.SkipSnappy
 	options |= index.SkipChunking
 
