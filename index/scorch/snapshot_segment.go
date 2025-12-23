@@ -321,7 +321,7 @@ func (c *cachedDocs) visitDoc(localDocNum uint64,
 
 			if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
 				for {
-					i := bytes.Index(tlist, TermSeparatorSplitSlice)
+					i := bytes.IndexByte(tlist, TermSeparator)
 					if i < 0 {
 						break
 					}
