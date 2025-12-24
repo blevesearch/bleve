@@ -49,7 +49,7 @@ func (is *IndexSnapshot) VectorReader(ctx context.Context, vector []float32,
 // the KNN search from a pre-filter query.
 type eligibleDocumentSelector struct {
 	// segment ID -> segment local doc nums
-	eligibleDocNums map[int][]uint64
+	eligibleDocNums [][]uint64
 	is              *IndexSnapshot
 }
 
@@ -75,7 +75,7 @@ func (eds *eligibleDocumentSelector) AddEligibleDocumentMatch(id index.IndexInte
 
 func (is *IndexSnapshot) NewEligibleDocumentSelector() index.EligibleDocumentSelector {
 	return &eligibleDocumentSelector{
-		eligibleDocNums: map[int][]uint64{},
+		eligibleDocNums: make([][]uint64, len(is.segment)),
 		is:              is,
 	}
 }
