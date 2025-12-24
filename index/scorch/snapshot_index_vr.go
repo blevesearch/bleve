@@ -183,8 +183,7 @@ func (i *IndexSnapshot) CentroidCardinalities(field string, limit int, descendin
 
 	for _, segment := range i.segment {
 		if sv, ok := segment.segment.(segment_api.VectorSegment); ok {
-			vecIndex, err := sv.InterpretVectorIndex(field,
-				false /* does not require filtering */, segment.deleted)
+			vecIndex, err := sv.InterpretVectorIndex(field, segment.deleted)
 			if err != nil {
 				return nil, fmt.Errorf("failed to interpret vector index for field %s in segment: %v", field, err)
 			}
