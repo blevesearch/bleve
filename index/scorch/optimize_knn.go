@@ -106,7 +106,7 @@ func (o *OptimizeVR) Finish() error {
 						// kNN search.
 						if vr.eligibleSelector != nil {
 							pl, err = vecIndex.SearchWithFilter(vr.vector, vr.k,
-								vr.eligibleSelector.SegmentEligibleDocs(index), vr.searchParams)
+								vr.eligibleSelector.SegmentEligibleDocuments(index), vr.searchParams)
 						} else {
 							pl, err = vecIndex.Search(vr.vector, vr.k, vr.searchParams)
 						}
