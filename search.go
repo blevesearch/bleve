@@ -374,6 +374,26 @@ func (ar *AggregationRequest) SetRegexFilter(pattern string) {
 	ar.TermPattern = pattern
 }
 
+// AddNumericRange adds a numeric range bucket for range aggregations.
+func (ar *AggregationRequest) AddNumericRange(name string, min, max *float64) {
+	ar.NumericRanges = append(ar.NumericRanges, &numericRange{Name: name, Min: min, Max: max})
+}
+
+// AddDateTimeRange adds a date/time range bucket for date_range aggregations.
+func (ar *AggregationRequest) AddDateTimeRange(name string, start, end time.Time) {
+	ar.DateTimeRanges = append(ar.DateTimeRanges, &dateTimeRange{Name: name, Start: start, End: end})
+}
+
+// AddDateTimeRangeString adds a date/time range bucket using string dates.
+func (ar *AggregationRequest) AddDateTimeRangeString(name string, start, end *string) {
+	ar.DateTimeRanges = append(ar.DateTimeRanges, &dateTimeRange{Name: name, startString: start, endString: end})
+}
+
+// AddDistanceRange adds a distance range bucket for geo_distance aggregations.
+func (ar *AggregationRequest) AddDistanceRange(name string, from, to *float64) {
+	ar.DistanceRanges = append(ar.DistanceRanges, &distanceRange{Name: name, From: from, To: to})
+}
+
 // Validate validates the aggregation request
 func (ar *AggregationRequest) Validate() error {
 	validTypes := map[string]bool{
