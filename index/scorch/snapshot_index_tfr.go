@@ -109,7 +109,7 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 			i.currID = rv.ID
 			i.currPosting = next
 			if i.updateBytesRead {
-				// postingsIterators is maintain the bytesRead stat in a cumulative fashion.
+				// postingsIterators maintains the bytesRead stat in a cumulative fashion.
 				// this is because there are chances of having a series of loadChunk calls,
 				// and they have to be added together before sending the bytesRead at this point
 				// upstream.

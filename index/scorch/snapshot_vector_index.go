@@ -67,8 +67,7 @@ func (edl *eligibleDocumentList) Iterator() index.EligibleDocumentIterator {
 	}
 	// return the iterator
 	return &eligibleDocumentIterator{
-		bs:  edl.bs,
-		max: uint(edl.bs.Len()),
+		bs: edl.bs,
 	}
 }
 
@@ -87,7 +86,6 @@ var emptyEligibleDocumentList = &eligibleDocumentList{}
 type eligibleDocumentIterator struct {
 	bs      *bitset.BitSet
 	current uint
-	max     uint
 }
 
 // Next returns the next eligible document ID and whether it exists.
@@ -96,14 +94,14 @@ func (it *eligibleDocumentIterator) Next() (id uint64, ok bool) {
 		return 0, false // no eligible documents
 	}
 	next, found := it.bs.NextSet(it.current)
-	if next >= it.max || !found {
+	if !found {
 		return 0, false
 	}
 	it.current = next + 1
 	return uint64(next), true
 }
 
-// emptyIterator is a reusable empty eligible document iterator.
+// emptyEligibleIterator is a reusable empty eligible document iterator.
 var emptyEligibleIterator = &eligibleDocumentIterator{}
 
 // SegmentEligibleDocuments returns an EligibleDocumentList for the specified segment ID.
