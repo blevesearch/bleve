@@ -72,11 +72,11 @@ func (edl *eligibleDocumentList) Iterator() index.EligibleDocumentIterator {
 }
 
 // Count returns the number of eligible document IDs.
-func (edl *eligibleDocumentList) Count() int {
+func (edl *eligibleDocumentList) Count() uint64 {
 	if edl.bs == nil {
 		return 0
 	}
-	return int(edl.bs.Count())
+	return uint64(edl.bs.Count())
 }
 
 // emptyEligibleDocumentList is a reusable empty eligible document list.
