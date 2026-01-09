@@ -46,14 +46,6 @@ func (is *IndexSnapshot) VectorReader(ctx context.Context, vector []float32,
 	return rv, nil
 }
 
-// eligibleDocumentSelector is used to filter out documents that are eligible for
-// the KNN search from a pre-filter query.
-type eligibleDocumentSelector struct {
-	// segment ID -> segment local doc nums in a bitset
-	eligibleDocNums []*bitset.BitSet
-	is              *IndexSnapshot
-}
-
 // eligibleDocumentList represents the list of eligible documents within a segment.
 type eligibleDocumentList struct {
 	bs *bitset.BitSet
@@ -90,9 +82,6 @@ type eligibleDocumentIterator struct {
 
 // Next returns the next eligible document ID and whether it exists.
 func (it *eligibleDocumentIterator) Next() (id uint64, ok bool) {
-	if it.bs == nil {
-		return 0, false // no eligible documents
-	}
 	next, found := it.bs.NextSet(it.current)
 	if !found {
 		return 0, false
@@ -102,7 +91,23 @@ func (it *eligibleDocumentIterator) Next() (id uint64, ok bool) {
 }
 
 // emptyEligibleIterator is a reusable empty eligible document iterator.
-var emptyEligibleIterator = &eligibleDocumentIterator{}
+var emptyEligibleIterator = &emptyEligibleDocumentIterator{}
+
+// emptyEligibleDocumentIterator is an iterator that always returns no documents.
+type emptyEligibleDocumentIterator struct{}
+
+// Next always returns false for empty iterator.
+func (it *emptyEligibleDocumentIterator) Next() (id uint64, ok bool) {
+	return 0, false
+}
+
+// eligibleDocumentSelector is used to filter out documents that are eligible for
+// the KNN search from a pre-filter query.
+type eligibleDocumentSelector struct {
+	// segment ID -> segment local doc nums in a bitset
+	eligibleDocNums []*bitset.BitSet
+	is              *IndexSnapshot
+}
 
 // SegmentEligibleDocuments returns an EligibleDocumentList for the specified segment ID.
 func (eds *eligibleDocumentSelector) SegmentEligibleDocuments(segmentID int) index.EligibleDocumentList {
