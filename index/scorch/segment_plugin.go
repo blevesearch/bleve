@@ -74,8 +74,8 @@ var defaultSegmentPlugin SegmentPlugin
 
 func init() {
 	ResetSegmentPlugins()
-	RegisterSegmentPlugin(&zapv17.ZapPlugin{}, false)
-	RegisterSegmentPlugin(&zapv16.ZapPlugin{}, true) // defaults to v16
+	RegisterSegmentPlugin(&zapv17.ZapPlugin{}, true)
+	RegisterSegmentPlugin(&zapv16.ZapPlugin{}, false)
 	RegisterSegmentPlugin(&zapv15.ZapPlugin{}, false)
 	RegisterSegmentPlugin(&zapv14.ZapPlugin{}, false)
 	RegisterSegmentPlugin(&zapv13.ZapPlugin{}, false)
