@@ -118,7 +118,7 @@ func letterCounter(layout string, idx int) int {
 }
 
 func invalidFormatError(character byte, count int) error {
-	return fmt.Errorf("invalid format string, unknown format specifier: " + strings.Repeat(string(character), count))
+	return fmt.Errorf("invalid format string, unknown format specifier: %s", strings.Repeat(string(character), count))
 }
 
 func parseISOString(layout string) (string, error) {
@@ -146,7 +146,7 @@ func parseISOString(layout string) (string, error) {
 			// second text literal delimiter
 			if idx == len(layout) {
 				// text literal delimiter not found error
-				return "", fmt.Errorf("invalid format string, expected text literal delimiter: " + string(textLiteralDelimiter))
+				return "", fmt.Errorf("invalid format string, expected text literal delimiter: %s", string(textLiteralDelimiter))
 			}
 			// increment idx to skip the second text literal delimiter
 			idx++

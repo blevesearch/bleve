@@ -700,6 +700,8 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 			rv.incrementBytesRead(bytesRead - prevBytesReadItr)
 		}
 	}
+	// ONLY update the bytes read value beyond this point for this TFR if scoring is enabled
+	rv.updateBytesRead = rv.includeFreq || rv.includeNorm || rv.includeTermVectors
 	atomic.AddUint64(&is.parent.stats.TotTermSearchersStarted, uint64(1))
 	return rv, nil
 }
