@@ -51,6 +51,10 @@ type IndexSnapshotTermFieldReader struct {
 	bytesRead          uint64
 	ctx                context.Context
 	unadorned          bool
+	// flag to indicate whether to increment our bytesRead
+	// value after creation of the TFR while iterating our postings
+	// lists
+	updateBytesRead bool
 }
 
 func (i *IndexSnapshotTermFieldReader) incrementBytesRead(val uint64) {
@@ -83,10 +87,15 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 	if rv == nil {
 		rv = &index.TermFieldDoc{}
 	}
+	var prevBytesRead uint64
 	// find the next hit
 	for i.segmentOffset < len(i.iterators) {
-		prevBytesRead := i.iterators[i.segmentOffset].BytesRead()
-		next, err := i.iterators[i.segmentOffset].Next()
+		// get our current postings iterator
+		curItr := i.iterators[i.segmentOffset]
+		if i.updateBytesRead {
+			prevBytesRead = curItr.BytesRead()
+		}
+		next, err := curItr.Next()
 		if err != nil {
 			return nil, err
 		}
@@ -99,13 +108,15 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 
 			i.currID = rv.ID
 			i.currPosting = next
-			// postingsIterators is maintain the bytesRead stat in a cumulative fashion.
-			// this is because there are chances of having a series of loadChunk calls,
-			// and they have to be added together before sending the bytesRead at this point
-			// upstream.
-			bytesRead := i.iterators[i.segmentOffset].BytesRead()
-			if bytesRead > prevBytesRead {
-				i.incrementBytesRead(bytesRead - prevBytesRead)
+			if i.updateBytesRead {
+				// postingsIterators maintains the bytesRead stat in a cumulative fashion.
+				// this is because there are chances of having a series of loadChunk calls,
+				// and they have to be added together before sending the bytesRead at this point
+				// upstream.
+				bytesRead := curItr.BytesRead()
+				if bytesRead > prevBytesRead {
+					i.incrementBytesRead(bytesRead - prevBytesRead)
+				}
 			}
 			return rv, nil
 		}
