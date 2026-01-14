@@ -1,4 +1,4 @@
-# Hierarchy search
+# Hierarchical nested search
 
 * *v2.6.0* (and after) will come with support for **Array indexing and hierarchy search**.
 * We've achieved this by embedding nested documents within our bleve (scorch) indexes.
