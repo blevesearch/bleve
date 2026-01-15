@@ -1016,7 +1016,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		return nil, fmt.Errorf("segment path missing")
 	}
 	segmentPath := s.path + string(os.PathSeparator) + string(pathBytes)
-	segment, err := s.segPlugin.OpenEx(segmentPath, s.segmentConfig)
+	seg, err := s.segPlugin.OpenEx(segmentPath, s.segmentConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error opening bolt segment: %v", err)
 	}
