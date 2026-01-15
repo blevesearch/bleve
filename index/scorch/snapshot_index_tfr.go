@@ -15,7 +15,6 @@
 package scorch
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"reflect"
@@ -103,7 +102,7 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 			// make segment number into global number by adding offset
 			globalOffset := i.snapshot.offsets[i.segmentOffset]
 			nnum := next.Number()
-			rv.ID = docNumberToBytes(rv.ID, nnum+globalOffset)
+			rv.ID = index.NewIndexInternalID(rv.ID, nnum+globalOffset)
 			i.postingToTermFieldDoc(next, rv)
 
 			i.currID = rv.ID
@@ -157,7 +156,7 @@ func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Postin
 func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
 	// FIXME do something better
 	// for now, if we need to seek backwards, then restart from the beginning
-	if i.currPosting != nil && bytes.Compare(i.currID, ID) >= 0 {
+	if i.currPosting != nil && i.currID.Compare(ID) >= 0 {
 		// Check if the TFR is a special unadorned composite optimization.
 		// Such a TFR will NOT have a valid `term` or `field` set, making it
 		// impossible for the TFR to replace itself with a new one.
@@ -182,7 +181,7 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 			}
 		}
 	}
-	num, err := docInternalToNumber(ID)
+	num, err := ID.Value()
 	if err != nil {
 		return nil, fmt.Errorf("error converting to doc number % x - %v", ID, err)
 	}
@@ -207,7 +206,7 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 	if preAlloced == nil {
 		preAlloced = &index.TermFieldDoc{}
 	}
-	preAlloced.ID = docNumberToBytes(preAlloced.ID, next.Number()+
+	preAlloced.ID = index.NewIndexInternalID(preAlloced.ID, next.Number()+
 		i.snapshot.offsets[segIndex])
 	i.postingToTermFieldDoc(next, preAlloced)
 	i.currID = preAlloced.ID

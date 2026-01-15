@@ -17,7 +17,6 @@ package scorch
 import (
 	"container/heap"
 	"context"
-	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -42,9 +41,8 @@ type asynchSegmentResult struct {
 	dict    segment.TermDictionary
 	dictItr segment.DictionaryIterator
 
-	cardinality int
-	index       int
-	docs        *roaring.Bitmap
+	index int
+	docs  *roaring.Bitmap
 
 	thesItr segment.ThesaurusIterator
 
@@ -59,11 +57,11 @@ func init() {
 	var err error
 	lb1, err = lev.NewLevenshteinAutomatonBuilder(1, true)
 	if err != nil {
-		panic(fmt.Errorf("Levenshtein automaton ed1 builder err: %v", err))
+		panic(fmt.Errorf("levenshtein automaton ed1 builder err: %v", err))
 	}
 	lb2, err = lev.NewLevenshteinAutomatonBuilder(2, true)
 	if err != nil {
-		panic(fmt.Errorf("Levenshtein automaton ed2 builder err: %v", err))
+		panic(fmt.Errorf("levenshtein automaton ed2 builder err: %v", err))
 	}
 }
 
@@ -474,7 +472,7 @@ func (is *IndexSnapshot) GetInternal(key []byte) ([]byte, error) {
 func (is *IndexSnapshot) DocCount() (uint64, error) {
 	var rv uint64
 	for _, segment := range is.segment {
-		rv += segment.Count()
+		rv += segment.CountRoot()
 	}
 	return rv, nil
 }
@@ -501,7 +499,7 @@ func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		return nil, nil
 	}
 
-	docNum, err := docInternalToNumber(next.ID)
+	docNum, err := next.ID.Value()
 	if err != nil {
 		return nil, err
 	}
@@ -571,7 +569,7 @@ func (is *IndexSnapshot) segmentIndexAndLocalDocNumFromGlobal(docNum uint64) (in
 }
 
 func (is *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
-	docNum, err := docInternalToNumber(id)
+	docNum, err := id.Value()
 	if err != nil {
 		return "", err
 	}
@@ -589,7 +587,7 @@ func (is *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
 }
 
 func (is *IndexSnapshot) segmentIndexAndLocalDocNum(id index.IndexInternalID) (int, uint64, error) {
-	docNum, err := docInternalToNumber(id)
+	docNum, err := id.Value()
 	if err != nil {
 		return 0, 0, err
 	}
@@ -778,25 +776,6 @@ func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReade
 	is.m2.Unlock()
 }
 
-func docNumberToBytes(buf []byte, in uint64) []byte {
-	if len(buf) != 8 {
-		if cap(buf) >= 8 {
-			buf = buf[0:8]
-		} else {
-			buf = make([]byte, 8)
-		}
-	}
-	binary.BigEndian.PutUint64(buf, in)
-	return buf
-}
-
-func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
-	if len(in) != 8 {
-		return 0, fmt.Errorf("wrong len for IndexInternalID: %q", in)
-	}
-	return binary.BigEndian.Uint64(in), nil
-}
-
 func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	segmentIndex int, localDocNum uint64, fields []string, cFields []string,
 	visitor index.DocValueVisitor, dvs segment.DocVisitState) (
@@ -899,7 +878,7 @@ func (dvr *DocValueReader) BytesRead() uint64 {
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
 	visitor index.DocValueVisitor,
 ) (err error) {
-	docNum, err := docInternalToNumber(id)
+	docNum, err := id.Value()
 	if err != nil {
 		return err
 	}
@@ -1298,4 +1277,24 @@ func (is *IndexSnapshot) TermFrequencies(field string, limit int, descending boo
 	}
 
 	return termFreqs[:limit], nil
+}
+
+// Ancestors returns the ancestor IDs for the given document ID. The prealloc
+// slice can be provided to avoid allocations downstream, and MUST be empty.
+func (i *IndexSnapshot) Ancestors(ID index.IndexInternalID, prealloc []index.AncestorID) ([]index.AncestorID, error) {
+	// get segment and local doc num for the ID
+	seg, ldoc, err := i.segmentIndexAndLocalDocNum(ID)
+	if err != nil {
+		return nil, err
+	}
+	// get ancestors from the segment
+	prealloc = i.segment[seg].Ancestors(ldoc, prealloc)
+	// get global offset for the segment (correcting factor for multi-segment indexes)
+	globalOffset := i.offsets[seg]
+	// adjust ancestors to global doc numbers, not local to segment
+	for idx := range prealloc {
+		prealloc[idx] = prealloc[idx].Add(globalOffset)
+	}
+	// return adjusted ancestors
+	return prealloc, nil
 }

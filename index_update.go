@@ -180,6 +180,10 @@ func checkUpdatedMapping(ori, upd *mapping.DocumentMapping) error {
 		return nil
 	}
 
+	if ori.Nested != upd.Nested {
+		return fmt.Errorf("nested property cannot be changed")
+	}
+
 	var err error
 	// Recursively go through the child mappings
 	for name, updDMapping := range upd.Properties {

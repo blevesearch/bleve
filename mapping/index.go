@@ -17,12 +17,14 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -195,11 +197,19 @@ func (im *IndexMappingImpl) Validate() error {
 	// the map will hold the fully qualified field name to FieldMapping, so we can
 	// check for conflicts as we validate each DocumentMapping.
 	fieldAliasCtx := make(map[string]*FieldMapping)
+	// ensure that the nested property is not set for top-level default mapping
+	if im.DefaultMapping.Nested {
+		return fmt.Errorf("default mapping cannot be nested")
+	}
 	err = im.DefaultMapping.Validate(im.cache, []string{}, fieldAliasCtx)
 	if err != nil {
 		return err
 	}
-	for _, docMapping := range im.TypeMapping {
+	for name, docMapping := range im.TypeMapping {
+		// ensure that the nested property is not set for top-level mappings
+		if docMapping.Nested {
+			return fmt.Errorf("type mapping named: %s cannot be nested", name)
+		}
 		err = docMapping.Validate(im.cache, []string{}, fieldAliasCtx)
 		if err != nil {
 			return err
@@ -366,7 +376,13 @@ func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}
 		// see if the _all field was disabled
 		allMapping, _ := docMapping.documentMappingForPath("_all")
 		if allMapping == nil || allMapping.Enabled {
-			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, index.IndexField|index.IncludeTermVectors)
+			excludedFromAll := walkContext.excludedFromAll
+			nf := doc.NestedFields()
+			if nf != nil {
+				// if the document has any nested fields, exclude them from _all
+				excludedFromAll = append(excludedFromAll, nf.Slice()...)
+			}
+			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, excludedFromAll, index.IndexField|index.IncludeTermVectors)
 			doc.AddField(field)
 		}
 		doc.SetIndexed()
@@ -573,4 +589,71 @@ func (im *IndexMappingImpl) SynonymSourceVisitor(visitor analysis.SynonymSourceV
 		return err
 	}
 	return nil
+}
+
+func (im *IndexMappingImpl) buildNestedPrefixes() map[string]int {
+	prefixDepth := make(map[string]int)
+	var collectNestedFields func(dm *DocumentMapping, pathComponents []string, currentDepth int)
+	collectNestedFields = func(dm *DocumentMapping, pathComponents []string, currentDepth int) {
+		for name, docMapping := range dm.Properties {
+			newPathComponents := append(pathComponents, name)
+			if docMapping.Nested {
+				// This is a nested field boundary
+				newDepth := currentDepth + 1
+				prefixDepth[strings.Join(newPathComponents, pathSeparator)] = newDepth
+				// Continue deeper with incremented depth
+				collectNestedFields(docMapping, newPathComponents, newDepth)
+			} else {
+				// Not nested, continue with same depth
+				collectNestedFields(docMapping, newPathComponents, currentDepth)
+			}
+		}
+	}
+	// Start from depth 0 (root)
+	if im.DefaultMapping != nil && im.DefaultMapping.Enabled {
+		collectNestedFields(im.DefaultMapping, []string{}, 0)
+	}
+	// Now do this for each type mapping
+	for _, docMapping := range im.TypeMapping {
+		if docMapping.Enabled {
+			collectNestedFields(docMapping, []string{}, 0)
+		}
+	}
+	return prefixDepth
+}
+
+func (im *IndexMappingImpl) NestedDepth(fs search.FieldSet) (int, int) {
+	if im.cache == nil || im.cache.NestedPrefixes == nil {
+		return 0, 0
+	}
+
+	im.cache.NestedPrefixes.InitOnce(func() map[string]int {
+		return im.buildNestedPrefixes()
+	})
+
+	return im.cache.NestedPrefixes.NestedDepth(fs)
+}
+
+func (im *IndexMappingImpl) CountNested() int {
+	if im.cache == nil || im.cache.NestedPrefixes == nil {
+		return 0
+	}
+
+	im.cache.NestedPrefixes.InitOnce(func() map[string]int {
+		return im.buildNestedPrefixes()
+	})
+
+	return im.cache.NestedPrefixes.CountNested()
+}
+
+func (im *IndexMappingImpl) IntersectsPrefix(fs search.FieldSet) bool {
+	if im.cache == nil || im.cache.NestedPrefixes == nil {
+		return false
+	}
+
+	im.cache.NestedPrefixes.InitOnce(func() map[string]int {
+		return im.buildNestedPrefixes()
+	})
+
+	return im.cache.NestedPrefixes.IntersectsPrefix(fs)
 }

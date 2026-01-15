@@ -799,6 +799,12 @@ func analyze(d index.Document, fn customAnalyzerPluginInitFunc) {
 			}
 		}
 	})
+	if nd, ok := d.(index.NestedDocument); ok {
+		nd.VisitNestedDocuments(func(doc index.Document) {
+			doc.AddIDField()
+			analyze(doc, fn)
+		})
+	}
 }
 
 func (s *Scorch) AddEligibleForRemoval(epoch uint64) {

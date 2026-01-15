@@ -377,7 +377,7 @@ func addSortAndFieldsToKNNHits(req *SearchRequest, knnHits []*search.DocumentMat
 			}
 		}
 		req.Sort.Value(hit)
-		err, _ = LoadAndHighlightFields(hit, req, "", reader, nil)
+		err, _ = LoadAndHighlightAllFields(hit, req, "", reader, nil)
 		if err != nil {
 			return err
 		}
@@ -474,17 +474,15 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	return knnHits, nil
 }
 
-func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector) {
+func setKnnHitsInCollector(knnHits []*search.DocumentMatch, coll *collector.TopNCollector) {
 	if len(knnHits) > 0 {
-		newScoreExplComputer := func(queryMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) (float64, *search.Explanation) {
-			totalScore := queryMatch.Score + knnMatch.Score
-			if !req.Explain {
-				// exit early as we don't need to compute the explanation
-				return totalScore, nil
-			}
-			return totalScore, &search.Explanation{Value: totalScore, Message: "sum of:", Children: []*search.Explanation{queryMatch.Expl, knnMatch.Expl}}
+		mergeFn := func(ftsMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) {
+			// Boost the FTS score using the KNN score
+			ftsMatch.Score += knnMatch.Score
+			// Combine the FTS explanation with the KNN explanation, if present
+			ftsMatch.Expl.MergeWith(knnMatch.Expl)
 		}
-		coll.SetKNNHits(knnHits, search.ScoreExplCorrectionCallbackFunc(newScoreExplComputer))
+		coll.SetKNNHits(knnHits, search.HybridMergeCallbackFn(mergeFn))
 	}
 }
 
