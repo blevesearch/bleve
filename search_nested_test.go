@@ -16,7 +16,7 @@ package bleve
 
 import (
 	"encoding/json"
-    "fmt"
+	"fmt"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/mapping"
