@@ -425,7 +425,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	var totSize int
 	var numSegsToFlushOut int
 	var totDocs uint64
-
+	fmt.Println("persister doing its thing")
 	// legacy behaviour of merge + flush of all in-memory segments in one-shot
 	if legacyFlushBehaviour(po.MaxSizeInMemoryMergePerWorker, po.NumPersisterWorkers) {
 		val := &flushable{
