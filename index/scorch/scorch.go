@@ -616,6 +616,7 @@ func (s *Scorch) trainerLoop() {
 				// persist in a tmp file and then rename - is that a fair strategy?
 				fmt.Println("merging centroid index")
 				s.segmentConfig["training"] = true
+				fmt.Println("version while merging", s.segPlugin.Version())
 				_, _, err := s.segPlugin.MergeEx([]segment.Segment{s.centroidIndex.segment, sampleSeg},
 					[]*roaring.Bitmap{nil, nil}, filepath.Join(s.path, "centroid_index.tmp"), s.closeCh, nil, s.segmentConfig)
 				if err != nil {
@@ -685,6 +686,8 @@ func (s *Scorch) trainerLoop() {
 				return
 			}
 
+			// update the centroid index pointer
+			fmt.Println("version", s.segPlugin.Version())
 			centroidIndex, err := s.segPlugin.OpenEx(filepath.Join(s.path, "centroid_index"), s.segmentConfig)
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error opening centroid index: %v", err)
@@ -702,10 +705,6 @@ func (s *Scorch) trainerLoop() {
 func (s *Scorch) Train(batch *index.Batch) error {
 	// regulate the Train function
 	s.FireIndexEvent()
-
-	// // is the lock really needed?
-	// s.rootLock.Lock()
-	// defer s.rootLock.Unlock()
 
 	var trainData []index.Document
 	for key, doc := range batch.IndexOps {
@@ -745,14 +744,8 @@ func (s *Scorch) Train(batch *index.Batch) error {
 		fmt.Println("error training", err)
 		return err
 	}
+	fmt.Println("got centroid index")
 
-	centroidIndex, err := s.segPlugin.OpenEx(filepath.Join(s.path, "centroid_index"), s.segmentConfig)
-	if err != nil {
-		return err
-	}
-	s.centroidIndex = &SegmentSnapshot{
-		segment: centroidIndex,
-	}
 	_, err = s.getCentroidIndex("emb")
 	if err != nil {
 		return err
@@ -767,6 +760,8 @@ func (s *Scorch) getCentroidIndex(field string) (*faiss.IndexImpl, error) {
 	if !ok {
 		return nil, fmt.Errorf("segment is not a centroid index segment", s.centroidIndex.segment != nil)
 	}
+
+	fmt.Println("getting coarse quantizer", field)
 	coarseQuantizer, err := centroidIndexSegment.GetCoarseQuantizer(field)
 	if err != nil {
 		return nil, err
