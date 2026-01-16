@@ -1,0 +1,30 @@
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+name: Coverage
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Clean environment
+        run: |
+          go clean -cache -testcache -modcache
+          rm -f profile.cov
+      - name: Test
+        run: |
+          go test -coverprofile=profile.cov ./...
+      - name: Remove non-GO entries from coverage profile
+        run: |
+          grep -E 'mode|\.go' profile.cov > profile_go.cov
+      - name: Send coverage
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: profile_go.cov

@@ -1281,23 +1281,29 @@ func TestKNNScoreBoosting(t *testing.T) {
 	searchRequest.AddKNN("vector", queryVec, 3, 1.0)
 	searchRequest.Fields = []string{"content", "vector"}
 
-	hits, _ := index.Search(searchRequest)
+	hits, err := index.Search(searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
 	hitsMap := make(map[string]float64, 0)
 	for _, hit := range hits.Hits {
 		hitsMap[hit.ID] = (hit.Score)
 	}
 
-	searchRequest2 := NewSearchRequest(NewMatchNoneQuery())
+	searchRequest = NewSearchRequest(NewMatchNoneQuery())
 	searchRequest.AddKNN("vector", queryVec, 3, 10.0)
 	searchRequest.Fields = []string{"content", "vector"}
 
-	hits2, _ := index.Search(searchRequest2)
+	hits, err = index.Search(searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
 	hitsMap2 := make(map[string]float64, 0)
-	for _, hit := range hits2.Hits {
+	for _, hit := range hits.Hits {
 		hitsMap2[hit.ID] = (hit.Score)
 	}
 
-	for _, hit := range hits2.Hits {
+	for _, hit := range hits.Hits {
 		if hitsMap[hit.ID] != hitsMap2[hit.ID]/10 {
 			t.Errorf("boosting not working: %v %v \n", hitsMap[hit.ID], hitsMap2[hit.ID])
 		}
@@ -1642,6 +1648,345 @@ func TestNestedVectors(t *testing.T) {
 			t.Fatalf("expected docID %s, got %s", test.expectedDocID,
 				res.Hits[0].ID)
 		}
+	}
+}
+
+// -----------------------------------------------------------------------------
+// TestMultiVector tests the KNN functionality which handles duplicate
+// vectors being matched within the same document. When a document has multiple vectors
+// (via [[]] array of vectors or [{}] array of objects with vectors), the KNN
+// searcher must pick the best scoring vector match for that document. This test covers these scenarios:
+// - Single vector field (baseline)
+// - [[]] style: array of vectors (same doc appears multiple times)
+// - [{}] style: array of objects with vector field (chunks pattern)
+func TestMultiVector(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	// JSON documents covering merger scenarios:
+	// - Single vector (baseline)
+	// - [[]] style: array of vectors (same doc appears multiple times)
+	// - [{}] style: array of objects with vector field (chunks pattern)
+	docs := map[string]string{
+		// Single vector - baseline
+		"doc1": `{
+			"vec": [10, 10, 10],
+			"vecB": [100, 100, 100]
+		}`,
+		// [[]] style - array of 2 vectors
+		"doc2": `{
+			"vec": [[0, 0, 0], [500, 500, 500]],
+			"vecB": [[900, 900, 900], [950, 950, 950], [975, 975, 975], [990, 990, 990]]
+		}`,
+		// [[]] style - array of 3 vectors
+		"doc3": `{ 
+			"vec": [[50, 50, 50], [200, 200, 200], [400, 400, 400]],
+			"vecB": [[800, 800, 800], [850, 850, 850]]
+		}`,
+		// Single vector - baseline
+		"doc4": `{
+			"vec": [1000, 1000, 1000],
+			"vecB": [1, 1, 1]
+		}`,
+		// [{}] style - array of objects with vector field (chunks pattern)
+		"doc5": `{
+			"chunks": [
+				{"vec": [10, 10, 10], "text": "chunk1"},
+				{"vec": [20, 20, 20], "text": "chunk2"},
+				{"vec": [30, 30, 30], "text": "chunk3"},
+				{"vec": [40, 40, 40], "text": "chunk4"}
+			]
+		}`,
+		"doc6": `{
+			"chunks": [
+				{"vec": [[10, 10, 10],[20, 20, 20]], "text": "chunk1"},
+				{"vec": [[30, 30, 30],[40, 40, 40]], "text": "chunk2"}
+			]
+		}`,
+	}
+
+	// Parse JSON documents
+	dataset := make(map[string]map[string]interface{})
+	for docID, jsonStr := range docs {
+		var doc map[string]interface{}
+		if err := json.Unmarshal([]byte(jsonStr), &doc); err != nil {
+			t.Fatalf("failed to unmarshal %s: %v", docID, err)
+		}
+		dataset[docID] = doc
+	}
+
+	// Index mapping
+	indexMapping := NewIndexMapping()
+
+	vecMapping := mapping.NewVectorFieldMapping()
+	vecMapping.Dims = 3
+	vecMapping.Similarity = index.InnerProduct
+	indexMapping.DefaultMapping.AddFieldMappingsAt("vec", vecMapping)
+	indexMapping.DefaultMapping.AddFieldMappingsAt("vecB", vecMapping)
+
+	// Nested chunks mapping for [{}] style
+	chunksMapping := mapping.NewDocumentMapping()
+	chunksMapping.AddFieldMappingsAt("vec", vecMapping)
+	indexMapping.DefaultMapping.AddSubDocumentMapping("chunks", chunksMapping)
+
+	// Create and populate index
+	idx, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := idx.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch := idx.NewBatch()
+	for docID, doc := range dataset {
+		if err := batch.Index(docID, doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	// Test: Single KNN query - basic functionality
+	t.Run("VecFieldSingle", func(t *testing.T) {
+		searchReq := NewSearchRequest(query.NewMatchNoneQuery())
+		searchReq.AddKNN("vec", []float32{1, 1, 1}, 20, 1.0)
+		res, err := idx.Search(searchReq)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Inner product: score = sum(query_i * doc_i)
+		// doc1 vec=[10,10,10]: 1*10*3 = 30
+		// doc2 vec best is [500,500,500]: 1*500*3 = 1500
+		// doc3 vec best is [400,400,400]: 1*400*3 = 1200
+		// doc4 vec=[1000,1000,1000]: 1*1000*3 = 3000
+		expectedResult := []struct {
+			docID         string
+			expectedScore float64
+		}{
+			{docID: "doc4", expectedScore: 3000},
+			{docID: "doc2", expectedScore: 1500},
+			{docID: "doc3", expectedScore: 1200},
+			{docID: "doc1", expectedScore: 30},
+		}
+
+		if len(res.Hits) != len(expectedResult) {
+			t.Fatalf("expected %d hits, got %d", len(expectedResult), len(res.Hits))
+		}
+
+		for i, expected := range expectedResult {
+			if res.Hits[i].ID != expected.docID {
+				t.Fatalf("at rank %d, expected docID %s, got %s", i+1, expected.docID, res.Hits[i].ID)
+			}
+			if res.Hits[i].Score != expected.expectedScore {
+				t.Fatalf("at rank %d, expected score %v, got %v", i+1, expected.expectedScore, res.Hits[i].Score)
+			}
+		}
+	})
+
+	// Test: Single KNN query on vecB field
+	t.Run("VecBFieldSingle", func(t *testing.T) {
+		searchReq := NewSearchRequest(query.NewMatchNoneQuery())
+		searchReq.AddKNN("vecB", []float32{1000, 1000, 1000}, 20, 1.0)
+		res, err := idx.Search(searchReq)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Inner product: score = sum(query_i * doc_i) for each dimension
+		// doc1: vecB=[100,100,100] -> 1000*100*3 = 300,000
+		// doc2: vecB best is [990,990,990] -> 1000*990*3 = 2,970,000
+		// doc3: vecB best is [850,850,850] -> 1000*850*3 = 2,550,000
+		// doc4: vecB=[1,1,1] -> 1000*1*3 = 3,000
+		expectedResult := []struct {
+			docID         string
+			expectedScore float64
+		}{
+			{docID: "doc2", expectedScore: 2970000},
+			{docID: "doc3", expectedScore: 2550000},
+			{docID: "doc1", expectedScore: 300000},
+			{docID: "doc4", expectedScore: 3000},
+		}
+
+		if len(res.Hits) != len(expectedResult) {
+			t.Fatalf("expected %d hits, got %d", len(expectedResult), len(res.Hits))
+		}
+
+		for i, expected := range expectedResult {
+			if res.Hits[i].ID != expected.docID {
+				t.Fatalf("at rank %d, expected docID %s, got %s", i+1, expected.docID, res.Hits[i].ID)
+			}
+			if res.Hits[i].Score != expected.expectedScore {
+				t.Fatalf("at rank %d, expected score %v, got %v", i+1, expected.expectedScore, res.Hits[i].Score)
+			}
+		}
+	})
+
+	// Test: Single KNN query on nested chunks.vec field
+	t.Run("ChunksVecFieldSingle", func(t *testing.T) {
+		searchReq := NewSearchRequest(query.NewMatchNoneQuery())
+		searchReq.AddKNN("chunks.vec", []float32{1, 1, 1}, 20, 1.0)
+		searchReq.SortBy([]string{"_score", "docID"})
+		res, err := idx.Search(searchReq)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Only doc5 and doc6 have chunks.vec
+		// doc5 chunks: [10,10,10], [20,20,20], [30,30,30], [40,40,40]
+		//   Best score: 1*40*3 = 120
+		// doc6 chunks: [[10,10,10],[20,20,20]], [[30,30,30],[40,40,40]]
+		//   Best score: 1*40*3 = 120
+		if len(res.Hits) != 2 {
+			t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+		}
+
+		// Both should have score 120
+		for _, hit := range res.Hits {
+			if hit.ID != "doc5" && hit.ID != "doc6" {
+				t.Fatalf("unexpected docID %s, expected doc5 or doc6", hit.ID)
+			}
+			if hit.Score != 120 {
+				t.Fatalf("for %s, expected score 120, got %v", hit.ID, hit.Score)
+			}
+		}
+	})
+}
+
+// TestMultiVectorCosineNormalization verifies that multi-vector fields are
+// normalized correctly with cosine similarity. Each sub-vector in a multi-vector
+// should be independently normalized, producing correct similarity scores.
+func TestMultiVectorCosineNormalization(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	const dims = 3
+
+	// Create index with cosine similarity
+	indexMapping := NewIndexMapping()
+	vecFieldMapping := mapping.NewVectorFieldMapping()
+	vecFieldMapping.Dims = dims
+	vecFieldMapping.Similarity = index.CosineSimilarity
+
+	// Single-vector field
+	indexMapping.DefaultMapping.AddFieldMappingsAt("vec", vecFieldMapping)
+	// Multi-vector field
+	indexMapping.DefaultMapping.AddFieldMappingsAt("multi_vec", vecFieldMapping)
+
+	idx, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	docsString := []string{
+		`{"vec": [3, 0, 0]}`,
+		`{"vec": [0, 4, 0]}`,
+		`{"multi_vec": [[3, 0, 0], [0, 4, 0]]}`,
+	}
+
+	for i, docStr := range docsString {
+		var doc map[string]interface{}
+		err = json.Unmarshal([]byte(docStr), &doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = idx.Index(fmt.Sprintf("doc%d", i+1), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Query for X direction [1,0,0]
+	searchReq := NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("vec", []float32{1, 0, 0}, 3, 1.0)
+	res, err := idx.Search(searchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+	// Hit 1 should be doc1 with score 1.0 (perfect match)
+	if res.Hits[0].ID != "doc1" {
+		t.Fatalf("expected doc1 as first hit, got %s", res.Hits[0].ID)
+	}
+	if math.Abs(float64(res.Hits[0].Score-1.0)) > 1e-6 {
+		t.Fatalf("expected score 1.0, got %f", res.Hits[0].Score)
+	}
+	// Hit 2 should be doc2 with a score of 0.0 (orthogonal)
+	if res.Hits[1].ID != "doc2" {
+		t.Fatalf("expected doc2 as second hit, got %s", res.Hits[1].ID)
+	}
+	if math.Abs(float64(res.Hits[1].Score-0.0)) > 1e-6 {
+		t.Fatalf("expected score 0.0, got %f", res.Hits[1].Score)
+	}
+
+	// Query for Y direction [0,1,0]
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("vec", []float32{0, 1, 0}, 3, 1.0)
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+	// Hit 1 should be doc2 with score 1.0 (perfect match)
+	if res.Hits[0].ID != "doc2" {
+		t.Fatalf("expected doc2 as first hit, got %s", res.Hits[0].ID)
+	}
+	if math.Abs(float64(res.Hits[0].Score-1.0)) > 1e-6 {
+		t.Fatalf("expected score 1.0, got %f", res.Hits[0].Score)
+	}
+	// Hit 2 should be doc1 with a score of 0.0 (orthogonal)
+	if res.Hits[1].ID != "doc1" {
+		t.Fatalf("expected doc1 as second hit, got %s", res.Hits[1].ID)
+	}
+	if math.Abs(float64(res.Hits[1].Score-0.0)) > 1e-6 {
+		t.Fatalf("expected score 0.0, got %f", res.Hits[1].Score)
+	}
+
+	// Now test querying the nested multi-vector field
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("multi_vec", []float32{1, 0, 0}, 3, 1.0)
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	// Hit should be doc3 with score 1.0 (perfect match on first sub-vector)
+	if res.Hits[0].ID != "doc3" {
+		t.Fatalf("expected doc3 as first hit, got %s", res.Hits[0].ID)
+	}
+	if math.Abs(float64(res.Hits[0].Score-1.0)) > 1e-6 {
+		t.Fatalf("expected score 1.0, got %f", res.Hits[0].Score)
+	}
+	// Query for Y direction [0,1,0] on nested field
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("multi_vec", []float32{0, 1, 0}, 3, 1.0)
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	// Hit should be doc3 with score 1.0 (perfect match on second sub-vector)
+	if res.Hits[0].ID != "doc3" {
+		t.Fatalf("expected doc3 as first hit, got %s", res.Hits[0].ID)
+	}
+	if math.Abs(float64(res.Hits[0].Score-1.0)) > 1e-6 {
+		t.Fatalf("expected score 1.0, got %f", res.Hits[0].Score)
 	}
 }
 
