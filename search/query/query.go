@@ -431,6 +431,10 @@ func expandQuery(m mapping.IndexMapping, query Query) (Query, error) {
 			if err != nil {
 				return nil, err
 			}
+			q.Filter, err = expand(q.Filter)
+			if err != nil {
+				return nil, err
+			}
 			return q, nil
 		default:
 			return query, nil
@@ -451,13 +455,10 @@ func DumpQuery(m mapping.IndexMapping, query Query) (string, error) {
 	return string(data), err
 }
 
-// FieldSet represents a set of queried fields.
-type FieldSet map[string]struct{}
-
 // ExtractFields returns a set of fields referenced by the query.
 // The returned set may be nil if the query does not explicitly reference any field
 // and the DefaultSearchField is unset in the index mapping.
-func ExtractFields(q Query, m mapping.IndexMapping, fs FieldSet) (FieldSet, error) {
+func ExtractFields(q Query, m mapping.IndexMapping, fs search.FieldSet) (search.FieldSet, error) {
 	if q == nil || m == nil {
 		return fs, nil
 	}
@@ -470,9 +471,9 @@ func ExtractFields(q Query, m mapping.IndexMapping, fs FieldSet) (FieldSet, erro
 		}
 		if f != "" {
 			if fs == nil {
-				fs = make(FieldSet)
+				fs = search.NewFieldSet()
 			}
-			fs[f] = struct{}{}
+			fs.AddField(f)
 		}
 	case *QueryStringQuery:
 		var expandedQuery Query
@@ -481,7 +482,7 @@ func ExtractFields(q Query, m mapping.IndexMapping, fs FieldSet) (FieldSet, erro
 			fs, err = ExtractFields(expandedQuery, m, fs)
 		}
 	case *BooleanQuery:
-		for _, subq := range []Query{q.Must, q.Should, q.MustNot} {
+		for _, subq := range []Query{q.Must, q.Should, q.MustNot, q.Filter} {
 			fs, err = ExtractFields(subq, m, fs)
 			if err != nil {
 				break
@@ -550,6 +551,10 @@ func ExtractSynonyms(ctx context.Context, m mapping.SynonymMapping, r index.Thes
 			return nil, err
 		}
 		rv, err = ExtractSynonyms(ctx, m, r, q.MustNot, rv)
+		if err != nil {
+			return nil, err
+		}
+		rv, err = ExtractSynonyms(ctx, m, r, q.Filter, rv)
 		if err != nil {
 			return nil, err
 		}

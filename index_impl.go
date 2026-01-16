@@ -60,8 +60,6 @@ type indexImpl struct {
 
 const storePath = "store"
 
-var mappingInternalKey = []byte("_mapping")
-
 const (
 	SearchQueryStartCallbackKey search.ContextKey = "_search_query_start_callback_key"
 	SearchQueryEndCallbackKey   search.ContextKey = "_search_query_end_callback_key"
@@ -576,8 +574,7 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 				return nil, err
 			}
 
-			fs := make(query.FieldSet)
-			fs, err := query.ExtractFields(req.Query, i.m, fs)
+			fs, err := query.ExtractFields(req.Query, i.m, search.NewFieldSet())
 			if err != nil {
 				return nil, err
 			}
@@ -908,8 +905,64 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}
 
+	// ------------------------------------------------------------------------------------------
+	// set up additional contexts for any search operation that will proceed from
+	// here, such as presearch, knn collector, topn collector etc.
+
+	// Scoring model callback to be used to get scoring model
+	scoringModelCallback := func() string {
+		if isBM25Enabled(i.m) {
+			return index.BM25Scoring
+		}
+		return index.DefaultScoringModel
+	}
+	ctx = context.WithValue(ctx, search.GetScoringModelCallbackKey,
+		search.GetScoringModelCallbackFn(scoringModelCallback))
+
+	// This callback and variable handles the tracking of bytes read
+	//  1. as part of creation of tfr and its Next() calls which is
+	//     accounted by invoking this callback when the TFR is closed.
+	//  2. the docvalues portion (accounted in collector) and the retrieval
+	//     of stored fields bytes (by LoadAndHighlightFields)
+	var totalSearchCost uint64
+	sendBytesRead := func(bytesRead uint64) {
+		totalSearchCost += bytesRead
+	}
+	// Ensure IO cost accounting and result cost assignment happen on all return paths
+	defer func() {
+		if sr != nil {
+			sr.Cost = totalSearchCost
+		}
+		if is, ok := indexReader.(*scorch.IndexSnapshot); ok {
+			is.UpdateIOStats(totalSearchCost)
+		}
+		search.RecordSearchCost(ctx, search.DoneM, 0)
+	}()
+
+	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey, search.SearchIOStatsCallbackFunc(sendBytesRead))
+
+	// Geo buffer pool callback to be used for getting geo buffer pool
+	var bufPool *s2.GeoBufferPool
+	getBufferPool := func() *s2.GeoBufferPool {
+		if bufPool == nil {
+			bufPool = s2.NewGeoBufferPool(search.MaxGeoBufPoolSize, search.MinGeoBufPoolSize)
+		}
+
+		return bufPool
+	}
+
+	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey, search.GeoBufferPoolCallbackFunc(getBufferPool))
+	// check if the index mapping has any nested fields, which should force
+	// all collectors and searchers to be run in nested mode
+	if nm, ok := i.m.(mapping.NestedMapping); ok {
+		if nm.CountNested() > 0 {
+			ctx = context.WithValue(ctx, search.NestedSearchKey, true)
+		}
+	}
+	// ------------------------------------------------------------------------------------------
+
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
-		preSearchResult, err := i.preSearch(ctx, req, indexReader)
+		sr, err = i.preSearch(ctx, req, indexReader)
 		if err != nil {
 			return nil, err
 		}
@@ -923,7 +976,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		// time stat
 		searchDuration := time.Since(searchStart)
 		atomic.AddUint64(&i.stats.searchTime, uint64(searchDuration))
-		return preSearchResult, nil
+
+		return sr, nil
 	}
 
 	var reverseQueryExecution bool
@@ -934,11 +988,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		req.SearchBefore = nil
 	}
 
-	var coll *collector.TopNCollector
-	if req.SearchAfter != nil {
-		coll = collector.NewTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter)
-	} else {
-		coll = collector.NewTopNCollector(req.Size, req.From, req.Sort)
+	coll, err := i.buildTopNCollector(ctx, req, indexReader)
+	if err != nil {
+		return nil, err
 	}
 
 	var knnHits []*search.DocumentMatch
@@ -993,6 +1045,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		// if score fusion, run collect if rescorer is defined
 		if rescorer != nil && requestHasKNN(req) {
 			knnHits, err = i.runKnnCollector(ctx, req, indexReader, false)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -1010,9 +1065,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	// if score fusion, no faceting for knn hits is done
 	// hence we can skip setting the knn hits in the collector
 	if !contextScoreFusionKeyExists {
-		setKnnHitsInCollector(knnHits, req, coll)
+		setKnnHitsInCollector(knnHits, coll)
 	}
-	
 
 	if fts != nil {
 		if is, ok := indexReader.(*scorch.IndexSnapshot); ok {
@@ -1021,43 +1075,11 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		ctx = context.WithValue(ctx, search.FieldTermSynonymMapKey, fts)
 	}
 
-	scoringModelCallback := func() string {
-		if isBM25Enabled(i.m) {
-			return index.BM25Scoring
-		}
-		return index.DefaultScoringModel
-	}
-	ctx = context.WithValue(ctx, search.GetScoringModelCallbackKey,
-		search.GetScoringModelCallbackFn(scoringModelCallback))
-
 	// set the bm25Stats (stats important for consistent scoring) in
 	// the context object
 	if bm25Stats != nil {
 		ctx = context.WithValue(ctx, search.BM25StatsKey, bm25Stats)
 	}
-
-	// This callback and variable handles the tracking of bytes read
-	//  1. as part of creation of tfr and its Next() calls which is
-	//     accounted by invoking this callback when the TFR is closed.
-	//  2. the docvalues portion (accounted in collector) and the retrieval
-	//     of stored fields bytes (by LoadAndHighlightFields)
-	var totalSearchCost uint64
-	sendBytesRead := func(bytesRead uint64) {
-		totalSearchCost += bytesRead
-	}
-
-	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey, search.SearchIOStatsCallbackFunc(sendBytesRead))
-
-	var bufPool *s2.GeoBufferPool
-	getBufferPool := func() *s2.GeoBufferPool {
-		if bufPool == nil {
-			bufPool = s2.NewGeoBufferPool(search.MaxGeoBufPoolSize, search.MinGeoBufPoolSize)
-		}
-
-		return bufPool
-	}
-
-	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey, search.GeoBufferPoolCallbackFunc(getBufferPool))
 
 	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
@@ -1071,14 +1093,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if serr := searcher.Close(); err == nil && serr != nil {
 			err = serr
 		}
-		if sr != nil {
-			sr.Cost = totalSearchCost
-		}
-		if sr, ok := indexReader.(*scorch.IndexSnapshot); ok {
-			sr.UpdateIOStats(totalSearchCost)
-		}
-
-		search.RecordSearchCost(ctx, search.DoneM, 0)
 	}()
 
 	if req.Facets != nil {
@@ -1116,6 +1130,26 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			} else {
 				// build terms facet
 				facetBuilder := facet.NewTermsFacetBuilder(facetRequest.Field, facetRequest.Size)
+
+				// Set prefix filter if provided
+				if facetRequest.TermPrefix != "" {
+					facetBuilder.SetPrefixFilter(facetRequest.TermPrefix)
+				}
+
+				// Set regex filter if provided
+				if facetRequest.TermPattern != "" {
+					// Use cached compiled pattern if available, otherwise compile it now
+					if facetRequest.compiledPattern != nil {
+						facetBuilder.SetRegexFilter(facetRequest.compiledPattern)
+					} else {
+						regex, err := regexp.Compile(facetRequest.TermPattern)
+						if err != nil {
+							return nil, fmt.Errorf("error compiling regex pattern for facet '%s': %v", facetName, err)
+						}
+						facetBuilder.SetRegexFilter(regex)
+					}
+				}
+
 				facetsBuilder.Add(facetName, facetBuilder)
 			}
 		}
@@ -1211,7 +1245,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if i.name != "" && hit.Index == "" {
 			hit.Index = i.name
 		}
-		err, storedFieldsBytes := LoadAndHighlightFields(hit, req, i.name, indexReader, highlighter)
+		err, storedFieldsBytes := LoadAndHighlightAllFields(hit, req, i.name, indexReader, highlighter)
 		if err != nil {
 			return nil, err
 		}
@@ -1377,6 +1411,56 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 		}
 	}
 
+	return nil, totalStoredFieldsBytes
+}
+
+const NestedDocumentKey = "_$nested"
+
+// LoadAndHighlightAllFields loads stored fields + highlights for root and its descendants.
+// All descendant documents are collected into a _$nested array in the root DocumentMatch.
+func LoadAndHighlightAllFields(
+	root *search.DocumentMatch,
+	req *SearchRequest,
+	indexName string,
+	r index.IndexReader,
+	highlighter highlight.Highlighter,
+) (error, uint64) {
+	var totalStoredFieldsBytes uint64
+	// load root fields/highlights
+	err, bytes := LoadAndHighlightFields(root, req, indexName, r, highlighter)
+	totalStoredFieldsBytes += bytes
+	if err != nil {
+		return err, totalStoredFieldsBytes
+	}
+	// collect all descendant documents
+	nestedDocs := make([]*search.NestedDocumentMatch, 0, len(root.Descendants))
+	// create a dummy desc DocumentMatch to reuse LoadAndHighlightFields
+	desc := &search.DocumentMatch{}
+	for _, descID := range root.Descendants {
+		extID, err := r.ExternalID(descID)
+		if err != nil {
+			return err, totalStoredFieldsBytes
+		}
+		// reset desc for reuse
+		desc.ID = extID
+		desc.IndexInternalID = descID
+		desc.Locations = root.Locations
+		err, bytes := LoadAndHighlightFields(desc, req, indexName, r, highlighter)
+		totalStoredFieldsBytes += bytes
+		if err != nil {
+			return err, totalStoredFieldsBytes
+		}
+		// copy fields to nested doc and append
+		if len(desc.Fields) != 0 || len(desc.Fragments) != 0 {
+			nestedDocs = append(nestedDocs, search.NewNestedDocumentMatch(desc.Fields, desc.Fragments))
+		}
+		desc.Fields = nil
+		desc.Fragments = nil
+	}
+	// add nested documents to root under _$nested key
+	if len(nestedDocs) > 0 {
+		root.AddFieldValue(NestedDocumentKey, nestedDocs)
+	}
 	return nil, totalStoredFieldsBytes
 }
 
@@ -1600,6 +1684,9 @@ func (f *indexImplFieldDict) Cardinality() int {
 
 // helper function to remove duplicate entries from slice of strings
 func deDuplicate(fields []string) []string {
+	if len(fields) == 0 {
+		return fields
+	}
 	entries := make(map[string]struct{})
 	ret := []string{}
 	for _, entry := range fields {
@@ -1693,4 +1780,105 @@ func (i *indexImpl) FireIndexEvent() {
 		// fire the Index() event
 		internalEventIndex.FireIndexEvent()
 	}
+}
+
+// -----------------------------------------------------------------------------
+
+func (i *indexImpl) TermFrequencies(field string, limit int, descending bool) (
+	[]index.TermFreq, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
+	reader, err := i.i.Reader()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if cerr := reader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	insightsReader, ok := reader.(index.IndexInsightsReader)
+	if !ok {
+		return nil, fmt.Errorf("index reader does not support TermFrequencies")
+	}
+
+	return insightsReader.TermFrequencies(field, limit, descending)
+}
+
+func (i *indexImpl) CentroidCardinalities(field string, limit int, descending bool) (
+	[]index.CentroidCardinality, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
+	reader, err := i.i.Reader()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if cerr := reader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	insightsReader, ok := reader.(index.IndexInsightsReader)
+	if !ok {
+		return nil, fmt.Errorf("index reader does not support CentroidCardinalities")
+	}
+
+	centroidCardinalities, err := insightsReader.CentroidCardinalities(field, limit, descending)
+	if err != nil {
+		return nil, err
+	}
+
+	for j := 0; j < len(centroidCardinalities); j++ {
+		centroidCardinalities[j].Index = i.name
+	}
+
+	return centroidCardinalities, nil
+}
+
+func (i *indexImpl) buildTopNCollector(ctx context.Context, req *SearchRequest, reader index.IndexReader) (*collector.TopNCollector, error) {
+	newCollector := func() *collector.TopNCollector {
+		if req.SearchAfter != nil {
+			return collector.NewTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter)
+		}
+		return collector.NewTopNCollector(req.Size, req.From, req.Sort)
+	}
+
+	newNestedCollector := func(nr index.NestedReader) *collector.TopNCollector {
+		if req.SearchAfter != nil {
+			return collector.NewNestedTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter, nr)
+		}
+		return collector.NewNestedTopNCollector(req.Size, req.From, req.Sort, nr)
+	}
+
+	// check if we are in nested mode
+	if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); ok && nestedMode {
+		// get the nested reader from the index reader
+		if nr, ok := reader.(index.NestedReader); ok {
+			// check if the mapping has any nested fields that intersect
+			if nm, ok := i.m.(mapping.NestedMapping); ok {
+				var fs search.FieldSet
+				var err error
+				fs, err = query.ExtractFields(req.Query, i.m, fs)
+				if err != nil {
+					return nil, err
+				}
+				if nm.IntersectsPrefix(fs) {
+					return newNestedCollector(nr), nil
+				}
+			}
+		}
+	}
+	return newCollector(), nil
 }

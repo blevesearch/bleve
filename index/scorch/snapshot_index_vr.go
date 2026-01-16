@@ -18,11 +18,11 @@
 package scorch
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
@@ -95,7 +95,7 @@ func (i *IndexSnapshotVectorReader) Next(preAlloced *index.VectorDoc) (
 			// make segment number into global number by adding offset
 			globalOffset := i.snapshot.offsets[i.segmentOffset]
 			nnum := next.Number()
-			rv.ID = docNumberToBytes(rv.ID, nnum+globalOffset)
+			rv.ID = index.NewIndexInternalID(rv.ID, nnum+globalOffset)
 			rv.Score = float64(next.Score())
 
 			i.currID = rv.ID
@@ -112,7 +112,7 @@ func (i *IndexSnapshotVectorReader) Next(preAlloced *index.VectorDoc) (
 func (i *IndexSnapshotVectorReader) Advance(ID index.IndexInternalID,
 	preAlloced *index.VectorDoc) (*index.VectorDoc, error) {
 
-	if i.currPosting != nil && bytes.Compare(i.currID, ID) >= 0 {
+	if i.currPosting != nil && i.currID.Compare(ID) >= 0 {
 		i2, err := i.snapshot.VectorReader(i.ctx, i.vector, i.field, i.k,
 			i.searchParams, i.eligibleSelector)
 		if err != nil {
@@ -123,7 +123,7 @@ func (i *IndexSnapshotVectorReader) Advance(ID index.IndexInternalID,
 		*i = *(i2.(*IndexSnapshotVectorReader))
 	}
 
-	num, err := docInternalToNumber(ID)
+	num, err := ID.Value()
 	if err != nil {
 		return nil, fmt.Errorf("error converting to doc number % x - %v", ID, err)
 	}
@@ -148,7 +148,7 @@ func (i *IndexSnapshotVectorReader) Advance(ID index.IndexInternalID,
 	if preAlloced == nil {
 		preAlloced = &index.VectorDoc{}
 	}
-	preAlloced.ID = docNumberToBytes(preAlloced.ID, next.Number()+
+	preAlloced.ID = index.NewIndexInternalID(preAlloced.ID, next.Number()+
 		i.snapshot.offsets[segIndex])
 	i.currID = preAlloced.ID
 	i.currPosting = next
@@ -166,4 +166,52 @@ func (i *IndexSnapshotVectorReader) Count() uint64 {
 func (i *IndexSnapshotVectorReader) Close() error {
 	// TODO Consider if any scope of recycling here.
 	return nil
+}
+
+func (i *IndexSnapshot) CentroidCardinalities(field string, limit int, descending bool) (
+	[]index.CentroidCardinality, error) {
+	if len(i.segment) == 0 {
+		return nil, nil
+	}
+
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be positive")
+	}
+
+	centroids := make([]index.CentroidCardinality, 0, limit*len(i.segment))
+
+	for _, segment := range i.segment {
+		if sv, ok := segment.segment.(segment_api.VectorSegment); ok {
+			vecIndex, err := sv.InterpretVectorIndex(field, segment.deleted)
+			if err != nil {
+				return nil, fmt.Errorf("failed to interpret vector index for field %s in segment: %v", field, err)
+			}
+
+			centroidCardinalities, err := vecIndex.ObtainKCentroidCardinalitiesFromIVFIndex(limit, descending)
+			if err != nil {
+				return nil, fmt.Errorf("failed to obtain top k centroid cardinalities for field %s in segment: %v", field, err)
+			}
+
+			if len(centroidCardinalities) > 0 {
+				centroids = append(centroids, centroidCardinalities...)
+			}
+		}
+	}
+
+	if len(centroids) == 0 {
+		return nil, nil
+	}
+
+	sort.Slice(centroids, func(i, j int) bool {
+		if descending {
+			return centroids[i].Cardinality > centroids[j].Cardinality
+		}
+		return centroids[i].Cardinality < centroids[j].Cardinality
+	})
+
+	if limit >= len(centroids) {
+		return centroids, nil
+	}
+
+	return centroids[:limit], nil
 }

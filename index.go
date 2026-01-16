@@ -388,3 +388,11 @@ type SynonymIndex interface {
 	// IndexSynonym indexes a synonym definition, with the specified id and belonging to the specified collection.
 	IndexSynonym(id string, collection string, definition *SynonymDefinition) error
 }
+
+type InsightsIndex interface {
+	Index
+	// TermFrequencies returns the tokens ordered by frequencies for the field index.
+	TermFrequencies(field string, limit int, descending bool) ([]index.TermFreq, error)
+	// CentroidCardinalities returns the centroids (clusters) from IVF indexes ordered by data density.
+	CentroidCardinalities(field string, limit int, desceding bool) ([]index.CentroidCardinality, error)
+}

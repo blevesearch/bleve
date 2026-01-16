@@ -49,9 +49,9 @@ info:
 
     ## Common Properties
 
-  All queries support:
-    - **boost**: Query boost value (float, default 1.0)
-    - **field**: Field to search (string, optional)
+    All queries support:
+      - **boost**: Query boost value (float, default 1.0)
+      - **field**: Field to search (string, optional)
 
     ## Query Parsing
 
@@ -88,8 +88,6 @@ components:
     Query:
       type: object
       description: Base query object - all queries extend this
-      discriminator:
-        propertyName: type
       properties:
         boost:
           type: number
@@ -354,35 +352,52 @@ components:
             must:
               oneOf:
                 - type: array
-              description: Queries that must match
+                  items:
+                    $ref: '#/components/schemas/Query'
+                - $ref: '#/components/schemas/Query'
+              description: Queries that must match (can be single query or array)
             should:
               oneOf:
                 - type: array
-              description: Queries that should match (boost score)
+                  items:
+                    $ref: '#/components/schemas/Query'
+                - $ref: '#/components/schemas/Query'
+              description: Queries that should match (boost score, can be single query or array)
             must_not:
               oneOf:
                 - type: array
-              description: Queries that must not match
+                  items:
+                    $ref: '#/components/schemas/Query'
+                - $ref: '#/components/schemas/Query'
+              description: Queries that must not match (can be single query or array)
             filter:
               oneOf:
                 - type: array
-              description: Queries that filter results (no score impact)
+                  items:
+                    $ref: '#/components/schemas/Query'
+                - $ref: '#/components/schemas/Query'
+              description: Queries that filter results (no score impact, can be single query or array)
             min_should:
               type: integer
               description: Minimum number of should queries that must match
               minimum: 0
           example:
             must:
-              term: "important"
-              field: "status"
-            should:
+              - term: "important"
+                field: "status"
               - match: "urgent"
                 field: "title"
+            should:
               - match: "critical"
                 field: "content"
+              - match: "priority"
+                field: "tags"
             must_not:
-              term: "archived"
-              field: "status"
+              - term: "archived"
+                field: "status"
+            filter:
+              - term: "published"
+                field: "status"
             boost: 1.5
 
     ConjunctionQuery:
@@ -391,6 +406,8 @@ components:
           properties:
             conjuncts:
               type: array
+              items:
+                $ref: '#/components/schemas/Query'
               description: Array of queries that must all match
               minItems: 1
           required:
@@ -408,6 +425,8 @@ components:
           properties:
             disjuncts:
               type: array
+              items:
+                $ref: '#/components/schemas/Query'
               description: Array of queries where at least one must match
               minItems: 1
             min:
@@ -599,7 +618,20 @@ components:
                   type: string
                   enum: [Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon, GeometryCollection]
                 coordinates:
-                  description: Geometry coordinates
+                  description: Geometry coordinates (format depends on geometry type)
+                  oneOf:
+                    - type: array
+                      description: Coordinates for Point, LineString, MultiPoint, etc.
+                    - type: array
+                      items:
+                        type: array
+                      description: Nested coordinates for Polygon, MultiLineString, etc.
+                    - type: array
+                      items:
+                        type: array
+                        items:
+                          type: array
+                      description: Deeply nested coordinates for MultiPolygon, etc.
               required:
                 - type
                 - coordinates

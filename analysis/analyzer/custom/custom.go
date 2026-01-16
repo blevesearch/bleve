@@ -140,7 +140,7 @@ func convertInterfaceSliceToStringSlice(interfaceSlice []interface{}, objType st
 		if ok {
 			stringSlice[i] = stringObj
 		} else {
-			return nil, fmt.Errorf(objType + " name must be a string")
+			return nil, fmt.Errorf("%s name must be a string", objType)
 		}
 	}
 

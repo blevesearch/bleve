@@ -1,7 +1,7 @@
 # ![bleve](docs/bleve.png) bleve
 
 [![Tests](https://github.com/blevesearch/bleve/actions/workflows/tests.yml/badge.svg?branch=master&event=push)](https://github.com/blevesearch/bleve/actions/workflows/tests.yml?query=event%3Apush+branch%3Amaster)
-[![Coverage Status](https://coveralls.io/repos/github/blevesearch/bleve/badge.svg?branch=master)](https://coveralls.io/github/blevesearch/bleve?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/blevesearch/bleve/badge.svg)](https://coveralls.io/github/blevesearch/bleve)
 [![Go Reference](https://pkg.go.dev/badge/github.com/blevesearch/bleve/v2.svg)](https://pkg.go.dev/github.com/blevesearch/bleve/v2)
 [![Join the chat](https://badges.gitter.im/join_chat.svg)](https://app.gitter.im/#/room/#blevesearch_bleve:gitter.im)
 [![Go Report Card](https://goreportcard.com/badge/github.com/blevesearch/bleve/v2)](https://goreportcard.com/report/github.com/blevesearch/bleve/v2)
@@ -24,6 +24,7 @@ A modern indexing + search library in GO
   * [geo spatial search](https://github.com/blevesearch/bleve/blob/master/geo/README.md)
   * approximate k-nearest neighbors via [vector search](https://github.com/blevesearch/bleve/blob/master/docs/vectors.md)
   * [synonym search](https://github.com/blevesearch/bleve/blob/master/docs/synonyms.md)
+  * [hierarchical nested search](https://github.com/blevesearch/bleve/blob/master/docs/hierarchy.md)
 * [tf-idf](https://github.com/blevesearch/bleve/blob/master/docs/scoring.md#tf-idf) / [bm25](https://github.com/blevesearch/bleve/blob/master/docs/scoring.md#bm25) scoring models
 * Hybrid search: exact + semantic
   * Supports [RRF (Reciprocal Rank Fusion) and RSF (Relative Score Fusion)](docs/score_fusion.md)

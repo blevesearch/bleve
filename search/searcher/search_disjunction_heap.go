@@ -15,7 +15,6 @@
 package searcher
 
 import (
-	"bytes"
 	"container/heap"
 	"context"
 	"math"
@@ -169,7 +168,7 @@ func (s *DisjunctionHeapSearcher) updateMatches() error {
 		matchingIdxs = append(matchingIdxs, next.matchingIdx)
 
 		// now as long as top of heap matches, keep popping
-		for len(s.heap) > 0 && bytes.Compare(next.curr.IndexInternalID, s.heap[0].curr.IndexInternalID) == 0 {
+		for len(s.heap) > 0 && next.curr.IndexInternalID.Equals(s.heap[0].curr.IndexInternalID) {
 			next = heap.Pop(s).(*SearcherCurr)
 			matching = append(matching, next.curr)
 			matchingCurrs = append(matchingCurrs, next)
@@ -264,7 +263,7 @@ func (s *DisjunctionHeapSearcher) Advance(ctx *search.SearchContext,
 
 	// find all searchers that actually need to be advanced
 	// advance them, using s.matchingCurrs as temp storage
-	for len(s.heap) > 0 && bytes.Compare(s.heap[0].curr.IndexInternalID, ID) < 0 {
+	for len(s.heap) > 0 && s.heap[0].curr.IndexInternalID.Compare(ID) < 0 {
 		searcherCurr := heap.Pop(s).(*SearcherCurr)
 		ctx.DocumentMatchPool.Put(searcherCurr.curr)
 		curr, err := searcherCurr.searcher.Advance(ctx, ID)
@@ -347,7 +346,7 @@ func (s *DisjunctionHeapSearcher) Less(i, j int) bool {
 	} else if s.heap[j].curr == nil {
 		return false
 	}
-	return bytes.Compare(s.heap[i].curr.IndexInternalID, s.heap[j].curr.IndexInternalID) < 0
+	return s.heap[i].curr.IndexInternalID.Compare(s.heap[j].curr.IndexInternalID) < 0
 }
 
 func (s *DisjunctionHeapSearcher) Swap(i, j int) {
