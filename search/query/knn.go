@@ -53,7 +53,7 @@ func (q *KNNQuery) SetK(k int64) {
 	q.K = k
 }
 
-func (q *KNNQuery) SetFieldVal(field string) {
+func (q *KNNQuery) SetField(field string) {
 	q.VectorField = field
 }
 

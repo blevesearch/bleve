@@ -3082,3 +3082,133 @@ func BenchmarkIndexUpdateText(b *testing.B) {
 		}
 	}
 }
+
+func TestIndexUpdateNestedMapping(t *testing.T) {
+	// Helper: create a mapping with optional nested structure
+	createCompanyMapping := func(nestedEmployees, nestedDepartments, nestedProjects, nestedLocations bool) *mapping.IndexMappingImpl {
+		rv := mapping.NewIndexMapping()
+		companyMapping := mapping.NewDocumentMapping()
+
+		// Basic fields
+		companyMapping.AddFieldMappingsAt("id", mapping.NewTextFieldMapping())
+		companyMapping.AddFieldMappingsAt("name", mapping.NewTextFieldMapping())
+
+		var deptMapping *mapping.DocumentMapping
+		// Departments nested conditionally
+		if !nestedDepartments {
+			deptMapping = mapping.NewDocumentMapping()
+		} else {
+			deptMapping = mapping.NewNestedDocumentMapping()
+		}
+		deptMapping.AddFieldMappingsAt("name", mapping.NewTextFieldMapping())
+		deptMapping.AddFieldMappingsAt("budget", mapping.NewNumericFieldMapping())
+
+		// Employees nested conditionally
+		var empMapping *mapping.DocumentMapping
+		if !nestedEmployees {
+			empMapping = mapping.NewNestedDocumentMapping()
+		} else {
+			empMapping = mapping.NewDocumentMapping()
+		}
+		empMapping.AddFieldMappingsAt("name", mapping.NewTextFieldMapping())
+		empMapping.AddFieldMappingsAt("role", mapping.NewTextFieldMapping())
+		deptMapping.AddSubDocumentMapping("employees", empMapping)
+
+		// Projects nested conditionally
+		var projMapping *mapping.DocumentMapping
+		if !nestedProjects {
+			projMapping = mapping.NewNestedDocumentMapping()
+		} else {
+			projMapping = mapping.NewDocumentMapping()
+		}
+		projMapping.AddFieldMappingsAt("title", mapping.NewTextFieldMapping())
+		projMapping.AddFieldMappingsAt("status", mapping.NewTextFieldMapping())
+		deptMapping.AddSubDocumentMapping("projects", projMapping)
+
+		companyMapping.AddSubDocumentMapping("departments", deptMapping)
+
+		// Locations nested conditionally
+		var locMapping *mapping.DocumentMapping
+		if nestedLocations {
+			locMapping = mapping.NewNestedDocumentMapping()
+		} else {
+			locMapping = mapping.NewDocumentMapping()
+		}
+		locMapping.AddFieldMappingsAt("address", mapping.NewTextFieldMapping())
+		locMapping.AddFieldMappingsAt("city", mapping.NewTextFieldMapping())
+
+		companyMapping.AddSubDocumentMapping("locations", locMapping)
+
+		rv.DefaultMapping.AddSubDocumentMapping("company", companyMapping)
+		return rv
+	}
+
+	tests := []struct {
+		name      string
+		original  *mapping.IndexMappingImpl
+		updated   *mapping.IndexMappingImpl
+		expectErr bool
+	}{
+		{
+			name:      "No nested to all nested",
+			original:  createCompanyMapping(false, false, false, false),
+			updated:   createCompanyMapping(true, true, true, true),
+			expectErr: true,
+		},
+		{
+			name:      "No nested to mixed nested",
+			original:  createCompanyMapping(false, false, false, false),
+			updated:   createCompanyMapping(true, false, true, false),
+			expectErr: true,
+		},
+		{
+			name:      "No nested to mixed nested",
+			original:  createCompanyMapping(false, false, false, false),
+			updated:   createCompanyMapping(true, true, true, false),
+			expectErr: true,
+		},
+		{
+			name:      "Mixed nested to no nested",
+			original:  createCompanyMapping(false, true, false, true),
+			updated:   createCompanyMapping(false, false, true, true),
+			expectErr: true,
+		},
+		{
+			name:      "All nested to no nested",
+			original:  createCompanyMapping(true, true, true, true),
+			updated:   createCompanyMapping(false, false, false, false),
+			expectErr: true,
+		},
+		{
+			name:      "Mixed nested to all nested",
+			original:  createCompanyMapping(true, false, true, false),
+			updated:   createCompanyMapping(true, true, true, true),
+			expectErr: true,
+		},
+		{
+			name:      "All nested to mixed nested",
+			original:  createCompanyMapping(true, true, true, true),
+			updated:   createCompanyMapping(true, false, true, false),
+			expectErr: true,
+		},
+		{
+			name:      "No nested to no nested",
+			original:  createCompanyMapping(false, false, false, false),
+			updated:   createCompanyMapping(false, false, false, false),
+			expectErr: false,
+		},
+		{
+			name:      "All nested to all nested",
+			original:  createCompanyMapping(true, true, true, true),
+			updated:   createCompanyMapping(true, true, true, true),
+			expectErr: false,
+		},
+	}
+
+	for _, test := range tests {
+		_, err := DeletedFields(test.original, test.updated)
+		if (err != nil) != test.expectErr {
+			t.Errorf("Test '%s' unexpected error state: got %v, expectErr %t", test.name, err, test.expectErr)
+		}
+	}
+}

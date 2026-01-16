@@ -200,7 +200,11 @@ func TestReciprocalRankFusion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ReciprocalRankFusion(tt.hits, tt.weights, tt.rank_constant, tt.window_size, tt.numKNNQueries, false); !compareFusionResults(got, tt.want) {
+			for i, hit := range tt.hits {
+				hit.HitNumber = uint64(i)
+			}
+
+			if got := ReciprocalRankFusion(tt.hits, tt.weights, tt.rank_constant, tt.window_size, tt.numKNNQueries, false); !compareFusionResults(*got, tt.want) {
 				t.Errorf("ReciprocalRankFusion() = %v, want %v", got, tt.want)
 			}
 		})
