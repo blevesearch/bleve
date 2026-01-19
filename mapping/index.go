@@ -376,13 +376,7 @@ func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}
 		// see if the _all field was disabled
 		allMapping, _ := docMapping.documentMappingForPath("_all")
 		if allMapping == nil || allMapping.Enabled {
-			excludedFromAll := walkContext.excludedFromAll
-			nf := doc.NestedFields()
-			if nf != nil {
-				// if the document has any nested fields, exclude them from _all
-				excludedFromAll = append(excludedFromAll, nf.Slice()...)
-			}
-			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, excludedFromAll, index.IndexField|index.IncludeTermVectors)
+			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, index.IndexField|index.IncludeTermVectors)
 			doc.AddField(field)
 		}
 		doc.SetIndexed()
