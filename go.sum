@@ -48,6 +48,8 @@ github.com/blevesearch/zapx/v16 v16.3.0 h1:hF6VlN15E9CB40RMPyqOIhlDw1OOo9RItumhK
 github.com/blevesearch/zapx/v16 v16.3.0/go.mod h1:zCFjv7McXWm1C8rROL+3mUoD5WYe2RKsZP3ufqcYpLY=
 github.com/blevesearch/zapx/v17 v17.0.0 h1:srLJFkv5ghz1Z8iVz5uoOK89G2NvI4KdMG7aF3Cx7rE=
 github.com/blevesearch/zapx/v17 v17.0.0/go.mod h1:/pi9Gq7byQcduhNB6Vk08+ZXGVGPjZoNc5QnQY8lkOo=
+github.com/bmatcuk/doublestar/v4 v4.9.2 h1:b0mc6WyRSYLjzofB2v/0cuDUZ+MqoGyH3r0dVij35GI=
+github.com/bmatcuk/doublestar/v4 v4.9.2/go.mod h1:xBQ8jztBU6kakFMg+8WGxn0c6z1fTSPVIjEY1Wr7jzc=
 github.com/couchbase/ghistogram v0.1.0 h1:b95QcQTCzjTUocDXp/uMgSNQi8oj1tGwnJ4bODWZnps=
 github.com/couchbase/ghistogram v0.1.0/go.mod h1:s1Jhy76zqfEecpNWJfWUiKZookAFaiGOEoyzgHt9i7k=
 github.com/couchbase/moss v0.2.0 h1:VCYrMzFwEryyhRSeI+/b3tRBSeTpi/8gn5Kf6dxqn+o=
