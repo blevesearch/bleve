@@ -299,3 +299,15 @@ func (fs FieldSet) Slice() []string {
 	}
 	return rv
 }
+
+// HasID returns true if the field set contains the "_id" field.
+func (fs FieldSet) HasID() bool {
+	_, ok := fs["_id"]
+	return ok
+}
+
+// HasAll returns true if the field set contains the "_all" field.
+func (fs FieldSet) HasAll() bool {
+	_, ok := fs["_all"]
+	return ok
+}
