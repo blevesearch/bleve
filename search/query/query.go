@@ -502,6 +502,11 @@ func ExtractFields(q Query, m mapping.IndexMapping, fs search.FieldSet) (search.
 				break
 			}
 		}
+	case *DocIDQuery, *MatchAllQuery:
+		if fs == nil {
+			fs = search.NewFieldSet()
+		}
+		fs.AddField("_id")
 	}
 	return fs, err
 }

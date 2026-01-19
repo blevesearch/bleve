@@ -806,6 +806,176 @@ func TestNestedConjunctionQuery(t *testing.T) {
 	if res.Hits[0].ID != "doc2" {
 		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
 	}
+
+	// Test 9: Match_All query must return only top-level documents
+	matchAllQuery := query.NewMatchAllQuery()
+	req = buildReq([]query.Query{matchAllQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 3 {
+		t.Fatalf("expected 3 hits, got %d", len(res.Hits))
+	}
+
+	// Test 10: DocID query must return only top-level documents
+	docIDQuery := query.NewDocIDQuery([]string{"doc1", "doc2", "doc3", "doc2_$company.locations_$0", "doc3_$company.departments_$0_$company.departments.employees_$0"})
+	req = buildReq([]query.Query{docIDQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 3 {
+		t.Fatalf("expected 3 hits, got %d", len(res.Hits))
+	}
+
+	// Test 11: Boolean query in Filter-only mode must return correct top-level documents
+	empNameQuery = query.NewMatchQuery("Frank")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	boolQuery := query.NewBooleanQuery(nil, nil, nil)
+	boolQuery.AddFilter(empNameQuery)
+
+	req = buildReq([]query.Query{boolQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "doc2" || res.Hits[1].ID != "doc3" {
+		t.Fatalf("unexpected hit IDs: %v, %v", res.Hits[0].ID, res.Hits[1].ID)
+	}
+
+	// Test 12: Boolean query Must clause should work in nested context
+	empNameQuery = query.NewMatchQuery("Ivan")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery = query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	countryQuery = query.NewMatchQuery("Canada")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("London")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	boolQuery = query.NewBooleanQuery([]query.Query{empQuery, locQuery}, nil, nil)
+	req = buildReq([]query.Query{boolQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "doc3" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
+
+	// Test 13: Queries targetting _all field should:
+	// - match only top-level fields when no specific field is set
+	// - not match nested fields when no specific field is set
+	// - work correctly when combined with nested field queries,
+	//   returning only top-level documents where both conditions are met
+	allRootFieldQuery := query.NewMatchQuery("TechCorp")
+
+	req = buildReq([]query.Query{allRootFieldQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "doc1" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
+
+	allNestedFieldQuery := query.NewMatchQuery("Alice")
+	req = buildReq([]query.Query{allNestedFieldQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 0 {
+		t.Fatalf("expected 0 hits, got %d", len(res.Hits))
+	}
+
+	allMixedQuery := buildReq([]query.Query{allRootFieldQuery, allNestedFieldQuery})
+	res, err = idx.Search(allMixedQuery)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 0 {
+		t.Fatalf("expected 0 hits, got %d", len(res.Hits))
+	}
+
+	nestedFieldQuery := query.NewMatchQuery("Alice")
+	nestedFieldQuery.SetField("company.departments.employees.name")
+
+	allMixedQueryWithNested := buildReq([]query.Query{allRootFieldQuery, nestedFieldQuery})
+	res, err = idx.Search(allMixedQueryWithNested)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "doc1" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
+
+	empNameQuery = query.NewMatchQuery("Frank")
+	empNameQuery.SetField("company.departments.employees.name")
+
+	empRoleQuery = query.NewMatchQuery("Manager")
+	empRoleQuery.SetField("company.departments.employees.role")
+
+	empQuery = query.NewConjunctionQuery([]query.Query{empNameQuery, empRoleQuery})
+
+	deptNameQuery = query.NewMatchQuery("Engineering")
+	deptNameQuery.SetField("company.departments.name")
+
+	deptQuery = query.NewConjunctionQuery([]query.Query{empQuery, deptNameQuery})
+
+	countryQuery = query.NewMatchQuery("UK")
+	countryQuery.SetField("company.locations.country")
+
+	cityQuery = query.NewMatchQuery("London")
+	cityQuery.SetField("company.locations.city")
+
+	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
+
+	// mixed queries with _all field and _id field should match at root level always
+	companyNameAllQuery := query.NewMatchQuery("BizInc")
+	matchAllQuery = query.NewMatchAllQuery()
+	req = buildReq([]query.Query{deptQuery, locQuery, companyNameAllQuery, matchAllQuery})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "doc2" {
+		t.Fatalf("unexpected hit ID: %v", res.Hits[0].ID)
+	}
+
+	companyNameAllQueryNoMatch := query.NewMatchQuery("WebSolutions")
+	req = buildReq([]query.Query{deptQuery, locQuery, companyNameAllQueryNoMatch})
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(res.Hits) != 0 {
+		t.Fatalf("expected 0 hits, got %d", len(res.Hits))
+	}
 }
 
 func TestNestedArrayConjunctionQuery(t *testing.T) {

@@ -106,6 +106,12 @@ func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		// if we have common depth == max depth then we can just use
 		// the normal conjunction searcher, as all fields share the same
 		// nested context, otherwise we need to use the nested conjunction searcher
+		// also, if we are querying the _all or _id fields, we need to use
+		// the nested conjunction searcher as well, with common depth 0
+		// indicating matches happen only at the root level
+		if qfs.HasAll() || qfs.HasID() {
+			commonDepth = 0
+		}
 		if commonDepth < maxDepth {
 			return searcher.NewNestedConjunctionSearcher(ctx, i, ss, commonDepth, options)
 		}
