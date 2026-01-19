@@ -132,7 +132,7 @@ func filterCandidateTerms(indexReader index.IndexReader,
 	for err == nil && tfd != nil {
 		termBytes := []byte(tfd.Term)
 		i := sort.Search(len(terms), func(i int) bool { return bytes.Compare(terms[i], termBytes) >= 0 })
-		if i < len(terms) && bytes.Compare(terms[i], termBytes) == 0 {
+		if i < len(terms) && bytes.Equal(terms[i], termBytes) {
 			rv = append(rv, terms[i])
 		}
 		terms = terms[i:]
