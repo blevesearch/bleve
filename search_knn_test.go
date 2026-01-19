@@ -26,11 +26,14 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"reflect"
 	"sort"
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/v2/analysis/lang/en"
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -2043,6 +2046,617 @@ func TestNumVecsStat(t *testing.T) {
 			if !ok || v1 != uint64(300) {
 				t.Fatalf("mismatch in the number of vectors, expected 300, got %d", indexStatsMap["field:vector:num_vectors"])
 			}
+		}
+	}
+}
+
+func TestIndexUpdateVector(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMappingBefore := mapping.NewIndexMapping()
+	indexMappingBefore.TypeMapping = map[string]*mapping.DocumentMapping{}
+	indexMappingBefore.DefaultMapping = &mapping.DocumentMapping{
+		Enabled: true,
+		Dynamic: false,
+		Properties: map[string]*mapping.DocumentMapping{
+			"a": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:                    "vector",
+						Index:                   true,
+						Dims:                    4,
+						Similarity:              "l2_norm",
+						VectorIndexOptimizedFor: "latency",
+					},
+				},
+			},
+			"b": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:                    "vector",
+						Index:                   true,
+						Dims:                    4,
+						Similarity:              "l2_norm",
+						VectorIndexOptimizedFor: "latency",
+					},
+				},
+			},
+			"c": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:                    "vector_base64",
+						Index:                   true,
+						Dims:                    4,
+						Similarity:              "l2_norm",
+						VectorIndexOptimizedFor: "latency",
+					},
+				},
+			},
+			"d": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:                    "vector_base64",
+						Index:                   true,
+						Dims:                    4,
+						Similarity:              "l2_norm",
+						VectorIndexOptimizedFor: "latency",
+					},
+				},
+			},
+		},
+		Fields: []*mapping.FieldMapping{},
+	}
+	indexMappingBefore.IndexDynamic = false
+	indexMappingBefore.StoreDynamic = false
+	indexMappingBefore.DocValuesDynamic = false
+
+	index, err := New(tmpIndexPath, indexMappingBefore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc1 := map[string]interface{}{"a": []float32{0.32894259691238403, 0.6973215341567993, 0.6835201978683472, 0.38296082615852356}, "b": []float32{0.32894259691238403, 0.6973215341567993, 0.6835201978683472, 0.38296082615852356}, "c": "L5MOPw7NID5SQMU9pHUoPw==", "d": "L5MOPw7NID5SQMU9pHUoPw=="}
+	doc2 := map[string]interface{}{"a": []float32{0.0018692062003538013, 0.41076546907424927, 0.5675257444381714, 0.45832985639572144}, "b": []float32{0.0018692062003538013, 0.41076546907424927, 0.5675257444381714, 0.45832985639572144}, "c": "czloP94ZCD71ldY+GbAOPw==", "d": "czloP94ZCD71ldY+GbAOPw=="}
+	doc3 := map[string]interface{}{"a": []float32{0.7853356599807739, 0.6904757618904114, 0.5643226504325867, 0.682637631893158}, "b": []float32{0.7853356599807739, 0.6904757618904114, 0.5643226504325867, 0.682637631893158}, "c": "Chh6P2lOqT47mjg/0odlPg==", "d": "Chh6P2lOqT47mjg/0odlPg=="}
+	batch := index.NewBatch()
+	err = batch.Index("001", doc1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = batch.Index("002", doc2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = batch.Index("003", doc3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = index.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	indexMappingAfter := mapping.NewIndexMapping()
+	indexMappingAfter.TypeMapping = map[string]*mapping.DocumentMapping{}
+	indexMappingAfter.DefaultMapping = &mapping.DocumentMapping{
+		Enabled: true,
+		Dynamic: false,
+		Properties: map[string]*mapping.DocumentMapping{
+			"a": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:                    "vector",
+						Index:                   true,
+						Dims:                    4,
+						Similarity:              "l2_norm",
+						VectorIndexOptimizedFor: "latency",
+					},
+				},
+			},
+			"c": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:                    "vector_base64",
+						Index:                   true,
+						Dims:                    4,
+						Similarity:              "l2_norm",
+						VectorIndexOptimizedFor: "latency",
+					},
+				},
+			},
+			"d": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:                    "vector_base64",
+						Index:                   false,
+						Dims:                    4,
+						Similarity:              "l2_norm",
+						VectorIndexOptimizedFor: "latency",
+					},
+				},
+			},
+		},
+		Fields: []*mapping.FieldMapping{},
+	}
+	indexMappingAfter.IndexDynamic = false
+	indexMappingAfter.StoreDynamic = false
+	indexMappingAfter.DocValuesDynamic = false
+
+	mappingString, err := json.Marshal(indexMappingAfter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := map[string]interface{}{
+		"updated_mapping": string(mappingString),
+	}
+
+	index, err = OpenUsing(tmpIndexPath, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	q1 := NewSearchRequest(NewMatchNoneQuery())
+	q1.AddKNN("a", []float32{1, 2, 3, 4}, 3, 1.0)
+	res1, err := index.Search(q1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res1.Hits) != 3 {
+		t.Fatalf("Expected 3 hits, got %d", len(res1.Hits))
+	}
+	q2 := NewSearchRequest(NewMatchNoneQuery())
+	q2.AddKNN("b", []float32{1, 2, 3, 4}, 3, 1.0)
+	res2, err := index.Search(q2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res2.Hits) != 0 {
+		t.Fatalf("Expected 0 hits, got %d", len(res2.Hits))
+	}
+	q3 := NewSearchRequest(NewMatchNoneQuery())
+	q3.AddKNN("c", []float32{1, 2, 3, 4}, 3, 1.0)
+	res3, err := index.Search(q3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res3.Hits) != 3 {
+		t.Fatalf("Expected 3 hits, got %d", len(res3.Hits))
+	}
+	q4 := NewSearchRequest(NewMatchNoneQuery())
+	q4.AddKNN("d", []float32{1, 2, 3, 4}, 3, 1.0)
+	res4, err := index.Search(q4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res4.Hits) != 0 {
+		t.Fatalf("Expected 0 hits, got %d", len(res4.Hits))
+	}
+}
+
+func TestIndexInsightsTermFrequencies(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	mp := mapping.NewIndexMapping()
+	textMapping := mapping.NewTextFieldMapping()
+	textMapping.Analyzer = "en"
+	mp.DefaultMapping.AddFieldMappingsAt("text", textMapping)
+
+	idx, err := New(tmpIndexPath, mp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	data := []map[string]string{
+		{
+			"id":   "one",
+			"text": "She sells sea shells by the sea shore",
+		},
+		{
+			"id":   "two",
+			"text": "The quick brown fox jumps over the lazy dog",
+		},
+		{
+			"id":   "three",
+			"text": "She sold sea shells to the person with the dog",
+		},
+		{
+			"id":   "four",
+			"text": "But there are a lot of dogs on the beach",
+		},
+		{
+			"id":   "five",
+			"text": "To hell with the foxes",
+		},
+		{
+			"id":   "six",
+			"text": "What about the dogs",
+		},
+		{
+			"id":   "seven",
+			"text": "Dogs are OK, foxes are not",
+		},
+	}
+
+	expectTermFreqs := []index.TermFreq{
+		{Term: "dog", Frequency: 5},
+		{Term: "fox", Frequency: 3},
+		{Term: "sea", Frequency: 2},
+		{Term: "shell", Frequency: 2},
+		{Term: "beach", Frequency: 1},
+	}
+
+	for _, d := range data {
+		err = idx.Index(d["id"], d)
+		if err != nil {
+			t.Errorf("Error updating index: %v", err)
+		}
+	}
+
+	insightsIdx, ok := idx.(InsightsIndex)
+	if !ok {
+		t.Fatal("index does not support insights")
+	}
+
+	termFreqs, err := insightsIdx.TermFrequencies("text", 5, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(termFreqs, expectTermFreqs) {
+		t.Fatalf("term freqs do not match: got: %v, expected: %v", termFreqs, expectTermFreqs)
+	}
+}
+
+func TestIndexInsightsCentroidCardinalities(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	vectorDims := 5
+
+	mp := mapping.NewIndexMapping()
+	vecFieldMapping := mapping.NewVectorFieldMapping()
+	vecFieldMapping.Dims = vectorDims
+	vecFieldMapping.Similarity = index.CosineSimilarity
+	mp.DefaultMapping.AddFieldMappingsAt("vec", vecFieldMapping)
+
+	idx, err := New(tmpIndexPath, mp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	rand.Seed(time.Now().UnixNano())
+	min, max := float32(-10.0), float32(10.0)
+	genRandomVector := func() []float32 {
+		vec := make([]float32, vectorDims)
+		for i := range vec {
+			vec[i] = min + rand.Float32()*(max-min)
+		}
+		return vec
+	}
+
+	batch := idx.NewBatch()
+	for i := 1; i <= 50000; i++ {
+		if err = batch.Index(fmt.Sprintf("doc-%d", i), map[string]interface{}{
+			"vec": genRandomVector(),
+		}); err != nil {
+			t.Fatalf("error indexing doc: %v", err)
+		}
+
+		if i%200 == 0 {
+			err = idx.Batch(batch)
+			if err != nil {
+				t.Fatalf("Error adding batch to index: %v", err)
+			}
+			batch = idx.NewBatch()
+		}
+	}
+
+	if batch.Size() > 0 {
+		// In case doc count is not a multiple of 200, we need to add the final batch
+		err = idx.Batch(batch)
+		if err != nil {
+			t.Errorf("Error adding final batch to index: %v", err)
+		}
+	}
+
+	insightsIdx, ok := idx.(InsightsIndex)
+	if !ok {
+		t.Fatal("index does not support insights")
+	}
+
+	centroids, err := insightsIdx.CentroidCardinalities("vec", 5, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(centroids) != 5 {
+		t.Fatalf("expected 5 centroids, got %d", len(centroids))
+	}
+
+	for _, entry := range centroids {
+		if len(entry.Index) == 0 {
+			t.Fatal("expected index name for each centroid")
+		}
+	}
+}
+
+func TestHierarchicalNestedVectorSearch(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	dataset := `
+	[
+		{
+			"id": "doc1",
+			"items": [
+				{
+					"description": "I like trains",
+					"embedding_vector": [
+						1,
+						0,
+						0
+					],
+					"type": "transport"
+				},
+				{
+					"description": "I love pizza",
+					"embedding_vector": [
+						0,
+						1,
+						0
+					],
+					"type": "food"
+				}
+			]
+		},
+		{
+			"id": "doc2",
+			"items": [
+				{
+					"description": "I go to school by bus",
+					"embedding_vector": [
+						0.9,
+						0.1,
+						0
+					],
+					"type": "transport"
+				},
+				{
+					"description": "Sushi is delicious",
+					"embedding_vector": [
+						0,
+						1,
+						0
+					],
+					"type": "food"
+				}
+			]
+		},
+		{
+			"id": "doc3",
+			"items": [
+				{
+					"description": "Hamburgers are tasty",
+					"embedding_vector": [
+						0,
+						0.8,
+						0.2
+					],
+					"type": "food"
+				},
+				{
+					"description": "I enjoy biking",
+					"embedding_vector": [
+						0.7,
+						0,
+						0.3
+					],
+					"type": "transport"
+				}
+			]
+		}
+	]`
+	var documents []map[string]interface{}
+	err := json.Unmarshal([]byte(dataset), &documents)
+	if err != nil {
+		t.Fatalf("failed to unmarshal dataset: %v", err)
+	}
+	indexMapping := NewIndexMapping()
+	vecFieldMapping := mapping.NewVectorFieldMapping()
+	vecFieldMapping.Dims = 3
+	vecFieldMapping.Similarity = index.CosineSimilarity
+
+	typeMapping := mapping.NewTextFieldMapping()
+	typeMapping.Analyzer = keyword.Name
+
+	descMapping := mapping.NewTextFieldMapping()
+	descMapping.Analyzer = en.AnalyzerName
+
+	// items is NOT nested
+	itemsMapping := mapping.NewDocumentMapping()
+	itemsMapping.AddFieldMappingsAt("embedding_vector", vecFieldMapping)
+	itemsMapping.AddFieldMappingsAt("type", typeMapping)
+	itemsMapping.AddFieldMappingsAt("description", descMapping)
+
+	indexMapping.DefaultMapping.AddSubDocumentMapping("items", itemsMapping)
+	idx, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatalf("failed to create index: %v", err)
+	}
+	defer func() {
+		if err := idx.Close(); err != nil {
+			t.Fatalf("failed to close index: %v", err)
+		}
+	}()
+
+	batch := idx.NewBatch()
+	for _, doc := range documents {
+		err := batch.Index(doc["id"].(string), doc)
+		if err != nil {
+			t.Fatalf("failed to index document %s: %v", doc["id"], err)
+		}
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to batch index documents: %v", err)
+	}
+
+	// Plain vector search
+	searchReq := NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("items.embedding_vector", []float32{0, 1, 0}, 5, 1.0)
+	searchReq.SortBy([]string{"-_score", "_id"})
+
+	res, err := idx.Search(searchReq)
+	if err != nil {
+		t.Fatalf("failed to execute search: %v", err)
+	}
+
+	expectedOrder := []string{"doc1", "doc2", "doc3"}
+	expectedScores := []float64{1.0, 1.0, 0.970}
+	if len(res.Hits) != len(expectedOrder) {
+		t.Fatalf("expected %d hits, got %d", len(expectedOrder), len(res.Hits))
+	}
+	for i, expectedID := range expectedOrder {
+		if res.Hits[i].ID != expectedID {
+			t.Fatalf("at rank %d, expected docID %s, got %s", i+1, expectedID, res.Hits[i].ID)
+		}
+		if math.Abs(res.Hits[i].Score-expectedScores[i]) > 0.01 {
+			t.Fatalf("at rank %d, expected score %.3f, got %.3f", i+1, expectedScores[i], res.Hits[i].Score)
+		}
+	}
+
+	// Filtered vector search - should match output of plain vector search in non-nested case
+	filterQuery := NewTermQuery("transport")
+	filterQuery.SetField("items.type")
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNNWithFilter("items.embedding_vector", []float32{0, 1, 0}, 5, 1.0, filterQuery)
+	searchReq.SortBy([]string{"-_score", "_id"})
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatalf("failed to execute filtered search: %v", err)
+	}
+	if len(res.Hits) != len(expectedOrder) {
+		t.Fatalf("expected %d hits, got %d", len(expectedOrder), len(res.Hits))
+	}
+	for i, expectedID := range expectedOrder {
+		if res.Hits[i].ID != expectedID {
+			t.Fatalf("at rank %d, expected docID %s, got %s", i+1, expectedID, res.Hits[i].ID)
+		}
+		if math.Abs(res.Hits[i].Score-expectedScores[i]) > 0.01 {
+			t.Fatalf("at rank %d, expected score %.3f, got %.3f", i+1, expectedScores[i], res.Hits[i].Score)
+		}
+	}
+
+	// items IS nested
+	nestedItemsMapping := mapping.NewNestedDocumentMapping()
+	nestedItemsMapping.AddFieldMappingsAt("embedding_vector", vecFieldMapping)
+	nestedItemsMapping.AddFieldMappingsAt("type", typeMapping)
+	nestedItemsMapping.AddFieldMappingsAt("description", descMapping)
+
+	indexMappingNested := NewIndexMapping()
+	indexMappingNested.DefaultMapping.AddSubDocumentMapping("items", nestedItemsMapping)
+	idxNested, err := New(tmpIndexPath+"_nested", indexMappingNested)
+	if err != nil {
+		t.Fatalf("failed to create nested index: %v", err)
+	}
+	defer func() {
+		if err := idxNested.Close(); err != nil {
+			t.Fatalf("failed to close nested index: %v", err)
+		}
+	}()
+
+	batch = idxNested.NewBatch()
+	for _, doc := range documents {
+		err := batch.Index(doc["id"].(string), doc)
+		if err != nil {
+			t.Fatalf("failed to index document %s in nested index: %v", doc["id"], err)
+		}
+	}
+	err = idxNested.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to batch index documents in nested index: %v", err)
+	}
+	// Plain vector search on nested index
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("items.embedding_vector", []float32{0, 1, 0}, 5, 1.0)
+	searchReq.SortBy([]string{"-_score", "_id"})
+
+	res, err = idxNested.Search(searchReq)
+	if err != nil {
+		t.Fatalf("failed to execute search on nested index: %v", err)
+	}
+	// Exact same behavior as non-nested in this case
+	if len(res.Hits) != len(expectedOrder) {
+		t.Fatalf("expected %d hits, got %d", len(expectedOrder), len(res.Hits))
+	}
+	for i, expectedID := range expectedOrder {
+		if res.Hits[i].ID != expectedID {
+			t.Fatalf("at rank %d, expected docID %s, got %s", i+1, expectedID, res.Hits[i].ID)
+		}
+		if math.Abs(res.Hits[i].Score-expectedScores[i]) > 0.01 {
+			t.Fatalf("at rank %d, expected score %.3f, got %.3f", i+1, expectedScores[i], res.Hits[i].Score)
+		}
+	}
+
+	// Filtered vector search on nested index - should NOT match output of plain vector search in nested case
+	filterQuery = NewTermQuery("transport")
+	filterQuery.SetField("items.type")
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNNWithFilter("items.embedding_vector", []float32{0, 1, 0}, 5, 1.0, filterQuery)
+	searchReq.SortBy([]string{"-_score", "_id"})
+	res, err = idxNested.Search(searchReq)
+	if err != nil {
+		t.Fatalf("failed to execute filtered search on nested index: %v", err)
+	}
+	expectedNestedOrder := []string{"doc2", "doc1", "doc3"}
+	expectedNestedScores := []float64{0.110, 0, 0}
+	if len(res.Hits) != len(expectedNestedOrder) {
+		t.Fatalf("expected %d hits, got %d", len(expectedNestedOrder), len(res.Hits))
+	}
+	for i, expectedID := range expectedNestedOrder {
+		if res.Hits[i].ID != expectedID {
+			t.Fatalf("at rank %d, expected docID %s, got %s", i+1, expectedID, res.Hits[i].ID)
+		}
+		if math.Abs(res.Hits[i].Score-expectedNestedScores[i]) > 0.01 {
+			t.Fatalf("at rank %d, expected score %.3f, got %.3f", i+1, expectedNestedScores[i], res.Hits[i].Score)
 		}
 	}
 }
