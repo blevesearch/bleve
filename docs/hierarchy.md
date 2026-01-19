@@ -1,6 +1,6 @@
 # Hierarchical nested search
 
-* *v2.6.0* (and after) will come with support for **Array indexing and hierarchy search**.
+* *v2.6.0* (and after) will come with support for **Array indexing and hierarchical nested search**.
 * We've achieved this by embedding nested documents within our bleve (scorch) indexes.
 * Usage of zap file format: [v17](https://github.com/blevesearch/zapx/blob/master/zap.md). Here we preserve hierarchical document relationships within segments, continuing to conform to the segmented architecture of *scorch*.
 
@@ -146,7 +146,7 @@
 }
 ```
 
-* Any Bleve query (e.g., match, phrase, term, fuzzy, numeric/date range etc.) can be executed against fields within nested documents, with no special handling required. The query processor will automatically traverse the nested structures to find matches. Additional search constructs
+* Any Bleve query (e.g., `match`, `phrase`, `term`, `fuzzy`, `numeric/date range` etc.) can be executed against fields within nested documents, with no special handling required. The query processor will automatically traverse the nested structures to find matches. Additional search constructs
 like vector search, synonym search, hybrid and pre-filtered vector search integrate seamlessly with hierarchy search.
 
 * Conjunction Queries (AND queries) and other queries that depend on term co-occurrence within the same hierarchical context will respect the boundaries of nested documents. This means that terms must appear within the same nested object to be considered a match. For example, a conjunction query searching for an employee named "Alice" with the role "Engineer" within the "Engineering" department will only return results where both name and role terms are found within the same employee object, which is itself within a "Engineering" department object.
@@ -156,11 +156,11 @@ like vector search, synonym search, hybrid and pre-filtered vector search integr
 
   * Nested Faceting / Aggregations: Facets are computed within matched nested objects, producing context-aware buckets. E.g., a facet on `departments.projects.status` returns ongoing or completed only for projects in matched departments.
 
-  * Sorting by Nested Fields: Sorting can use fields from the relevant nested object, e.g., ordering companies by `departments.budget sorts` based on the budget of the specific matched department, not unrelated departments.
+  * Sorting by Nested Fields: Sorting can use fields from the relevant nested object, e.g., ordering companies by `departments.budget` sorts based on the budget of the specific matched department, not unrelated departments.
 
-* Vector Search (KNN / Multi-KNN): When an array of objects is marked as nested and contains vector fields, each vector is treated as belonging to its own nested document. Vector similarity is computed only within the same nested object, not across siblings. For example, if `departments.employees` is a nested array where each employee has a `skills_vector`, a KNN search using the embedding of `machine learning engineer` will match only employees whose own `skills_vector` is similar; other employees vectors within the same department or document do not contribute to the score or match. This also means that a vector search query for `K = 3` will return the top 3 most similar employees across all departments and all companies, and may return multiple employees from the same department or company if they rank among the top 3 most similar overall.
+* Vector Search (KNN / Multi-KNN): When a document contains an array of objects with vector/multi-vector fields, the final document score and ranking are identical whether or not the array is marked as `nested`. In both cases, the highest-scoring vector is selected; either directly from the array (non-nested) or from the best-matching nested object with its score bubbled up to the parent document.
 
-* Pre-Filtered Vector Search: When vector search is combined with filters on fields inside a nested array, the filters are applied first to pick which nested items are eligible. The vector search then runs only on those filtered items. For example, if `departments.employees` is a `nested` array, a pre-filtered KNN query for employees with the role `Manager` in the `Sales` department will first narrow the candidate set to only employees who meet those field conditions, and then compute vector similarity on the `skills_vector` of that filtered subset. This ensures that vector search results come only from the employees that satisfy the filter, while still treating each employee as an independent vector candidate.
+* Pre-Filtered Vector Search: When vector search is combined with filters on fields inside a nested array, the filters are applied first to pick which nested items are eligible. Vector similarity is then computed only on the vector fields of those filtered nested objects. For example, if `departments.employees` is a `nested` array, a pre-filtered KNN query for employees with a `skills_vector` matching `machine learning engineer`, a role of `Manager`, and belonging to the `Sales` department will first narrow the candidate set to only employees who meet the requirement, and then compute vector similarity on the `skills_vector` of that filtered subset. This ensures that vector search results come only from the employees that satisfy the filter, and not from unrelated employees in other departments.
 
 ## Indexing
 
