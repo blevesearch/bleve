@@ -238,10 +238,6 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	for i := range ftls { // recycle the ArrayPositions of each location
 		ftls[i].Location.ArrayPositions = ftls[i].Location.ArrayPositions[:0]
 	}
-	// remember the score breakdown map
-	scoreBreakdown := dm.ScoreBreakdown
-	// clear out the score breakdown map
-	clear(scoreBreakdown)
 	// remember the Descendants backing array
 	descendants := dm.Descendants
 	for i := range descendants { // recycle each IndexInternalID
@@ -258,8 +254,6 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	dm.FieldTermLocations = ftls[:0]
 	// reuse the Descendants already allocated (and reset len to 0)
 	dm.Descendants = descendants[:0]
-	// reuse the score breakdown map already allocated (after clearing it)
-	dm.ScoreBreakdown = scoreBreakdown
 	return dm
 }
 
