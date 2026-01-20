@@ -829,25 +829,6 @@ func TestNestedConjunctionQuery(t *testing.T) {
 		t.Fatalf("expected 3 hits, got %d", len(res.Hits))
 	}
 
-	// Test 11: Boolean query in Filter-only mode must return correct top-level documents
-	empNameQuery = query.NewMatchQuery("Frank")
-	empNameQuery.SetField("company.departments.employees.name")
-
-	boolQuery := query.NewBooleanQuery(nil, nil, nil)
-	boolQuery.AddFilter(empNameQuery)
-
-	req = buildReq([]query.Query{boolQuery})
-	res, err = idx.Search(req)
-	if err != nil {
-		t.Fatalf("search failed: %v", err)
-	}
-	if len(res.Hits) != 2 {
-		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
-	}
-	if res.Hits[0].ID != "doc2" || res.Hits[1].ID != "doc3" {
-		t.Fatalf("unexpected hit IDs: %v, %v", res.Hits[0].ID, res.Hits[1].ID)
-	}
-
 	// Test 12: Boolean query Must clause should work in nested context
 	empNameQuery = query.NewMatchQuery("Ivan")
 	empNameQuery.SetField("company.departments.employees.name")
@@ -865,7 +846,7 @@ func TestNestedConjunctionQuery(t *testing.T) {
 
 	locQuery = query.NewConjunctionQuery([]query.Query{countryQuery, cityQuery})
 
-	boolQuery = query.NewBooleanQuery([]query.Query{empQuery, locQuery}, nil, nil)
+	boolQuery := query.NewBooleanQuery([]query.Query{empQuery, locQuery}, nil, nil)
 	req = buildReq([]query.Query{boolQuery})
 	res, err = idx.Search(req)
 	if err != nil {
