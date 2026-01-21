@@ -172,9 +172,9 @@ type DocumentMatch struct {
 
 	// used to indicate the sub-scores that combined to form the
 	// final score for this document match.  This is only populated
-	// when the search request's query is a DisjunctionQuery
-	// or a ConjunctionQuery. The map key is the index of the sub-query
-	// in the DisjunctionQuery or ConjunctionQuery. The map value is the
+	// when the search request's query is a DisjunctionQuery.
+	// The map key is the index of the sub-query
+	// in the DisjunctionQuery. The map value is the
 	// sub-score for that sub-query.
 	ScoreBreakdown map[int]float64 `json:"score_breakdown,omitempty"`
 
@@ -185,6 +185,10 @@ type DocumentMatch struct {
 	// of the index that this match came from
 	// of the current alias view, used in alias of aliases scenario
 	IndexNames []string `json:"index_names,omitempty"`
+
+	// Descendants holds the IDs of any child/descendant document that contributed
+	// to this root DocumentMatch.
+	Descendants []index.IndexInternalID `json:"-"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
@@ -208,16 +212,38 @@ func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
 	dm.Fields[name] = valSlice
 }
 
+func (dm *DocumentMatch) AddFragments(field string, fragments []string) {
+	if dm.Fragments == nil {
+		dm.Fragments = make(FieldFragmentMap)
+	}
+OUTER:
+	for _, newFrag := range fragments {
+		for _, existingFrag := range dm.Fragments[field] {
+			if existingFrag == newFrag {
+				continue OUTER // no duplicates allowed
+			}
+		}
+		dm.Fragments[field] = append(dm.Fragments[field], newFrag)
+	}
+}
+
 // Reset allows an already allocated DocumentMatch to be reused
 func (dm *DocumentMatch) Reset() *DocumentMatch {
 	// remember the []byte used for the IndexInternalID
 	indexInternalID := dm.IndexInternalID
 	// remember the []interface{} used for sort
 	sort := dm.Sort
+	// remember the []string used for decoded sort
+	decodedSort := dm.DecodedSort
 	// remember the FieldTermLocations backing array
 	ftls := dm.FieldTermLocations
 	for i := range ftls { // recycle the ArrayPositions of each location
 		ftls[i].Location.ArrayPositions = ftls[i].Location.ArrayPositions[:0]
+	}
+	// remember the Descendants backing array
+	descendants := dm.Descendants
+	for i := range descendants { // recycle each IndexInternalID
+		descendants[i] = descendants[i][:0]
 	}
 	// idiom to copy over from empty DocumentMatch (0 allocations)
 	*dm = DocumentMatch{}
@@ -225,9 +251,12 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	dm.IndexInternalID = indexInternalID[:0]
 	// reuse the []interface{} already allocated (and reset len to 0)
 	dm.Sort = sort[:0]
-	dm.DecodedSort = dm.DecodedSort[:0]
+	// reuse the []string already allocated (and reset len to 0)
+	dm.DecodedSort = decodedSort[:0]
 	// reuse the FieldTermLocations already allocated (and reset len to 0)
 	dm.FieldTermLocations = ftls[:0]
+	// reuse the Descendants already allocated (and reset len to 0)
+	dm.Descendants = descendants[:0]
 	return dm
 }
 
@@ -399,4 +428,21 @@ func (sc *SearchContext) Size() int {
 	}
 
 	return sizeInBytes
+}
+
+// A NestedDocumentMatch is like a DocumentMatch but used for nested documents
+// and does not have score or locations, or a score and is mainly used to
+// hold field values and fragments, to be embedded in the parent DocumentMatch
+type NestedDocumentMatch struct {
+	Fields    map[string]interface{} `json:"fields,omitempty"`
+	Fragments FieldFragmentMap       `json:"fragments,omitempty"`
+}
+
+// NewNestedDocumentMatch creates a new NestedDocumentMatch instance
+// with the given fields and fragments
+func NewNestedDocumentMatch(fields map[string]interface{}, fragments FieldFragmentMap) *NestedDocumentMatch {
+	return &NestedDocumentMatch{
+		Fields:    fields,
+		Fragments: fragments,
+	}
 }

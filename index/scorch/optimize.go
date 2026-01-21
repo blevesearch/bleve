@@ -395,5 +395,7 @@ func (i *IndexSnapshot) unadornedTermFieldReader(
 		recycle:            false,
 		// signal downstream that this is a special unadorned termFieldReader
 		unadorned: true,
+		// unadorned TFRs do not require bytes read tracking
+		updateBytesRead: false,
 	}
 }
