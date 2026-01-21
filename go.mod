@@ -34,11 +34,14 @@ require (
 )
 
 require (
+	github.com/axiomhq/hyperloglog v0.2.5 // indirect
 	github.com/blevesearch/mmap-go v1.0.4 // indirect
 	github.com/couchbase/ghistogram v0.1.0 // indirect
+	github.com/dgryski/go-metro v0.0.0-20180109044635-280f6062b5bc // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v0.0.0-20171115153421-f7279a603ede // indirect
+	github.com/kamstrup/intmap v0.5.1 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	golang.org/x/sys v0.29.0 // indirect

@@ -31,11 +31,13 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/nanoseconds"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/seconds"
 	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/aggregation"
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/facet"
 	"github.com/blevesearch/bleve/v2/search/highlight"
@@ -587,6 +589,15 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 		}
 	}
 
+	// Collect background statistics for significant_terms aggregations
+	var significantTermsStats map[string]*search.SignificantTermsStats
+	if requestHasSignificantTerms(req) {
+		significantTermsStats, err = i.collectSignificantTermsBackgroundStats(ctx, req, reader)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
@@ -598,7 +609,262 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 			DocCount:         float64(count),
 			FieldCardinality: fieldCardinality,
 		},
+		SignificantTermsStats: significantTermsStats,
 	}, nil
+}
+
+// collectSignificantTermsBackgroundStats collects background term statistics
+// for all significant_terms aggregations in the request
+func (i *indexImpl) collectSignificantTermsBackgroundStats(ctx context.Context, req *SearchRequest, reader index.IndexReader) (map[string]*search.SignificantTermsStats, error) {
+	// Find all fields used in significant_terms aggregations
+	fields := make(map[string]bool)
+	collectSignificantTermsFields(req.Aggregations, fields)
+
+	if len(fields) == 0 {
+		return nil, nil
+	}
+
+	// Collect statistics for each field
+	stats := make(map[string]*search.SignificantTermsStats)
+
+	for field := range fields {
+		// Pass nil for terms to collect ALL terms from the field dictionary
+		fieldStats, err := aggregation.CollectBackgroundTermStats(ctx, reader, field, nil)
+		if err != nil {
+			return nil, err
+		}
+		stats[field] = fieldStats
+	}
+
+	return stats, nil
+}
+
+// collectSignificantTermsFields recursively finds all fields used in significant_terms aggregations
+func collectSignificantTermsFields(aggs map[string]*AggregationRequest, fields map[string]bool) {
+	for _, agg := range aggs {
+		if agg.Type == "significant_terms" && agg.Field != "" {
+			fields[agg.Field] = true
+		}
+		// Recurse into sub-aggregations
+		if agg.Aggregations != nil {
+			collectSignificantTermsFields(agg.Aggregations, fields)
+		}
+	}
+}
+
+// buildAggregation recursively builds an aggregation builder from a request
+func buildAggregation(aggRequest *AggregationRequest) (search.AggregationBuilder, error) {
+	// Build sub-aggregations first (if any)
+	var subAggBuilders map[string]search.AggregationBuilder
+	if aggRequest.Aggregations != nil && len(aggRequest.Aggregations) > 0 {
+		subAggBuilders = make(map[string]search.AggregationBuilder)
+		for subName, subRequest := range aggRequest.Aggregations {
+			subBuilder, err := buildAggregation(subRequest)
+			if err != nil {
+				return nil, err
+			}
+			subAggBuilders[subName] = subBuilder
+		}
+	}
+
+	// Build the aggregation based on type
+	switch aggRequest.Type {
+	// Metric aggregations
+	case "sum":
+		return aggregation.NewSumAggregation(aggRequest.Field), nil
+	case "avg":
+		return aggregation.NewAvgAggregation(aggRequest.Field), nil
+	case "min":
+		return aggregation.NewMinAggregation(aggRequest.Field), nil
+	case "max":
+		return aggregation.NewMaxAggregation(aggRequest.Field), nil
+	case "count":
+		return aggregation.NewCountAggregation(aggRequest.Field), nil
+	case "sumsquares":
+		return aggregation.NewSumSquaresAggregation(aggRequest.Field), nil
+	case "stats":
+		return aggregation.NewStatsAggregation(aggRequest.Field), nil
+	case "cardinality":
+		precision := uint8(14) // default precision
+		if aggRequest.Precision != nil {
+			precision = *aggRequest.Precision
+		}
+		return aggregation.NewCardinalityAggregation(aggRequest.Field, precision), nil
+
+	// Bucket aggregations
+	case "terms":
+		size := 10 // default
+		if aggRequest.Size != nil {
+			size = *aggRequest.Size
+		}
+		termsAgg := aggregation.NewTermsAggregation(
+			aggRequest.Field,
+			size,
+			subAggBuilders,
+		)
+
+		// Set prefix filter if provided
+		if aggRequest.TermPrefix != "" {
+			termsAgg.SetPrefixFilter(aggRequest.TermPrefix)
+		}
+
+		// Set regex filter if provided
+		if aggRequest.TermPattern != "" {
+			// Use cached compiled pattern if available, otherwise compile it now
+			if aggRequest.compiledPattern != nil {
+				termsAgg.SetRegexFilter(aggRequest.compiledPattern)
+			} else {
+				regex, err := regexp.Compile(aggRequest.TermPattern)
+				if err != nil {
+					return nil, fmt.Errorf("error compiling regex pattern for aggregation: %v", err)
+				}
+				termsAgg.SetRegexFilter(regex)
+			}
+		}
+
+		return termsAgg, nil
+
+	case "range":
+		if len(aggRequest.NumericRanges) == 0 {
+			return nil, fmt.Errorf("range aggregation requires numeric ranges")
+		}
+		// Convert API ranges to internal format
+		ranges := make(map[string]*aggregation.NumericRange)
+		for _, nr := range aggRequest.NumericRanges {
+			ranges[nr.Name] = &aggregation.NumericRange{
+				Name: nr.Name,
+				Min:  nr.Min,
+				Max:  nr.Max,
+			}
+		}
+		return aggregation.NewRangeAggregation(aggRequest.Field, ranges, subAggBuilders), nil
+
+	case "date_range":
+		if len(aggRequest.DateTimeRanges) == 0 {
+			return nil, fmt.Errorf("date_range aggregation requires date ranges")
+		}
+		// Convert API ranges to internal format
+		ranges := make(map[string]*aggregation.DateRange)
+		for _, dtr := range aggRequest.DateTimeRanges {
+			dr := &aggregation.DateRange{
+				Name: dtr.Name,
+			}
+			// Handle start time (zero time = unbounded)
+			if !dtr.Start.IsZero() {
+				start := dtr.Start
+				dr.Start = &start
+			}
+			// Handle end time (zero time = unbounded)
+			if !dtr.End.IsZero() {
+				end := dtr.End
+				dr.End = &end
+			}
+			ranges[dtr.Name] = dr
+		}
+		return aggregation.NewDateRangeAggregation(aggRequest.Field, ranges, subAggBuilders), nil
+
+	case "histogram":
+		interval := 1.0 // default interval
+		if aggRequest.Interval != nil {
+			interval = *aggRequest.Interval
+		}
+		minDocCount := int64(0) // default
+		if aggRequest.MinDocCount != nil {
+			minDocCount = *aggRequest.MinDocCount
+		}
+		return aggregation.NewHistogramAggregation(aggRequest.Field, interval, minDocCount, subAggBuilders), nil
+
+	case "date_histogram":
+		minDocCount := int64(0) // default
+		if aggRequest.MinDocCount != nil {
+			minDocCount = *aggRequest.MinDocCount
+		}
+
+		// Use fixed interval if provided, otherwise calendar interval
+		if aggRequest.FixedInterval != "" {
+			duration, err := time.ParseDuration(aggRequest.FixedInterval)
+			if err != nil {
+				return nil, fmt.Errorf("invalid fixed interval '%s': %v", aggRequest.FixedInterval, err)
+			}
+			return aggregation.NewDateHistogramAggregationWithFixedInterval(aggRequest.Field, duration, minDocCount, subAggBuilders), nil
+		}
+
+		// Default to daily calendar interval if not specified
+		calendarInterval := aggregation.CalendarIntervalDay
+		if aggRequest.CalendarInterval != "" {
+			calendarInterval = aggregation.CalendarInterval(aggRequest.CalendarInterval)
+		}
+		return aggregation.NewDateHistogramAggregation(aggRequest.Field, calendarInterval, minDocCount, subAggBuilders), nil
+
+	case "geohash_grid":
+		precision := 5 // default precision (5km x 5km cells)
+		if aggRequest.GeoHashPrecision != nil {
+			precision = *aggRequest.GeoHashPrecision
+		}
+		size := 10 // default
+		if aggRequest.Size != nil {
+			size = *aggRequest.Size
+		}
+		return aggregation.NewGeohashGridAggregation(aggRequest.Field, precision, size, subAggBuilders), nil
+
+	case "geo_distance":
+		if aggRequest.CenterLon == nil || aggRequest.CenterLat == nil {
+			return nil, fmt.Errorf("geo_distance aggregation requires center_lon and center_lat")
+		}
+		if len(aggRequest.DistanceRanges) == 0 {
+			return nil, fmt.Errorf("geo_distance aggregation requires distance ranges")
+		}
+
+		// Parse distance unit (default to kilometers)
+		unitMultiplier := 1000.0 // default to kilometers
+		if aggRequest.DistanceUnit != "" {
+			multiplier, err := geo.ParseDistanceUnit(aggRequest.DistanceUnit)
+			if err != nil {
+				return nil, fmt.Errorf("invalid distance unit '%s': %v", aggRequest.DistanceUnit, err)
+			}
+			unitMultiplier = multiplier
+		}
+
+		// Convert API distance ranges to internal format
+		ranges := make(map[string]*aggregation.DistanceRange)
+		for _, dr := range aggRequest.DistanceRanges {
+			ranges[dr.Name] = &aggregation.DistanceRange{
+				Name: dr.Name,
+				From: dr.From,
+				To:   dr.To,
+			}
+		}
+
+		return aggregation.NewGeoDistanceAggregation(
+			aggRequest.Field,
+			*aggRequest.CenterLon,
+			*aggRequest.CenterLat,
+			unitMultiplier,
+			ranges,
+			subAggBuilders,
+		), nil
+
+	case "significant_terms":
+		size := 10 // default
+		if aggRequest.Size != nil {
+			size = *aggRequest.Size
+		}
+		minDocCount := int64(0) // default
+		if aggRequest.MinDocCount != nil {
+			minDocCount = *aggRequest.MinDocCount
+		}
+
+		// Parse algorithm
+		algorithm := aggregation.SignificanceAlgorithmJLH // default
+		if aggRequest.SignificanceAlgorithm != "" {
+			algorithm = aggregation.SignificanceAlgorithm(aggRequest.SignificanceAlgorithm)
+		}
+
+		return aggregation.NewSignificantTermsAggregation(aggRequest.Field, size, minDocCount, algorithm), nil
+
+	default:
+		return nil, fmt.Errorf("unknown aggregation type: %s", aggRequest.Type)
+	}
 }
 
 // SearchInContext executes a search request operation within the provided
@@ -890,6 +1156,44 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		coll.SetFacetsBuilder(facetsBuilder)
 	}
 
+	// build aggregations if requested
+	if req.Aggregations != nil {
+		aggregationsBuilder := search.NewAggregationsBuilder(indexReader)
+
+		// Get significant_terms background stats from PreSearchData if available
+		var significantTermsStats map[string]*search.SignificantTermsStats
+		if req.PreSearchData != nil {
+			if stats, ok := req.PreSearchData[search.SignificantTermsPreSearchDataKey].(map[string]*search.SignificantTermsStats); ok {
+				significantTermsStats = stats
+			}
+		}
+
+		for aggName, aggRequest := range req.Aggregations {
+			aggBuilder, err := buildAggregation(aggRequest)
+			if err != nil {
+				return nil, err
+			}
+
+			// If this is a significant_terms aggregation, inject the background stats
+			if aggRequest.Type == "significant_terms" {
+				if sta, ok := aggBuilder.(*aggregation.SignificantTermsAggregation); ok {
+					if significantTermsStats != nil && aggRequest.Field != "" {
+						if fieldStats, ok := significantTermsStats[aggRequest.Field]; ok {
+							sta.SetBackgroundStats(fieldStats)
+						}
+					}
+					// If no pre-search stats, the aggregation will use the index reader
+					if significantTermsStats == nil {
+						sta.SetIndexReader(indexReader)
+					}
+				}
+			}
+
+			aggregationsBuilder.Add(aggName, aggBuilder)
+		}
+		coll.SetAggregationsBuilder(aggregationsBuilder)
+	}
+
 	memNeeded := memNeededForSearch(req, searcher, coll)
 	if cb := ctx.Value(SearchQueryStartCallbackKey); cb != nil {
 		if cbF, ok := cb.(SearchQueryStartCallbackFn); ok {
@@ -982,11 +1286,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			Total:      1,
 			Successful: 1,
 		},
-		Hits:     hits,
-		Total:    coll.Total(),
-		MaxScore: coll.MaxScore(),
-		Took:     searchDuration,
-		Facets:   coll.FacetResults(),
+		Hits:         hits,
+		Total:        coll.Total(),
+		MaxScore:     coll.MaxScore(),
+		Took:         searchDuration,
+		Facets:       coll.FacetResults(),
+		Aggregations: coll.AggregationResults(),
 	}
 
 	// rescore if fusion flag is set

@@ -204,9 +204,10 @@ const (
 // PreSearchDataKey are used to store the data gathered during the presearch phase
 // which would be use in the actual search phase.
 const (
-	KnnPreSearchDataKey     = "_knn_pre_search_data_key"
-	SynonymPreSearchDataKey = "_synonym_pre_search_data_key"
-	BM25PreSearchDataKey    = "_bm25_pre_search_data_key"
+	KnnPreSearchDataKey              = "_knn_pre_search_data_key"
+	SynonymPreSearchDataKey          = "_synonym_pre_search_data_key"
+	BM25PreSearchDataKey             = "_bm25_pre_search_data_key"
+	SignificantTermsPreSearchDataKey = "_significant_terms_pre_search_data_key"
 )
 
 const GlobalScoring = "_global_scoring"

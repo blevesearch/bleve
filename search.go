@@ -143,6 +143,12 @@ type numericRange struct {
 	Max  *float64 `json:"max,omitempty"`
 }
 
+type distanceRange struct {
+	Name string   `json:"name,omitempty"`
+	From *float64 `json:"from,omitempty"` // In specified unit
+	To   *float64 `json:"to,omitempty"`   // In specified unit
+}
+
 // A FacetRequest describes a facet or aggregation
 // of the result document set you would like to be
 // built.
@@ -283,6 +289,196 @@ type FacetsRequest map[string]*FacetRequest
 
 func (fr FacetsRequest) Validate() error {
 	for _, v := range fr {
+		if err := v.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// An AggregationRequest describes an aggregation
+// to be computed over the result set.
+// Supports both metric aggregations (sum, avg, etc.) and bucket aggregations (terms, range, etc.).
+// Bucket aggregations can contain sub-aggregations via the Aggregations field.
+type AggregationRequest struct {
+	Type  string `json:"type"`  // Metric: sum, avg, min, max, count, sumsquares, stats, cardinality
+	                             // Bucket: terms, range, date_range, histogram, date_histogram, geohash_grid, geo_distance, significant_terms
+	Field string `json:"field"`
+
+	// Bucket aggregation configuration
+	Size           *int             `json:"size,omitempty"`            // For terms, geohash_grid aggregations
+	TermPrefix     string           `json:"term_prefix,omitempty"`     // For terms aggregations - filter by prefix
+	TermPattern    string           `json:"term_pattern,omitempty"`    // For terms aggregations - filter by regex
+	NumericRanges  []*numericRange  `json:"numeric_ranges,omitempty"`  // For numeric range aggregations
+	DateTimeRanges []*dateTimeRange `json:"date_ranges,omitempty"`     // For date range aggregations
+
+	// Metric aggregation configuration
+	Precision *uint8 `json:"precision,omitempty"` // For cardinality aggregations (HyperLogLog precision: 10-18, default: 14)
+
+	// Histogram aggregation configuration
+	Interval       *float64 `json:"interval,omitempty"`         // For histogram aggregations (bucket interval)
+	MinDocCount    *int64   `json:"min_doc_count,omitempty"`    // For histogram, date_histogram aggregations
+
+	// Date histogram aggregation configuration
+	CalendarInterval string `json:"calendar_interval,omitempty"` // For date_histogram: "1m", "1h", "1d", "1w", "1M", "1q", "1y"
+	FixedInterval    string `json:"fixed_interval,omitempty"`    // For date_histogram: duration string like "30m", "1h"
+
+	// Geohash grid aggregation configuration
+	GeoHashPrecision *int `json:"geohash_precision,omitempty"` // For geohash_grid: 1-12 (default: 5)
+
+	// Geo distance aggregation configuration
+	CenterLon       *float64          `json:"center_lon,omitempty"`       // For geo_distance
+	CenterLat       *float64          `json:"center_lat,omitempty"`       // For geo_distance
+	DistanceUnit    string            `json:"distance_unit,omitempty"`    // For geo_distance: "m", "km", "mi", etc.
+	DistanceRanges  []*distanceRange  `json:"distance_ranges,omitempty"`  // For geo_distance aggregations
+
+	// Significant terms aggregation configuration
+	SignificanceAlgorithm string `json:"significance_algorithm,omitempty"` // For significant_terms: "jlh", "mutual_information", "chi_squared", "percentage"
+
+	// Sub-aggregations (for bucket aggregations)
+	Aggregations AggregationsRequest `json:"aggregations,omitempty"`
+
+	// Compiled regex pattern (cached during validation)
+	compiledPattern *regexp.Regexp `json:"-"`
+}
+
+// NewAggregationRequest creates a simple metric aggregation request
+func NewAggregationRequest(aggType, field string) *AggregationRequest {
+	return &AggregationRequest{
+		Type:  aggType,
+		Field: field,
+	}
+}
+
+// NewTermsAggregation creates a terms bucket aggregation
+func NewTermsAggregation(field string, size int) *AggregationRequest {
+	return &AggregationRequest{
+		Type:  "terms",
+		Field: field,
+		Size:  &size,
+	}
+}
+
+// NewTermsAggregationWithFilter creates a filtered terms bucket aggregation
+// prefix filters terms by prefix (fast, zero-allocation byte comparison)
+// pattern filters terms by regex (flexible but slower)
+func NewTermsAggregationWithFilter(field string, size int, prefix, pattern string) *AggregationRequest {
+	return &AggregationRequest{
+		Type:        "terms",
+		Field:       field,
+		Size:        &size,
+		TermPrefix:  prefix,
+		TermPattern: pattern,
+	}
+}
+
+// NewRangeAggregation creates a numeric range bucket aggregation
+func NewRangeAggregation(field string, ranges []*numericRange) *AggregationRequest {
+	return &AggregationRequest{
+		Type:          "range",
+		Field:         field,
+		NumericRanges: ranges,
+	}
+}
+
+// AddSubAggregation adds a sub-aggregation to a bucket aggregation
+func (ar *AggregationRequest) AddSubAggregation(name string, subAgg *AggregationRequest) {
+	if ar.Aggregations == nil {
+		ar.Aggregations = make(AggregationsRequest)
+	}
+	ar.Aggregations[name] = subAgg
+}
+
+// SetPrefixFilter sets the prefix filter for terms aggregations.
+func (ar *AggregationRequest) SetPrefixFilter(prefix string) {
+	ar.TermPrefix = prefix
+}
+
+// SetRegexFilter sets the regex pattern filter for terms aggregations.
+func (ar *AggregationRequest) SetRegexFilter(pattern string) {
+	ar.TermPattern = pattern
+}
+
+// AddNumericRange adds a numeric range bucket for range aggregations.
+func (ar *AggregationRequest) AddNumericRange(name string, min, max *float64) {
+	ar.NumericRanges = append(ar.NumericRanges, &numericRange{Name: name, Min: min, Max: max})
+}
+
+// AddDateTimeRange adds a date/time range bucket for date_range aggregations.
+func (ar *AggregationRequest) AddDateTimeRange(name string, start, end time.Time) {
+	ar.DateTimeRanges = append(ar.DateTimeRanges, &dateTimeRange{Name: name, Start: start, End: end})
+}
+
+// AddDateTimeRangeString adds a date/time range bucket using string dates.
+func (ar *AggregationRequest) AddDateTimeRangeString(name string, start, end *string) {
+	ar.DateTimeRanges = append(ar.DateTimeRanges, &dateTimeRange{Name: name, startString: start, endString: end})
+}
+
+// AddDistanceRange adds a distance range bucket for geo_distance aggregations.
+func (ar *AggregationRequest) AddDistanceRange(name string, from, to *float64) {
+	ar.DistanceRanges = append(ar.DistanceRanges, &distanceRange{Name: name, From: from, To: to})
+}
+
+// Validate validates the aggregation request
+func (ar *AggregationRequest) Validate() error {
+	validTypes := map[string]bool{
+		// Metric aggregations
+		"sum": true, "avg": true, "min": true, "max": true,
+		"count": true, "sumsquares": true, "stats": true, "cardinality": true,
+		// Bucket aggregations
+		"terms": true, "range": true, "date_range": true,
+		"histogram": true, "date_histogram": true,
+		"geohash_grid": true, "geo_distance": true, "significant_terms": true,
+	}
+	if !validTypes[ar.Type] {
+		return fmt.Errorf("invalid aggregation type '%s'", ar.Type)
+	}
+	if ar.Field == "" {
+		return fmt.Errorf("aggregation field cannot be empty")
+	}
+
+	// Validate that TermPattern and TermPrefix are only used with "terms" aggregations
+	if ar.TermPattern != "" {
+		if ar.Type != "terms" {
+			return fmt.Errorf("term_pattern is only valid for terms aggregations, not %s", ar.Type)
+		}
+		compiled, err := regexp.Compile(ar.TermPattern)
+		if err != nil {
+			return fmt.Errorf("invalid term pattern: %v", err)
+		}
+		ar.compiledPattern = compiled
+	}
+	if ar.TermPrefix != "" && ar.Type != "terms" {
+		return fmt.Errorf("term_prefix is only valid for terms aggregations, not %s", ar.Type)
+	}
+
+	// Validate bucket-specific configuration
+	if ar.Type == "terms" {
+		if ar.Size != nil && *ar.Size < 0 {
+			return fmt.Errorf("terms aggregation size must be non-negative")
+		}
+	}
+
+	if ar.Type == "range" {
+		if len(ar.NumericRanges) == 0 {
+			return fmt.Errorf("range aggregation must have at least one range")
+		}
+	}
+
+	// Validate sub-aggregations
+	if ar.Aggregations != nil {
+		return ar.Aggregations.Validate()
+	}
+
+	return nil
+}
+
+// AggregationsRequest groups together all aggregation requests
+type AggregationsRequest map[string]*AggregationRequest
+
+// Validate validates all aggregation requests
+func (ar AggregationsRequest) Validate() error {
+	for _, v := range ar {
 		if err := v.Validate(); err != nil {
 			return err
 		}
@@ -537,20 +733,24 @@ func (ss *SearchStatus) Merge(other *SearchStatus) {
 // Took - The time taken to execute the search.
 // Facets - The facet results for the search.
 type SearchResult struct {
-	Status   *SearchStatus                  `json:"status"`
-	Request  *SearchRequest                 `json:"request,omitempty"`
-	Hits     search.DocumentMatchCollection `json:"hits"`
-	Total    uint64                         `json:"total_hits"`
-	Cost     uint64                         `json:"cost"`
-	MaxScore float64                        `json:"max_score"`
-	Took     time.Duration                  `json:"took"`
-	Facets   search.FacetResults            `json:"facets"`
+	Status       *SearchStatus                  `json:"status"`
+	Request      *SearchRequest                 `json:"request,omitempty"`
+	Hits         search.DocumentMatchCollection `json:"hits"`
+	Total        uint64                         `json:"total_hits"`
+	Cost         uint64                         `json:"cost"`
+	MaxScore     float64                        `json:"max_score"`
+	Took         time.Duration                  `json:"took"`
+	Facets       search.FacetResults       `json:"facets"`
+	Aggregations search.AggregationResults `json:"aggregations,omitempty"`
 	// special fields that are applicable only for search
 	// results that are obtained from a presearch
 	SynonymResult search.FieldTermSynonymMap `json:"synonym_result,omitempty"`
 
 	// The following fields are applicable to BM25 preSearch
 	BM25Stats *search.BM25Stats `json:"bm25_stats,omitempty"`
+
+	// The following field is applicable to significant_terms aggregations pre-search
+	SignificantTermsStats map[string]*search.SignificantTermsStats `json:"significant_terms_stats,omitempty"` // field -> stats
 }
 
 func (sr *SearchResult) Size() int {
@@ -678,10 +878,16 @@ func (sr *SearchResult) Merge(other *SearchResult) {
 	}
 	if sr.Facets == nil && len(other.Facets) != 0 {
 		sr.Facets = other.Facets
-		return
+	} else {
+		sr.Facets.Merge(other.Facets)
 	}
 
-	sr.Facets.Merge(other.Facets)
+	// Merge aggregations
+	if sr.Aggregations == nil && len(other.Aggregations) != 0 {
+		sr.Aggregations = other.Aggregations
+	} else {
+		sr.Aggregations.Merge(other.Aggregations)
+	}
 }
 
 // MemoryNeededForSearchResult is an exported helper function to determine the RAM

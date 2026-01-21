@@ -60,10 +60,11 @@ type TopNCollector struct {
 	total         uint64
 	bytesRead     uint64
 	maxScore      float64
-	took          time.Duration
-	sort          search.SortOrder
-	results       search.DocumentMatchCollection
-	facetsBuilder *search.FacetsBuilder
+	took                time.Duration
+	sort                search.SortOrder
+	results             search.DocumentMatchCollection
+	facetsBuilder       *search.FacetsBuilder
+	aggregationsBuilder *search.AggregationsBuilder
 
 	store collectorStore
 
@@ -311,6 +312,9 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	hc.updateFieldVisitor = func(field string, term []byte) {
 		if hc.facetsBuilder != nil {
 			hc.facetsBuilder.UpdateVisitor(field, term)
+		}
+		if hc.aggregationsBuilder != nil {
+			hc.aggregationsBuilder.UpdateVisitor(field, term)
 		}
 		hc.sort.UpdateVisitor(field, term)
 	}
@@ -583,6 +587,9 @@ func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.Doc
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.StartDoc()
 	}
+	if hc.aggregationsBuilder != nil {
+		hc.aggregationsBuilder.StartDoc()
+	}
 	if d.ID != "" && d.IndexInternalID == nil {
 		// this document may have been sent over as preSearchData and
 		// we need to look up the internal id to visit the doc values for it
@@ -605,6 +612,9 @@ func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.Doc
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.EndDoc()
 	}
+	if hc.aggregationsBuilder != nil {
+		hc.aggregationsBuilder.EndDoc()
+	}
 
 	hc.bytesRead += hc.dvReader.BytesRead()
 
@@ -617,6 +627,25 @@ func (hc *TopNCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
 	fieldsRequiredForFaceting := facetsBuilder.RequiredFields()
 	// for each of these fields, append only if not already there in hc.neededFields.
 	for _, field := range fieldsRequiredForFaceting {
+		found := false
+		for _, neededField := range hc.neededFields {
+			if field == neededField {
+				found = true
+				break
+			}
+		}
+		if !found {
+			hc.neededFields = append(hc.neededFields, field)
+		}
+	}
+}
+
+// SetAggregationsBuilder registers an aggregations builder for this collector
+func (hc *TopNCollector) SetAggregationsBuilder(aggregationsBuilder *search.AggregationsBuilder) {
+	hc.aggregationsBuilder = aggregationsBuilder
+	fieldsRequiredForAggregations := aggregationsBuilder.RequiredFields()
+	// for each of these fields, append only if not already there in hc.neededFields.
+	for _, field := range fieldsRequiredForAggregations {
 		found := false
 		for _, neededField := range hc.neededFields {
 			if field == neededField {
@@ -675,6 +704,14 @@ func (hc *TopNCollector) Took() time.Duration {
 func (hc *TopNCollector) FacetResults() search.FacetResults {
 	if hc.facetsBuilder != nil {
 		return hc.facetsBuilder.Results()
+	}
+	return nil
+}
+
+// AggregationResults returns the computed aggregation results
+func (hc *TopNCollector) AggregationResults() search.AggregationResults {
+	if hc.aggregationsBuilder != nil {
+		return hc.aggregationsBuilder.Results()
 	}
 	return nil
 }

@@ -58,6 +58,7 @@ type SearchRequest struct {
 	Highlight        *HighlightRequest `json:"highlight"`
 	Fields           []string          `json:"fields"`
 	Facets           FacetsRequest     `json:"facets"`
+	Aggregations     AggregationsRequest `json:"aggregations"`
 	Explain          bool              `json:"explain"`
 	Sort             search.SortOrder  `json:"sort"`
 	IncludeLocations bool              `json:"includeLocations"`
@@ -92,6 +93,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Highlight        *HighlightRequest `json:"highlight"`
 		Fields           []string          `json:"fields"`
 		Facets           FacetsRequest     `json:"facets"`
+		Aggregations     AggregationsRequest `json:"aggregations"`
 		Explain          bool              `json:"explain"`
 		Sort             []json.RawMessage `json:"sort"`
 		IncludeLocations bool              `json:"includeLocations"`
@@ -125,6 +127,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.Highlight = temp.Highlight
 	r.Fields = temp.Fields
 	r.Facets = temp.Facets
+	r.Aggregations = temp.Aggregations
 	r.IncludeLocations = temp.IncludeLocations
 	r.Score = temp.Score
 	r.SearchAfter = temp.SearchAfter
@@ -178,6 +181,7 @@ func copySearchRequest(req *SearchRequest, preSearchData map[string]interface{})
 		Highlight:        req.Highlight,
 		Fields:           req.Fields,
 		Facets:           req.Facets,
+		Aggregations:     req.Aggregations,
 		Explain:          req.Explain,
 		Sort:             req.Sort.Copy(),
 		IncludeLocations: req.IncludeLocations,
