@@ -291,11 +291,14 @@ func (fs FieldSet) AddField(field string) {
 	fs[field] = struct{}{}
 }
 
-// Slice returns the fields in this set as a slice of strings.
-func (fs FieldSet) Slice() []string {
-	rv := make([]string, 0, len(fs))
-	for field := range fs {
-		rv = append(rv, field)
-	}
-	return rv
+// HasID returns true if the field set contains the "_id" field.
+func (fs FieldSet) HasID() bool {
+	_, ok := fs["_id"]
+	return ok
+}
+
+// HasAll returns true if the field set contains the "_all" field.
+func (fs FieldSet) HasAll() bool {
+	_, ok := fs["_all"]
+	return ok
 }

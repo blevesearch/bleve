@@ -33,6 +33,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/v2/analysis/lang/en"
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -2413,6 +2414,249 @@ func TestIndexInsightsCentroidCardinalities(t *testing.T) {
 	for _, entry := range centroids {
 		if len(entry.Index) == 0 {
 			t.Fatal("expected index name for each centroid")
+		}
+	}
+}
+
+func TestHierarchicalNestedVectorSearch(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	dataset := `
+	[
+		{
+			"id": "doc1",
+			"items": [
+				{
+					"description": "I like trains",
+					"embedding_vector": [
+						1,
+						0,
+						0
+					],
+					"type": "transport"
+				},
+				{
+					"description": "I love pizza",
+					"embedding_vector": [
+						0,
+						1,
+						0
+					],
+					"type": "food"
+				}
+			]
+		},
+		{
+			"id": "doc2",
+			"items": [
+				{
+					"description": "I go to school by bus",
+					"embedding_vector": [
+						0.9,
+						0.1,
+						0
+					],
+					"type": "transport"
+				},
+				{
+					"description": "Sushi is delicious",
+					"embedding_vector": [
+						0,
+						1,
+						0
+					],
+					"type": "food"
+				}
+			]
+		},
+		{
+			"id": "doc3",
+			"items": [
+				{
+					"description": "Hamburgers are tasty",
+					"embedding_vector": [
+						0,
+						0.8,
+						0.2
+					],
+					"type": "food"
+				},
+				{
+					"description": "I enjoy biking",
+					"embedding_vector": [
+						0.7,
+						0,
+						0.3
+					],
+					"type": "transport"
+				}
+			]
+		}
+	]`
+	var documents []map[string]interface{}
+	err := json.Unmarshal([]byte(dataset), &documents)
+	if err != nil {
+		t.Fatalf("failed to unmarshal dataset: %v", err)
+	}
+	indexMapping := NewIndexMapping()
+	vecFieldMapping := mapping.NewVectorFieldMapping()
+	vecFieldMapping.Dims = 3
+	vecFieldMapping.Similarity = index.CosineSimilarity
+
+	typeMapping := mapping.NewTextFieldMapping()
+	typeMapping.Analyzer = keyword.Name
+
+	descMapping := mapping.NewTextFieldMapping()
+	descMapping.Analyzer = en.AnalyzerName
+
+	// items is NOT nested
+	itemsMapping := mapping.NewDocumentMapping()
+	itemsMapping.AddFieldMappingsAt("embedding_vector", vecFieldMapping)
+	itemsMapping.AddFieldMappingsAt("type", typeMapping)
+	itemsMapping.AddFieldMappingsAt("description", descMapping)
+
+	indexMapping.DefaultMapping.AddSubDocumentMapping("items", itemsMapping)
+	idx, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatalf("failed to create index: %v", err)
+	}
+	defer func() {
+		if err := idx.Close(); err != nil {
+			t.Fatalf("failed to close index: %v", err)
+		}
+	}()
+
+	batch := idx.NewBatch()
+	for _, doc := range documents {
+		err := batch.Index(doc["id"].(string), doc)
+		if err != nil {
+			t.Fatalf("failed to index document %s: %v", doc["id"], err)
+		}
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to batch index documents: %v", err)
+	}
+
+	// Plain vector search
+	searchReq := NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("items.embedding_vector", []float32{0, 1, 0}, 5, 1.0)
+	searchReq.SortBy([]string{"-_score", "_id"})
+
+	res, err := idx.Search(searchReq)
+	if err != nil {
+		t.Fatalf("failed to execute search: %v", err)
+	}
+
+	expectedOrder := []string{"doc1", "doc2", "doc3"}
+	expectedScores := []float64{1.0, 1.0, 0.970}
+	if len(res.Hits) != len(expectedOrder) {
+		t.Fatalf("expected %d hits, got %d", len(expectedOrder), len(res.Hits))
+	}
+	for i, expectedID := range expectedOrder {
+		if res.Hits[i].ID != expectedID {
+			t.Fatalf("at rank %d, expected docID %s, got %s", i+1, expectedID, res.Hits[i].ID)
+		}
+		if math.Abs(res.Hits[i].Score-expectedScores[i]) > 0.01 {
+			t.Fatalf("at rank %d, expected score %.3f, got %.3f", i+1, expectedScores[i], res.Hits[i].Score)
+		}
+	}
+
+	// Filtered vector search - should match output of plain vector search in non-nested case
+	filterQuery := NewTermQuery("transport")
+	filterQuery.SetField("items.type")
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNNWithFilter("items.embedding_vector", []float32{0, 1, 0}, 5, 1.0, filterQuery)
+	searchReq.SortBy([]string{"-_score", "_id"})
+	res, err = idx.Search(searchReq)
+	if err != nil {
+		t.Fatalf("failed to execute filtered search: %v", err)
+	}
+	if len(res.Hits) != len(expectedOrder) {
+		t.Fatalf("expected %d hits, got %d", len(expectedOrder), len(res.Hits))
+	}
+	for i, expectedID := range expectedOrder {
+		if res.Hits[i].ID != expectedID {
+			t.Fatalf("at rank %d, expected docID %s, got %s", i+1, expectedID, res.Hits[i].ID)
+		}
+		if math.Abs(res.Hits[i].Score-expectedScores[i]) > 0.01 {
+			t.Fatalf("at rank %d, expected score %.3f, got %.3f", i+1, expectedScores[i], res.Hits[i].Score)
+		}
+	}
+
+	// items IS nested
+	nestedItemsMapping := mapping.NewNestedDocumentMapping()
+	nestedItemsMapping.AddFieldMappingsAt("embedding_vector", vecFieldMapping)
+	nestedItemsMapping.AddFieldMappingsAt("type", typeMapping)
+	nestedItemsMapping.AddFieldMappingsAt("description", descMapping)
+
+	indexMappingNested := NewIndexMapping()
+	indexMappingNested.DefaultMapping.AddSubDocumentMapping("items", nestedItemsMapping)
+	idxNested, err := New(tmpIndexPath+"_nested", indexMappingNested)
+	if err != nil {
+		t.Fatalf("failed to create nested index: %v", err)
+	}
+	defer func() {
+		if err := idxNested.Close(); err != nil {
+			t.Fatalf("failed to close nested index: %v", err)
+		}
+	}()
+
+	batch = idxNested.NewBatch()
+	for _, doc := range documents {
+		err := batch.Index(doc["id"].(string), doc)
+		if err != nil {
+			t.Fatalf("failed to index document %s in nested index: %v", doc["id"], err)
+		}
+	}
+	err = idxNested.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to batch index documents in nested index: %v", err)
+	}
+	// Plain vector search on nested index
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNN("items.embedding_vector", []float32{0, 1, 0}, 5, 1.0)
+	searchReq.SortBy([]string{"-_score", "_id"})
+
+	res, err = idxNested.Search(searchReq)
+	if err != nil {
+		t.Fatalf("failed to execute search on nested index: %v", err)
+	}
+	// Exact same behavior as non-nested in this case
+	if len(res.Hits) != len(expectedOrder) {
+		t.Fatalf("expected %d hits, got %d", len(expectedOrder), len(res.Hits))
+	}
+	for i, expectedID := range expectedOrder {
+		if res.Hits[i].ID != expectedID {
+			t.Fatalf("at rank %d, expected docID %s, got %s", i+1, expectedID, res.Hits[i].ID)
+		}
+		if math.Abs(res.Hits[i].Score-expectedScores[i]) > 0.01 {
+			t.Fatalf("at rank %d, expected score %.3f, got %.3f", i+1, expectedScores[i], res.Hits[i].Score)
+		}
+	}
+
+	// Filtered vector search on nested index - should NOT match output of plain vector search in nested case
+	filterQuery = NewTermQuery("transport")
+	filterQuery.SetField("items.type")
+	searchReq = NewSearchRequest(query.NewMatchNoneQuery())
+	searchReq.AddKNNWithFilter("items.embedding_vector", []float32{0, 1, 0}, 5, 1.0, filterQuery)
+	searchReq.SortBy([]string{"-_score", "_id"})
+	res, err = idxNested.Search(searchReq)
+	if err != nil {
+		t.Fatalf("failed to execute filtered search on nested index: %v", err)
+	}
+	expectedNestedOrder := []string{"doc2", "doc1", "doc3"}
+	expectedNestedScores := []float64{0.110, 0, 0}
+	if len(res.Hits) != len(expectedNestedOrder) {
+		t.Fatalf("expected %d hits, got %d", len(expectedNestedOrder), len(res.Hits))
+	}
+	for i, expectedID := range expectedNestedOrder {
+		if res.Hits[i].ID != expectedID {
+			t.Fatalf("at rank %d, expected docID %s, got %s", i+1, expectedID, res.Hits[i].ID)
+		}
+		if math.Abs(res.Hits[i].Score-expectedNestedScores[i]) > 0.01 {
+			t.Fatalf("at rank %d, expected score %.3f, got %.3f", i+1, expectedNestedScores[i], res.Hits[i].Score)
 		}
 	}
 }

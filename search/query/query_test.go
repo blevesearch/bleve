@@ -1017,6 +1017,18 @@ func TestExtractFields(t *testing.T) {
 					}`,
 			expFields: []string{"text"},
 		},
+		{
+			query: `{
+						"match_all": {}
+					}`,
+			expFields: []string{"_id"},
+		},
+		{
+			query: `{
+						"ids": ["a", "b", "c"]
+					}`,
+			expFields: []string{"_id"},
+		},
 	}
 
 	m := mapping.NewIndexMapping()

@@ -36,8 +36,6 @@ type MatchAllSearcher struct {
 	reader      index.DocIDReader
 	scorer      *scorer.ConstantScorer
 	count       uint64
-	nested      bool
-	ancestors   []index.AncestorID
 }
 
 func NewMatchAllSearcher(ctx context.Context, indexReader index.IndexReader, boost float64, options search.SearcherOptions) (*MatchAllSearcher, error) {
@@ -52,15 +50,11 @@ func NewMatchAllSearcher(ctx context.Context, indexReader index.IndexReader, boo
 	}
 	scorer := scorer.NewConstantScorer(1.0, boost, options)
 
-	// check if we are in nested mode
-	nested, _ := ctx.Value(search.NestedSearchKey).(bool)
-
 	return &MatchAllSearcher{
 		indexReader: indexReader,
 		reader:      reader,
 		scorer:      scorer,
 		count:       count,
-		nested:      nested,
 	}, nil
 }
 
@@ -82,23 +76,6 @@ func (s *MatchAllSearcher) SetQueryNorm(qnorm float64) {
 	s.scorer.SetQueryNorm(qnorm)
 }
 
-func (s *MatchAllSearcher) isNested(id index.IndexInternalID) bool {
-	// if not running in nested mode, always return false
-	if !s.nested {
-		return false
-	}
-	var err error
-	// check if this doc has ancestors, if so it is nested
-	if nr, ok := s.reader.(index.NestedReader); ok {
-		s.ancestors, err = nr.Ancestors(id, s.ancestors[:0])
-		if err != nil {
-			return false
-		}
-		return len(s.ancestors) > 1
-	}
-	return false
-}
-
 func (s *MatchAllSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	id, err := s.reader.Next()
 	if err != nil {
@@ -107,11 +84,6 @@ func (s *MatchAllSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatc
 
 	if id == nil {
 		return nil, nil
-	}
-
-	if s.isNested(id) {
-		// if nested then skip and get next
-		return s.Next(ctx)
 	}
 
 	// score match
@@ -129,11 +101,6 @@ func (s *MatchAllSearcher) Advance(ctx *search.SearchContext, ID index.IndexInte
 
 	if id == nil {
 		return nil, nil
-	}
-
-	if s.isNested(id) {
-		// if nested then return next
-		return s.Next(ctx)
 	}
 
 	// score match
