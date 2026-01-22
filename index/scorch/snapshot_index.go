@@ -796,10 +796,6 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	// Filter out fields that have been completely deleted or had their
 	// docvalues data deleted from both visitable fields and required fields
 	filterUpdatedFields := func(fields []string) []string {
-		// fast path: if no updatedFields just return the input
-		if len(is.updatedFields) == 0 {
-			return fields
-		}
 		filteredFields := make([]string, 0, len(fields))
 		for _, field := range fields {
 			if info, ok := is.updatedFields[field]; ok &&
@@ -811,8 +807,10 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 		return filteredFields
 	}
 
-	fields = filterUpdatedFields(fields)
-	vFields = filterUpdatedFields(vFields)
+	if len(is.updatedFields) > 0 {
+		fields = filterUpdatedFields(fields)
+		vFields = filterUpdatedFields(vFields)
+	}
 
 	var errCh chan error
 
