@@ -58,11 +58,6 @@ func NewGeoShapeSearcher(ctx context.Context, indexReader index.IndexReader, sha
 	return NewFilteringSearcher(ctx, mSearcher, buildRelationFilterOnShapes(ctx, dvReader, field, relation, shape)), nil
 }
 
-// Using the same term splitter slice used in the doc values in zap.
-// TODO: This needs to be revisited whenever we change the zap
-// implementation of doc values.
-var termSeparatorSplitSlice = []byte{0xff}
-
 func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueReader, field string,
 	relation string, shape index.GeoJSON,
 ) FilterFunc {
@@ -104,7 +99,7 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 					finishReading = true
 				}
 
-				dvShapeValue = append(dvShapeValue, termSeparatorSplitSlice...)
+				dvShapeValue = append(dvShapeValue, index.DocValueTermSeparator)
 				dvShapeValue = append(dvShapeValue, term...)
 			}
 
