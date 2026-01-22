@@ -170,6 +170,11 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			newss.deleted = nil
 		}
 
+		// update the deleted bitmap to include any nested/sub-documents as well
+		// if the segment supports that
+		if ns, ok := newss.segment.(segment.NestedSegment); ok {
+			newss.deleted = ns.AddNestedDocuments(newss.deleted)
+		}
 		// check for live size before copying
 		if newss.LiveSize() > 0 {
 			newSnapshot.segment = append(newSnapshot.segment, newss)

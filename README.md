@@ -24,6 +24,7 @@ A modern indexing + search library in GO
   * [geo spatial search](https://github.com/blevesearch/bleve/blob/master/geo/README.md)
   * approximate k-nearest neighbors via [vector search](https://github.com/blevesearch/bleve/blob/master/docs/vectors.md)
   * [synonym search](https://github.com/blevesearch/bleve/blob/master/docs/synonyms.md)
+  * [hierarchical nested search](https://github.com/blevesearch/bleve/blob/master/docs/hierarchy.md)
 * [tf-idf](https://github.com/blevesearch/bleve/blob/master/docs/scoring.md#tf-idf) / [bm25](https://github.com/blevesearch/bleve/blob/master/docs/scoring.md#bm25) scoring models
 * Hybrid search: exact + semantic
   * Supports [RRF (Reciprocal Rank Fusion) and RSF (Relative Score Fusion)](docs/score_fusion.md)
