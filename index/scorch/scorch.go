@@ -22,10 +22,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/registry"
@@ -104,9 +106,10 @@ func (t ScorchErrorType) Error() string {
 }
 
 type trainRequest struct {
-	sample   segment.Segment
-	vecCount int
-	ackCh    chan error
+	sample         segment.Segment
+	vecCount       int
+	train_complete bool
+	ackCh          chan error
 }
 
 // ErrType values for ScorchError
@@ -563,9 +566,27 @@ func (s *Scorch) getInternal(key []byte) ([]byte, error) {
 	defer s.rootLock.RUnlock()
 	// todo: return the total number of vectors that have been processed so far in training
 	// in cbft use that as a checkpoint to resume training for n-x samples.
-	if string(key) == "_centroid_index_complete" {
-		return []byte(fmt.Sprintf("%t", s.centroidIndex != nil)), nil
+	if s.centroidIndex != nil {
+		switch string(key) {
+		case string(util.BoltTrainCompleteKey):
+			val := s.centroidIndex.cachedMeta.fetchMeta(string(util.BoltTrainCompleteKey))
+			if val != nil {
+				return []byte(fmt.Sprintf("%t", val)), nil
+			}
+
+		case string(util.BoltVecSamplesProcessedKey):
+			val := s.centroidIndex.cachedMeta.fetchMeta(string(util.BoltVecSamplesProcessedKey))
+			if val != nil {
+				trainingSampleProcessed, ok := val.([]byte)
+				if ok {
+					return trainingSampleProcessed, nil
+				}
+			}
+		}
+	} else {
+		fmt.Println("centroid index is nil")
 	}
+
 	return nil, nil
 }
 
@@ -576,6 +597,10 @@ func moveFile(sourcePath, destPath string) error {
 		return fmt.Errorf("error renaming file: %v", err)
 	}
 	return nil
+}
+
+func boolToByte(b bool) byte {
+	return *(*byte)(unsafe.Pointer(&b))
 }
 
 // this is not a routine that will be running throughout the lifetime of the index. It's purpose
@@ -614,9 +639,7 @@ func (s *Scorch) trainerLoop() {
 			} else {
 				// merge the new segment with the existing one, no need to persist?
 				// persist in a tmp file and then rename - is that a fair strategy?
-				fmt.Println("merging centroid index")
 				s.segmentConfig["training"] = true
-				fmt.Println("version while merging", s.segPlugin.Version())
 				_, _, err := s.segPlugin.MergeEx([]segment.Segment{s.centroidIndex.segment, sampleSeg},
 					[]*roaring.Bitmap{nil, nil}, filepath.Join(s.path, "centroid_index.tmp"), s.closeCh, nil, s.segmentConfig)
 				if err != nil {
@@ -670,6 +693,13 @@ func (s *Scorch) trainerLoop() {
 				return
 			}
 
+			err = centroidBucket.Put(util.BoltTrainCompleteKey, []byte{boolToByte(trainReq.train_complete)})
+			if err != nil {
+				trainReq.ackCh <- fmt.Errorf("error updating centroid index complete: %v", err)
+				close(trainReq.ackCh)
+				return
+			}
+
 			// total number of vectors that have been processed so far for the training
 			n := binary.PutUvarint(buf, uint64(totalSamplesProcessed))
 			err = centroidBucket.Put(util.BoltVecSamplesProcessedKey, buf[:n])
@@ -686,8 +716,14 @@ func (s *Scorch) trainerLoop() {
 				return
 			}
 
+			err = s.rootBolt.Sync()
+			if err != nil {
+				trainReq.ackCh <- fmt.Errorf("error committing bolt transaction: %v", err)
+				close(trainReq.ackCh)
+				return
+			}
+
 			// update the centroid index pointer
-			fmt.Println("version", s.segPlugin.Version())
 			centroidIndex, err := s.segPlugin.OpenEx(filepath.Join(s.path, "centroid_index"), s.segmentConfig)
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error opening centroid index: %v", err)
@@ -705,6 +741,8 @@ func (s *Scorch) trainerLoop() {
 func (s *Scorch) Train(batch *index.Batch) error {
 	// regulate the Train function
 	s.FireIndexEvent()
+
+	// batch.InternalOps
 
 	var trainData []index.Document
 	for key, doc := range batch.IndexOps {
@@ -732,24 +770,26 @@ func (s *Scorch) Train(batch *index.Batch) error {
 		return err
 	}
 
+	train_complete := false
+	if batch.InternalOps[string(util.BoltTrainCompleteKey)] != nil {
+		train_complete, err = strconv.ParseBool(string(batch.InternalOps[string(util.BoltTrainCompleteKey)]))
+		if err != nil {
+			return err
+		}
+	}
 	trainReq := &trainRequest{
-		sample:   seg,
-		vecCount: len(trainData), // todo: multivector support
-		ackCh:    make(chan error),
+		sample:         seg,
+		vecCount:       len(trainData), // todo: multivector support
+		train_complete: train_complete,
+		ackCh:          make(chan error),
 	}
 
 	s.train <- trainReq
 	err = <-trainReq.ackCh
 	if err != nil {
-		fmt.Println("error training", err)
 		return err
 	}
-	fmt.Println("got centroid index")
 
-	_, err = s.getCentroidIndex("emb")
-	if err != nil {
-		return err
-	}
 	fmt.Println("number of bytes written to centroid index", n)
 	return err
 }
@@ -761,7 +801,6 @@ func (s *Scorch) getCentroidIndex(field string) (*faiss.IndexImpl, error) {
 		return nil, fmt.Errorf("segment is not a centroid index segment", s.centroidIndex.segment != nil)
 	}
 
-	fmt.Println("getting coarse quantizer", field)
 	coarseQuantizer, err := centroidIndexSegment.GetCoarseQuantizer(field)
 	if err != nil {
 		return nil, err

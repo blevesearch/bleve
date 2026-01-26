@@ -866,6 +866,16 @@ func (s *Scorch) updateCentroidIndex(bucket *bolt.Bucket) error {
 	defer s.rootLock.Unlock()
 	fmt.Println("updateCentroidIndex", segmentSnapshot.segment != nil)
 	s.centroidIndex = segmentSnapshot
+
+	trainBytes := bucket.Get(util.BoltTrainCompleteKey)
+	trainComplete, err := strconv.ParseBool(string(trainBytes))
+	if err != nil {
+		return err
+	}
+	s.centroidIndex.cachedMeta.updateMeta(string(util.BoltTrainCompleteKey), trainComplete)
+
+	vecSamplesProcessedBytes := bucket.Get(util.BoltVecSamplesProcessedKey)
+	s.centroidIndex.cachedMeta.updateMeta(string(util.BoltVecSamplesProcessedKey), vecSamplesProcessedBytes)
 	return nil
 }
 
