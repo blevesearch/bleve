@@ -16,7 +16,6 @@ package scorch
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,6 +25,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/registry"
@@ -563,7 +563,8 @@ func (s *Scorch) getInternal(key []byte) ([]byte, error) {
 	defer s.rootLock.RUnlock()
 	// todo: return the total number of vectors that have been processed so far in training
 	// in cbft use that as a checkpoint to resume training for n-x samples.
-	if string(key) == "_centroid_index_complete" {
+	switch string(key) {
+	case string(util.BoltTrainCompleteKey):
 		return []byte(fmt.Sprintf("%t", s.centroidIndex != nil)), nil
 	}
 	return nil, nil
@@ -578,6 +579,10 @@ func moveFile(sourcePath, destPath string) error {
 	return nil
 }
 
+func boolToByte(b bool) byte {
+	return *(*byte)(unsafe.Pointer(&b))
+}
+
 // this is not a routine that will be running throughout the lifetime of the index. It's purpose
 // is to only train the vector index before the data ingestion starts.
 func (s *Scorch) trainerLoop() {
@@ -589,7 +594,6 @@ func (s *Scorch) trainerLoop() {
 	var totalSamplesProcessed int
 	filename := "centroid_index"
 	path := filepath.Join(s.path, filename)
-	buf := make([]byte, binary.MaxVarintLen64)
 	for {
 		select {
 		case <-s.closeCh:
@@ -614,9 +618,7 @@ func (s *Scorch) trainerLoop() {
 			} else {
 				// merge the new segment with the existing one, no need to persist?
 				// persist in a tmp file and then rename - is that a fair strategy?
-				fmt.Println("merging centroid index")
 				s.segmentConfig["training"] = true
-				fmt.Println("version while merging", s.segPlugin.Version())
 				_, _, err := s.segPlugin.MergeEx([]segment.Segment{s.centroidIndex.segment, sampleSeg},
 					[]*roaring.Bitmap{nil, nil}, filepath.Join(s.path, "centroid_index.tmp"), s.closeCh, nil, s.segmentConfig)
 				if err != nil {
@@ -647,7 +649,11 @@ func (s *Scorch) trainerLoop() {
 				close(trainReq.ackCh)
 				return
 			}
-			defer tx.Rollback()
+			defer func() {
+				if err != nil {
+					_ = tx.Rollback()
+				}
+			}()
 
 			snapshotsBucket, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
 			if err != nil {
@@ -670,15 +676,6 @@ func (s *Scorch) trainerLoop() {
 				return
 			}
 
-			// total number of vectors that have been processed so far for the training
-			n := binary.PutUvarint(buf, uint64(totalSamplesProcessed))
-			err = centroidBucket.Put(util.BoltVecSamplesProcessedKey, buf[:n])
-			if err != nil {
-				trainReq.ackCh <- fmt.Errorf("error updating vec samples processed: %v", err)
-				close(trainReq.ackCh)
-				return
-			}
-
 			err = tx.Commit()
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error committing bolt transaction: %v", err)
@@ -686,8 +683,14 @@ func (s *Scorch) trainerLoop() {
 				return
 			}
 
+			err = s.rootBolt.Sync()
+			if err != nil {
+				trainReq.ackCh <- fmt.Errorf("error committing bolt transaction: %v", err)
+				close(trainReq.ackCh)
+				return
+			}
+
 			// update the centroid index pointer
-			fmt.Println("version", s.segPlugin.Version())
 			centroidIndex, err := s.segPlugin.OpenEx(filepath.Join(s.path, "centroid_index"), s.segmentConfig)
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error opening centroid index: %v", err)
@@ -705,6 +708,8 @@ func (s *Scorch) trainerLoop() {
 func (s *Scorch) Train(batch *index.Batch) error {
 	// regulate the Train function
 	s.FireIndexEvent()
+
+	// batch.InternalOps
 
 	var trainData []index.Document
 	for key, doc := range batch.IndexOps {
@@ -741,15 +746,9 @@ func (s *Scorch) Train(batch *index.Batch) error {
 	s.train <- trainReq
 	err = <-trainReq.ackCh
 	if err != nil {
-		fmt.Println("error training", err)
 		return err
 	}
-	fmt.Println("got centroid index")
 
-	_, err = s.getCentroidIndex("emb")
-	if err != nil {
-		return err
-	}
 	fmt.Println("number of bytes written to centroid index", n)
 	return err
 }
@@ -761,7 +760,6 @@ func (s *Scorch) getCentroidIndex(field string) (*faiss.IndexImpl, error) {
 		return nil, fmt.Errorf("segment is not a centroid index segment", s.centroidIndex.segment != nil)
 	}
 
-	fmt.Println("getting coarse quantizer", field)
 	coarseQuantizer, err := centroidIndexSegment.GetCoarseQuantizer(field)
 	if err != nil {
 		return nil, err
@@ -1219,7 +1217,11 @@ func (s *Scorch) UpdateFileInBolt(key []byte, value []byte) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
 
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
 	if err != nil {
