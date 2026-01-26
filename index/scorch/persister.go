@@ -425,7 +425,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	var totSize int
 	var numSegsToFlushOut int
 	var totDocs uint64
-
+	fmt.Println("persister doing its thing")
 	// legacy behaviour of merge + flush of all in-memory segments in one-shot
 	if legacyFlushBehaviour(po.MaxSizeInMemoryMergePerWorker, po.NumPersisterWorkers) {
 		val := &flushable{
@@ -804,7 +804,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot, exclude map[uint
 			}
 		}()
 		for segmentID, path := range newSegmentPaths {
-			newSegments[segmentID], err = s.segPlugin.Open(path)
+			newSegments[segmentID], err = s.segPlugin.OpenEx(path, s.segmentConfig)
 			if err != nil {
 				return fmt.Errorf("error opening new segment at %s, %v", path, err)
 			}
@@ -853,6 +853,32 @@ func zapFileName(epoch uint64) string {
 	return fmt.Sprintf("%012x.zap", epoch)
 }
 
+func (s *Scorch) updateCentroidIndex(bucket *bolt.Bucket) error {
+	if bucket == nil {
+		return nil
+	}
+	fmt.Println("updateCentroidIndex bucket", bucket != nil)
+	segmentSnapshot, err := s.loadSegment(bucket)
+	if err != nil {
+		return err
+	}
+	s.rootLock.Lock()
+	defer s.rootLock.Unlock()
+	fmt.Println("updateCentroidIndex", segmentSnapshot.segment != nil)
+	s.centroidIndex = segmentSnapshot
+
+	trainBytes := bucket.Get(util.BoltTrainCompleteKey)
+	trainComplete, err := strconv.ParseBool(string(trainBytes))
+	if err != nil {
+		return err
+	}
+	s.centroidIndex.cachedMeta.updateMeta(string(util.BoltTrainCompleteKey), trainComplete)
+
+	vecSamplesProcessedBytes := bucket.Get(util.BoltVecSamplesProcessedKey)
+	s.centroidIndex.cachedMeta.updateMeta(string(util.BoltVecSamplesProcessedKey), vecSamplesProcessedBytes)
+	return nil
+}
+
 // bolt snapshot code
 
 func (s *Scorch) loadFromBolt() error {
@@ -873,6 +899,12 @@ func (s *Scorch) loadFromBolt() error {
 				s.AddEligibleForRemoval(snapshotEpoch)
 				continue
 			}
+			// fmt.Println("loadFromBolt key %s", k)
+			// if k[0] == util.BoltCentroidIndexKey[0] {
+			// 	fmt.Println("loadFromBolt centroid index key", string(k))
+
+			// 	continue
+			// }
 			snapshot := snapshots.Bucket(k)
 			if snapshot == nil {
 				log.Printf("snapshot key, but bucket missing %x, continuing", k)
@@ -903,6 +935,12 @@ func (s *Scorch) loadFromBolt() error {
 			}
 
 			foundRoot = true
+		}
+
+		centroidIndexBucket := snapshots.Bucket(util.BoltCentroidIndexKey)
+		err := s.updateCentroidIndex(centroidIndexBucket)
+		if err != nil {
+			return err
 		}
 		return nil
 	})
@@ -1016,7 +1054,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		return nil, fmt.Errorf("segment path missing")
 	}
 	segmentPath := s.path + string(os.PathSeparator) + string(pathBytes)
-	seg, err := s.segPlugin.Open(segmentPath)
+	seg, err := s.segPlugin.OpenEx(segmentPath, s.segmentConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error opening bolt segment: %v", err)
 	}
