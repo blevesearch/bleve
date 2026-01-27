@@ -69,7 +69,7 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 	// this is for accumulating the shape's actual complete value
 	// spread across multiple docvalue visitor callbacks.
 	var dvShapeValue []byte
-	var startReading, finishReading bool
+	var startReading, finishReading, found bool
 	var reader *bytes.Reader
 
 	var bufPool *s2.GeoBufferPool
@@ -77,51 +77,58 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 		bufPool = bufPoolCallback()
 	}
 
-	return func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
-		var found bool
+	dvVisitor := func(_ string, term []byte) {
+		if found {
+			// avoid redundant work if already found
+			return
+		}
+		tl := len(term)
+		// only consider the values which are GlueBytes prefixed or
+		// if it had already started reading the shape bytes from previous callbacks.
+		if startReading || tl > geo.GlueBytesOffset {
 
-		err := dvReader.VisitDocValues(d.IndexInternalID,
-			func(field string, term []byte) {
-				// only consider the values which are GlueBytes prefixed or
-				// if it had already started reading the shape bytes from previous callbacks.
-				if startReading || len(term) > geo.GlueBytesOffset {
+			if !startReading && bytes.Equal(geo.GlueBytes, term[:geo.GlueBytesOffset]) {
+				startReading = true
 
-					if !startReading && bytes.Equal(geo.GlueBytes, term[:geo.GlueBytesOffset]) {
-						startReading = true
-
-						if bytes.Equal(geo.GlueBytes, term[len(term)-geo.GlueBytesOffset:]) {
-							term = term[:len(term)-geo.GlueBytesOffset]
-							finishReading = true
-						}
-
-						dvShapeValue = append(dvShapeValue, term[geo.GlueBytesOffset:]...)
-
-					} else if startReading && !finishReading {
-						if len(term) > geo.GlueBytesOffset &&
-							bytes.Equal(geo.GlueBytes, term[len(term)-geo.GlueBytesOffset:]) {
-							term = term[:len(term)-geo.GlueBytesOffset]
-							finishReading = true
-						}
-
-						term = append(termSeparatorSplitSlice, term...)
-						dvShapeValue = append(dvShapeValue, term...)
-					}
-
-					// apply the filter once the entire docvalue is finished reading.
-					if finishReading {
-						v, err := geojson.FilterGeoShapesOnRelation(shape, dvShapeValue, relation, &reader, bufPool)
-						if err == nil && v {
-							found = true
-						}
-
-						dvShapeValue = dvShapeValue[:0]
-						startReading = false
-						finishReading = false
-					}
+				if bytes.Equal(geo.GlueBytes, term[tl-geo.GlueBytesOffset:]) {
+					term = term[:tl-geo.GlueBytesOffset]
+					finishReading = true
 				}
-			})
 
-		if err == nil && found {
+				dvShapeValue = append(dvShapeValue, term[geo.GlueBytesOffset:]...)
+
+			} else if startReading && !finishReading {
+				if tl > geo.GlueBytesOffset &&
+					bytes.Equal(geo.GlueBytes, term[tl-geo.GlueBytesOffset:]) {
+					term = term[:tl-geo.GlueBytesOffset]
+					finishReading = true
+				}
+
+				dvShapeValue = append(dvShapeValue, termSeparatorSplitSlice...)
+				dvShapeValue = append(dvShapeValue, term...)
+			}
+
+			// apply the filter once the entire docvalue is finished reading.
+			if finishReading {
+				v, err := geojson.FilterGeoShapesOnRelation(shape, dvShapeValue, relation, &reader, bufPool)
+				if err == nil && v {
+					found = true
+				}
+
+				dvShapeValue = dvShapeValue[:0]
+				startReading = false
+				finishReading = false
+			}
+		}
+	}
+
+	return func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
+		// reset state variables for each document
+		found = false
+		startReading = false
+		finishReading = false
+		dvShapeValue = dvShapeValue[:0]
+		if err := dvReader.VisitDocValues(d.IndexInternalID, dvVisitor); err == nil && found {
 			bytes := dvReader.BytesRead()
 			if bytes > 0 {
 				reportIOStats(ctx, bytes)

@@ -53,7 +53,7 @@ func NewGeoBoundingBoxSearcher(ctx context.Context, indexReader index.IndexReade
 			}
 
 			return NewFilteringSearcher(ctx, boxSearcher, buildRectFilter(ctx, dvReader,
-				field, minLon, minLat, maxLon, maxLat)), nil
+				minLon, minLat, maxLon, maxLat)), nil
 		}
 	}
 
@@ -88,7 +88,7 @@ func NewGeoBoundingBoxSearcher(ctx context.Context, indexReader index.IndexReade
 		}
 		// add filter to check points near the boundary
 		onBoundarySearcher = NewFilteringSearcher(ctx, rawOnBoundarySearcher,
-			buildRectFilter(ctx, dvReader, field, minLon, minLat, maxLon, maxLat))
+			buildRectFilter(ctx, dvReader, minLon, minLat, maxLon, maxLat))
 		openedSearchers = append(openedSearchers, onBoundarySearcher)
 	}
 
@@ -205,28 +205,35 @@ func buildIsIndexedFunc(ctx context.Context, indexReader index.IndexReader, fiel
 	return isIndexed, closeF, err
 }
 
-func buildRectFilter(ctx context.Context, dvReader index.DocValueReader, field string,
+func buildRectFilter(ctx context.Context, dvReader index.DocValueReader,
 	minLon, minLat, maxLon, maxLat float64,
 ) FilterFunc {
+	// reuse the following for each document match that is checked using the filter
+	var lons, lats []float64
+	var found bool
+	dvVisitor := func(_ string, term []byte) {
+		if found {
+			// avoid redundant work if already found
+			return
+		}
+		// only consider the values which are shifted 0
+		prefixCoded := numeric.PrefixCoded(term)
+		shift, err := prefixCoded.Shift()
+		if err == nil && shift == 0 {
+			var i64 int64
+			i64, err = prefixCoded.Int64()
+			if err == nil {
+				lons = append(lons, geo.MortonUnhashLon(uint64(i64)))
+				lats = append(lats, geo.MortonUnhashLat(uint64(i64)))
+				found = true
+			}
+		}
+	}
 	return func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
 		// check geo matches against all numeric type terms indexed
-		var lons, lats []float64
-		var found bool
-		err := dvReader.VisitDocValues(d.IndexInternalID, func(field string, term []byte) {
-			// only consider the values which are shifted 0
-			prefixCoded := numeric.PrefixCoded(term)
-			shift, err := prefixCoded.Shift()
-			if err == nil && shift == 0 {
-				var i64 int64
-				i64, err = prefixCoded.Int64()
-				if err == nil {
-					lons = append(lons, geo.MortonUnhashLon(uint64(i64)))
-					lats = append(lats, geo.MortonUnhashLat(uint64(i64)))
-					found = true
-				}
-			}
-		})
-		if err == nil && found {
+		lons, lats = lons[:0], lats[:0]
+		found = false
+		if err := dvReader.VisitDocValues(d.IndexInternalID, dvVisitor); err == nil && found {
 			bytes := dvReader.BytesRead()
 			if bytes > 0 {
 				reportIOStats(ctx, bytes)
