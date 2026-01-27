@@ -16,70 +16,82 @@
 package fusion
 
 import (
+	"sort"
+
 	"github.com/blevesearch/bleve/v2/search"
 )
 
-// scoreBreakdownSortFunc returns a comparison function for sorting DocumentMatch objects
-// by their ScoreBreakdown at the specified index in descending order.
-// In case of ties, documents with lower HitNumber (earlier hits) are preferred.
-// If either document is missing the ScoreBreakdown for the specified index,
-// it's treated as having a score of 0.0.
-func scoreBreakdownSortFunc(idx int) func(i, j *search.DocumentMatch) int {
-	return func(i, j *search.DocumentMatch) int {
-		// Safely extract scores, defaulting to 0.0 if missing
-		iScore := 0.0
-		jScore := 0.0
-
-		if i.ScoreBreakdown != nil {
-			if score, ok := i.ScoreBreakdown[idx]; ok {
-				iScore = score
-			}
-		}
-
-		if j.ScoreBreakdown != nil {
-			if score, ok := j.ScoreBreakdown[idx]; ok {
-				jScore = score
-			}
-		}
-
-		// Sort by score in descending order (higher scores first)
-		if iScore > jScore {
-			return -1
-		} else if iScore < jScore {
-			return 1
-		}
-
-		// Break ties by HitNumber in ascending order (lower HitNumber wins)
-		if i.HitNumber < j.HitNumber {
-			return -1
-		} else if i.HitNumber > j.HitNumber {
-			return 1
-		}
-
-		return 0 // Equal scores and HitNumbers
+// sortDocMatchesByScore orders the provided collection in-place by the primary
+// score in descending order, breaking ties with the original `HitNumber` to
+// ensure deterministic output.
+func sortDocMatchesByScore(hits search.DocumentMatchCollection) {
+	if len(hits) < 2 {
+		return
 	}
+
+	sort.Slice(hits, func(a, b int) bool {
+		i := hits[a]
+		j := hits[b]
+		if i.Score == j.Score {
+			return i.HitNumber < j.HitNumber
+		}
+		return i.Score > j.Score
+	})
 }
 
-func scoreSortFunc() func(i, j *search.DocumentMatch) int {
-	return func(i, j *search.DocumentMatch) int {
-		// Sort by score in descending order
-		if i.Score > j.Score {
-			return -1
-		} else if i.Score < j.Score {
-			return 1
-		}
-
-		// Break ties by HitNumber
-		if i.HitNumber < j.HitNumber {
-			return -1
-		} else if i.HitNumber > j.HitNumber {
-			return 1
-		}
-
-		return 0
+// scoreBreakdownForQuery fetches the score for a specific KNN query index from
+// the provided hit. The boolean return indicates whether the score is present.
+func scoreBreakdownForQuery(hit *search.DocumentMatch, idx int) (float64, bool) {
+	if hit == nil || hit.ScoreBreakdown == nil {
+		return 0, false
 	}
+
+	score, ok := hit.ScoreBreakdown[idx]
+	return score, ok
 }
 
+// sortDocMatchesByBreakdown orders the hits in-place using the KNN score for
+// the supplied query index (descending), breaking ties with `HitNumber` and
+// placing hits without a score at the end.
+func sortDocMatchesByBreakdown(hits search.DocumentMatchCollection, queryIdx int) {
+	if len(hits) < 2 {
+		return
+	}
+
+	sort.SliceStable(hits, func(a, b int) bool {
+		left := hits[a]
+		right := hits[b]
+
+		var leftScore float64
+		leftOK := false
+		if left != nil && left.ScoreBreakdown != nil {
+			leftScore, leftOK = left.ScoreBreakdown[queryIdx]
+		}
+
+		var rightScore float64
+		rightOK := false
+		if right != nil && right.ScoreBreakdown != nil {
+			rightScore, rightOK = right.ScoreBreakdown[queryIdx]
+		}
+
+		if leftOK && rightOK {
+			if leftScore == rightScore {
+				return left.HitNumber < right.HitNumber
+			}
+			return leftScore > rightScore
+		}
+
+		if leftOK != rightOK {
+			return leftOK
+		}
+
+		return left.HitNumber < right.HitNumber
+	})
+}
+
+// getFusionExplAt copies the existing explanation child at the requested index
+// and wraps it in a new node describing how the fusion algorithm adjusted the
+// score.
 func getFusionExplAt(hit *search.DocumentMatch, i int, value float64, message string) *search.Explanation {
 	return &search.Explanation{
 		Value:    value,
@@ -88,6 +100,9 @@ func getFusionExplAt(hit *search.DocumentMatch, i int, value float64, message st
 	}
 }
 
+// finalizeFusionExpl installs the collection of fusion explanation children and
+// updates the root message so the caller sees the fused score as the sum of its
+// parts.
 func finalizeFusionExpl(hit *search.DocumentMatch, explChildren []*search.Explanation) {
 	hit.Expl.Children = explChildren
 

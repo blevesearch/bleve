@@ -41,7 +41,7 @@ func parseQuerySyntax(query string) (rq Query, err error) {
 	doParse(lex)
 
 	if len(lex.errs) > 0 {
-		return nil, fmt.Errorf(strings.Join(lex.errs, "\n"))
+		return nil, fmt.Errorf("%s", strings.Join(lex.errs, "\n"))
 	}
 	return lex.query, nil
 }

@@ -15,7 +15,6 @@
 package query
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -203,7 +202,7 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 				return false
 			}
 			// Compare document IDs
-			cmp := bytes.Compare(refDoc.IndexInternalID, d.IndexInternalID)
+			cmp := refDoc.IndexInternalID.Compare(d.IndexInternalID)
 			if cmp < 0 {
 				// filterSearcher is behind the current document, Advance() it
 				refDoc, err = filterSearcher.Advance(sctx, d.IndexInternalID)
@@ -211,7 +210,7 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 					return false
 				}
 				// After advance, check if they're now equal
-				return bytes.Equal(refDoc.IndexInternalID, d.IndexInternalID)
+				cmp = refDoc.IndexInternalID.Compare(d.IndexInternalID)
 			}
 			// cmp >= 0: either equal (match) or filterSearcher is ahead (no match)
 			return cmp == 0

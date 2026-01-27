@@ -71,12 +71,12 @@ var registryCmd = &cobra.Command{
 func printType(label string, types, instances []string) {
 	sort.Strings(types)
 	sort.Strings(instances)
-	fmt.Printf(label + " Types:\n")
+	fmt.Printf("%s Types:\n", label)
 	for _, name := range types {
 		fmt.Printf("\t%s\n", name)
 	}
 	fmt.Println()
-	fmt.Printf(label + " Instances:\n")
+	fmt.Printf("%s Instances:\n", label)
 	for _, name := range instances {
 		fmt.Printf("\t%s\n", name)
 	}
