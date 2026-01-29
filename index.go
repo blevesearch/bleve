@@ -353,6 +353,13 @@ type IndexCopyable interface {
 	CopyTo(d index.Directory) error
 }
 
+// IndexFileCopyable is an index supporting the transfer of a single file between
+// two indexes
+type IndexFileCopyable interface {
+	UpdateFileInBolt(key []byte, value []byte) error
+	CopyFile(file string, d index.IndexDirectory) error
+}
+
 // FileSystemDirectory is the default implementation for the
 // index.Directory interface.
 type FileSystemDirectory string
