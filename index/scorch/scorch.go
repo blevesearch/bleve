@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -29,7 +28,6 @@ import (
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/go-faiss"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	bolt "go.etcd.io/bbolt"
 )
@@ -81,9 +79,8 @@ type Scorch struct {
 	persisterNotifier        chan *epochWatcher
 	rootBolt                 *bolt.DB
 	asyncTasks               sync.WaitGroup
-	// not a real searchable segment
-	centroidIndex *SegmentSnapshot
-	train         chan *trainRequest
+
+	trainer trainer
 
 	onEvent      func(event Event) bool
 	onAsyncError func(err error, path string)
@@ -95,16 +92,17 @@ type Scorch struct {
 	spatialPlugin index.SpatialAnalyzerPlugin
 }
 
+type trainer interface {
+	trainLoop()
+	train(batch *index.Batch) error
+	loadTrainedData(*bolt.Bucket) error
+	getInternal(key []byte) ([]byte, error)
+}
+
 type ScorchErrorType string
 
 func (t ScorchErrorType) Error() string {
 	return string(t)
-}
-
-type trainRequest struct {
-	sample   segment.Segment
-	vecCount int
-	ackCh    chan error
 }
 
 // ErrType values for ScorchError
@@ -279,7 +277,7 @@ func (s *Scorch) Open() error {
 	go s.introducerLoop()
 
 	s.asyncTasks.Add(1)
-	go s.trainerLoop()
+	go s.trainer.trainLoop()
 
 	if !s.readOnly && s.path != "" {
 		s.asyncTasks.Add(1)
@@ -356,7 +354,6 @@ func (s *Scorch) openBolt() error {
 	s.persisterNotifier = make(chan *epochWatcher, 1)
 	s.closeCh = make(chan struct{})
 	s.forceMergeRequestCh = make(chan *mergerCtrl, 1)
-	s.train = make(chan *trainRequest)
 
 	if !s.readOnly && s.path != "" {
 		err := s.removeOldZapFiles() // Before persister or merger create any new files.
@@ -558,207 +555,20 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 func (s *Scorch) getInternal(key []byte) ([]byte, error) {
 	s.rootLock.RLock()
 	defer s.rootLock.RUnlock()
-	// todo: return the total number of vectors that have been processed so far in training
-	// in cbft use that as a checkpoint to resume training for n-x samples.
+
 	switch string(key) {
 	case string(util.BoltTrainCompleteKey):
-		return []byte(fmt.Sprintf("%t", s.centroidIndex != nil)), nil
+		return s.trainer.getInternal(key)
 	}
 	return nil, nil
-}
-
-func moveFile(sourcePath, destPath string) error {
-	// rename is supposed to be atomic on the same filesystem
-	err := os.Rename(sourcePath, destPath)
-	if err != nil {
-		return fmt.Errorf("error renaming file: %v", err)
-	}
-	return nil
 }
 
 func boolToByte(b bool) byte {
 	return *(*byte)(unsafe.Pointer(&b))
 }
 
-// this is not a routine that will be running throughout the lifetime of the index. It's purpose
-// is to only train the vector index before the data ingestion starts.
-func (s *Scorch) trainerLoop() {
-	defer func() {
-		s.asyncTasks.Done()
-	}()
-	// some init stuff
-	s.segmentConfig["getCentroidIndexCallback"] = s.getCentroidIndex
-	var totalSamplesProcessed int
-	filename := index.CentroidIndexFileName
-	path := filepath.Join(s.path, filename)
-	for {
-		select {
-		case <-s.closeCh:
-			return
-		case trainReq := <-s.train:
-			sampleSeg := trainReq.sample
-			if s.centroidIndex == nil {
-				switch seg := sampleSeg.(type) {
-				case segment.UnpersistedSegment:
-					err := persistToDirectory(seg, nil, path)
-					if err != nil {
-						// clean up this ugly ass error handling code
-						trainReq.ackCh <- fmt.Errorf("error persisting segment: %v", err)
-						close(trainReq.ackCh)
-						return
-					}
-				default:
-					fmt.Errorf("segment is not a unpersisted segment")
-					close(s.closeCh)
-					return
-				}
-			} else {
-				// merge the new segment with the existing one, no need to persist?
-				// persist in a tmp file and then rename - is that a fair strategy?
-				s.segmentConfig["training"] = true
-				_, _, err := s.segPlugin.MergeEx([]segment.Segment{s.centroidIndex.segment, sampleSeg},
-					[]*roaring.Bitmap{nil, nil}, filepath.Join(s.path, index.CentroidIndexFileName+".tmp"), s.closeCh, nil, s.segmentConfig)
-				if err != nil {
-					trainReq.ackCh <- fmt.Errorf("error merging centroid index: %v", err)
-					close(trainReq.ackCh)
-				}
-				// reset the training flag once completed
-				s.segmentConfig["training"] = false
-
-				// close the existing centroid segment - it's supposed to be gc'd at this point
-				s.centroidIndex.segment.Close()
-				err = moveFile(filepath.Join(s.path, index.CentroidIndexFileName+".tmp"), filepath.Join(s.path, index.CentroidIndexFileName))
-				if err != nil {
-					trainReq.ackCh <- fmt.Errorf("error renaming centroid index: %v", err)
-					close(trainReq.ackCh)
-				}
-			}
-			totalSamplesProcessed += trainReq.vecCount
-			// a bolt transaction is necessary for failover-recovery scenario and also serves as a checkpoint
-			// where we can be sure that the centroid index is available for the indexing operations downstream
-			//
-			// note: when the scale increases massively especially with real world dimensions of 1536+, this API
-			// will have to be refactored to persist in a more resource efficient way. so having this bolt related
-			// code will help in tracking the progress a lot better and avoid any redudant data streaming operations.
-			tx, err := s.rootBolt.Begin(true)
-			if err != nil {
-				trainReq.ackCh <- fmt.Errorf("error starting bolt transaction: %v", err)
-				close(trainReq.ackCh)
-				return
-			}
-			defer func() {
-				if err != nil {
-					_ = tx.Rollback()
-				}
-			}()
-
-			snapshotsBucket, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
-			if err != nil {
-				trainReq.ackCh <- fmt.Errorf("error creating snapshots bucket: %v", err)
-				close(trainReq.ackCh)
-				return
-			}
-
-			centroidBucket, err := snapshotsBucket.CreateBucketIfNotExists(util.BoltCentroidIndexKey)
-			if err != nil {
-				trainReq.ackCh <- fmt.Errorf("error creating centroid bucket: %v", err)
-				close(trainReq.ackCh)
-				return
-			}
-
-			err = centroidBucket.Put(util.BoltPathKey, []byte(filename))
-			if err != nil {
-				trainReq.ackCh <- fmt.Errorf("error updating centroid bucket: %v", err)
-				close(trainReq.ackCh)
-				return
-			}
-
-			err = tx.Commit()
-			if err != nil {
-				trainReq.ackCh <- fmt.Errorf("error committing bolt transaction: %v", err)
-				close(trainReq.ackCh)
-				return
-			}
-
-			err = s.rootBolt.Sync()
-			if err != nil {
-				trainReq.ackCh <- fmt.Errorf("error committing bolt transaction: %v", err)
-				close(trainReq.ackCh)
-				return
-			}
-
-			// update the centroid index pointer
-			centroidIndex, err := s.segPlugin.OpenEx(filepath.Join(s.path, index.CentroidIndexFileName), s.segmentConfig)
-			if err != nil {
-				trainReq.ackCh <- fmt.Errorf("error opening centroid index: %v", err)
-				close(trainReq.ackCh)
-				return
-			}
-			s.centroidIndex = &SegmentSnapshot{
-				segment: centroidIndex,
-			}
-			close(trainReq.ackCh)
-		}
-	}
-}
-
 func (s *Scorch) Train(batch *index.Batch) error {
-	// regulate the Train function
-	s.FireIndexEvent()
-
-	var trainData []index.Document
-	for key, doc := range batch.IndexOps {
-		if doc != nil {
-			// insert _id field
-			// no need to track updates/deletes over here since
-			// the API is singleton
-			doc.AddIDField()
-		}
-		if strings.HasPrefix(key, index.TrainDataPrefix) {
-			trainData = append(trainData, doc)
-		}
-	}
-
-	// just builds a new vector index out of the train data provided
-	// it'll be an IVF index so the centroids are computed at this stage and
-	// this template will be used in the indexing down the line to index
-	// the data vectors. s.segmentConfig will mark this as a training phase
-	// and zap will handle it accordingly.
-	//
-	// note: this might index text data too, how to handle this? s.segmentConfig?
-	// todo: updates/deletes -> data drift detection
-	seg, _, err := s.segPlugin.NewEx(trainData, s.segmentConfig)
-	if err != nil {
-		return err
-	}
-
-	trainReq := &trainRequest{
-		sample:   seg,
-		vecCount: len(trainData), // todo: multivector support
-		ackCh:    make(chan error),
-	}
-
-	s.train <- trainReq
-	err = <-trainReq.ackCh
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (s *Scorch) getCentroidIndex(field string) (*faiss.IndexImpl, error) {
-	// return the coarse quantizer of the centroid index belonging to the field
-	centroidIndexSegment, ok := s.centroidIndex.segment.(segment.CentroidIndexSegment)
-	if !ok {
-		return nil, fmt.Errorf("segment is not a centroid index segment", s.centroidIndex.segment != nil)
-	}
-
-	coarseQuantizer, err := centroidIndexSegment.GetCoarseQuantizer(field)
-	if err != nil {
-		return nil, err
-	}
-	return coarseQuantizer, nil
+	return s.trainer.train(batch)
 }
 
 func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,

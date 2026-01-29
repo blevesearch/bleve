@@ -852,18 +852,8 @@ func zapFileName(epoch uint64) string {
 	return fmt.Sprintf("%012x.zap", epoch)
 }
 
-func (s *Scorch) loadCentroidIndex(bucket *bolt.Bucket) error {
-	if bucket == nil {
-		return nil
-	}
-	segmentSnapshot, err := s.loadSegment(bucket)
-	if err != nil {
-		return err
-	}
-	s.rootLock.Lock()
-	defer s.rootLock.Unlock()
-	s.centroidIndex = segmentSnapshot
-	return nil
+func (s *Scorch) loadTrainedData(bucket *bolt.Bucket) error {
+	return s.trainer.loadTrainedData(bucket)
 }
 
 // bolt snapshot code
@@ -919,8 +909,8 @@ func (s *Scorch) loadFromBolt() error {
 			foundRoot = true
 		}
 
-		centroidIndexBucket := snapshots.Bucket(util.BoltCentroidIndexKey)
-		err := s.loadCentroidIndex(centroidIndexBucket)
+		trainerBucket := snapshots.Bucket(util.BoltTrainerKey)
+		err := s.trainer.loadTrainedData(trainerBucket)
 		if err != nil {
 			return err
 		}
