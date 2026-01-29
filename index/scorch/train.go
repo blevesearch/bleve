@@ -56,7 +56,7 @@ func moveFile(sourcePath, destPath string) error {
 
 // this is not a routine that will be running throughout the lifetime of the index. It's purpose
 // is to only train the vector index before the data ingestion starts.
-func (t *vectorTrainer) trainerLoop() {
+func (t *vectorTrainer) trainLoop() {
 	defer func() {
 		t.parent.asyncTasks.Done()
 	}()
