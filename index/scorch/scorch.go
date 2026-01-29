@@ -15,10 +15,13 @@
 package scorch
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1041,6 +1044,88 @@ func (s *Scorch) CopyReader() index.CopyReader {
 	}
 	s.rootLock.Unlock()
 	return rv
+}
+
+func (s *Scorch) UpdateFileInBolt(key []byte, value []byte) error {
+	tx, err := s.rootBolt.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	snapshotsBucket, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
+	if err != nil {
+		return err
+	}
+
+	// currently this is specific to centroid index file update
+	if bytes.Equal(key, util.BoltTrainerKey) {
+		// todo: guard against duplicate updates
+		trainerBucket, err := snapshotsBucket.CreateBucketIfNotExists(util.BoltTrainerKey)
+		if err != nil {
+			return err
+		}
+		if trainerBucket == nil {
+			return fmt.Errorf("trainer bucket not found")
+		}
+		existingValue := trainerBucket.Get(util.BoltPathKey)
+		if existingValue != nil {
+			return fmt.Errorf("key already exists %v %v", s.path, string(existingValue))
+		}
+
+		err = trainerBucket.Put(util.BoltPathKey, value)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	err = s.rootBolt.Sync()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CopyFile copies a specific file to a destination directory which has an access to a bleve index
+// doing a io.Copy() isn't enough because the file needs to be tracked in bolt file as well
+func (s *Scorch) CopyFile(file string, d index.IndexDirectory) error {
+	s.rootLock.Lock()
+	defer s.rootLock.Unlock()
+
+	// this code is currently specific to centroid index file but is future proofed for other files
+	// to be updated in the dest's bolt
+	if strings.HasSuffix(file, index.CentroidIndexFileName) {
+		// centroid index file - this is outside the snapshots domain so the bolt update is different
+		err := d.UpdateFileInBolt(util.BoltTrainerKey, []byte(file))
+		if err != nil {
+			return fmt.Errorf("error updating dest index bolt: %w", err)
+		}
+	}
+
+	dest, err := d.GetWriter(filepath.Join("store", file))
+	if err != nil {
+		return err
+	}
+
+	source, err := os.Open(filepath.Join(s.path, file))
+	if err != nil {
+		return err
+	}
+
+	defer source.Close()
+	defer dest.Close()
+	_, err = io.Copy(dest, source)
+	return err
 }
 
 // external API to fire a scorch event (EventKindIndexStart) externally from bleve
