@@ -17,6 +17,7 @@ package scorch
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -97,6 +98,10 @@ type trainer interface {
 	train(batch *index.Batch) error
 	loadTrainedData(*bolt.Bucket) error
 	getInternal(key []byte) ([]byte, error)
+
+	// file transfer operations
+	copyFileLOCKED(file string, d index.IndexDirectory) error
+	updateBolt(snapshotsBucket *bolt.Bucket, key []byte, value []byte) error
 }
 
 type ScorchErrorType string
@@ -1016,6 +1021,65 @@ func (s *Scorch) CopyReader() index.CopyReader {
 	}
 	s.rootLock.Unlock()
 	return rv
+}
+
+func (s *Scorch) UpdateFileInBolt(key []byte, value []byte) error {
+	tx, err := s.rootBolt.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	snapshotsBucket, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
+	if err != nil {
+		return err
+	}
+
+	// currently this is specific to centroid index file update
+	err = s.trainer.updateBolt(snapshotsBucket, key, value)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return s.rootBolt.Sync()
+}
+
+// CopyFile copies a specific file to a destination directory which has an access to a bleve index
+// doing a io.Copy() isn't enough because the file needs to be tracked in bolt file as well
+func (s *Scorch) CopyFile(file string, d index.IndexDirectory) error {
+	s.rootLock.Lock()
+	defer s.rootLock.Unlock()
+
+	// this code is currently specific to copying trained data but is future proofed for other files
+	// to be updated in the dest's bolt
+	err := s.trainer.copyFileLOCKED(file, d)
+	if err != nil {
+		return err
+	}
+
+	dest, err := d.GetWriter(filepath.Join("store", file))
+	if err != nil {
+		return err
+	}
+
+	source, err := os.Open(filepath.Join(s.path, file))
+	if err != nil {
+		return err
+	}
+
+	defer source.Close()
+	defer dest.Close()
+	_, err = io.Copy(dest, source)
+	return err
 }
 
 // external API to fire a scorch event (EventKindIndexStart) externally from bleve
