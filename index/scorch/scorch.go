@@ -15,13 +15,11 @@
 package scorch
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -117,6 +115,10 @@ type trainer interface {
 	loadTrainedData(*bolt.Bucket) error
 	// to fetch the internal data from the component
 	getInternal(key []byte) ([]byte, error)
+
+	// file transfer operations
+	copyFileLOCKED(file string, d index.IndexDirectory) error
+	updateBolt(snapshotsBucket *bolt.Bucket, key []byte, value []byte) error
 }
 
 type ScorchErrorType string
@@ -1063,24 +1065,9 @@ func (s *Scorch) UpdateFileInBolt(key []byte, value []byte) error {
 	}
 
 	// currently this is specific to centroid index file update
-	if bytes.Equal(key, util.BoltTrainerKey) {
-		// todo: guard against duplicate updates
-		trainerBucket, err := snapshotsBucket.CreateBucketIfNotExists(util.BoltTrainerKey)
-		if err != nil {
-			return err
-		}
-		if trainerBucket == nil {
-			return fmt.Errorf("trainer bucket not found")
-		}
-		existingValue := trainerBucket.Get(util.BoltPathKey)
-		if existingValue != nil {
-			return fmt.Errorf("key already exists %v %v", s.path, string(existingValue))
-		}
-
-		err = trainerBucket.Put(util.BoltPathKey, value)
-		if err != nil {
-			return err
-		}
+	err = s.trainer.updateBolt(snapshotsBucket, key, value)
+	if err != nil {
+		return err
 	}
 
 	err = tx.Commit()
@@ -1088,12 +1075,7 @@ func (s *Scorch) UpdateFileInBolt(key []byte, value []byte) error {
 		return err
 	}
 
-	err = s.rootBolt.Sync()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.rootBolt.Sync()
 }
 
 // CopyFile copies a specific file to a destination directory which has an access to a bleve index
@@ -1102,14 +1084,11 @@ func (s *Scorch) CopyFile(file string, d index.IndexDirectory) error {
 	s.rootLock.Lock()
 	defer s.rootLock.Unlock()
 
-	// this code is currently specific to centroid index file but is future proofed for other files
+	// this code is currently specific to copying trained data but is future proofed for other files
 	// to be updated in the dest's bolt
-	if strings.HasSuffix(file, index.CentroidIndexFileName) {
-		// centroid index file - this is outside the snapshots domain so the bolt update is different
-		err := d.UpdateFileInBolt(util.BoltTrainerKey, []byte(file))
-		if err != nil {
-			return fmt.Errorf("error updating dest index bolt: %w", err)
-		}
+	err := s.trainer.copyFileLOCKED(file, d)
+	if err != nil {
+		return err
 	}
 
 	dest, err := d.GetWriter(filepath.Join("store", file))
