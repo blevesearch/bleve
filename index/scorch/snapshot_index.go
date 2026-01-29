@@ -66,8 +66,7 @@ func init() {
 }
 
 type IndexSnapshot struct {
-	parent *Scorch
-
+	parent   *Scorch
 	segment  []*SegmentSnapshot
 	offsets  []uint64
 	internal map[string][]byte

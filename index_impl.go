@@ -328,13 +328,11 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 
 	i.FireIndexEvent()
 
-	// fmt.Printf("data is %#v\n", data)
 	doc := document.NewDocument(id)
 	err = i.m.MapDocument(doc, data)
 	if err != nil {
 		return
 	}
-	// fmt.Printf("data is after mapping %#v\n", doc)
 	err = i.i.Update(doc)
 	return
 }
@@ -1447,8 +1445,6 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 	if !ok {
 		return fmt.Errorf("index implementation does not support copy reader")
 	}
-
-	// copyIndex.Copy() -> copies the centroid index
 
 	copyReader := copyIndex.CopyReader()
 	if copyReader == nil {
