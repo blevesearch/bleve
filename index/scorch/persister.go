@@ -882,12 +882,7 @@ func (s *Scorch) loadFromBolt() error {
 				s.AddEligibleForRemoval(snapshotEpoch)
 				continue
 			}
-			// fmt.Println("loadFromBolt key %s", k)
-			// if k[0] == util.BoltCentroidIndexKey[0] {
-			// 	fmt.Println("loadFromBolt centroid index key", string(k))
 
-			// 	continue
-			// }
 			snapshot := snapshots.Bucket(k)
 			if snapshot == nil {
 				log.Printf("snapshot key, but bucket missing %x, continuing", k)
