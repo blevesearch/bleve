@@ -66,6 +66,14 @@ func MustNewPrefixCodedInt64(in int64, shift uint) PrefixCoded {
 	return rv
 }
 
+func MustNewPrefixCodedInt64Prealloc(in int64, shift uint, prealloc []byte) PrefixCoded {
+	rv, _, err := NewPrefixCodedInt64Prealloc(in, shift, prealloc)
+	if err != nil {
+		panic(err)
+	}
+	return rv
+}
+
 // Shift returns the number of bits shifted
 // returns 0 if in uninitialized state
 func (p PrefixCoded) Shift() (uint, error) {
