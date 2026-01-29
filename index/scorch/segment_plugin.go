@@ -101,7 +101,6 @@ func RegisterSegmentPlugin(plugin SegmentPlugin, makeDefault bool) {
 	}
 	supportedSegmentPlugins[plugin.Type()][plugin.Version()] = plugin
 	if makeDefault {
-		fmt.Println("registering default segment plugin", plugin.Type(), plugin.Version())
 		defaultSegmentPlugin = plugin
 	}
 }

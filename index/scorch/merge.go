@@ -539,7 +539,6 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			filename := zapFileName(newSegmentID)
 			path := s.path + string(os.PathSeparator) + filename
 
-			fmt.Println("version while merging", s.segPlugin.Version())
 			// the newly merged segment is already flushed out to disk, just needs
 			// to be opened using mmap.
 			newDocIDs, _, err :=

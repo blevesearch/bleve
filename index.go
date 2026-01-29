@@ -51,12 +51,10 @@ func (b *Batch) Index(id string, data interface{}) error {
 		eventIndex.FireIndexEvent()
 	}
 	doc := document.NewDocument(id)
-	// fmt.Printf("data is before mapping %#v\n", data)
 	err := b.index.Mapping().MapDocument(doc, data)
 	if err != nil {
 		return err
 	}
-	// fmt.Printf("data is after mapping %#v\n", doc)
 	b.internal.Update(doc)
 
 	b.lastDocSize = uint64(doc.Size() +
@@ -353,11 +351,6 @@ type IndexCopyable interface {
 	// CopyTo creates a fully functional copy of the index at the
 	// specified destination directory implementation.
 	CopyTo(d index.Directory) error
-}
-
-type IndexFileCopyable interface {
-	UpdateFileInBolt(key []byte, value []byte) error
-	CopyFile(file string, d index.IndexDirectory) error
 }
 
 // FileSystemDirectory is the default implementation for the

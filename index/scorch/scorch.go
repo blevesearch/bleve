@@ -15,10 +15,8 @@
 package scorch
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,7 +81,7 @@ type Scorch struct {
 	persisterNotifier        chan *epochWatcher
 	rootBolt                 *bolt.DB
 	asyncTasks               sync.WaitGroup
-	// not a real searchable segment, singleton
+	// not a real searchable segment
 	centroidIndex *SegmentSnapshot
 	train         chan *trainRequest
 
@@ -184,7 +182,6 @@ func NewScorch(storeName string,
 		}
 	}
 
-	// "pretraining": true
 	segConfig, ok := config["segmentConfig"].(map[string]interface{})
 	if ok {
 		rv.segmentConfig = segConfig
@@ -592,7 +589,7 @@ func (s *Scorch) trainerLoop() {
 	// some init stuff
 	s.segmentConfig["getCentroidIndexCallback"] = s.getCentroidIndex
 	var totalSamplesProcessed int
-	filename := "centroid_index"
+	filename := index.CentroidIndexFileName
 	path := filepath.Join(s.path, filename)
 	for {
 		select {
@@ -620,7 +617,7 @@ func (s *Scorch) trainerLoop() {
 				// persist in a tmp file and then rename - is that a fair strategy?
 				s.segmentConfig["training"] = true
 				_, _, err := s.segPlugin.MergeEx([]segment.Segment{s.centroidIndex.segment, sampleSeg},
-					[]*roaring.Bitmap{nil, nil}, filepath.Join(s.path, "centroid_index.tmp"), s.closeCh, nil, s.segmentConfig)
+					[]*roaring.Bitmap{nil, nil}, filepath.Join(s.path, index.CentroidIndexFileName+".tmp"), s.closeCh, nil, s.segmentConfig)
 				if err != nil {
 					trainReq.ackCh <- fmt.Errorf("error merging centroid index: %v", err)
 					close(trainReq.ackCh)
@@ -630,7 +627,7 @@ func (s *Scorch) trainerLoop() {
 
 				// close the existing centroid segment - it's supposed to be gc'd at this point
 				s.centroidIndex.segment.Close()
-				err = moveFile(filepath.Join(s.path, "centroid_index.tmp"), filepath.Join(s.path, "centroid_index"))
+				err = moveFile(filepath.Join(s.path, index.CentroidIndexFileName+".tmp"), filepath.Join(s.path, index.CentroidIndexFileName))
 				if err != nil {
 					trainReq.ackCh <- fmt.Errorf("error renaming centroid index: %v", err)
 					close(trainReq.ackCh)
@@ -691,7 +688,7 @@ func (s *Scorch) trainerLoop() {
 			}
 
 			// update the centroid index pointer
-			centroidIndex, err := s.segPlugin.OpenEx(filepath.Join(s.path, "centroid_index"), s.segmentConfig)
+			centroidIndex, err := s.segPlugin.OpenEx(filepath.Join(s.path, index.centroidIndexFileName), s.segmentConfig)
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error opening centroid index: %v", err)
 				close(trainReq.ackCh)
@@ -708,8 +705,6 @@ func (s *Scorch) trainerLoop() {
 func (s *Scorch) Train(batch *index.Batch) error {
 	// regulate the Train function
 	s.FireIndexEvent()
-
-	// batch.InternalOps
 
 	var trainData []index.Document
 	for key, doc := range batch.IndexOps {
@@ -732,7 +727,7 @@ func (s *Scorch) Train(batch *index.Batch) error {
 	//
 	// note: this might index text data too, how to handle this? s.segmentConfig?
 	// todo: updates/deletes -> data drift detection
-	seg, n, err := s.segPlugin.NewEx(trainData, s.segmentConfig)
+	seg, _, err := s.segPlugin.NewEx(trainData, s.segmentConfig)
 	if err != nil {
 		return err
 	}
@@ -749,7 +744,6 @@ func (s *Scorch) Train(batch *index.Batch) error {
 		return err
 	}
 
-	fmt.Println("number of bytes written to centroid index", n)
 	return err
 }
 
@@ -1210,88 +1204,6 @@ func (s *Scorch) CopyReader() index.CopyReader {
 	}
 	s.rootLock.Unlock()
 	return rv
-}
-
-func (s *Scorch) UpdateFileInBolt(key []byte, value []byte) error {
-	tx, err := s.rootBolt.Begin(true)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
-	snapshotsBucket, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
-	if err != nil {
-		return err
-	}
-
-	// currently this is specific to centroid index file update
-	if bytes.Equal(key, util.BoltCentroidIndexKey) {
-		// todo: guard against duplicate updates
-		centroidBucket, err := snapshotsBucket.CreateBucketIfNotExists(util.BoltCentroidIndexKey)
-		if err != nil {
-			return err
-		}
-		if centroidBucket == nil {
-			return fmt.Errorf("centroid bucket not found")
-		}
-		existingValue := centroidBucket.Get(util.BoltPathKey)
-		if existingValue != nil {
-			return fmt.Errorf("key already exists %v %v", s.path, string(existingValue))
-		}
-
-		err = centroidBucket.Put(util.BoltPathKey, value)
-		if err != nil {
-			return err
-		}
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-
-	err = s.rootBolt.Sync()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// CopyFile copies a specific file to a destination directory which has an access to a bleve index
-// doing a io.Copy() isn't enough because the file needs to be tracked in bolt file as well
-func (s *Scorch) CopyFile(file string, d index.IndexDirectory) error {
-	s.rootLock.Lock()
-	defer s.rootLock.Unlock()
-
-	// this code is currently specific to centroid index file but is future proofed for other files
-	// to be updated in the dest's bolt
-	if strings.HasSuffix(file, "centroid_index") {
-		// centroid index file - this is outside the snapshots domain so the bolt update is different
-		err := d.UpdateFileInBolt(util.BoltCentroidIndexKey, []byte(file))
-		if err != nil {
-			return fmt.Errorf("error updating dest index bolt: %w", err)
-		}
-	}
-
-	dest, err := d.GetWriter(filepath.Join("store", file))
-	if err != nil {
-		return err
-	}
-
-	source, err := os.Open(filepath.Join(s.path, file))
-	if err != nil {
-		return err
-	}
-
-	defer source.Close()
-	defer dest.Close()
-	_, err = io.Copy(dest, source)
-	return err
 }
 
 // external API to fire a scorch event (EventKindIndexStart) externally from bleve

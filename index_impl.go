@@ -326,13 +326,11 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 
 	i.FireIndexEvent()
 
-	// fmt.Printf("data is %#v\n", data)
 	doc := document.NewDocument(id)
 	err = i.m.MapDocument(doc, data)
 	if err != nil {
 		return
 	}
-	// fmt.Printf("data is after mapping %#v\n", doc)
 	err = i.i.Update(doc)
 	return
 }
@@ -1432,39 +1430,6 @@ func (m *searchHitSorter) Less(i, j int) bool {
 	return c < 0
 }
 
-func (i *indexImpl) CopyFile(file string, d index.IndexDirectory) (err error) {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
-
-	if !i.open {
-		return ErrorIndexClosed
-	}
-
-	copyIndex, ok := i.i.(index.IndexFileCopyable)
-	if !ok {
-		return fmt.Errorf("index implementation does not support copy reader")
-	}
-
-	return copyIndex.CopyFile(file, d)
-}
-
-func (i *indexImpl) UpdateFileInBolt(key []byte, value []byte) error {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
-
-	if !i.open {
-		return ErrorIndexClosed
-	}
-
-	copyIndex, ok := i.i.(index.IndexFileCopyable)
-	if !ok {
-		return fmt.Errorf("index implementation does not support file copy")
-	}
-
-	return copyIndex.UpdateFileInBolt(key, value)
-}
-
-// CopyTo (index.Directory, filter)
 func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -1477,8 +1442,6 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 	if !ok {
 		return fmt.Errorf("index implementation does not support copy reader")
 	}
-
-	// copyIndex.Copy() -> copies the centroid index
 
 	copyReader := copyIndex.CopyReader()
 	if copyReader == nil {
