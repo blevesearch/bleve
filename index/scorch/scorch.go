@@ -688,7 +688,7 @@ func (s *Scorch) trainerLoop() {
 			}
 
 			// update the centroid index pointer
-			centroidIndex, err := s.segPlugin.OpenEx(filepath.Join(s.path, index.centroidIndexFileName), s.segmentConfig)
+			centroidIndex, err := s.segPlugin.OpenEx(filepath.Join(s.path, index.CentroidIndexFileName), s.segmentConfig)
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error opening centroid index: %v", err)
 				close(trainReq.ackCh)
