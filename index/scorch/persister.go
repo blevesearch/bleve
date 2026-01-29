@@ -425,7 +425,6 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	var totSize int
 	var numSegsToFlushOut int
 	var totDocs uint64
-	fmt.Println("persister doing its thing")
 	// legacy behaviour of merge + flush of all in-memory segments in one-shot
 	if legacyFlushBehaviour(po.MaxSizeInMemoryMergePerWorker, po.NumPersisterWorkers) {
 		val := &flushable{
@@ -887,12 +886,7 @@ func (s *Scorch) loadFromBolt() error {
 				s.AddEligibleForRemoval(snapshotEpoch)
 				continue
 			}
-			// fmt.Println("loadFromBolt key %s", k)
-			// if k[0] == util.BoltCentroidIndexKey[0] {
-			// 	fmt.Println("loadFromBolt centroid index key", string(k))
 
-			// 	continue
-			// }
 			snapshot := snapshots.Bucket(k)
 			if snapshot == nil {
 				log.Printf("snapshot key, but bucket missing %x, continuing", k)

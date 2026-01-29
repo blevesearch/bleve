@@ -375,7 +375,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
 			prevBytesReadTotal := cumulateBytesRead(segmentsToMerge)
 
-			fmt.Println("files", files)
 			newDocNums, _, err := s.segPlugin.MergeEx(segmentsToMerge, docsToDrop, path,
 				cw.cancelCh, s, s.segmentConfig)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
@@ -541,7 +540,6 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			filename := zapFileName(newSegmentID)
 			path := s.path + string(os.PathSeparator) + filename
 
-			fmt.Println("version while merging", s.segPlugin.Version())
 			// the newly merged segment is already flushed out to disk, just needs
 			// to be opened using mmap.
 			newDocIDs, _, err :=
