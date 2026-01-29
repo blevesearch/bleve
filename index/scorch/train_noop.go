@@ -10,6 +10,10 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+func initTrainer(s *Scorch) *noopTrainer {
+	return &noopTrainer{}
+}
+
 type noopTrainer struct {
 }
 
