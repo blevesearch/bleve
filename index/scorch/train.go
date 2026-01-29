@@ -37,6 +37,13 @@ type trainRequest struct {
 	ackCh    chan error
 }
 
+func initTrainer(s *Scorch) *vectorTrainer {
+	return &vectorTrainer{
+		parent:  s,
+		trainCh: make(chan *trainRequest),
+	}
+}
+
 type vectorTrainer struct {
 	parent *Scorch
 
@@ -62,7 +69,6 @@ func (t *vectorTrainer) trainLoop() {
 	}()
 	// initialize stuff
 	t.parent.segmentConfig["getCentroidIndexCallback"] = t.getCentroidIndex
-	t.trainCh = make(chan *trainRequest)
 	var totalSamplesProcessed int
 	filename := index.CentroidIndexFileName
 	path := filepath.Join(t.parent.path, filename)
