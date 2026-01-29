@@ -23,3 +23,7 @@ func (t *noopTrainer) loadTrainedData(bucket *bolt.Bucket) error {
 	// noop
 	return nil
 }
+
+func (t *noopTrainer) getInternal(key []byte) ([]byte, error) {
+	return nil, nil
+}
