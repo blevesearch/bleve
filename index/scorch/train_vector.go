@@ -19,6 +19,7 @@ package scorch
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -35,9 +36,10 @@ import (
 )
 
 type trainRequest struct {
-	sample   segment.Segment
-	vecCount int
-	ackCh    chan error
+	vecCount      int
+	ackCh         chan error
+	trainComplete []byte
+	sample        segment.Segment
 }
 
 func initTrainer(s *Scorch, config map[string]interface{}) *vectorTrainer {
@@ -170,6 +172,22 @@ func (t *vectorTrainer) trainLoop() {
 				return
 			}
 
+			err = trainerBucket.Put(util.BoltTrainCompleteKey, trainReq.trainComplete)
+			if err != nil {
+				trainReq.ackCh <- fmt.Errorf("error updating train complete bucket: %v", err)
+				close(trainReq.ackCh)
+				return
+			}
+
+			// track progress of training in temrs of samples processed
+			binary.LittleEndian.PutUint64(buf, uint64(totalSamplesProcessed))
+			err = trainerBucket.Put(util.BoltTrainedSamplesKey, buf)
+			if err != nil {
+				trainReq.ackCh <- fmt.Errorf("error updating trained samples bucket: %v", err)
+				close(trainReq.ackCh)
+				return
+			}
+
 			err = tx.Commit()
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error committing bolt transaction: %v", err)
@@ -213,6 +231,7 @@ func (t *vectorTrainer) loadTrainedData(bucket *bolt.Bucket) error {
 	t.m.Lock()
 	defer t.m.Unlock()
 	t.centroidIndex = segmentSnapshot
+
 	return nil
 }
 
@@ -243,13 +262,29 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	// todo: updates/deletes -> data drift detection
 	seg, _, err := t.parent.segPlugin.NewUsing(trainData, t.parent.segmentConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("error parsing train complete: %v", err)
+	}
+
+	if !fin {
+		// just builds a new vector index out of the train data provided
+		// it'll be an IVF index so the centroids are computed at this stage and
+		// this template will be used in the indexing down the line to index
+		// the data vectors. s.segmentConfig will mark this as a training phase
+		// and zap will handle it accordingly.
+		//
+		// note: this might index text data too, how to handle this? s.segmentConfig?
+		// todo: updates/deletes -> data drift detection
+		seg, _, err = t.parent.segPlugin.NewEx(trainData, t.parent.segmentConfig)
+		if err != nil {
+			return err
+		}
 	}
 
 	trainReq := &trainRequest{
-		sample:   seg,
-		vecCount: len(trainData), // todo: multivector support
-		ackCh:    make(chan error),
+		sample:        seg,
+		vecCount:      len(trainData), // todo: multivector support
+		trainComplete: trainComplete,
+		ackCh:         make(chan error),
 	}
 
 	t.trainCh <- trainReq
@@ -264,9 +299,16 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 func (t *vectorTrainer) getInternal(key []byte) ([]byte, error) {
 	// todo: return the total number of vectors that have been processed so far in training
 	// in cbft use that as a checkpoint to resume training for n-x samples.
-	switch string(key) {
-	case string(util.BoltTrainCompleteKey):
-		return []byte(fmt.Sprintf("%t", t.centroidIndex != nil)), nil
+	if t.centroidIndex != nil {
+		switch string(key) {
+		case string(util.BoltTrainCompleteKey):
+			trainComplete := t.centroidIndex.cachedMeta.fetchMeta("trainComplete").([]byte)
+			return trainComplete, nil
+		case string(util.BoltTrainedSamplesKey):
+			// keep rv in a human readable format
+			trainedSamples := t.centroidIndex.cachedMeta.fetchMeta("trainedSamples").(uint64)
+			return []byte(fmt.Sprintf("%d", trainedSamples)), nil
+		}
 	}
 	return nil, nil
 }
