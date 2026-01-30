@@ -15,7 +15,6 @@
 package scorch
 
 import (
-	"bytes"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -180,9 +179,9 @@ func (s *SegmentSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.Updat
 
 type cachedFieldDocs struct {
 	m       sync.Mutex
-	readyCh chan struct{}     // closed when the cachedFieldDocs.docs is ready to be used.
-	err     error             // Non-nil if there was an error when preparing this cachedFieldDocs.
-	docs    map[uint64][]byte // Keyed by localDocNum, value is a list of terms delimited by 0xFF.
+	readyCh chan struct{}       // closed when the cachedFieldDocs.docs is ready to be used.
+	err     error               // Non-nil if there was an error when preparing this cachedFieldDocs.
+	docs    map[uint64][]string // Keyed by localDocNum, value is a list of terms delimited by 0xFF.
 	size    uint64
 }
 
@@ -228,8 +227,7 @@ func (cfd *cachedFieldDocs) prepareField(field string, ss *SegmentSnapshot) {
 		nextPosting, err2 := postingsItr.Next()
 		for err2 == nil && nextPosting != nil {
 			docNum := nextPosting.Number()
-			cfd.docs[docNum] = append(cfd.docs[docNum], []byte(next.Term)...)
-			cfd.docs[docNum] = append(cfd.docs[docNum], index.DocValueTermSeparator)
+			cfd.docs[docNum] = append(cfd.docs[docNum], next.Term)
 			cfd.size += uint64(len(next.Term) + 1) // map value
 			nextPosting, err2 = postingsItr.Next()
 		}
@@ -266,7 +264,7 @@ func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) e
 		if !exists {
 			c.cache[field] = &cachedFieldDocs{
 				readyCh: make(chan struct{}),
-				docs:    make(map[uint64][]byte),
+				docs:    make(map[uint64][]string),
 			}
 
 			go c.cache[field].prepareField(field, ss)
@@ -329,13 +327,8 @@ func (c *cachedDocs) visitDoc(localDocNum uint64,
 			c.m.RLock()
 
 			if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
-				for {
-					i := bytes.IndexByte(tlist, index.DocValueTermSeparator)
-					if i < 0 {
-						break
-					}
-					visitor(field, tlist[0:i])
-					tlist = tlist[i+1:]
+				for _, term := range tlist {
+					visitor(field, []byte(term))
 				}
 			}
 		}
