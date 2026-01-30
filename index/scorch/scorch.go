@@ -565,6 +565,8 @@ func (s *Scorch) getInternal(key []byte) ([]byte, error) {
 
 	switch string(key) {
 	case string(util.BoltTrainCompleteKey):
+		fallthrough
+	case string(util.BoltTrainedSamplesKey):
 		return s.trainer.getInternal(key)
 	}
 	return nil, nil

@@ -248,9 +248,13 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	}
 
 	var seg segment.Segment
+	var fin bool
+	var err error
 	trainComplete := batch.InternalOps[string(util.BoltTrainCompleteKey)]
-
-	fin, err := strconv.ParseBool(string(trainComplete))
+	if trainComplete == nil {
+		trainComplete = []byte("false")
+	}
+	fin, err = strconv.ParseBool(string(trainComplete))
 	if err != nil {
 		return fmt.Errorf("error parsing train complete: %v", err)
 	}
