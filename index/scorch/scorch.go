@@ -22,6 +22,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/registry"
@@ -45,6 +46,7 @@ type Scorch struct {
 	readOnly      bool
 	version       uint8
 	config        map[string]interface{}
+	segmentConfig map[string]interface{}
 	analysisQueue *index.AnalysisQueue
 	path          string
 
@@ -78,6 +80,8 @@ type Scorch struct {
 	rootBolt                 *bolt.DB
 	asyncTasks               sync.WaitGroup
 
+	trainer trainer
+
 	onEvent      func(event Event) bool
 	onAsyncError func(err error, path string)
 
@@ -86,6 +90,13 @@ type Scorch struct {
 	segPlugin SegmentPlugin
 
 	spatialPlugin index.SpatialAnalyzerPlugin
+}
+
+type trainer interface {
+	trainLoop()
+	train(batch *index.Batch) error
+	loadTrainedData(*bolt.Bucket) error
+	getInternal(key []byte) ([]byte, error)
 }
 
 type ScorchErrorType string
@@ -154,6 +165,7 @@ func NewScorch(storeName string,
 		forceMergeRequestCh:  make(chan *mergerCtrl, 1),
 		segPlugin:            defaultSegmentPlugin,
 		copyScheduled:        map[string]int{},
+		segmentConfig:        make(map[string]interface{}),
 	}
 
 	forcedSegmentType, forcedSegmentVersion, err := configForceSegmentTypeVersion(config)
@@ -166,6 +178,11 @@ func NewScorch(storeName string,
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	segConfig, ok := config["segmentConfig"].(map[string]interface{})
+	if ok {
+		rv.segmentConfig = segConfig
 	}
 
 	typ, ok := config["spatialPlugin"].(string)
@@ -204,6 +221,8 @@ func NewScorch(storeName string,
 	if err != nil {
 		return nil, err
 	}
+
+	rv.trainer = initTrainer(rv)
 
 	return rv, nil
 }
@@ -258,6 +277,9 @@ func (s *Scorch) Open() error {
 
 	s.asyncTasks.Add(1)
 	go s.introducerLoop()
+
+	s.asyncTasks.Add(1)
+	go s.trainer.trainLoop()
 
 	if !s.readOnly && s.path != "" {
 		s.asyncTasks.Add(1)
@@ -497,7 +519,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	stats := newFieldStats()
 
 	if len(analysisResults) > 0 {
-		newSegment, bufBytes, err = s.segPlugin.New(analysisResults)
+		newSegment, bufBytes, err = s.segPlugin.NewEx(analysisResults, s.segmentConfig)
 		if err != nil {
 			return err
 		}
@@ -530,6 +552,25 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	atomic.AddUint64(&s.stats.TotIndexTime, uint64(time.Since(indexStart)))
 
 	return err
+}
+
+func (s *Scorch) getInternal(key []byte) ([]byte, error) {
+	s.rootLock.RLock()
+	defer s.rootLock.RUnlock()
+
+	switch string(key) {
+	case string(util.BoltTrainCompleteKey):
+		return s.trainer.getInternal(key)
+	}
+	return nil, nil
+}
+
+func boolToByte(b bool) byte {
+	return *(*byte)(unsafe.Pointer(&b))
+}
+
+func (s *Scorch) Train(batch *index.Batch) error {
+	return s.trainer.train(batch)
 }
 
 func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,

@@ -335,6 +335,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 		docsToDrop := make([]*roaring.Bitmap, 0, len(task.Segments))
 		mergedSegHistory := make(map[uint64]*mergedSegmentHistory, len(task.Segments))
 
+		var files []string
 		for _, planSegment := range task.Segments {
 			if segSnapshot, ok := planSegment.(*SegmentSnapshot); ok {
 				oldMap[segSnapshot.id] = segSnapshot
@@ -350,6 +351,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 					} else {
 						segmentsToMerge = append(segmentsToMerge, segSnapshot.segment)
 						docsToDrop = append(docsToDrop, segSnapshot.deleted)
+						files = append(files, persistedSeg.Path())
 					}
 					// track the files getting merged for unsetting the
 					// removal ineligibility. This helps to unflip files
@@ -372,8 +374,9 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
 			prevBytesReadTotal := cumulateBytesRead(segmentsToMerge)
-			newDocNums, _, err := s.segPlugin.Merge(segmentsToMerge, docsToDrop, path,
-				cw.cancelCh, s)
+
+			newDocNums, _, err := s.segPlugin.MergeEx(segmentsToMerge, docsToDrop, path,
+				cw.cancelCh, s, s.segmentConfig)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
 
 			fileMergeZapTime := uint64(time.Since(fileMergeZapStartTime))
@@ -391,7 +394,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 				return fmt.Errorf("merging failed: %v", err)
 			}
 
-			seg, err = s.segPlugin.Open(path)
+			seg, err = s.segPlugin.OpenEx(path, s.segmentConfig)
 			if err != nil {
 				s.unmarkIneligibleForRemoval(filename)
 				atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
@@ -540,7 +543,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			// the newly merged segment is already flushed out to disk, just needs
 			// to be opened using mmap.
 			newDocIDs, _, err :=
-				s.segPlugin.Merge(segsBatch, dropsBatch, path, s.closeCh, s)
+				s.segPlugin.MergeEx(segsBatch, dropsBatch, path, s.closeCh, s, s.segmentConfig)
 			if err != nil {
 				em.Lock()
 				errs = append(errs, err)
@@ -555,7 +558,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			s.markIneligibleForRemoval(filename)
 			newMergedSegmentIDs[id] = newSegmentID
 			newDocIDsSet[id] = newDocIDs
-			newMergedSegments[id], err = s.segPlugin.Open(path)
+			newMergedSegments[id], err = s.segPlugin.OpenEx(path, s.segmentConfig)
 			if err != nil {
 				em.Lock()
 				errs = append(errs, err)
