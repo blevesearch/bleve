@@ -586,10 +586,12 @@ func (s *Scorch) getInternal(key []byte) ([]byte, error) {
 
 	switch string(key) {
 	case string(util.BoltTrainCompleteKey):
+		fallthrough
+	case string(util.BoltTrainedSamplesKey):
 		if s.trainer != nil {
 			return s.trainer.getInternal(key)
 		} else {
-			return nil, fmt.Errorf("get on BoltTrainCompleteKey is not supported" +
+			return nil, fmt.Errorf("getInternal on train keys is not supported" +
 				" with this build")
 		}
 	}
