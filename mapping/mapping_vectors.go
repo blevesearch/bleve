@@ -234,6 +234,11 @@ func validateVectorFieldAlias(field *FieldMapping, path []string,
 	if effectiveOptimizedFor == "" {
 		effectiveOptimizedFor = index.DefaultIndexOptimization
 	}
+	// If optimized for binary, similarity must be cosine
+	if effectiveOptimizedFor == index.IndexOptimizedForBinary {
+		field.Similarity = index.CosineSimilarity
+		effectiveSimilarity = index.CosineSimilarity
+	}
 
 	// # If alias is present, validate the field options as per the alias.
 	// note: reading from a nil map is safe
