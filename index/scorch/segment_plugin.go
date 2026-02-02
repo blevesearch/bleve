@@ -46,13 +46,13 @@ type SegmentPlugin interface {
 	// New takes a set of Documents and turns them into a new Segment
 	New(results []index.Document) (segment.Segment, uint64, error)
 
-	NewEx(results []index.Document, config map[string]interface{}) (segment.Segment, uint64, error)
+	NewUsing(results []index.Document, config map[string]interface{}) (segment.Segment, uint64, error)
 
 	// Open attempts to open the file at the specified path and
 	// return the corresponding Segment
 	Open(path string) (segment.Segment, error)
 
-	OpenEx(path string, config map[string]interface{}) (segment.Segment, error)
+	OpenUsing(path string, config map[string]interface{}) (segment.Segment, error)
 
 	// Merge takes a set of Segments, and creates a new segment on disk at
 	// the specified path.
@@ -72,7 +72,7 @@ type SegmentPlugin interface {
 		closeCh chan struct{}, s segment.StatsReporter) (
 		[][]uint64, uint64, error)
 
-	MergeEx(segments []segment.Segment, drops []*roaring.Bitmap, path string,
+	MergeUsing(segments []segment.Segment, drops []*roaring.Bitmap, path string,
 		closeCh chan struct{}, s segment.StatsReporter, config map[string]interface{}) (
 		[][]uint64, uint64, error)
 }
