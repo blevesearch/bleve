@@ -97,7 +97,7 @@ func (t *vectorTrainer) trainLoop() {
 				// merge the new segment with the existing one, no need to persist?
 				// persist in a tmp file and then rename - is that a fair strategy?
 				t.parent.segmentConfig["training"] = true
-				_, _, err := t.parent.segPlugin.MergeEx([]segment.Segment{t.centroidIndex.segment, sampleSeg},
+				_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.centroidIndex.segment, sampleSeg},
 					[]*roaring.Bitmap{nil, nil}, filepath.Join(t.parent.path, filename+".tmp"), t.parent.closeCh, nil, t.parent.segmentConfig)
 				if err != nil {
 					trainReq.ackCh <- fmt.Errorf("error merging centroid index: %v", err)
@@ -169,7 +169,7 @@ func (t *vectorTrainer) trainLoop() {
 			}
 
 			// update the centroid index pointer
-			centroidIndex, err := t.parent.segPlugin.OpenEx(filepath.Join(t.parent.path, index.CentroidIndexFileName), t.parent.segmentConfig)
+			centroidIndex, err := t.parent.segPlugin.OpenUsing(filepath.Join(t.parent.path, index.CentroidIndexFileName), t.parent.segmentConfig)
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error opening centroid index: %v", err)
 				close(trainReq.ackCh)
@@ -222,7 +222,7 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	//
 	// note: this might index text data too, how to handle this? s.segmentConfig?
 	// todo: updates/deletes -> data drift detection
-	seg, _, err := t.parent.segPlugin.NewEx(trainData, t.parent.segmentConfig)
+	seg, _, err := t.parent.segPlugin.NewUsing(trainData, t.parent.segmentConfig)
 	if err != nil {
 		return err
 	}
