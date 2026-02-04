@@ -1,4 +1,4 @@
-//  Copyright (c) 2018 Couchbase, Inc.
+//  Copyright (c) 2026 Couchbase, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/util"
@@ -47,7 +48,9 @@ func initTrainer(s *Scorch) *vectorTrainer {
 type vectorTrainer struct {
 	parent *Scorch
 
-	// not a real searchable segment
+	m sync.Mutex
+	// not a searchable segment in the sense that it won't return
+	// the data vectors. can return centroid vectors
 	centroidIndex *SegmentSnapshot
 	trainCh       chan *trainRequest
 }
@@ -68,10 +71,8 @@ func (t *vectorTrainer) trainLoop() {
 		t.parent.asyncTasks.Done()
 	}()
 	// initialize stuff
-	t.parent.segmentConfig["getCentroidIndexCallback"] = t.getCentroidIndex
-	var totalSamplesProcessed int
-	filename := index.CentroidIndexFileName
-	path := filepath.Join(t.parent.path, filename)
+	t.parent.segmentConfig[index.CentroidIndexCallback] = t.getCentroidIndex
+	path := filepath.Join(t.parent.path, index.CentroidIndexFileName)
 	for {
 		select {
 		case <-t.parent.closeCh:
@@ -83,44 +84,43 @@ func (t *vectorTrainer) trainLoop() {
 				case segment.UnpersistedSegment:
 					err := persistToDirectory(seg, nil, path)
 					if err != nil {
-						// clean up this ugly ass error handling code
 						trainReq.ackCh <- fmt.Errorf("error persisting segment: %v", err)
 						close(trainReq.ackCh)
 						return
 					}
 				default:
-					fmt.Errorf("segment is not a unpersisted segment")
-					close(t.parent.closeCh)
-					return
 				}
 			} else {
-				// merge the new segment with the existing one, no need to persist?
-				// persist in a tmp file and then rename - is that a fair strategy?
-				t.parent.segmentConfig["training"] = true
+				// merge the new segment with the existing one, to create a new
+				// .tmp centroid index file and then move it to the actual
+				// centroid index file path (during the merge, Os.Open(centroidIndexPath)
+				// won't be safe since its still being used for merge)
+				t.parent.segmentConfig[index.TrainingKey] = true
 				_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.centroidIndex.segment, sampleSeg},
-					[]*roaring.Bitmap{nil, nil}, filepath.Join(t.parent.path, filename+".tmp"), t.parent.closeCh, nil, t.parent.segmentConfig)
+					[]*roaring.Bitmap{nil, nil}, path+".tmp", t.parent.closeCh, nil, t.parent.segmentConfig)
 				if err != nil {
 					trainReq.ackCh <- fmt.Errorf("error merging centroid index: %v", err)
 					close(trainReq.ackCh)
 				}
 				// reset the training flag once completed
-				t.parent.segmentConfig["training"] = false
+				t.parent.segmentConfig[index.TrainingKey] = false
 
 				// close the existing centroid segment - it's supposed to be gc'd at this point
 				t.centroidIndex.segment.Close()
-				err = moveFile(filepath.Join(t.parent.path, filename+".tmp"), filepath.Join(t.parent.path, filename))
+				err = moveFile(path+".tmp", path)
 				if err != nil {
 					trainReq.ackCh <- fmt.Errorf("error renaming centroid index: %v", err)
 					close(trainReq.ackCh)
 				}
 			}
-			totalSamplesProcessed += trainReq.vecCount
 			// a bolt transaction is necessary for failover-recovery scenario and also serves as a checkpoint
 			// where we can be sure that the centroid index is available for the indexing operations downstream
 			//
 			// note: when the scale increases massively especially with real world dimensions of 1536+, this API
 			// will have to be refactored to persist in a more resource efficient way. so having this bolt related
 			// code will help in tracking the progress a lot better and avoid any redudant data streaming operations.
+			//
+			// todo: rethink the frequency of bolt writes
 			tx, err := t.parent.rootBolt.Begin(true)
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error starting bolt transaction: %v", err)
@@ -147,7 +147,7 @@ func (t *vectorTrainer) trainLoop() {
 				return
 			}
 
-			err = trainerBucket.Put(util.BoltPathKey, []byte(filename))
+			err = trainerBucket.Put(util.BoltPathKey, []byte(index.CentroidIndexFileName))
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error updating centroid bucket: %v", err)
 				close(trainReq.ackCh)
@@ -163,26 +163,29 @@ func (t *vectorTrainer) trainLoop() {
 
 			err = t.parent.rootBolt.Sync()
 			if err != nil {
-				trainReq.ackCh <- fmt.Errorf("error committing bolt transaction: %v", err)
+				trainReq.ackCh <- fmt.Errorf("error on bolt sync: %v", err)
 				close(trainReq.ackCh)
 				return
 			}
 
 			// update the centroid index pointer
-			centroidIndex, err := t.parent.segPlugin.OpenUsing(filepath.Join(t.parent.path, index.CentroidIndexFileName), t.parent.segmentConfig)
+			centroidIndex, err := t.parent.segPlugin.OpenUsing(path, t.parent.segmentConfig)
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error opening centroid index: %v", err)
 				close(trainReq.ackCh)
 				return
 			}
+			t.m.Lock()
 			t.centroidIndex = &SegmentSnapshot{
 				segment: centroidIndex,
 			}
+			t.m.Unlock()
 			close(trainReq.ackCh)
 		}
 	}
 }
 
+// loads the metadata specific to the centroid index from boltdb
 func (t *vectorTrainer) loadTrainedData(bucket *bolt.Bucket) error {
 	if bucket == nil {
 		return nil
@@ -191,8 +194,8 @@ func (t *vectorTrainer) loadTrainedData(bucket *bolt.Bucket) error {
 	if err != nil {
 		return err
 	}
-	t.parent.rootLock.Lock()
-	defer t.parent.rootLock.Unlock()
+	t.m.Lock()
+	defer t.m.Unlock()
 	t.centroidIndex = segmentSnapshot
 	return nil
 }
@@ -215,10 +218,10 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	}
 
 	// just builds a new vector index out of the train data provided
-	// it'll be an IVF index so the centroids are computed at this stage and
-	// this template will be used in the indexing down the line to index
-	// the data vectors. s.segmentConfig will mark this as a training phase
-	// and zap will handle it accordingly.
+	// this is not necessarily the final train data since this is submitted
+	// as a request to the trainer component to be merged. once the training
+	// is complete, the template will be used for other operations down the line
+	// like merge and search.
 	//
 	// note: this might index text data too, how to handle this? s.segmentConfig?
 	// todo: updates/deletes -> data drift detection
@@ -236,7 +239,7 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	t.trainCh <- trainReq
 	err = <-trainReq.ackCh
 	if err != nil {
-		return err
+		return fmt.Errorf("train_vector: train() err'd out with: %w", err)
 	}
 
 	return err
@@ -256,7 +259,7 @@ func (t *vectorTrainer) getCentroidIndex(field string) (*faiss.IndexImpl, error)
 	// return the coarse quantizer of the centroid index belonging to the field
 	centroidIndexSegment, ok := t.centroidIndex.segment.(segment.CentroidIndexSegment)
 	if !ok {
-		return nil, fmt.Errorf("segment is not a centroid index segment", t.centroidIndex.segment != nil)
+		return nil, fmt.Errorf("segment is not a centroid index segment")
 	}
 
 	coarseQuantizer, err := centroidIndexSegment.GetCoarseQuantizer(field)

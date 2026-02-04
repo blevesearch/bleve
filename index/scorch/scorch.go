@@ -22,7 +22,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/registry"
@@ -92,10 +91,26 @@ type Scorch struct {
 	spatialPlugin index.SpatialAnalyzerPlugin
 }
 
+// trainer interface is used for training an index that has the concept
+// of "learning". Naturally, a vector index is one such thing that would
+// implement this interface. There can be multiple implementations of the
+// training itself even for the same index type.
+//
+// this component is not supposed to interact with the other master routines
+// of scorch and will be used only for training the index before the actual data
+// ingestion starts. The routine should also be released once the
+// training is marked as complete - which can be done using the BoltTrainCompleteKey
+// key and a bool value. However the struct is still maintained for the pointer to
+// the instance so that we can use in the later stages of the index lifecycle.
 type trainer interface {
+	// ephemeral
 	trainLoop()
+	// for the training state and the ingestion of the samples
 	train(batch *index.Batch) error
+
+	// to load the metadata from the bolt under the BoltTrainerKey
 	loadTrainedData(*bolt.Bucket) error
+	// to fetch the internal data from the component
 	getInternal(key []byte) ([]byte, error)
 }
 
@@ -563,10 +578,6 @@ func (s *Scorch) getInternal(key []byte) ([]byte, error) {
 		return s.trainer.getInternal(key)
 	}
 	return nil, nil
-}
-
-func boolToByte(b bool) byte {
-	return *(*byte)(unsafe.Pointer(&b))
 }
 
 func (s *Scorch) Train(batch *index.Batch) error {
