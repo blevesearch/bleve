@@ -19,13 +19,13 @@ require (
 	github.com/blevesearch/stempel v0.2.0
 	github.com/blevesearch/upsidedown_store_api v1.0.2
 	github.com/blevesearch/vellum v1.2.0
-	github.com/blevesearch/zapx/v11 v11.4.2
-	github.com/blevesearch/zapx/v12 v12.4.2
-	github.com/blevesearch/zapx/v13 v13.4.2
-	github.com/blevesearch/zapx/v14 v14.4.2
-	github.com/blevesearch/zapx/v15 v15.4.2
-	github.com/blevesearch/zapx/v16 v16.3.0
-	github.com/blevesearch/zapx/v17 v17.0.1
+	github.com/blevesearch/zapx/v11 v11.4.3
+	github.com/blevesearch/zapx/v12 v12.4.3
+	github.com/blevesearch/zapx/v13 v13.4.3
+	github.com/blevesearch/zapx/v14 v14.4.3
+	github.com/blevesearch/zapx/v15 v15.4.3
+	github.com/blevesearch/zapx/v16 v16.3.1
+	github.com/blevesearch/zapx/v17 v17.0.2-0.20260204210735-148661f2ddf6
 	github.com/couchbase/moss v0.2.0
 	github.com/spf13/cobra v1.10.2
 	go.etcd.io/bbolt v1.4.0
