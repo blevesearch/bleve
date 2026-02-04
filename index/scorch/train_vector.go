@@ -317,6 +317,12 @@ func (t *vectorTrainer) updateBolt(snapshotsBucket *bolt.Bucket, key []byte, val
 		if err != nil {
 			return err
 		}
+
+		// update the centroid index pointer
+		t.centroidIndex, err = t.parent.loadSegment(trainerBucket)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

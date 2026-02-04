@@ -106,9 +106,6 @@ func (i *indexAliasImpl) IndexSynonym(id string, collection string, definition *
 func (i *indexAliasImpl) Train(batch *Batch) error {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
-	if !i.open {
-		return ErrorIndexClosed
-	}
 
 	if !i.open {
 		return ErrorIndexClosed

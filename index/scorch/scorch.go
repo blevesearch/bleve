@@ -1084,13 +1084,6 @@ func (s *Scorch) CopyFile(file string, d index.IndexDirectory) error {
 	s.rootLock.Lock()
 	defer s.rootLock.Unlock()
 
-	// this code is currently specific to copying trained data but is future proofed for other files
-	// to be updated in the dest's bolt
-	err := s.trainer.copyFileLOCKED(file, d)
-	if err != nil {
-		return err
-	}
-
 	dest, err := d.GetWriter(filepath.Join("store", file))
 	if err != nil {
 		return err
@@ -1104,6 +1097,13 @@ func (s *Scorch) CopyFile(file string, d index.IndexDirectory) error {
 	defer source.Close()
 	defer dest.Close()
 	_, err = io.Copy(dest, source)
+	if err != nil {
+		return err
+	}
+
+	// this code is currently specific to copying trained data but is future proofed for other files
+	// to be updated in the dest's bolt
+	err = s.trainer.copyFileLOCKED(file, d)
 	return err
 }
 
