@@ -363,7 +363,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 		var seg segment.Segment
 		var filename string
-		var trainingSample []float32
 		if len(segmentsToMerge) > 0 {
 			filename = zapFileName(newSegmentID)
 			s.markIneligibleForRemoval(filename)
