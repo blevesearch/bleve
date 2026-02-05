@@ -66,7 +66,7 @@ func NewGeoPointDistanceSearcher(ctx context.Context, indexReader index.IndexRea
 
 	// wrap it in a filtering searcher which checks the actual distance
 	return NewFilteringSearcher(ctx, rectSearcher,
-		buildDistFilter(ctx, dvReader, field, centerLon, centerLat, dist)), nil
+		buildDistFilter(ctx, dvReader, centerLon, centerLat, dist)), nil
 }
 
 // boxSearcher builds a searcher for the described bounding box
@@ -113,27 +113,33 @@ func boxSearcher(ctx context.Context, indexReader index.IndexReader,
 	return boxSearcher, nil
 }
 
-func buildDistFilter(ctx context.Context, dvReader index.DocValueReader, field string,
+func buildDistFilter(ctx context.Context, dvReader index.DocValueReader,
 	centerLon, centerLat, maxDist float64) FilterFunc {
+	// reuse the following for each document match that is checked using the filter
+	var lons, lats []float64
+	var found bool
+	dvVisitor := func(_ string, term []byte) {
+		if found {
+			// avoid redundant work if already found
+			return
+		}
+		// only consider the values which are shifted 0
+		prefixCoded := numeric.PrefixCoded(term)
+		shift, err := prefixCoded.Shift()
+		if err == nil && shift == 0 {
+			i64, err := prefixCoded.Int64()
+			if err == nil {
+				lons = append(lons, geo.MortonUnhashLon(uint64(i64)))
+				lats = append(lats, geo.MortonUnhashLat(uint64(i64)))
+				found = true
+			}
+		}
+	}
 	return func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
 		// check geo matches against all numeric type terms indexed
-		var lons, lats []float64
-		var found bool
-
-		err := dvReader.VisitDocValues(d.IndexInternalID, func(field string, term []byte) {
-			// only consider the values which are shifted 0
-			prefixCoded := numeric.PrefixCoded(term)
-			shift, err := prefixCoded.Shift()
-			if err == nil && shift == 0 {
-				i64, err := prefixCoded.Int64()
-				if err == nil {
-					lons = append(lons, geo.MortonUnhashLon(uint64(i64)))
-					lats = append(lats, geo.MortonUnhashLat(uint64(i64)))
-					found = true
-				}
-			}
-		})
-		if err == nil && found {
+		lons, lats = lons[:0], lats[:0]
+		found = false
+		if err := dvReader.VisitDocValues(d.IndexInternalID, dvVisitor); err == nil && found {
 			bytes := dvReader.BytesRead()
 			if bytes > 0 {
 				reportIOStats(ctx, bytes)

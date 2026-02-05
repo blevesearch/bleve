@@ -254,7 +254,7 @@ func (cfd *cachedFieldDocs) prepareField(field string, ss *SegmentSnapshot) {
 
 type cachedDocs struct {
 	size  uint64
-	m     sync.Mutex                  // As the cache is asynchronously prepared, need a lock
+	m     sync.RWMutex                // As the cache is asynchronously prepared, need a lock
 	cache map[string]*cachedFieldDocs // Keyed by field
 }
 
@@ -296,14 +296,14 @@ func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) e
 
 // hasFields returns true if the cache has all the given fields
 func (c *cachedDocs) hasFields(fields []string) bool {
-	c.m.Lock()
+	c.m.RLock()
 	for _, field := range fields {
 		if _, exists := c.cache[field]; !exists {
-			c.m.Unlock()
+			c.m.RUnlock()
 			return false // found a field not in cache
 		}
 	}
-	c.m.Unlock()
+	c.m.RUnlock()
 	return true
 }
 
@@ -324,13 +324,13 @@ func (c *cachedDocs) updateSizeLOCKED() {
 
 func (c *cachedDocs) visitDoc(localDocNum uint64,
 	fields []string, visitor index.DocValueVisitor) {
-	c.m.Lock()
+	c.m.RLock()
 
 	for _, field := range fields {
 		if cachedFieldDocs, exists := c.cache[field]; exists {
-			c.m.Unlock()
+			c.m.RUnlock()
 			<-cachedFieldDocs.readyCh
-			c.m.Lock()
+			c.m.RLock()
 
 			if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
 				for {
@@ -345,7 +345,7 @@ func (c *cachedDocs) visitDoc(localDocNum uint64,
 		}
 	}
 
-	c.m.Unlock()
+	c.m.RUnlock()
 }
 
 // the purpose of the cachedMeta is to simply allow the user of this type to record

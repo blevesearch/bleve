@@ -199,7 +199,7 @@ func (s *NestedConjunctionSearcher) Next(ctx *search.SearchContext) (*search.Doc
 	}
 	// check if the docQueue has any buffered matches
 	if s.docQueue.Len() > 0 {
-		return s.docQueue.Dequeue()
+		return s.docQueue.Dequeue(ctx), nil
 	}
 	// now enter the main alignment loop
 	n := len(s.searchers)
@@ -271,17 +271,11 @@ OUTER:
 		// now we need to buffer all the intermediate matches for every
 		// searcher at this key, until either the searcher's key changes
 		// or the searcher is exhausted
+		var err error
 		for i := 0; i < n; i++ {
 			for {
 				// buffer the current match
-				recycle, err := s.docQueue.Enqueue(s.currs[i])
-				if err != nil {
-					return nil, err
-				}
-				if recycle != nil {
-					// we got a match to recycle
-					ctx.DocumentMatchPool.Put(recycle)
-				}
+				s.docQueue.Enqueue(s.currs[i])
 				// advance to next match
 				s.currs[i], err = s.searchers[i].Next(ctx)
 				if err != nil {
@@ -308,7 +302,7 @@ OUTER:
 		// finalize the docQueue for dequeueing
 		s.docQueue.Finalize()
 		// finally return the first buffered match
-		return s.docQueue.Dequeue()
+		return s.docQueue.Dequeue(ctx), nil
 	}
 }
 
@@ -341,10 +335,7 @@ func (s *NestedConjunctionSearcher) Advance(ctx *search.SearchContext, ID index.
 	// first check if the docQueue has any buffered matches
 	// if so we first check if any of them can satisfy the Advance(ID)
 	for s.docQueue.Len() > 0 {
-		dm, err := s.docQueue.Dequeue()
-		if err != nil {
-			return nil, err
-		}
+		dm := s.docQueue.Dequeue(ctx)
 		if dm.IndexInternalID.Compare(ID) >= 0 {
 			return dm, nil
 		}
@@ -421,45 +412,21 @@ func (s *NestedConjunctionSearcher) Advance(ctx *search.SearchContext, ID index.
 
 // ------------------------------------------------------------------------------------------
 type CoalesceQueue struct {
-	order []*search.DocumentMatch          // queue of DocumentMatch
-	items map[uint64]*search.DocumentMatch // map of ID to DocumentMatch
+	order []*search.DocumentMatch // queue of DocumentMatch
 }
 
 func NewCoalesceQueue() *CoalesceQueue {
 	cq := &CoalesceQueue{
 		order: make([]*search.DocumentMatch, 0),
-		items: make(map[uint64]*search.DocumentMatch),
 	}
 	return cq
 }
 
-// Enqueue adds the given DocumentMatch to the queue. If a DocumentMatch with the same
-// IndexInternalID already exists in the queue, it merges the scores and explanations,
-// and returns the given DocumentMatch for recycling. If it's a new entry, it adds it
-// to the queue and returns nil.
-func (cq *CoalesceQueue) Enqueue(it *search.DocumentMatch) (*search.DocumentMatch, error) {
-	val, err := it.IndexInternalID.Value()
-	if err != nil {
-		// cannot coalesce without a valid uint64 ID
-		return nil, err
-	}
-
-	if existing, ok := cq.items[val]; ok {
-		// merge with current version
-		existing.Score += it.Score
-		existing.Expl = existing.Expl.MergeWith(it.Expl)
-		existing.FieldTermLocations = search.MergeFieldTermLocationsFromMatch(
-			existing.FieldTermLocations, it)
-		// return it to caller for recycling
-		return it, nil
-	}
-
-	// first time we see this ID — enqueue
-	cq.items[val] = it
+// Enqueue appends the given DocumentMatch to the queue. Coalescing of duplicates
+// is deferred until Dequeue, after Finalize has sorted items by IndexInternalID.
+func (cq *CoalesceQueue) Enqueue(it *search.DocumentMatch) {
 	// append to order slice (this is a stack)
 	cq.order = append(cq.order, it)
-	// no recycling needed as we added a new item
-	return nil, nil
 }
 
 // Finalize prepares the queue for dequeue operations by sorting the items based on
@@ -473,24 +440,38 @@ func (cq *CoalesceQueue) Finalize() {
 	})
 }
 
-// Dequeue removes and returns the next DocumentMatch from the queue in sorted order.
-// If the queue is empty, it returns nil.
-func (cq *CoalesceQueue) Dequeue() (*search.DocumentMatch, error) {
+// Dequeue removes and returns the next DocumentMatch in sorted order, merging any
+// consecutive duplicates. Merged items are recycled via ctx.DocumentMatchPool.
+// Returns nil when the queue is empty.
+func (cq *CoalesceQueue) Dequeue(ctx *search.SearchContext) *search.DocumentMatch {
 	if cq.Len() == 0 {
-		return nil, nil
+		return nil
 	}
 
 	// pop from end of slice
 	rv := cq.order[len(cq.order)-1]
 	cq.order = cq.order[:len(cq.order)-1]
 
-	val, err := rv.IndexInternalID.Value()
-	if err != nil {
-		return nil, err
+	// merge duplicates
+	for cq.Len() > 0 {
+		// peek at next item
+		next := cq.order[len(cq.order)-1]
+		if !rv.IndexInternalID.Equals(next.IndexInternalID) {
+			// different ID, stop merging
+			break
+		}
+		// pop the next item
+		cq.order = cq.order[:len(cq.order)-1]
+		// same ID, merge
+		rv.Score += next.Score
+		rv.Expl = rv.Expl.MergeWith(next.Expl)
+		rv.FieldTermLocations = search.MergeFieldTermLocationsFromMatch(
+			rv.FieldTermLocations, next)
+		// recycle the merged item
+		ctx.DocumentMatchPool.Put(next)
 	}
 
-	delete(cq.items, val)
-	return rv, nil
+	return rv
 }
 
 // Len returns the number of DocumentMatch items currently in the queue.
