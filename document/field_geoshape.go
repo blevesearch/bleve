@@ -183,8 +183,8 @@ func NewGeoShapeFieldFromShapeWithIndexingOptions(name string, arrayPositions []
 	// snappy compression and chunking are always skipped for geoshape
 	// to avoid mem copies and faster lookups.
 	options |= index.DocValues
-	options |= index.SkipSnappy
-	options |= index.SkipChunking
+	options |= index.SkipDVChunking
+	options |= index.SkipDVCompression
 
 	return &GeoShapeField{
 		shape:             shape,
@@ -239,8 +239,8 @@ func NewGeometryCollectionFieldFromShapesWithIndexingOptions(name string,
 	// snappy compression and chunking are always skipped for geoshape
 	// to avoid mem copies and faster lookups.
 	options |= index.DocValues
-	options |= index.SkipSnappy
-	options |= index.SkipChunking
+	options |= index.SkipDVChunking
+	options |= index.SkipDVCompression
 
 	return &GeoShapeField{
 		shape:             shape,

@@ -186,8 +186,8 @@ func NewGeoPointFieldWithIndexingOptions(name string, arrayPositions []uint64, l
 	// snappy compression and chunking are always skipped for geopoint
 	// to avoid mem copies and faster lookups.
 	options |= index.DocValues
-	options |= index.SkipSnappy
-	options |= index.SkipChunking
+	options |= index.SkipDVChunking
+	options |= index.SkipDVCompression
 
 	return &GeoPointField{
 		name:           name,
