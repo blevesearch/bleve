@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -36,10 +37,13 @@ import (
 )
 
 type trainRequest struct {
-	vecCount      int
-	ackCh         chan error
-	trainComplete []byte
-	sample        segment.Segment
+	ackCh  chan error
+	sample segment.Segment
+
+	// metadata to write out to bolt
+	trainComplete bool
+	vecCount      uint64
+	internalData  []byte
 }
 
 func initTrainer(s *Scorch, config map[string]interface{}) *vectorTrainer {
@@ -89,6 +93,8 @@ func (t *vectorTrainer) trainLoop() {
 		t.parent.asyncTasks.Done()
 	}()
 	// initialize stuff
+	totalSamplesProcessed := t.centroidIndex.cachedMeta.fetchMeta("trainedSamples").(uint64)
+	buf := make([]byte, binary.MaxVarintLen64)
 	t.parent.segmentConfig[index.CentroidIndexCallback] = t.getCentroidIndex
 	path := filepath.Join(t.parent.path, index.CentroidIndexFileName)
 	for {
@@ -108,7 +114,7 @@ func (t *vectorTrainer) trainLoop() {
 					}
 				default:
 				}
-			} else {
+			} else if sampleSeg != nil {
 				// merge the new segment with the existing one, to create a new
 				// .tmp centroid index file and then move it to the actual
 				// centroid index file path (during the merge, Os.Open(centroidIndexPath)
@@ -165,6 +171,7 @@ func (t *vectorTrainer) trainLoop() {
 				return
 			}
 
+			// update the path of the centroid index segmentSnaphshot in bolt
 			err = trainerBucket.Put(util.BoltPathKey, []byte(index.CentroidIndexFileName))
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error updating centroid bucket: %v", err)
@@ -172,15 +179,21 @@ func (t *vectorTrainer) trainLoop() {
 				return
 			}
 
-			err = trainerBucket.Put(util.BoltTrainCompleteKey, trainReq.trainComplete)
+			// train status - value is controlled by the application layer
+			var comp byte
+			if trainReq.trainComplete {
+				comp = 1
+			}
+			err = trainerBucket.Put(util.BoltTrainCompleteKey, []byte{comp})
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error updating train complete bucket: %v", err)
 				close(trainReq.ackCh)
 				return
 			}
 
-			// track progress of training in temrs of samples processed
-			binary.LittleEndian.PutUint64(buf, uint64(totalSamplesProcessed))
+			totalSamplesProcessed += trainReq.vecCount
+			// track progress of training in terms of samples processed
+			binary.LittleEndian.PutUint64(buf, totalSamplesProcessed)
 			err = trainerBucket.Put(util.BoltTrainedSamplesKey, buf)
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error updating trained samples bucket: %v", err)
@@ -188,6 +201,14 @@ func (t *vectorTrainer) trainLoop() {
 				return
 			}
 
+			// training related internal data that needs to be stored as per
+			// application layer via the SetInternal and GetInternal APIs
+			err = trainerBucket.Put(util.BoltInternalKey, trainReq.internalData)
+			if err != nil {
+				trainReq.ackCh <- fmt.Errorf("error updating train internal bucket: %v", err)
+				close(trainReq.ackCh)
+				return
+			}
 			err = tx.Commit()
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error committing bolt transaction: %v", err)
@@ -228,6 +249,15 @@ func (t *vectorTrainer) loadTrainedData(bucket *bolt.Bucket) error {
 	if err != nil {
 		return err
 	}
+
+	internalData := bucket.Get(util.BoltInternalKey)
+	trainedSamples := bucket.Get(util.BoltTrainedSamplesKey)
+	trainComplete := bucket.Get(util.BoltTrainCompleteKey)
+
+	segmentSnapshot.cachedMeta.updateMeta("internalData", internalData)
+	segmentSnapshot.cachedMeta.updateMeta("trainComplete", trainComplete)
+	segmentSnapshot.cachedMeta.updateMeta("trainedSamples", binary.LittleEndian.Uint64(trainedSamples))
+
 	t.m.Lock()
 	defer t.m.Unlock()
 	t.centroidIndex = segmentSnapshot
@@ -252,38 +282,37 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 		}
 	}
 
-	// just builds a new vector index out of the train data provided
-	// this is not necessarily the final train data since this is submitted
-	// as a request to the trainer component to be merged. once the training
-	// is complete, the template will be used for other operations down the line
-	// like merge and search.
-	//
-	// note: this might index text data too, how to handle this? s.segmentConfig?
-	// todo: updates/deletes -> data drift detection
-	seg, _, err := t.parent.segPlugin.NewUsing(trainData, t.parent.segmentConfig)
+	var seg segment.Segment
+	var fin bool
+	var err error
+	trainComplete := batch.InternalOps[string(util.BoltTrainCompleteKey)]
+	if trainComplete == nil {
+		trainComplete = []byte("false")
+	}
+	fin, err = strconv.ParseBool(string(trainComplete))
 	if err != nil {
 		return fmt.Errorf("error parsing train complete: %v", err)
 	}
 
 	if !fin {
 		// just builds a new vector index out of the train data provided
-		// it'll be an IVF index so the centroids are computed at this stage and
-		// this template will be used in the indexing down the line to index
-		// the data vectors. s.segmentConfig will mark this as a training phase
-		// and zap will handle it accordingly.
+		// this is not necessarily the final train data since this is submitted
+		// as a request to the trainer component to be merged. once the training
+		// is complete, the template will be used for other operations down the line
+		// like merge and search.
 		//
 		// note: this might index text data too, how to handle this? s.segmentConfig?
 		// todo: updates/deletes -> data drift detection
-		seg, _, err = t.parent.segPlugin.NewEx(trainData, t.parent.segmentConfig)
+		seg, _, err = t.parent.segPlugin.NewUsing(trainData, t.parent.segmentConfig)
 		if err != nil {
 			return err
 		}
 	}
 
 	trainReq := &trainRequest{
+		vecCount:      uint64(len(trainData)),
 		sample:        seg,
-		vecCount:      len(trainData), // todo: multivector support
-		trainComplete: trainComplete,
+		trainComplete: fin,
 		ackCh:         make(chan error),
 	}
 
@@ -303,11 +332,18 @@ func (t *vectorTrainer) getInternal(key []byte) ([]byte, error) {
 		switch string(key) {
 		case string(util.BoltTrainCompleteKey):
 			trainComplete := t.centroidIndex.cachedMeta.fetchMeta("trainComplete").([]byte)
-			return trainComplete, nil
+			if trainComplete[0] == 1 {
+				return []byte("true"), nil
+			}
+			return []byte("false"), nil
 		case string(util.BoltTrainedSamplesKey):
 			// keep rv in a human readable format
 			trainedSamples := t.centroidIndex.cachedMeta.fetchMeta("trainedSamples").(uint64)
 			return []byte(fmt.Sprintf("%d", trainedSamples)), nil
+		// keep the default fetch to be from the internal data
+		default:
+			internalData := t.centroidIndex.cachedMeta.fetchMeta("internalData").([]byte)
+			return internalData, nil
 		}
 	}
 	return nil, nil
