@@ -17,7 +17,6 @@ package scorch
 import (
 	"context"
 	"fmt"
-	"math"
 	"os"
 	"strings"
 	"sync"
@@ -336,7 +335,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 		docsToDrop := make([]*roaring.Bitmap, 0, len(task.Segments))
 		mergedSegHistory := make(map[uint64]*mergedSegmentHistory, len(task.Segments))
 
-		var files []string
 		for _, planSegment := range task.Segments {
 			if segSnapshot, ok := planSegment.(*SegmentSnapshot); ok {
 				oldMap[segSnapshot.id] = segSnapshot
@@ -352,7 +350,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 					} else {
 						segmentsToMerge = append(segmentsToMerge, segSnapshot.segment)
 						docsToDrop = append(docsToDrop, segSnapshot.deleted)
-						files = append(files, persistedSeg.Path())
 					}
 					// track the files getting merged for unsetting the
 					// removal ineligibility. This helps to unflip files
@@ -484,7 +481,6 @@ type mergedSegmentHistory struct {
 type segmentMerge struct {
 	id               []uint64
 	new              []segment.Segment
-	trainData        [][]float32
 	mergedSegHistory map[uint64]*mergedSegmentHistory
 	notifyCh         chan *mergeTaskIntroStatus
 	mmaped           uint32
@@ -530,27 +526,6 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 	var numSegments, newMergedCount uint64
 	var em sync.Mutex
 	var errs []error
-
-	var trainingSample [][]float32
-	collectTrainData := func(segTrainData [][]float32) {
-		trainingSample = append(trainingSample, segTrainData...)
-	}
-
-	// numDocs, err := snapshot.DocCount()
-	// if err != nil {
-	// 	return nil, nil, err
-	// }
-
-	// harcoding the total docs for now, need to get it from CB level
-	numDocs := 1000000
-	trainingSampleSize := math.Ceil(4 * math.Sqrt(float64(numDocs)) * 50)
-
-	// collect train data only if needed
-	if len(snapshot.trainData)/768 < int(trainingSampleSize) {
-		s.segmentConfig["collectTrainDataCallback"] = collectTrainData
-	} else {
-		s.segmentConfig["trainData"] = snapshot.trainData
-	}
 
 	// deploy the workers to merge and flush the batches of segments concurrently
 	// and create a new file segment
