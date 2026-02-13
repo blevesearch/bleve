@@ -151,6 +151,11 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	if vectorIndexOptimizedFor == "" {
 		vectorIndexOptimizedFor = index.DefaultIndexOptimization
 	}
+	// BIVF-Flat index needs cosine similarity for correct scoring
+	// regardless of the similarity metric specified in the mapping.
+	if vectorIndexOptimizedFor == index.IndexOptimizedWithBivfFlat {
+		similarity = index.CosineSimilarity
+	}
 	// normalize raw vector if similarity is cosine
 	// Since the vector can be multi-vector (flattened array of multiple vectors),
 	// we use NormalizeMultiVector to normalize each sub-vector independently.
@@ -184,6 +189,11 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	vectorIndexOptimizedFor := fm.VectorIndexOptimizedFor
 	if vectorIndexOptimizedFor == "" {
 		vectorIndexOptimizedFor = index.DefaultIndexOptimization
+	}
+	// BIVF-Flat index needs cosine similarity for correct scoring
+	// regardless of the similarity metric specified in the mapping.
+	if vectorIndexOptimizedFor == index.IndexOptimizedWithBivfFlat {
+		similarity = index.CosineSimilarity
 	}
 	decodedVector, err := document.DecodeVector(encodedString)
 	if err != nil || len(decodedVector) != fm.Dims {
@@ -288,6 +298,11 @@ func validateVectorFieldAlias(field *FieldMapping, path []string,
 			"optimization: '%s', valid optimizations are: %+v", effectiveFieldName,
 			effectiveOptimizedFor,
 			reflect.ValueOf(index.SupportedVectorIndexOptimizations).MapKeys())
+	}
+	// BIVF-Flat index optimization requires vector dimensions to be a multiple of 8
+	if effectiveOptimizedFor == index.IndexOptimizedWithBivfFlat && field.Dims%8 != 0 {
+		return fmt.Errorf("field: '%s', invalid vector dimension: %d for optimization with BIVF-Flat,"+
+			" dimension should be a multiple of 8", effectiveFieldName, field.Dims)
 	}
 
 	if fieldAliasCtx != nil { // writing to a nil map is unsafe

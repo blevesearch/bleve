@@ -114,7 +114,7 @@ func NewVectorFieldWithIndexingOptions(name string, arrayPositions []uint64,
 	// skip freq/norms for vector field
 	options |= index.SkipFreqNorm
 
-	if vectorIndexOptimizedFor == index.IndexOptimizedForBinary {
+	if vectorIndexOptimizedFor == index.IndexOptimizedWithBivfFlat {
 		similarity = index.CosineSimilarity
 	}
 
