@@ -244,6 +244,10 @@ func validateVectorFieldAlias(field *FieldMapping, path []string,
 	if effectiveOptimizedFor == "" {
 		effectiveOptimizedFor = index.DefaultIndexOptimization
 	}
+	if effectiveOptimizedFor == index.IndexOptimizedWithBivfFlat && field.Dims%8 != 0 {
+		return fmt.Errorf("field: '%s', vector dimensions for bivf-flat must be a multiple"+
+			" of 8", effectiveFieldName)
+	}
 
 	// # If alias is present, validate the field options as per the alias.
 	// note: reading from a nil map is safe
