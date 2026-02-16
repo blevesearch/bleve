@@ -114,6 +114,9 @@ func NewVectorFieldWithIndexingOptions(name string, arrayPositions []uint64,
 	// skip freq/norms for vector field
 	options |= index.SkipFreqNorm
 
+	// bivf-flat indexes only supports hamming distance for the primary
+	// binary index. Similarity here is used for the backing flat index,
+	// which is set to cosine similarity for recall reasons
 	if vectorIndexOptimizedFor == index.IndexOptimizedWithBivfFlat {
 		similarity = index.CosineSimilarity
 	}
