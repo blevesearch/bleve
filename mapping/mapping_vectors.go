@@ -151,8 +151,9 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	if vectorIndexOptimizedFor == "" {
 		vectorIndexOptimizedFor = index.DefaultIndexOptimization
 	}
-	// BIVF-Flat index needs cosine similarity for correct scoring
-	// regardless of the similarity metric specified in the mapping.
+	// bivf-flat indexes only supports hamming distance for the primary
+	// binary index. Similarity here is used for the backing flat index,
+	// which is set to cosine similarity for recall reasons
 	if vectorIndexOptimizedFor == index.IndexOptimizedWithBivfFlat {
 		similarity = index.CosineSimilarity
 	}
@@ -190,8 +191,9 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	if vectorIndexOptimizedFor == "" {
 		vectorIndexOptimizedFor = index.DefaultIndexOptimization
 	}
-	// BIVF-Flat index needs cosine similarity for correct scoring
-	// regardless of the similarity metric specified in the mapping.
+	// bivf-flat indexes only supports hamming distance for the primary
+	// binary index. Similarity here is used for the backing flat index,
+	// which is set to cosine similarity for recall reasons
 	if vectorIndexOptimizedFor == index.IndexOptimizedWithBivfFlat {
 		similarity = index.CosineSimilarity
 	}
@@ -243,10 +245,6 @@ func validateVectorFieldAlias(field *FieldMapping, path []string,
 	effectiveOptimizedFor := field.VectorIndexOptimizedFor
 	if effectiveOptimizedFor == "" {
 		effectiveOptimizedFor = index.DefaultIndexOptimization
-	}
-	if effectiveOptimizedFor == index.IndexOptimizedWithBivfFlat && field.Dims%8 != 0 {
-		return fmt.Errorf("field: '%s', vector dimensions for bivf-flat must be a multiple"+
-			" of 8", effectiveFieldName)
 	}
 
 	// # If alias is present, validate the field options as per the alias.
@@ -303,9 +301,9 @@ func validateVectorFieldAlias(field *FieldMapping, path []string,
 			effectiveOptimizedFor,
 			reflect.ValueOf(index.SupportedVectorIndexOptimizations).MapKeys())
 	}
-	// BIVF-Flat index optimization requires vector dimensions to be a multiple of 8
+	// bivf-flat's primary indexes requires vector dimensionality to be a multiple of 8
 	if effectiveOptimizedFor == index.IndexOptimizedWithBivfFlat && field.Dims%8 != 0 {
-		return fmt.Errorf("field: '%s', invalid vector dimension: %d for optimization with BIVF-Flat,"+
+		return fmt.Errorf("field: '%s', incompatible vector dimensionality for BIVF-FLAT: %d,"+
 			" dimension should be a multiple of 8", effectiveFieldName, field.Dims)
 	}
 
