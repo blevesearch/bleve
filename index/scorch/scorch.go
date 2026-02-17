@@ -237,7 +237,9 @@ func NewScorch(storeName string,
 		return nil, err
 	}
 
-	rv.trainer = initTrainer(rv, config)
+	if trainer := initTrainer(rv, config); trainer != nil {
+		rv.trainer = trainer
+	}
 
 	return rv, nil
 }

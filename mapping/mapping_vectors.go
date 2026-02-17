@@ -137,11 +137,16 @@ func processVector(vecI interface{}, dims int) ([]float32, bool) {
 
 func (fm *FieldMapping) vectorOptimizationForPath(path []string, context *walkContext) string {
 	optimizationType := fm.VectorIndexOptimizedFor
-	if optimizationType == "" {
+	if optimizationType == "" || (optimizationType == index.DefaultIndexOptimization &&
+		context.im.VectorOptimization == index.IndexOptimizedFastMerge) {
 		// todo: need to support document mapping default setting as well
+		// if optimization type is not set at field level, or is set to default,
+		// and index mapping optimization type is fast merge,
+		// then apply fast merge optimization since it includes the default recall
+		// optimization as part of it.
 		optimizationType = context.im.VectorOptimization
 	}
-	return index.DefaultIndexOptimization
+	return optimizationType
 }
 
 func (fm *FieldMapping) processVector(propertyMightBeVector interface{},

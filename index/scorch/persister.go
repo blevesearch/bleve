@@ -910,15 +910,17 @@ func (s *Scorch) loadFromBolt() error {
 			foundRoot = true
 		}
 
-		trainerBucket := snapshots.Bucket(util.BoltTrainerKey)
-		if trainerBucket != nil {
+		// try init trainer with the mapping details
+		if s.trainer == nil {
 			s.config["index_mapping"] = mappingBytes
 			s.trainer = initTrainer(s, s.config)
 		}
+		trainerBucket := snapshots.Bucket(util.BoltTrainerKey)
 		err := s.trainer.loadTrainedData(trainerBucket)
 		if err != nil {
 			return err
 		}
+
 		return nil
 	})
 	if err != nil {
