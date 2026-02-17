@@ -5219,3 +5219,98 @@ func TestSearchRequestValidatePagination(t *testing.T) {
 		})
 	}
 }
+
+func TestFieldExistsQuery(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMapping := NewIndexMapping()
+	idx, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Index some documents - some with "title" field, some without
+	docs := []map[string]interface{}{
+		{"id": "1", "title": "Hello World", "content": "Some content"},
+		{"id": "2", "content": "No title here"},
+		{"id": "3", "title": "Another Title", "content": "More content"},
+		{"id": "4", "content": "Also no title"},
+		{"id": "5", "title": "Third Title"},
+	}
+
+	for i, doc := range docs {
+		err := idx.Index(fmt.Sprintf("doc%d", i+1), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Query for documents that have the "title" field
+	q := NewFieldExistsQuery("title")
+	sr := NewSearchRequest(q)
+	sr.Size = 10
+
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Expect 3 documents (doc1, doc3, doc5 have "title")
+	if res.Total != 3 {
+		t.Fatalf("expected 3 results, got %d", res.Total)
+	}
+
+	// Query for documents that have the "content" field
+	q2 := NewFieldExistsQuery("content")
+	sr2 := NewSearchRequest(q2)
+	sr2.Size = 10
+
+	res2, err := idx.Search(sr2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Expect 4 documents (doc1, doc2, doc3, doc4 have "content")
+	if res2.Total != 4 {
+		t.Fatalf("expected 4 results, got %d", res2.Total)
+	}
+
+	// Query for documents that have a non-existent field
+	q3 := NewFieldExistsQuery("nonexistent")
+	sr3 := NewSearchRequest(q3)
+
+	res3, err := idx.Search(sr3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Expect 0 documents
+	if res3.Total != 0 {
+		t.Fatalf("expected 0 results, got %d", res3.Total)
+	}
+
+	// Test combining with boolean query - documents with title but without content
+	hasTitle := NewFieldExistsQuery("title")
+	hasContent := NewFieldExistsQuery("content")
+	bq := NewBooleanQuery()
+	bq.AddMust(hasTitle)
+	bq.AddMustNot(hasContent)
+
+	sr4 := NewSearchRequest(bq)
+	res4, err := idx.Search(sr4)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Expect 1 document (doc5 has title but no content)
+	if res4.Total != 1 {
+		t.Fatalf("expected 1 result for 'has title but no content', got %d", res4.Total)
+	}
+}
