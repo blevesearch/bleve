@@ -72,9 +72,9 @@ func indexStorePath(path string) string {
 	return path + string(os.PathSeparator) + storePath
 }
 
-func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (*indexImpl, error) {
+func newIndexUsing(path string, im mapping.IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (*indexImpl, error) {
 	// first validate the mapping
-	err := mapping.Validate()
+	err := im.Validate()
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	rv := indexImpl{
 		path: path,
 		name: path,
-		m:    mapping,
+		m:    im,
 		meta: newIndexMeta(indexType, kvstore, kvconfig),
 	}
 	rv.stats = &IndexStat{i: &rv}
@@ -106,6 +106,12 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	} else {
 		kvconfig["path"] = ""
 	}
+
+	mappingBytes, err := util.MarshalJSON(im)
+	if err != nil {
+		return nil, err
+	}
+	kvconfig["index_mapping"] = mappingBytes
 
 	// open the index
 	indexTypeConstructor := registry.IndexTypeConstructorByName(rv.meta.IndexType)
@@ -128,10 +134,6 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	}(&rv)
 
 	// now persist the mapping
-	mappingBytes, err := util.MarshalJSON(mapping)
-	if err != nil {
-		return nil, err
-	}
 	err = rv.i.SetInternal(util.MappingInternalKey, mappingBytes)
 	if err != nil {
 		return nil, err
@@ -1461,6 +1463,38 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 
 	// copy the metadata
 	return i.meta.CopyTo(d)
+}
+
+func (i *indexImpl) CopyFile(file string, d index.IndexDirectory) (err error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	copyIndex, ok := i.i.(index.IndexFileCopyable)
+	if !ok {
+		return fmt.Errorf("index implementation does not support copy reader")
+	}
+
+	return copyIndex.CopyFile(file, d)
+}
+
+func (i *indexImpl) UpdateFileInBolt(key []byte, value []byte) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	copyIndex, ok := i.i.(index.IndexFileCopyable)
+	if !ok {
+		return fmt.Errorf("index implementation does not support file copy")
+	}
+
+	return copyIndex.UpdateFileInBolt(key, value)
 }
 
 func (f FileSystemDirectory) GetWriter(filePath string) (io.WriteCloser,
