@@ -58,6 +58,7 @@ type IndexMappingImpl struct {
 	IndexDynamic          bool                        `json:"index_dynamic"`
 	DocValuesDynamic      bool                        `json:"docvalues_dynamic"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
+	VectorOptimization    string                      `json:"vector_optimization,omitempty"`
 	cache                 *registry.Cache
 }
 
@@ -324,6 +325,12 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 			}
 		case "scoring_model":
 			err := util.UnmarshalJSON(v, &im.ScoringModel)
+			if err != nil {
+				return err
+			}
+
+		case "vector_optimization":
+			err := util.UnmarshalJSON(v, &im.VectorOptimization)
 			if err != nil {
 				return err
 			}

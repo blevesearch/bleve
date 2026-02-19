@@ -24,7 +24,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-func initTrainer(s *Scorch) *noopTrainer {
+func initTrainer(s *Scorch, config map[string]interface{}) *noopTrainer {
 	return &noopTrainer{}
 }
 

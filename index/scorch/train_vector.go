@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	"github.com/RoaringBitmap/roaring/v2"
+	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/go-faiss"
@@ -38,7 +39,21 @@ type trainRequest struct {
 	ackCh    chan error
 }
 
-func initTrainer(s *Scorch) *vectorTrainer {
+func initTrainer(s *Scorch, config map[string]interface{}) *vectorTrainer {
+	mappingBytes, ok := config["index_mapping"].([]byte)
+	if !ok {
+		// if the flag is set to something other than fastmerge, don't init
+		return nil
+	}
+	var im *mapping.IndexMappingImpl
+	err := util.UnmarshalJSON(mappingBytes, &im)
+	if err != nil {
+		// if we can't unmarshal the mapping, don't init the trainer
+		return nil
+	}
+	if im.VectorOptimization != index.IndexOptimizedFastMerge {
+		return nil
+	}
 	return &vectorTrainer{
 		parent:  s,
 		trainCh: make(chan *trainRequest),

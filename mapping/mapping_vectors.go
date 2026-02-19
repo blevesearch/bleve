@@ -135,6 +135,20 @@ func processVector(vecI interface{}, dims int) ([]float32, bool) {
 	return rv, true
 }
 
+func (fm *FieldMapping) vectorOptimizationForPath(path []string, context *walkContext) string {
+	optimizationType := fm.VectorIndexOptimizedFor
+	if optimizationType == "" || (optimizationType == index.DefaultIndexOptimization &&
+		context.im.VectorOptimization == index.IndexOptimizedFastMerge) {
+		// todo: need to support document mapping default setting as well
+		// if optimization type is not set at field level, or is set to default,
+		// and index mapping optimization type is fast merge,
+		// then apply fast merge optimization since it includes the default recall
+		// optimization as part of it.
+		optimizationType = context.im.VectorOptimization
+	}
+	return optimizationType
+}
+
 func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	pathString string, path []string, indexes []uint64, context *walkContext) bool {
 	vector, ok := processVector(propertyMightBeVector, fm.Dims)
@@ -147,10 +161,8 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	if similarity == "" {
 		similarity = index.DefaultVectorSimilarityMetric
 	}
-	vectorIndexOptimizedFor := fm.VectorIndexOptimizedFor
-	if vectorIndexOptimizedFor == "" {
-		vectorIndexOptimizedFor = index.DefaultIndexOptimization
-	}
+	vectorIndexOptimizedFor := fm.vectorOptimizationForPath(path, context)
+
 	// normalize raw vector if similarity is cosine
 	// Since the vector can be multi-vector (flattened array of multiple vectors),
 	// we use NormalizeMultiVector to normalize each sub-vector independently.
@@ -181,10 +193,7 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	if similarity == "" {
 		similarity = index.DefaultVectorSimilarityMetric
 	}
-	vectorIndexOptimizedFor := fm.VectorIndexOptimizedFor
-	if vectorIndexOptimizedFor == "" {
-		vectorIndexOptimizedFor = index.DefaultIndexOptimization
-	}
+	vectorIndexOptimizedFor := fm.vectorOptimizationForPath(path, context)
 	decodedVector, err := document.DecodeVector(encodedString)
 	if err != nil || len(decodedVector) != fm.Dims {
 		return
