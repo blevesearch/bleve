@@ -370,6 +370,9 @@ func (c *cachedMeta) updateMeta(field string, val interface{}) {
 
 func (c *cachedMeta) fetchMeta(field string) (rv interface{}) {
 	c.m.RLock()
+	if c.meta == nil {
+		return nil
+	}
 	rv = c.meta[field]
 	c.m.RUnlock()
 	return rv
