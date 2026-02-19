@@ -93,7 +93,10 @@ func (t *vectorTrainer) trainLoop() {
 		t.parent.asyncTasks.Done()
 	}()
 	// initialize stuff
-	totalSamplesProcessed := t.centroidIndex.cachedMeta.fetchMeta("trainedSamples").(uint64)
+	var totalSamplesProcessed uint64
+	if t.centroidIndex != nil {
+		totalSamplesProcessed = t.centroidIndex.cachedMeta.fetchMeta("trainedSamples").(uint64)
+	}
 	buf := make([]byte, binary.MaxVarintLen64)
 	t.parent.segmentConfig[index.CentroidIndexCallback] = t.getCentroidIndex
 	path := filepath.Join(t.parent.path, index.CentroidIndexFileName)
@@ -232,9 +235,23 @@ func (t *vectorTrainer) trainLoop() {
 			}
 			t.m.Lock()
 			t.centroidIndex = &SegmentSnapshot{
-				segment: centroidIndex,
+				segment:    centroidIndex,
+				cachedMeta: &cachedMeta{meta: nil},
 			}
 			t.m.Unlock()
+
+			// if the train complete flag has been set, exit the routine and cleanup
+			if trainReq.trainComplete {
+				// cleanup .tmp file if it exists
+				if _, err := os.Stat(path + ".tmp"); err == nil {
+					err = os.Remove(path + ".tmp")
+					if err != nil {
+						trainReq.ackCh <- fmt.Errorf("error removing .tmp file: %v", err)
+					}
+				}
+				close(trainReq.ackCh)
+				return
+			}
 			close(trainReq.ackCh)
 		}
 	}
