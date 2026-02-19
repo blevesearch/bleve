@@ -19,6 +19,7 @@ var (
 	BoltSnapshotsBucket           = []byte{'s'}
 	BoltTrainerKey                = []byte{'t'}
 	BoltTrainCompleteKey          = []byte{'c'}
+	BoltTrainedSamplesKey         = []byte{'v'}
 	BoltPathKey                   = []byte{'p'}
 	BoltDeletedKey                = []byte{'d'}
 	BoltInternalKey               = []byte{'i'}
