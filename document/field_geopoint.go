@@ -182,8 +182,12 @@ func NewGeoPointFieldWithIndexingOptions(name string, arrayPositions []uint64, l
 	prefixCoded := numeric.MustNewPrefixCodedInt64(int64(mhash), 0)
 
 	// docvalues are always enabled for geopoint fields, even if the
-	// indexing options are set to not include them
+	// indexing options are set to not include docvalues.
+	// snappy compression and chunking are always skipped for geopoint
+	// to avoid mem copies and faster lookups.
 	options |= index.DocValues
+	options |= index.SkipDVChunking
+	options |= index.SkipDVCompression
 
 	return &GeoPointField{
 		name:           name,

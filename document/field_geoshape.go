@@ -180,7 +180,11 @@ func NewGeoShapeFieldFromShapeWithIndexingOptions(name string, arrayPositions []
 
 	// docvalues are always enabled for geoshape fields, even if the
 	// indexing options are set to not include docvalues.
+	// snappy compression and chunking are always skipped for geoshape
+	// to avoid mem copies and faster lookups.
 	options |= index.DocValues
+	options |= index.SkipDVChunking
+	options |= index.SkipDVCompression
 
 	return &GeoShapeField{
 		shape:             shape,
@@ -232,7 +236,11 @@ func NewGeometryCollectionFieldFromShapesWithIndexingOptions(name string,
 
 	// docvalues are always enabled for geoshape fields, even if the
 	// indexing options are set to not include docvalues.
+	// snappy compression and chunking are always skipped for geoshape
+	// to avoid mem copies and faster lookups.
 	options |= index.DocValues
+	options |= index.SkipDVChunking
+	options |= index.SkipDVCompression
 
 	return &GeoShapeField{
 		shape:             shape,

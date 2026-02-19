@@ -26,10 +26,6 @@ import (
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
 
-var TermSeparator byte = 0xff
-
-var TermSeparatorSplitSlice = []byte{TermSeparator}
-
 type SegmentSnapshot struct {
 	// this flag is needed to identify whether this
 	// segment was mmaped recently, in which case
@@ -233,7 +229,7 @@ func (cfd *cachedFieldDocs) prepareField(field string, ss *SegmentSnapshot) {
 		for err2 == nil && nextPosting != nil {
 			docNum := nextPosting.Number()
 			cfd.docs[docNum] = append(cfd.docs[docNum], []byte(next.Term)...)
-			cfd.docs[docNum] = append(cfd.docs[docNum], TermSeparator)
+			cfd.docs[docNum] = append(cfd.docs[docNum], index.DocValueTermSeparator)
 			cfd.size += uint64(len(next.Term) + 1) // map value
 			nextPosting, err2 = postingsItr.Next()
 		}
@@ -334,7 +330,7 @@ func (c *cachedDocs) visitDoc(localDocNum uint64,
 
 			if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
 				for {
-					i := bytes.Index(tlist, TermSeparatorSplitSlice)
+					i := bytes.IndexByte(tlist, index.DocValueTermSeparator)
 					if i < 0 {
 						break
 					}
