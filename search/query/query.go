@@ -308,6 +308,24 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
+	_, hasCustomFilter := tmp["custom_filter"]
+	if hasCustomFilter {
+		var rv CustomFilterQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	_, hasCustomScore := tmp["custom_score"]
+	if hasCustomScore {
+		var rv CustomScoreQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
 	_, hasDocIds := tmp["ids"]
 	if hasDocIds {
 		var rv DocIDQuery
