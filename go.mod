@@ -6,7 +6,7 @@ require (
 	github.com/RoaringBitmap/roaring/v2 v2.14.4
 	github.com/bits-and-blooms/bitset v1.24.2
 	github.com/blevesearch/bleve_index_api v1.3.2
-	github.com/blevesearch/geo v0.2.4
+	github.com/blevesearch/geo v0.2.5
 	github.com/blevesearch/go-faiss v1.0.27
 	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/blevesearch/go-porterstemmer v1.0.3
