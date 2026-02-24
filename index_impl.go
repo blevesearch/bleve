@@ -1593,3 +1593,35 @@ func (i *indexImpl) buildTopNCollector(ctx context.Context, req *SearchRequest, 
 	}
 	return newCollector(), nil
 }
+
+func (i *indexImpl) CopyFile(file string, d index.IndexDirectory) (err error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	copyIndex, ok := i.i.(index.IndexFileCopyable)
+	if !ok {
+		return fmt.Errorf("index implementation does not support copy reader")
+	}
+
+	return copyIndex.CopyFile(file, d)
+}
+
+func (i *indexImpl) UpdateFileInBolt(key []byte, value []byte) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	copyIndex, ok := i.i.(index.IndexFileCopyable)
+	if !ok {
+		return fmt.Errorf("index implementation does not support file copy")
+	}
+
+	return copyIndex.UpdateFileInBolt(key, value)
+}
