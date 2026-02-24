@@ -17,6 +17,8 @@ package util
 var (
 	// Bolt keys
 	BoltSnapshotsBucket           = []byte{'s'}
+	BoltTrainerKey                = []byte{'t'}
+	BoltTrainCompleteKey          = []byte{'c'}
 	BoltPathKey                   = []byte{'p'}
 	BoltDeletedKey                = []byte{'d'}
 	BoltInternalKey               = []byte{'i'}

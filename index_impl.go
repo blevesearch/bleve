@@ -72,9 +72,9 @@ func indexStorePath(path string) string {
 	return path + string(os.PathSeparator) + storePath
 }
 
-func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (*indexImpl, error) {
+func newIndexUsing(path string, im mapping.IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (*indexImpl, error) {
 	// first validate the mapping
-	err := mapping.Validate()
+	err := im.Validate()
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	rv := indexImpl{
 		path: path,
 		name: path,
-		m:    mapping,
+		m:    im,
 		meta: newIndexMeta(indexType, kvstore, kvconfig),
 	}
 	rv.stats = &IndexStat{i: &rv}
@@ -106,6 +106,12 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	} else {
 		kvconfig["path"] = ""
 	}
+
+	mappingBytes, err := util.MarshalJSON(im)
+	if err != nil {
+		return nil, err
+	}
+	kvconfig["index_mapping"] = mappingBytes
 
 	// open the index
 	indexTypeConstructor := registry.IndexTypeConstructorByName(rv.meta.IndexType)
@@ -128,10 +134,6 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	}(&rv)
 
 	// now persist the mapping
-	mappingBytes, err := util.MarshalJSON(mapping)
-	if err != nil {
-		return nil, err
-	}
 	err = rv.i.SetInternal(util.MappingInternalKey, mappingBytes)
 	if err != nil {
 		return nil, err
@@ -367,6 +369,20 @@ func (i *indexImpl) IndexSynonym(id string, collection string, definition *Synon
 	}
 	err = i.i.Update(doc)
 	return err
+}
+
+func (i *indexImpl) Train(batch *Batch) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	if vi, ok := i.i.(index.VectorIndex); ok {
+		return vi.Train(batch.internal)
+	}
+	return fmt.Errorf("not a vector index")
 }
 
 // IndexAdvanced takes a document.Document object
@@ -1442,7 +1458,7 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 
 	err = copyReader.CopyTo(d)
 	if err != nil {
-		return fmt.Errorf("error copying index metadata: %v", err)
+		return fmt.Errorf("error copying index data: %v", err)
 	}
 
 	// copy the metadata
