@@ -237,7 +237,9 @@ func NewScorch(storeName string,
 		return nil, err
 	}
 
-	rv.trainer = initTrainer(rv)
+	if trainer := initTrainer(rv, config); trainer != nil {
+		rv.trainer = trainer
+	}
 
 	return rv, nil
 }
@@ -293,8 +295,10 @@ func (s *Scorch) Open() error {
 	s.asyncTasks.Add(1)
 	go s.introducerLoop()
 
-	s.asyncTasks.Add(1)
-	go s.trainer.trainLoop()
+	if s.trainer != nil {
+		s.asyncTasks.Add(1)
+		go s.trainer.trainLoop()
+	}
 
 	if !s.readOnly && s.path != "" {
 		s.asyncTasks.Add(1)
@@ -575,13 +579,21 @@ func (s *Scorch) getInternal(key []byte) ([]byte, error) {
 
 	switch string(key) {
 	case string(util.BoltTrainCompleteKey):
-		return s.trainer.getInternal(key)
+		if s.trainer != nil {
+			return s.trainer.getInternal(key)
+		} else {
+			return nil, fmt.Errorf("get on BoltTrainCompleteKey is not supported" +
+				" with this build")
+		}
 	}
 	return nil, nil
 }
 
 func (s *Scorch) Train(batch *index.Batch) error {
-	return s.trainer.train(batch)
+	if s.trainer != nil {
+		return s.trainer.train(batch)
+	}
+	return fmt.Errorf("training is not supported with this build")
 }
 
 func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
