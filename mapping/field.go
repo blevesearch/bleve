@@ -83,6 +83,9 @@ type FieldMapping struct {
 	VectorIndexOptimizedFor string `json:"vector_index_optimized_for,omitempty"`
 
 	SynonymSource string `json:"synonym_source,omitempty"`
+
+	// Flag that indicates whether to use GPU for field indexing and searching
+	UseGPU bool `json:"gpu,omitempty"`
 }
 
 // NewTextFieldMapping returns a default field mapping for text
@@ -225,6 +228,9 @@ func (fm *FieldMapping) Options() index.FieldIndexingOptions {
 	}
 	if fm.SkipFreqNorm {
 		rv |= index.SkipFreqNorm
+	}
+	if fm.UseGPU {
+		rv |= index.GPU
 	}
 	return rv
 }
@@ -476,6 +482,11 @@ func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 			}
 		case "synonym_source":
 			err := util.UnmarshalJSON(v, &fm.SynonymSource)
+			if err != nil {
+				return err
+			}
+		case "gpu":
+			err := util.UnmarshalJSON(v, &fm.UseGPU)
 			if err != nil {
 				return err
 			}

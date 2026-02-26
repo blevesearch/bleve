@@ -277,6 +277,11 @@ func validateVectorFieldAlias(field *FieldMapping, path []string,
 				"(different vector index optimization values %s and %s)", effectiveFieldName,
 				effectiveOptimizedFor, aliasOptimizedFor)
 		}
+		if field.UseGPU != fieldAlias.UseGPU {
+			return fmt.Errorf("field: '%s', invalid alias "+
+				"(different useGPU values %v and %v)", fieldAlias.Name,
+				field.UseGPU, fieldAlias.UseGPU)
+		}
 
 		return nil
 	}
