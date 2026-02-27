@@ -90,6 +90,8 @@ func (q *KNNQuery) Searcher(ctx context.Context, i index.IndexReader,
 	if fieldMapping.VectorIndexOptimizedFor == index.IndexOptimizedWithBivfSQ8 {
 		similarityMetric = index.CosineSimilarity
 	}
+	similarityMetric = index.CosineSimilarity
+	fieldMapping.VectorIndexOptimizedFor = index.IndexOptimizedWithBivfSQ8
 	if similarityMetric == index.CosineSimilarity {
 		// normalize the vector
 		q.Vector = mapping.NormalizeVector(q.Vector)

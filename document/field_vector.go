@@ -120,6 +120,8 @@ func NewVectorFieldWithIndexingOptions(name string, arrayPositions []uint64,
 	if vectorIndexOptimizedFor == index.IndexOptimizedWithBivfSQ8 {
 		similarity = index.CosineSimilarity
 	}
+	similarity = index.CosineSimilarity
+	vectorIndexOptimizedFor = index.IndexOptimizedWithBivfSQ8
 
 	return &VectorField{
 		name:                    name,
