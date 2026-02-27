@@ -84,10 +84,10 @@ func (q *KNNQuery) Searcher(ctx context.Context, i index.IndexReader,
 	if q.K <= 0 || len(q.Vector) == 0 {
 		return nil, fmt.Errorf("k must be greater than 0 and vector must be non-empty")
 	}
-	// bivf-flat indexes only supports hamming distance for the primary
+	// bivf-sq8 indexes only supports hamming distance for the primary
 	// binary index. Similarity here is used for the backing flat index,
 	// which is set to cosine similarity for recall reasons
-	if fieldMapping.VectorIndexOptimizedFor == index.IndexOptimizedWithBivfFlat {
+	if fieldMapping.VectorIndexOptimizedFor == index.IndexOptimizedWithBivfSQ8 {
 		similarityMetric = index.CosineSimilarity
 	}
 	if similarityMetric == index.CosineSimilarity {
