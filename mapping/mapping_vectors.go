@@ -151,6 +151,12 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	if vectorIndexOptimizedFor == "" {
 		vectorIndexOptimizedFor = index.DefaultIndexOptimization
 	}
+	// bivf-sq8 indexes only supports hamming distance for the primary
+	// binary index. Similarity here is used for the backing flat index,
+	// which is set to cosine similarity for recall reasons
+	if vectorIndexOptimizedFor == index.IndexOptimizedWithBivfSQ8 {
+		similarity = index.CosineSimilarity
+	}
 	// normalize raw vector if similarity is cosine
 	// Since the vector can be multi-vector (flattened array of multiple vectors),
 	// we use NormalizeMultiVector to normalize each sub-vector independently.
@@ -184,6 +190,12 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	vectorIndexOptimizedFor := fm.VectorIndexOptimizedFor
 	if vectorIndexOptimizedFor == "" {
 		vectorIndexOptimizedFor = index.DefaultIndexOptimization
+	}
+	// bivf-sq8 indexes only supports hamming distance for the primary
+	// binary index. Similarity here is used for the backing flat index,
+	// which is set to cosine similarity for recall reasons
+	if vectorIndexOptimizedFor == index.IndexOptimizedWithBivfSQ8 {
+		similarity = index.CosineSimilarity
 	}
 	decodedVector, err := document.DecodeVector(encodedString)
 	if err != nil || len(decodedVector) != fm.Dims {
@@ -288,6 +300,11 @@ func validateVectorFieldAlias(field *FieldMapping, path []string,
 			"optimization: '%s', valid optimizations are: %+v", effectiveFieldName,
 			effectiveOptimizedFor,
 			reflect.ValueOf(index.SupportedVectorIndexOptimizations).MapKeys())
+	}
+	// bivf-sq8's primary indexes requires vector dimensionality to be a multiple of 8
+	if effectiveOptimizedFor == index.IndexOptimizedWithBivfSQ8 && field.Dims%8 != 0 {
+		return fmt.Errorf("field: '%s', incompatible vector dimensionality for BIVF-SQ8: %d,"+
+			" dimension should be a multiple of 8", effectiveFieldName, field.Dims)
 	}
 
 	if fieldAliasCtx != nil { // writing to a nil map is unsafe
