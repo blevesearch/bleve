@@ -157,6 +157,8 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	if vectorIndexOptimizedFor == index.IndexOptimizedWithBivfSQ8 {
 		similarity = index.CosineSimilarity
 	}
+	similarity = index.CosineSimilarity
+	vectorIndexOptimizedFor = index.IndexOptimizedWithBivfSQ8
 	// normalize raw vector if similarity is cosine
 	// Since the vector can be multi-vector (flattened array of multiple vectors),
 	// we use NormalizeMultiVector to normalize each sub-vector independently.
@@ -197,6 +199,8 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	if vectorIndexOptimizedFor == index.IndexOptimizedWithBivfSQ8 {
 		similarity = index.CosineSimilarity
 	}
+	similarity = index.CosineSimilarity
+	vectorIndexOptimizedFor = index.IndexOptimizedWithBivfSQ8
 	decodedVector, err := document.DecodeVector(encodedString)
 	if err != nil || len(decodedVector) != fm.Dims {
 		return
