@@ -1114,3 +1114,364 @@ func BenchmarkTop10000of1000000Scores(b *testing.B) {
 		return NewTopNCollector(10000, 0, search.SortOrder{&search.SortScore{Desc: true}})
 	}, b)
 }
+
+// Test field collapsing - deduplicate results by field value
+func TestCollapse(t *testing.T) {
+	// Create test data: multiple chunks per document
+	// doc1: chunks a (score 10), b (score 20), c (score 5)
+	// doc2: chunks d (score 15), e (score 8)
+	// doc3: chunk f (score 25)
+	// With collapse on document_id, we should get:
+	// - doc1 represented by chunk b (score 20)
+	// - doc2 represented by chunk d (score 15)
+	// - doc3 represented by chunk f (score 25)
+	// Sorted by score desc: f(25), b(20), d(15)
+
+	fieldValues := map[string]string{
+		"a": "doc1",
+		"b": "doc1",
+		"c": "doc1",
+		"d": "doc2",
+		"e": "doc2",
+		"f": "doc3",
+	}
+
+	searcher := &stubSearcher{
+		matches: []*search.DocumentMatch{
+			{IndexInternalID: index.IndexInternalID("a"), Score: 10},
+			{IndexInternalID: index.IndexInternalID("b"), Score: 20},
+			{IndexInternalID: index.IndexInternalID("c"), Score: 5},
+			{IndexInternalID: index.IndexInternalID("d"), Score: 15},
+			{IndexInternalID: index.IndexInternalID("e"), Score: 8},
+			{IndexInternalID: index.IndexInternalID("f"), Score: 25},
+		},
+	}
+
+	reader := &stubReaderWithCollapse{
+		fieldValues: fieldValues,
+		fieldName:   "document_id",
+	}
+
+	collector := NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	collapseReq := &search.CollapseRequest{Field: "document_id"}
+	collector.SetCollapse(collapseReq)
+
+	err := collector.Collect(context.Background(), searcher, reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	total := collector.Total()
+	if total != 6 {
+		t.Errorf("expected 6 total hits, got %d", total)
+	}
+
+	results := collector.Results()
+
+	// Should get 3 results (one per unique document_id)
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results after collapse, got %d", len(results))
+	}
+
+	// Check that we got the highest scoring chunk per document
+	// Result 0: f (doc3, score 25)
+	if results[0].ID != "f" {
+		t.Errorf("expected first result ID 'f', got %s", results[0].ID)
+	}
+	if results[0].Score != 25 {
+		t.Errorf("expected first result score 25, got %f", results[0].Score)
+	}
+
+	// Result 1: b (doc1, score 20)
+	if results[1].ID != "b" {
+		t.Errorf("expected second result ID 'b', got %s", results[1].ID)
+	}
+	if results[1].Score != 20 {
+		t.Errorf("expected second result score 20, got %f", results[1].Score)
+	}
+
+	// Result 2: d (doc2, score 15)
+	if results[2].ID != "d" {
+		t.Errorf("expected third result ID 'd', got %s", results[2].ID)
+	}
+	if results[2].Score != 15 {
+		t.Errorf("expected third result score 15, got %f", results[2].Score)
+	}
+}
+
+// Test collapse with missing field values
+func TestCollapseWithMissingValues(t *testing.T) {
+	// doc1: chunk a (score 10)
+	// doc2: chunk b (score 20)
+	// no doc_id: chunks c (score 15), d (score 8)
+	// With collapse, missing values should be grouped together
+
+	fieldValues := map[string]string{
+		"a": "doc1",
+		"b": "doc2",
+		// c and d have no document_id field
+	}
+
+	searcher := &stubSearcher{
+		matches: []*search.DocumentMatch{
+			{IndexInternalID: index.IndexInternalID("a"), Score: 10},
+			{IndexInternalID: index.IndexInternalID("b"), Score: 20},
+			{IndexInternalID: index.IndexInternalID("c"), Score: 15},
+			{IndexInternalID: index.IndexInternalID("d"), Score: 8},
+		},
+	}
+
+	reader := &stubReaderWithCollapse{
+		fieldValues: fieldValues,
+		fieldName:   "document_id",
+	}
+
+	collector := NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	collapseReq := &search.CollapseRequest{Field: "document_id"}
+	collector.SetCollapse(collapseReq)
+
+	err := collector.Collect(context.Background(), searcher, reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	results := collector.Results()
+
+	// Should get 3 results:
+	// - doc2 (b, score 20)
+	// - missing group (c, score 15)
+	// - doc1 (a, score 10)
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results after collapse, got %d", len(results))
+	}
+
+	// Verify scores are in descending order
+	if results[0].Score != 20 || results[1].Score != 15 || results[2].Score != 10 {
+		t.Errorf("results not properly sorted: scores %f, %f, %f",
+			results[0].Score, results[1].Score, results[2].Score)
+	}
+}
+
+// Test collapse with size > 1 (inner_hits style)
+func TestCollapseWithSize(t *testing.T) {
+	// Create test data: multiple chunks per document
+	// doc1: chunks a (score 10), b (score 20), c (score 5)
+	// doc2: chunks d (score 15), e (score 25), f (score 8)
+	// doc3: chunk g (score 18)
+	// With collapse size=2, we should get top 2 chunks per document:
+	// - doc1: b (20), a (10)
+	// - doc2: e (25), d (15)
+	// - doc3: g (18) [only has one chunk]
+	// Total: 5 results, sorted by score: e(25), b(20), g(18), d(15), a(10)
+
+	fieldValues := map[string]string{
+		"a": "doc1",
+		"b": "doc1",
+		"c": "doc1",
+		"d": "doc2",
+		"e": "doc2",
+		"f": "doc2",
+		"g": "doc3",
+	}
+
+	searcher := &stubSearcher{
+		matches: []*search.DocumentMatch{
+			{IndexInternalID: index.IndexInternalID("a"), Score: 10},
+			{IndexInternalID: index.IndexInternalID("b"), Score: 20},
+			{IndexInternalID: index.IndexInternalID("c"), Score: 5},
+			{IndexInternalID: index.IndexInternalID("d"), Score: 15},
+			{IndexInternalID: index.IndexInternalID("e"), Score: 25},
+			{IndexInternalID: index.IndexInternalID("f"), Score: 8},
+			{IndexInternalID: index.IndexInternalID("g"), Score: 18},
+		},
+	}
+
+	reader := &stubReaderWithCollapse{
+		fieldValues: fieldValues,
+		fieldName:   "document_id",
+	}
+
+	collector := NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	innerHits := search.NewInnerHitsRequest("top")
+	innerHits.Size = 2
+	collapseReq := &search.CollapseRequest{
+		Field:     "document_id",
+		InnerHits: []*search.InnerHitsRequest{innerHits},
+	}
+	collector.SetCollapse(collapseReq)
+
+	err := collector.Collect(context.Background(), searcher, reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	total := collector.Total()
+	if total != 7 {
+		t.Errorf("expected 7 total hits, got %d", total)
+	}
+
+	results := collector.Results()
+
+	// Should get 3 representatives (one per document)
+	if len(results) != 3 {
+		t.Fatalf("expected 3 representatives after collapse, got %d", len(results))
+	}
+
+	// Verify representatives are sorted by score
+	// Result 0: e (doc2, score 25)
+	if results[0].ID != "e" {
+		t.Errorf("expected first representative 'e', got %s", results[0].ID)
+	}
+	if results[0].Score != 25 {
+		t.Errorf("expected first representative score 25, got %f", results[0].Score)
+	}
+
+	// Check inner_hits for doc2 - should have 2 docs (e, d)
+	if results[0].InnerHits == nil || results[0].InnerHits["top"] == nil {
+		t.Fatal("expected inner_hits for doc2")
+	}
+	if len(results[0].InnerHits["top"].Hits) != 2 {
+		t.Errorf("expected 2 inner hits for doc2, got %d", len(results[0].InnerHits["top"].Hits))
+	}
+
+	// Result 1: b (doc1, score 20)
+	if results[1].ID != "b" {
+		t.Errorf("expected second representative 'b', got %s", results[1].ID)
+	}
+
+	// Check inner_hits for doc1 - should have 2 docs (b, a)
+	if results[1].InnerHits == nil || results[1].InnerHits["top"] == nil {
+		t.Fatal("expected inner_hits for doc1")
+	}
+	if len(results[1].InnerHits["top"].Hits) != 2 {
+		t.Errorf("expected 2 inner hits for doc1, got %d", len(results[1].InnerHits["top"].Hits))
+	}
+
+	// Result 2: g (doc3, score 18)
+	if results[2].ID != "g" {
+		t.Errorf("expected third representative 'g', got %s", results[2].ID)
+	}
+
+	// Check inner_hits for doc3 - should have 1 doc (g)
+	if results[2].InnerHits == nil || results[2].InnerHits["top"] == nil {
+		t.Fatal("expected inner_hits for doc3")
+	}
+	if len(results[2].InnerHits["top"].Hits) != 1 {
+		t.Errorf("expected 1 inner hit for doc3, got %d", len(results[2].InnerHits["top"].Hits))
+	}
+}
+
+// Test collapse with size=3 where one group has fewer docs
+func TestCollapseWithSizeLargerThanGroup(t *testing.T) {
+	// doc1: chunks a (score 10), b (score 20)
+	// doc2: chunk c (score 15)
+	// With collapse size=3, we should get all available chunks:
+	// - doc1: b (20), a (10) [only has 2, not 3]
+	// - doc2: c (15) [only has 1]
+	// Total: 3 results
+
+	fieldValues := map[string]string{
+		"a": "doc1",
+		"b": "doc1",
+		"c": "doc2",
+	}
+
+	searcher := &stubSearcher{
+		matches: []*search.DocumentMatch{
+			{IndexInternalID: index.IndexInternalID("a"), Score: 10},
+			{IndexInternalID: index.IndexInternalID("b"), Score: 20},
+			{IndexInternalID: index.IndexInternalID("c"), Score: 15},
+		},
+	}
+
+	reader := &stubReaderWithCollapse{
+		fieldValues: fieldValues,
+		fieldName:   "document_id",
+	}
+
+	collector := NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	innerHits := search.NewInnerHitsRequest("top")
+	innerHits.Size = 3
+	collapseReq := &search.CollapseRequest{
+		Field:     "document_id",
+		InnerHits: []*search.InnerHitsRequest{innerHits},
+	}
+	collector.SetCollapse(collapseReq)
+
+	err := collector.Collect(context.Background(), searcher, reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	results := collector.Results()
+
+	// Should get 2 representatives (one per document)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 representatives, got %d", len(results))
+	}
+
+	// Result 0: b (doc1, score 20) - highest overall
+	if results[0].ID != "b" || results[0].Score != 20 {
+		t.Errorf("expected first representative 'b' with score 20, got '%s' with score %f",
+			results[0].ID, results[0].Score)
+	}
+
+	// Check inner_hits for doc1 - should have 2 docs (only has 2, not 3)
+	if results[0].InnerHits == nil || results[0].InnerHits["top"] == nil {
+		t.Fatal("expected inner_hits for doc1")
+	}
+	if len(results[0].InnerHits["top"].Hits) != 2 {
+		t.Errorf("expected 2 inner hits for doc1, got %d", len(results[0].InnerHits["top"].Hits))
+	}
+
+	// Result 1: c (doc2, score 15)
+	if results[1].ID != "c" || results[1].Score != 15 {
+		t.Errorf("expected second representative 'c' with score 15, got '%s' with score %f",
+			results[1].ID, results[1].Score)
+	}
+
+	// Check inner_hits for doc2 - should have 1 doc (only has 1)
+	if results[1].InnerHits == nil || results[1].InnerHits["top"] == nil {
+		t.Fatal("expected inner_hits for doc2")
+	}
+	if len(results[1].InnerHits["top"].Hits) != 1 {
+		t.Errorf("expected 1 inner hit for doc2, got %d", len(results[1].InnerHits["top"].Hits))
+	}
+}
+
+// stubReaderWithCollapse is a stub reader that can return collapse field values
+type stubReaderWithCollapse struct {
+	stubReader
+	fieldValues map[string]string
+	fieldName   string
+}
+
+func (sr *stubReaderWithCollapse) DocumentVisitFieldTerms(id index.IndexInternalID, fields []string, visitor index.DocValueVisitor) error {
+	idStr := string(id)
+	for _, field := range fields {
+		if field == sr.fieldName {
+			if value, ok := sr.fieldValues[idStr]; ok {
+				visitor(field, []byte(value))
+			}
+			// If not in map, field is missing (empty value will be used)
+		}
+	}
+	return nil
+}
+
+func (sr *stubReaderWithCollapse) DocValueReader(fields []string) (index.DocValueReader, error) {
+	return &collapseDocValueReader{sr: sr, fields: fields}, nil
+}
+
+type collapseDocValueReader struct {
+	sr     *stubReaderWithCollapse
+	fields []string
+}
+
+func (dvr *collapseDocValueReader) VisitDocValues(id index.IndexInternalID, visitor index.DocValueVisitor) error {
+	return dvr.sr.DocumentVisitFieldTerms(id, dvr.fields, visitor)
+}
+
+func (dvr *collapseDocValueReader) BytesRead() uint64 {
+	return 0
+}
