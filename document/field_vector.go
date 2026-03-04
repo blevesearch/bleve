@@ -117,7 +117,7 @@ func NewVectorFieldWithIndexingOptions(name string, arrayPositions []uint64,
 	// bivf-sq8 indexes only supports hamming distance for the primary
 	// binary index. Similarity here is used for the backing flat index,
 	// which is set to cosine similarity for recall reasons
-	if vectorIndexOptimizedFor == index.IndexOptimizedWithBivfSQ8 {
+	if index.OptimizationRequiresBinaryIndex(vectorIndexOptimizedFor) {
 		similarity = index.CosineSimilarity
 	}
 

@@ -608,10 +608,17 @@ func TestVectorBase64Index(t *testing.T) {
 	}
 }
 
-// Test to verify that the BIVF-SQ8 index with vector base64 field mapping returns the
+// Test to verify that the BIVF-Flat index with vector base64 field mapping returns the
 // same results as the non-optimized vector field mapping for L2, Dot Product and Cosine similarities.
 // Also test to see no differences in results for any distance metric
-func TestVectorBivfSQ8Index(t *testing.T) {
+func TestVectorBivfIndexes(t *testing.T) {
+	optimizations := []string{index.IndexOptimizedWithBivfForDisk, index.IndexOptimizedWithBivfForLatency}
+	for _, optimization := range optimizations {
+		testVectorBivfIndex(t, optimization)
+	}
+}
+
+func testVectorBivfIndex(t *testing.T, optimization string) {
 
 	dataset, searchRequests, err := readDatasetAndQueries(testInputCompressedFile)
 	if err != nil {
@@ -653,22 +660,22 @@ func TestVectorBivfSQ8Index(t *testing.T) {
 	vecFML2 := mapping.NewVectorFieldMapping()
 	vecFML2.Dims = testDatasetDims
 	vecFML2.Similarity = index.EuclideanDistance
-	vecFML2.VectorIndexOptimizedFor = index.IndexOptimizedWithBivfSQ8
+	vecFML2.VectorIndexOptimizedFor = optimization
 
 	vecBFML2 := mapping.NewVectorBase64FieldMapping()
 	vecBFML2.Dims = testDatasetDims
 	vecBFML2.Similarity = index.EuclideanDistance
-	vecBFML2.VectorIndexOptimizedFor = index.IndexOptimizedWithBivfSQ8
+	vecBFML2.VectorIndexOptimizedFor = optimization
 
 	vecFMDot := mapping.NewVectorFieldMapping()
 	vecFMDot.Dims = testDatasetDims
 	vecFMDot.Similarity = index.InnerProduct
-	vecFMDot.VectorIndexOptimizedFor = index.IndexOptimizedWithBivfSQ8
+	vecFMDot.VectorIndexOptimizedFor = optimization
 
 	vecBFMDot := mapping.NewVectorBase64FieldMapping()
 	vecBFMDot.Dims = testDatasetDims
 	vecBFMDot.Similarity = index.InnerProduct
-	vecBFMDot.VectorIndexOptimizedFor = index.IndexOptimizedWithBivfSQ8
+	vecBFMDot.VectorIndexOptimizedFor = optimization
 
 	vecFMCosine := mapping.NewVectorFieldMapping()
 	vecFMCosine.Dims = testDatasetDims
@@ -677,7 +684,7 @@ func TestVectorBivfSQ8Index(t *testing.T) {
 	vecBFMCosine := mapping.NewVectorBase64FieldMapping()
 	vecBFMCosine.Dims = testDatasetDims
 	vecBFMCosine.Similarity = index.CosineSimilarity
-	vecBFMCosine.VectorIndexOptimizedFor = index.IndexOptimizedWithBivfSQ8
+	vecBFMCosine.VectorIndexOptimizedFor = optimization
 
 	indexMappingL2 := NewIndexMapping()
 	indexMappingL2.DefaultMapping.AddFieldMappingsAt("content", contentFM)
