@@ -3212,3 +3212,344 @@ func TestIndexUpdateNestedMapping(t *testing.T) {
 		}
 	}
 }
+
+func TestTemp(t *testing.T) {
+
+	oriJSON := `
+		{
+		"default_analyzer": "standard",
+		"default_datetime_parser": "dateTimeOptional",
+		"default_field": "_all",
+		"default_mapping": {
+			"dynamic": true,
+			"enabled": false
+		},
+		"default_type": "_default",
+		"docvalues_dynamic": false,
+		"index_dynamic": true,
+		"scoring_model": "tf-idf",
+		"store_dynamic": false,
+		"type_field": "_type",
+		"types": {
+			"inventory.hotel": {
+			"dynamic": false,
+			"enabled": true,
+			"properties": {
+				"city": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"analyzer": "keyword",
+					"docvalues": true,
+					"index": true,
+					"name": "city",
+					"store": true,
+					"type": "text"
+					}
+				]
+				},
+				"country": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"analyzer": "keyword",
+					"docvalues": true,
+					"index": true,
+					"name": "country",
+					"store": true,
+					"type": "text"
+					}
+				]
+				},
+				"description": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"analyzer": "en",
+					"docvalues": true,
+					"index": true,
+					"name": "description",
+					"store": true,
+					"type": "text"
+					}
+				]
+				},
+				"free_breakfast": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"docvalues": true,
+					"index": true,
+					"name": "free_breakfast",
+					"store": true,
+					"type": "boolean"
+					}
+				]
+				},
+				"geo": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"index": true,
+					"name": "geo",
+					"store": true,
+					"type": "geopoint"
+					}
+				]
+				},
+				"id": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"docvalues": true,
+					"index": true,
+					"name": "id",
+					"store": true,
+					"type": "number"
+					}
+				]
+				},
+				"name": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"analyzer": "en",
+					"docvalues": true,
+					"index": true,
+					"name": "name",
+					"type": "text",
+					"store": true
+					}
+				]
+				},
+				"phone": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"analyzer": "keyword",
+					"docvalues": true,
+					"index": true,
+					"name": "phone",
+					"type": "text"
+					}
+				]
+				},
+				"title": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"analyzer": "en",
+					"docvalues": true,
+					"index": true,
+					"name": "title",
+					"store": true,
+					"type": "text"
+					}
+				]
+				},
+				"vacancy": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"docvalues": true,
+					"index": true,
+					"name": "vacancy",
+					"store": true,
+					"type": "boolean"
+					}
+				]
+				}
+			}
+			}
+		}
+		}`
+
+	updJSON := `
+		{
+		"default_analyzer": "standard",
+		"default_datetime_parser": "dateTimeOptional",
+		"default_field": "_all",
+		"default_mapping": {
+			"dynamic": true,
+			"enabled": false
+		},
+		"default_type": "_default",
+		"docvalues_dynamic": false,
+		"index_dynamic": true,
+		"scoring_model": "tf-idf",
+		"store_dynamic": false,
+		"type_field": "_type",
+		"types": {
+			"inventory.hotel": {
+			"dynamic": false,
+			"enabled": true,
+			"properties": {
+				"city": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"analyzer": "keyword",
+					"docvalues": true,
+					"index": true,
+					"name": "city",
+					"store": true,
+					"type": "text"
+					}
+				]
+				},
+				"country": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"analyzer": "keyword",
+					"docvalues": true,
+					"index": true,
+					"name": "country",
+					"store": true,
+					"type": "text"
+					}
+				]
+				},
+				"description": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"analyzer": "en",
+					"docvalues": true,
+					"index": true,
+					"name": "description",
+					"store": true,
+					"type": "text"
+					}
+				]
+				},
+				"free_breakfast": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"docvalues": true,
+					"index": true,
+					"name": "free_breakfast",
+					"store": true,
+					"type": "boolean"
+					}
+				]
+				},
+				"geo": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"index": true,
+					"name": "geo",
+					"store": true,
+					"type": "geopoint"
+					}
+				]
+				},
+				"id": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"docvalues": true,
+					"index": true,
+					"name": "id",
+					"store": true,
+					"type": "number"
+					}
+				]
+				},
+				"name": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"analyzer": "en",
+					"docvalues": true,
+					"index": true,
+					"name": "name",
+					"type": "text",
+					"store": false
+					}
+				]
+				},
+				"phone": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"analyzer": "keyword",
+					"docvalues": true,
+					"index": true,
+					"name": "phone",
+					"type": "text"
+					}
+				]
+				},
+				"title": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"analyzer": "en",
+					"docvalues": true,
+					"index": true,
+					"name": "title",
+					"store": true,
+					"type": "text"
+					}
+				]
+				},
+				"vacancy": {
+				"enabled": true,
+				"dynamic": false,
+				"fields": [
+					{
+					"docvalues": true,
+					"index": true,
+					"name": "vacancy",
+					"store": true,
+					"type": "boolean"
+					}
+				]
+				}
+			}
+			}
+		}
+		}`
+
+	var originalMapping *mapping.IndexMappingImpl
+	err := json.Unmarshal([]byte(oriJSON), &originalMapping)
+	if err != nil {
+		t.Fatalf("Error unmarshalling mapping JSON: %v", err)
+	}
+
+	var updatedMapping *mapping.IndexMappingImpl
+	err = json.Unmarshal([]byte(updJSON), &updatedMapping)
+	if err != nil {
+		t.Fatalf("Error unmarshalling mapping JSON: %v", err)
+	}
+
+	deletedFields, err := DeletedFields(originalMapping, updatedMapping)
+	if err != nil {
+		t.Fatalf("Error comparing mappings: %v", err)
+	}
+
+	fmt.Printf("Deleted fields: %v\n", deletedFields)
+
+}
