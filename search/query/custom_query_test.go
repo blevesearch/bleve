@@ -15,6 +15,7 @@
 package query
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -54,9 +55,9 @@ func TestCustomFilterQueryJSON(t *testing.T) {
 		t.Errorf("expected abv 5.0, got %v", cfq.Params["abv"])
 	}
 
-	mq, ok := cfq.QueryVal.(*MatchQuery)
+	mq, ok := cfq.Query.(*MatchQuery)
 	if !ok {
-		t.Fatalf("expected inner query to be MatchQuery, got %T", cfq.QueryVal)
+		t.Fatalf("expected inner query to be MatchQuery, got %T", cfq.Query)
 	}
 
 	if mq.Match != "beer" {
@@ -86,5 +87,18 @@ func TestCustomScoreQueryJSON(t *testing.T) {
 
 	if csq.Source == "" {
 		t.Errorf("expected Source to be set")
+	}
+}
+
+func TestCustomFilterMarshalIncludesSourceKey(t *testing.T) {
+	q := NewCustomFilterQuery(NewMatchQuery("beer"), "")
+
+	b, err := q.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(b), `"source":""`) {
+		t.Fatalf("expected marshaled query to include empty source, got %s", string(b))
 	}
 }

@@ -27,26 +27,27 @@ import (
 )
 
 type CustomFilterQuery struct {
-	// QueryVal is the child query whose candidate matches are filtered.
-	QueryVal Query `json:"query"`
-	// Fields lists stored fields to load into doc.fields for UDF execution.
+	// Query is the child query whose candidate matches are filtered.
+	Query Query `json:"query"`
+	// Fields lists stored fields to load into doc.fields for callback execution.
+	// Nil or empty means no stored fields are loaded.
 	Fields []string `json:"fields,omitempty"`
 	// Params carries caller-provided values passed as the second UDF argument.
 	Params map[string]interface{} `json:"params,omitempty"`
 	// Source carries embedding-defined callback source that travels with the query.
-	Source string `json:"source,omitempty"`
+	Source string `json:"source"`
 }
 
 func NewCustomFilterQuery(query Query, source string) *CustomFilterQuery {
 	return &CustomFilterQuery{
-		QueryVal: query,
-		Source:   source,
+		Query:  query,
+		Source: source,
 	}
 }
 
 func (q *CustomFilterQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	// Build the inner searcher first; custom filtering wraps its output.
-	childSearcher, err := q.QueryVal.Searcher(ctx, i, m, options)
+	childSearcher, err := q.Query.Searcher(ctx, i, m, options)
 	if err != nil {
 		return nil, err
 	}
@@ -68,33 +69,33 @@ func (q *CustomFilterQuery) Searcher(ctx context.Context, i index.IndexReader, m
 }
 
 func (q *CustomFilterQuery) Validate() error {
-	if q.QueryVal == nil {
+	if q.Query == nil {
 		return fmt.Errorf("custom filter query must have a query")
 	}
 	if q.Source == "" {
 		return fmt.Errorf("custom filter query must have source")
 	}
-	if vq, ok := q.QueryVal.(ValidatableQuery); ok {
+	if vq, ok := q.Query.(ValidatableQuery); ok {
 		return vq.Validate()
 	}
 	return nil
 }
 
 func (q *CustomFilterQuery) MarshalJSON() ([]byte, error) {
-	inner := map[string]interface{}{
-		"query": q.QueryVal,
+	type customFilterInner struct {
+		Query  Query                  `json:"query"`
+		Fields []string               `json:"fields,omitempty"`
+		Params map[string]interface{} `json:"params,omitempty"`
+		Source string                 `json:"source"`
 	}
-	if len(q.Fields) > 0 {
-		inner["fields"] = q.Fields
-	}
-	if len(q.Params) > 0 {
-		inner["params"] = q.Params
-	}
-	if q.Source != "" {
-		inner["source"] = q.Source
-	}
+
 	return json.Marshal(map[string]interface{}{
-		"custom_filter": inner,
+		"custom_filter": customFilterInner{
+			Query:  q.Query,
+			Fields: q.Fields,
+			Params: q.Params,
+			Source: q.Source,
+		},
 	})
 }
 
@@ -113,7 +114,7 @@ func (q *CustomFilterQuery) UnmarshalJSON(data []byte) error {
 	}
 
 	if tmp.CustomFilter.Query != nil {
-		q.QueryVal, err = ParseQuery(tmp.CustomFilter.Query)
+		q.Query, err = ParseQuery(tmp.CustomFilter.Query)
 		if err != nil {
 			return err
 		}

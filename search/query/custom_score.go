@@ -27,26 +27,27 @@ import (
 )
 
 type CustomScoreQuery struct {
-	// QueryVal is the child query whose candidate matches are re-scored.
-	QueryVal Query `json:"query"`
-	// Fields lists stored fields to load into doc.fields for UDF execution.
+	// Query is the child query whose candidate matches are re-scored.
+	Query Query `json:"query"`
+	// Fields lists stored fields to load into doc.fields for callback execution.
+	// Nil or empty means no stored fields are loaded.
 	Fields []string `json:"fields,omitempty"`
 	// Params carries caller-provided values passed as the second UDF argument.
 	Params map[string]interface{} `json:"params,omitempty"`
 	// Source carries embedding-defined callback source that travels with the query.
-	Source string `json:"source,omitempty"`
+	Source string `json:"source"`
 }
 
 func NewCustomScoreQuery(query Query, source string) *CustomScoreQuery {
 	return &CustomScoreQuery{
-		QueryVal: query,
-		Source:   source,
+		Query:  query,
+		Source: source,
 	}
 }
 
 func (q *CustomScoreQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	// Build the inner searcher first; custom scoring wraps its output.
-	childSearcher, err := q.QueryVal.Searcher(ctx, i, m, options)
+	childSearcher, err := q.Query.Searcher(ctx, i, m, options)
 	if err != nil {
 		return nil, err
 	}
@@ -68,33 +69,33 @@ func (q *CustomScoreQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 }
 
 func (q *CustomScoreQuery) Validate() error {
-	if q.QueryVal == nil {
+	if q.Query == nil {
 		return fmt.Errorf("custom score query must have a query")
 	}
 	if q.Source == "" {
 		return fmt.Errorf("custom score query must have source")
 	}
-	if vq, ok := q.QueryVal.(ValidatableQuery); ok {
+	if vq, ok := q.Query.(ValidatableQuery); ok {
 		return vq.Validate()
 	}
 	return nil
 }
 
 func (q *CustomScoreQuery) MarshalJSON() ([]byte, error) {
-	inner := map[string]interface{}{
-		"query": q.QueryVal,
+	type customScoreInner struct {
+		Query  Query                  `json:"query"`
+		Fields []string               `json:"fields,omitempty"`
+		Params map[string]interface{} `json:"params,omitempty"`
+		Source string                 `json:"source"`
 	}
-	if len(q.Fields) > 0 {
-		inner["fields"] = q.Fields
-	}
-	if len(q.Params) > 0 {
-		inner["params"] = q.Params
-	}
-	if q.Source != "" {
-		inner["source"] = q.Source
-	}
+
 	return json.Marshal(map[string]interface{}{
-		"custom_score": inner,
+		"custom_score": customScoreInner{
+			Query:  q.Query,
+			Fields: q.Fields,
+			Params: q.Params,
+			Source: q.Source,
+		},
 	})
 }
 
@@ -113,7 +114,7 @@ func (q *CustomScoreQuery) UnmarshalJSON(data []byte) error {
 	}
 
 	if tmp.CustomScore.Query != nil {
-		q.QueryVal, err = ParseQuery(tmp.CustomScore.Query)
+		q.Query, err = ParseQuery(tmp.CustomScore.Query)
 		if err != nil {
 			return err
 		}

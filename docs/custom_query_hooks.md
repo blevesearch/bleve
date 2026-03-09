@@ -7,7 +7,7 @@ Bleve supports two query nodes for embedding-defined per-hit logic:
 
 Bleve treats `source` as an opaque payload. The embedding application provides execution via request-scoped callbacks in `context.Context`.
 
-## Query Shape
+## Query Object
 
 ### `custom_filter`
 
