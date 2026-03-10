@@ -84,8 +84,7 @@ type FieldMapping struct {
 
 	SynonymSource string `json:"synonym_source,omitempty"`
 
-	// Applicable to vector fields only - enables GPU acceleration for indexing
-	// and searching when the "gpu" field option is set in the mapping.
+	// Applicable to vector fields only - enables GPU acceleration for indexing and searching
 	GPU bool `json:"gpu,omitempty"`
 }
 
