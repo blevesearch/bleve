@@ -84,7 +84,8 @@ type FieldMapping struct {
 
 	SynonymSource string `json:"synonym_source,omitempty"`
 
-	// Flag that indicates whether to use GPU for field indexing and searching
+	// Applicable to vector fields only - enables GPU acceleration for indexing
+	// and searching when the "gpu" field option is set in the mapping.
 	UseGPU bool `json:"gpu,omitempty"`
 }
 
