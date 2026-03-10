@@ -86,7 +86,7 @@ type FieldMapping struct {
 
 	// Applicable to vector fields only - enables GPU acceleration for indexing
 	// and searching when the "gpu" field option is set in the mapping.
-	UseGPU bool `json:"gpu,omitempty"`
+	GPU bool `json:"gpu,omitempty"`
 }
 
 // NewTextFieldMapping returns a default field mapping for text
@@ -230,7 +230,7 @@ func (fm *FieldMapping) Options() index.FieldIndexingOptions {
 	if fm.SkipFreqNorm {
 		rv |= index.SkipFreqNorm
 	}
-	if fm.UseGPU {
+	if fm.GPU {
 		rv |= index.GPU
 	}
 	return rv
@@ -487,7 +487,7 @@ func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 				return err
 			}
 		case "gpu":
-			err := util.UnmarshalJSON(v, &fm.UseGPU)
+			err := util.UnmarshalJSON(v, &fm.GPU)
 			if err != nil {
 				return err
 			}
