@@ -151,10 +151,10 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	if vectorIndexOptimizedFor == "" {
 		vectorIndexOptimizedFor = index.DefaultIndexOptimization
 	}
-	// bivf-flat indexes only supports hamming distance for the primary
+	// bivf indexes only supports hamming distance for the primary
 	// binary index. Similarity here is used for the backing flat index,
 	// which is set to cosine similarity for recall reasons
-	if vectorIndexOptimizedFor == index.IndexOptimizedWithBivfFlat {
+	if index.OptimizationRequiresBinaryIndex(vectorIndexOptimizedFor) {
 		similarity = index.CosineSimilarity
 	}
 	// normalize raw vector if similarity is cosine
@@ -191,10 +191,10 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	if vectorIndexOptimizedFor == "" {
 		vectorIndexOptimizedFor = index.DefaultIndexOptimization
 	}
-	// bivf-flat indexes only supports hamming distance for the primary
+	// bivf indexes only supports hamming distance for the primary
 	// binary index. Similarity here is used for the backing flat index,
 	// which is set to cosine similarity for recall reasons
-	if vectorIndexOptimizedFor == index.IndexOptimizedWithBivfFlat {
+	if index.OptimizationRequiresBinaryIndex(vectorIndexOptimizedFor) {
 		similarity = index.CosineSimilarity
 	}
 	decodedVector, err := document.DecodeVector(encodedString)
@@ -306,9 +306,9 @@ func validateVectorFieldAlias(field *FieldMapping, path []string,
 			effectiveOptimizedFor,
 			reflect.ValueOf(index.SupportedVectorIndexOptimizations).MapKeys())
 	}
-	// bivf-flat's primary indexes requires vector dimensionality to be a multiple of 8
-	if effectiveOptimizedFor == index.IndexOptimizedWithBivfFlat && field.Dims%8 != 0 {
-		return fmt.Errorf("field: '%s', incompatible vector dimensionality for BIVF-FLAT: %d,"+
+	// bivf indexes requires vector dimensionality to be a multiple of 8
+	if index.OptimizationRequiresBinaryIndex(effectiveOptimizedFor) && field.Dims%8 != 0 {
+		return fmt.Errorf("field: '%s', incompatible vector dimensionality for BIVF: %d,"+
 			" dimension should be a multiple of 8", effectiveFieldName, field.Dims)
 	}
 
