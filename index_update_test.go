@@ -140,6 +140,42 @@ func TestCompareFieldMapping(t *testing.T) {
 			indexFieldInfo: nil,
 			err:            true,
 		},
+		{ // gpu changed for vector => not updatable
+			original: &mapping.FieldMapping{
+				Type:                    "vector",
+				Similarity:              "dot_product",
+				Dims:                    128,
+				VectorIndexOptimizedFor: "memory-efficient",
+				UseGPU:                  false,
+			},
+			updated: &mapping.FieldMapping{
+				Type:                    "vector",
+				Similarity:              "dot_product",
+				Dims:                    128,
+				VectorIndexOptimizedFor: "memory-efficient",
+				UseGPU:                  true,
+			},
+			indexFieldInfo: nil,
+			err:            true,
+		},
+		{ // gpu changed for vectorbase64 => not updatable
+			original: &mapping.FieldMapping{
+				Type:                    "vector_base64",
+				Similarity:              "dot_product",
+				Dims:                    128,
+				VectorIndexOptimizedFor: "memory-efficient",
+				UseGPU:                  false,
+			},
+			updated: &mapping.FieldMapping{
+				Type:                    "vector_base64",
+				Similarity:              "dot_product",
+				Dims:                    128,
+				VectorIndexOptimizedFor: "memory-efficient",
+				UseGPU:                  true,
+			},
+			indexFieldInfo: nil,
+			err:            true,
+		},
 		{ // includeinall changed => not updatable
 			original: &mapping.FieldMapping{
 				Type:         "numeric",
