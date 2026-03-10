@@ -279,7 +279,7 @@ func validateVectorFieldAlias(field *FieldMapping, path []string,
 		}
 		if field.GPU != fieldAlias.GPU {
 			return fmt.Errorf("field: '%s', invalid alias "+
-				"(different GPU values %v and %v)", effectiveFieldName,
+				"(different gpu values %v and %v)", effectiveFieldName,
 				field.GPU, fieldAlias.GPU)
 		}
 
