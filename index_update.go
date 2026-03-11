@@ -511,6 +511,9 @@ func compareFieldMapping(original, updated *mapping.FieldMapping) (*index.Update
 		if original.VectorIndexOptimizedFor != updated.VectorIndexOptimizedFor {
 			return nil, fmt.Errorf("vectorIndexOptimizedFor cannot be updated for vector and vector_base64 fields")
 		}
+		if original.GPU != updated.GPU {
+			return nil, fmt.Errorf("gpu cannot be updated for vector and vector_base64 fields")
+		}
 	}
 	if original.IncludeInAll != updated.IncludeInAll {
 		return nil, fmt.Errorf("includeInAll cannot be changed")

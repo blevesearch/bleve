@@ -247,6 +247,62 @@ func TestVectorFieldAliasValidation(t *testing.T) {
 			expValidity: false,
 			errMsgs:     []string{`field: 'cityVec', invalid vector dimension: 5000, value should be in range [1, 4096]`},
 		},
+		// Test 8b: Different GPU usage in alias should be invalid
+		{
+			name: "different_gpu_usage_alias",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"type": "vector",
+										"dims": 3,
+										"gpu": true
+									},
+									{
+										"name": "cityVec",
+										"type": "vector",
+										"dims": 3,
+										"gpu": false
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: false,
+			errMsgs:     []string{`field: 'cityVec', invalid alias (different gpu values false and true)`},
+		},
+		// Test 8c: Matching GPU usage in alias should be valid
+		{
+			name: "same_gpu_usage_alias",
+			mappingStr: `
+				{
+					"default_mapping": {
+						"properties": {
+							"cityVec": {
+								"fields": [
+									{
+										"type": "vector",
+										"dims": 3,
+										"gpu": true
+									},
+									{
+										"name": "cityVec",
+										"type": "vector",
+										"dims": 3,
+										"gpu": true
+									}
+								]
+							}
+						}
+					}
+				}`,
+			expValidity: true,
+			errMsgs:     []string{},
+		},
 		// Test 9: Invalid similarity metric
 		{
 			name: "invalid_similarity_metric",
