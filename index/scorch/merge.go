@@ -334,6 +334,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 		segmentsToMerge := make([]segment.Segment, 0, len(task.Segments))
 		docsToDrop := make([]*roaring.Bitmap, 0, len(task.Segments))
 		mergedSegHistory := make(map[uint64]*mergedSegmentHistory, len(task.Segments))
+		mergedSegIDs := make([]uint64, 0, len(task.Segments))
 
 		for _, planSegment := range task.Segments {
 			if segSnapshot, ok := planSegment.(*SegmentSnapshot); ok {
@@ -350,6 +351,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 					} else {
 						segmentsToMerge = append(segmentsToMerge, segSnapshot.segment)
 						docsToDrop = append(docsToDrop, segSnapshot.deleted)
+						mergedSegIDs = append(mergedSegIDs, segSnapshot.id)
 					}
 					// track the files getting merged for unsetting the
 					// removal ineligibility. This helps to unflip files
@@ -402,8 +404,8 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			seg.ResetBytesRead(totalBytesRead)
 
 			for i, segNewDocNums := range newDocNums {
-				if mergedSegHistory[task.Segments[i].Id()] != nil {
-					mergedSegHistory[task.Segments[i].Id()].oldNewDocIDs = segNewDocNums
+				if mergedSegHistory[mergedSegIDs[i]] != nil {
+					mergedSegHistory[mergedSegIDs[i]].oldNewDocIDs = segNewDocNums
 				}
 			}
 
