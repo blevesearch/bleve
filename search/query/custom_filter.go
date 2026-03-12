@@ -53,7 +53,7 @@ func (q *CustomFilterQuery) Searcher(ctx context.Context, i index.IndexReader, m
 	}
 
 	// Resolve the request-scoped callback builder injected by the embedder.
-	factory, _ := ctx.Value(CustomFilterContextKey).(CustomFilterFactory)
+	factory := customFilterFactoryFromContext(ctx)
 	if factory == nil {
 		return nil, fmt.Errorf("no custom filter factory registered in context")
 	}

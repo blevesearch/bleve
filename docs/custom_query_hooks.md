@@ -74,9 +74,7 @@ func withCustomHooks(ctx context.Context) context.Context {
 			}, nil
 		})
 
-	ctx = context.WithValue(ctx, bleveQuery.CustomFilterContextKey, filterBuilder)
-	ctx = context.WithValue(ctx, bleveQuery.CustomScoreContextKey, scoreBuilder)
-	return ctx
+	return bleveQuery.WithCustomFactories(ctx, filterBuilder, scoreBuilder)
 }
 
 func run(index bleve.Index, req *bleve.SearchRequest) (*bleve.SearchResult, error) {

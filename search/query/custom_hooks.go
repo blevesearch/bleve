@@ -15,6 +15,8 @@
 package query
 
 import (
+	"context"
+
 	"github.com/blevesearch/bleve/v2/search/searcher"
 )
 
@@ -35,3 +37,45 @@ type CustomFilterFactory func(source string, params map[string]interface{}, fiel
 // CustomScoreFactory lets the embedding application provide request-scoped
 // score callbacks created from query-provided source/params/fields.
 type CustomScoreFactory func(source string, params map[string]interface{}, fields []string) (searcher.ScoreFunc, error)
+
+// WithCustomFilterFactory returns a context carrying the request-scoped
+// filter factory used by CustomFilterQuery during searcher construction.
+func WithCustomFilterFactory(ctx context.Context, factory CustomFilterFactory) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, CustomFilterContextKey, factory)
+}
+
+// WithCustomScoreFactory returns a context carrying the request-scoped
+// score factory used by CustomScoreQuery during searcher construction.
+func WithCustomScoreFactory(ctx context.Context, factory CustomScoreFactory) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, CustomScoreContextKey, factory)
+}
+
+// WithCustomFactories returns a context carrying both request-scoped
+// custom query factories for search execution.
+func WithCustomFactories(ctx context.Context, filterFactory CustomFilterFactory,
+	scoreFactory CustomScoreFactory) context.Context {
+	ctx = WithCustomFilterFactory(ctx, filterFactory)
+	return WithCustomScoreFactory(ctx, scoreFactory)
+}
+
+func customFilterFactoryFromContext(ctx context.Context) CustomFilterFactory {
+	if ctx == nil {
+		return nil
+	}
+	factory, _ := ctx.Value(CustomFilterContextKey).(CustomFilterFactory)
+	return factory
+}
+
+func customScoreFactoryFromContext(ctx context.Context) CustomScoreFactory {
+	if ctx == nil {
+		return nil
+	}
+	factory, _ := ctx.Value(CustomScoreContextKey).(CustomScoreFactory)
+	return factory
+}
