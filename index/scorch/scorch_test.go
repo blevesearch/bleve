@@ -2810,3 +2810,262 @@ func TestPersistorMergerOptions(t *testing.T) {
 		}
 	}
 }
+
+func TestPersistorMergerDeletions(t *testing.T) {
+	// Setup config and analysis queue
+	cfg := CreateConfig("TestPersistorMergerDeletions")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = DestroyTest(cfg)
+	}()
+
+	os.Mkdir(cfg["path"].(string), 0o755)
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("failed to create Scorch: %v", err)
+	}
+	s, ok := idx.(*Scorch)
+	if !ok {
+		t.Fatalf("expected *Scorch, got %T", s)
+	}
+
+	po, err := s.parsePersisterOptions()
+	if err != nil {
+		t.Fatalf("failed to parse persister options: %v", err)
+	}
+
+	s.path = cfg["path"].(string)
+	err = s.openBolt()
+	if err != nil {
+		t.Fatalf("failed to open bolt: %v", err)
+	}
+
+	// Create 2 dummy segments with 2 documents each
+	segDocIDs := [][]string{
+		{"doc1", "doc2"},
+		{"doc3", "doc4"},
+	}
+	for _, docIDs := range segDocIDs {
+		segDocs := make([]index.Document, 0, len(docIDs))
+		for _, docID := range docIDs {
+			doc := document.NewDocument(docID)
+			doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
+			doc.AddIDField()
+			// analyze the document to create a segment
+			doc.VisitFields(func(field index.Field) {
+				field.Analyze()
+			})
+			segDocs = append(segDocs, doc)
+		}
+		seg, _, err := s.segPlugin.New(segDocs)
+		if err != nil {
+			t.Fatalf("failed to create segment: %v", err)
+		}
+		// Prepare segmentIntroduction
+		intro := &segmentIntroduction{
+			id:       atomic.AddUint64(&s.nextSegmentID, 1),
+			data:     seg,
+			ids:      docIDs,
+			internal: map[string][]byte{},
+			applied:  make(chan error, 1),
+		}
+		// Introduce the segment
+		err = s.introduceSegment(intro)
+		if err != nil {
+			t.Fatalf("introduceSegment failed: %v", err)
+		}
+	}
+	// current snapshot should have 2 segments, each with 2 documents, and no deletions
+	snapshot := s.root
+	if len(snapshot.segment) != 2 {
+		t.Fatalf("expected 2 segments, got %d", len(snapshot.segment))
+	}
+	for i, seg := range snapshot.segment {
+		if seg.Count() != 2 {
+			t.Fatalf("expected 2 documents in segment, got %d", seg.Count())
+		}
+		if seg.deleted != nil && seg.deleted.GetCardinality() != 0 {
+			t.Fatalf("expected no deletions in segment, got %d", seg.deleted.GetCardinality())
+		}
+		dict, err := seg.segment.Dictionary("_id")
+		if err != nil {
+			t.Fatalf("failed to get dictionary: %v", err)
+		}
+		if dict == nil {
+			t.Fatalf("expected _id dictionary, got nil")
+		}
+		// verify the _id field has the correct docID
+		for _, docID := range segDocIDs[i] {
+			cont, err := dict.Contains([]byte(docID))
+			if err != nil {
+				t.Fatalf("failed to check dictionary for docID %s: %v", docID, err)
+			}
+			if !cont {
+				t.Fatalf("expected to find docID %s in segment, but not found", docID)
+			}
+		}
+	}
+	// persist the snapshot, which will create a new snapshot with 2 persisted segments
+	// we have to listen to the merge channel to know when the merge is done and the new snapshot is ready
+	var errCh = make(chan error, 1)
+	var doneCh = make(chan struct{})
+	go func() {
+		_, err := s.persistSnapshotMaybeMerge(snapshot, po)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		doneCh <- struct{}{}
+	}()
+	var mergeData *segmentMerge
+	// listen to the merge channel for the new snapshot
+OUTER:
+	for {
+		select {
+		case mergeData = <-s.merges:
+			break OUTER
+		case err := <-errCh:
+			t.Fatalf("unexpected error during persistSnapshotMaybeMerge: %v", err)
+		}
+	}
+	// introduce a new segment with deletions for one doc each
+	// in the old segments, with a new segment that has a new document
+	newDocID := "doc5"
+	newDoc := document.NewDocument(newDocID)
+	newDoc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
+	newDoc.AddIDField()
+	// analyze the document to create a segment
+	newDoc.VisitFields(func(field index.Field) {
+		field.Analyze()
+	})
+	seg, _, err := s.segPlugin.New([]index.Document{newDoc})
+	if err != nil {
+		t.Fatalf("failed to create segment: %v", err)
+	}
+	intro := &segmentIntroduction{
+		id:       atomic.AddUint64(&s.nextSegmentID, 1),
+		data:     seg,
+		ids:      []string{"doc1", "doc3", newDocID},
+		internal: map[string][]byte{},
+		applied:  make(chan error, 1),
+	}
+	// Introduce the segment
+	err = s.introduceSegment(intro)
+	if err != nil {
+		t.Fatalf("introduceSegment failed: %v", err)
+	}
+	// current snapshot should have 3 segments, each with 1 document
+	snapshot = s.root
+	if len(snapshot.segment) != 3 {
+		t.Fatalf("expected 3 segments, got %d", len(snapshot.segment))
+	}
+	for _, seg := range snapshot.segment[:2] {
+		if seg.Count() != 1 {
+			t.Fatalf("expected 1 document in segment, got %d", seg.Count())
+		}
+		if seg.deleted == nil {
+			t.Fatalf("expected 1 deletion in segment, got nil bitmap")
+		}
+		if seg.deleted.GetCardinality() != 1 {
+			t.Fatalf("expected 1 deletion in segment, got %d", seg.deleted.GetCardinality())
+		}
+	}
+	// last segment should have the new document and no deletions
+	lastSeg := snapshot.segment[2]
+	if lastSeg.Count() != 1 {
+		t.Fatalf("expected 1 document in last segment, got %d", lastSeg.Count())
+	}
+	if lastSeg.deleted != nil && lastSeg.deleted.GetCardinality() != 0 {
+		t.Fatalf("expected no deletions in last segment, got %d", lastSeg.deleted.GetCardinality())
+	}
+	// the merge data should not be nil and should have 2 segments to merge
+	if mergeData == nil {
+		t.Fatal("expected merge data, got nil")
+	}
+	// now we apply the merge, which should result in a new snapshot
+	// with 1 segment that has both deletions applied
+	s.introduceMerge(mergeData)
+	// block until the merge is applied and the new snapshot is ready
+	select {
+	case err := <-errCh:
+		t.Fatalf("unexpected error during introduceMerge: %v", err)
+	case <-doneCh:
+	}
+	// close the index to ensure the persisted snapshot is written to disk
+	err = idx.Close()
+	if err != nil {
+		t.Fatalf("failed to close index: %v", err)
+	}
+	// now verify that the persisted snapshot has the expected state with the deletions applied
+	idx2, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("failed to create Scorch: %v", err)
+	}
+	s2, ok := idx2.(*Scorch)
+	if !ok {
+		t.Fatalf("expected *Scorch, got %T", s2)
+	}
+	s2.path = cfg["path"].(string)
+	err = s2.openBolt()
+	if err != nil {
+		t.Fatalf("failed to open bolt: %v", err)
+	}
+	// ensure that the persisted snapshot has 1 segment with 3 documents, and the correct deletions applied
+	snapshot = s2.root
+	if len(snapshot.segment) != 1 {
+		t.Fatalf("expected 1 segment, got %d", len(snapshot.segment))
+	}
+	newSegSnapshot := snapshot.segment[0]
+	if newSegSnapshot.LiveSize() != 3 {
+		t.Fatalf("expected 3 documents in segment, got %d", newSegSnapshot.LiveSize())
+	}
+	// expect doc1 and doc3 to be deleted, and doc2, doc4 and doc5 to be live
+	expectedLiveSet := map[string]bool{
+		"doc1": false,
+		"doc2": true,
+		"doc3": false,
+		"doc4": true,
+		"doc5": true,
+	}
+	dict, err := newSegSnapshot.segment.Dictionary("_id")
+	if err != nil {
+		t.Fatalf("failed to get dictionary: %v", err)
+	}
+	if dict == nil {
+		t.Fatalf("expected _id dictionary, got nil")
+	}
+	// get the docNums for each docID and verify if they are live or deleted according to the expectedLiveSet
+	for docID, shouldBeLive := range expectedLiveSet {
+		cont, err := dict.Contains([]byte(docID))
+		if err != nil {
+			t.Fatalf("failed to check dictionary for docID %s: %v", docID, err)
+		}
+		if !cont {
+			t.Fatalf("expected to find docID %s in segment, but not found", docID)
+		}
+		postingsList, err := dict.PostingsList([]byte(docID), nil, nil)
+		if err != nil {
+			t.Fatalf("failed to get postings list for docID %s: %v", docID, err)
+		}
+		if postingsList == nil {
+			t.Fatalf("expected postings list for docID %s, got nil", docID)
+		}
+		postingsEnum := postingsList.Iterator(false, false, false, nil)
+		docNum, err := postingsEnum.Next()
+		if err != nil {
+			t.Fatalf("failed to get docNum for docID %s: %v", docID, err)
+		}
+		var isLive = true
+		if newSegSnapshot.deleted != nil {
+			isLive = !newSegSnapshot.deleted.Contains(uint32(docNum.Number()))
+		}
+		if isLive != shouldBeLive {
+			t.Fatalf("expected docID %s to be live: %v, got %v", docID, shouldBeLive, isLive)
+		}
+	}
+}
