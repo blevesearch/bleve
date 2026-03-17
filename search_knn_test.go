@@ -608,11 +608,11 @@ func TestVectorBase64Index(t *testing.T) {
 	}
 }
 
-// Test to verify that the BIVF-Flat index with vector base64 field mapping returns the
+// Test to verify that the bivf-flat indexes with vector base64 field mapping returns the
 // same results as the non-optimized vector field mapping for L2, Dot Product and Cosine similarities.
 // Also test to see no differences in results for any distance metric
 func TestVectorBivfIndexes(t *testing.T) {
-	optimizations := []string{index.IndexOptimizedWithBivfForDisk, index.IndexOptimizedWithBivfForLatency}
+	optimizations := []string{index.IndexBIVFWithBackingSQ8, index.IndexBIVFWithBackingFlat}
 	for _, optimization := range optimizations {
 		testVectorBivfIndex(t, optimization)
 	}
