@@ -540,6 +540,9 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	for _, segment := range snapshot.segment {
 		if _, wasMerged := mergedSegmentIDs[segment.id]; !wasMerged {
 			equiv.segment = append(equiv.segment, segment)
+			// this can be either in-memory or persisted segment, but while
+			// preparing the bolt snapshot we avoid the in-memory segments to be
+			// flushed out
 			exclude[segment.id] = struct{}{}
 		}
 	}
@@ -548,10 +551,11 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	for _, segment := range newSnapshot.segment {
 		if _, ok := newMergedSegmentIDs[segment.id]; ok {
 			equiv.segment = append(equiv.segment, &SegmentSnapshot{
-				id:      segment.id,
-				segment: segment.segment,
-				deleted: nil, // nil since merging handled deletions
-				stats:   nil,
+				id:       segment.id,
+				segment:  segment.segment,
+				deleted:  nil, // nil since merging handled deletions
+				stats:    nil,
+				internal: nil, // segment is persisted and equiv is already updated
 			})
 		}
 	}
@@ -668,12 +672,12 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 	if err != nil {
 		return nil, nil, err
 	}
-	// TODO optimize writing these in order?
+
+	// deep copy the internal map since we'll be keeping only the persisted info
+	// in bolt and some of the information might be deleted
+	internalData := make(map[string][]byte, len(snapshot.internal))
 	for k, v := range snapshot.internal {
-		err = internalBucket.Put([]byte(k), v)
-		if err != nil {
-			return nil, nil, err
-		}
+		internalData[k] = v
 	}
 
 	if snapshot.parent != nil {
@@ -696,6 +700,8 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 		if err != nil {
 			return nil, nil, err
 		}
+
+		var persistedSeg bool
 		switch seg := segmentSnapshot.segment.(type) {
 		case segment.PersistedSegment:
 			segPath := seg.Path()
@@ -709,6 +715,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 				return nil, nil, err
 			}
 			filenames = append(filenames, filename)
+			persistedSeg = true
 		case segment.UnpersistedSegment:
 			// need to persist this to disk if its not part of exclude list (which
 			// restricts which in-memory segment to be persisted to disk)
@@ -725,42 +732,68 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 					return nil, nil, err
 				}
 				filenames = append(filenames, filename)
+				persistedSeg = false
+			} else {
+				// this segment is not going to be persisted in this cycle, so any
+				// of the corresponding internal values need to be removed since
+				// on recovery they shouldn't be loaded as part of the indexSnapshot
+				for k, v := range segmentSnapshot.internal {
+					if v != nil {
+						delete(internalData, k)
+					}
+				}
 			}
 		default:
 			return nil, nil, fmt.Errorf("unknown segment type: %T", seg)
 		}
-		// store current deleted bits
-		var roaringBuf bytes.Buffer
-		if segmentSnapshot.deleted != nil {
-			_, err = segmentSnapshot.deleted.WriteTo(&roaringBuf)
-			if err != nil {
-				return nil, nil, fmt.Errorf("error persisting roaring bytes: %v", err)
+
+		// if the segment was excluded from persistence, then skip updating the metadata
+		// or helper data corresponding to it - we need to keep things in-line with
+		// the on-disk information
+		if persistedSeg {
+			// store current deleted bits
+			var roaringBuf bytes.Buffer
+			if segmentSnapshot.deleted != nil {
+				_, err = segmentSnapshot.deleted.WriteTo(&roaringBuf)
+				if err != nil {
+					return nil, nil, fmt.Errorf("error persisting roaring bytes: %v", err)
+				}
+				err = snapshotSegmentBucket.Put(util.BoltDeletedKey, roaringBuf.Bytes())
+				if err != nil {
+					return nil, nil, err
+				}
 			}
-			err = snapshotSegmentBucket.Put(util.BoltDeletedKey, roaringBuf.Bytes())
-			if err != nil {
-				return nil, nil, err
+
+			// store segment stats
+			if segmentSnapshot.stats != nil {
+				b, err := json.Marshal(segmentSnapshot.stats.Fetch())
+				if err != nil {
+					return nil, nil, err
+				}
+				err = snapshotSegmentBucket.Put(util.BoltStatsKey, b)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+
+			// store updated field info
+			if segmentSnapshot.updatedFields != nil {
+				b, err := json.Marshal(segmentSnapshot.updatedFields)
+				if err != nil {
+					return nil, nil, err
+				}
+				err = snapshotSegmentBucket.Put(util.BoltUpdatedFieldsKey, b)
+				if err != nil {
+					return nil, nil, err
+				}
 			}
 		}
 
-		// store segment stats
-		if segmentSnapshot.stats != nil {
-			b, err := json.Marshal(segmentSnapshot.stats.Fetch())
-			if err != nil {
-				return nil, nil, err
-			}
-			err = snapshotSegmentBucket.Put(util.BoltStatsKey, b)
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-
-		// store updated field info
-		if segmentSnapshot.updatedFields != nil {
-			b, err := json.Marshal(segmentSnapshot.updatedFields)
-			if err != nil {
-				return nil, nil, err
-			}
-			err = snapshotSegmentBucket.Put(util.BoltUpdatedFieldsKey, b)
+		// TODO optimize writing these in order?
+		// NOTE: this is a hard-commit of the internal values which can be referenced
+		// to load a previously consistent state of the index
+		for k, v := range internalData {
+			err = internalBucket.Put([]byte(k), v)
 			if err != nil {
 				return nil, nil, err
 			}
