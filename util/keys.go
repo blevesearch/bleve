@@ -29,4 +29,5 @@ var (
 	TotBytesWrittenKey            = []byte("TotBytesWritten")
 
 	MappingInternalKey = []byte("_mapping")
+	DeletedInternalVal = []byte("_del")
 )

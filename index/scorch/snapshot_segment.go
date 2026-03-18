@@ -37,6 +37,7 @@ type SegmentSnapshot struct {
 	deleted       *roaring.Bitmap
 	creator       string
 	stats         *fieldStats
+	internal      map[string][]byte // soft-commit internal values
 	updatedFields map[string]*index.UpdateFieldInfo
 
 	cachedMeta *cachedMeta

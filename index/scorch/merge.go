@@ -481,6 +481,7 @@ type mergedSegmentHistory struct {
 type segmentMerge struct {
 	id               []uint64
 	new              []segment.Segment
+	internal         map[string][]byte // carry forward the hard-committed internal values
 	mergedSegHistory map[uint64]*mergedSegmentHistory
 	notifyCh         chan *mergeTaskIntroStatus
 	mmaped           uint32
@@ -508,7 +509,7 @@ func closeNewMergedSegments(segs []segment.Segment) error {
 // which are merged and persisted to disk concurrently. These are then introduced as
 // the new root snapshot in one-shot.
 func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
-	flushableObjs []*flushable) (*IndexSnapshot, []uint64, error) {
+	flushableObjs []*flushable, internalData map[string][]byte) (*IndexSnapshot, []uint64, error) {
 	atomic.AddUint64(&s.stats.TotMemMergeBeg, 1)
 
 	memMergeZapStartTime := time.Now()
@@ -601,6 +602,8 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 		mergedSegHistory: make(map[uint64]*mergedSegmentHistory, numSegments),
 		notifyCh:         make(chan *mergeTaskIntroStatus),
 		newCount:         newMergedCount,
+		// introduce the internal data, that's going to be hard-committed, into the system
+		internal: internalData,
 	}
 
 	// create a history map which maps the old in-memory segments with the specific

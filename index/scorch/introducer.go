@@ -40,8 +40,9 @@ type segmentIntroduction struct {
 }
 
 type persistIntroduction struct {
-	persisted map[uint64]segment.Segment
-	applied   notificationChan
+	internalData map[string][]byte
+	persisted    map[uint64]segment.Segment
+	applied      notificationChan
 }
 
 type epochWatcher struct {
@@ -154,6 +155,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			cachedDocs: root.segment[i].cachedDocs,
 			cachedMeta: root.segment[i].cachedMeta,
 			creator:    root.segment[i].creator,
+			internal:   root.segment[i].internal,
 		}
 
 		// apply new obsoletions
@@ -206,6 +208,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			stats:      next.stats,
 			cachedDocs: &cachedDocs{cache: nil},
 			cachedMeta: &cachedMeta{meta: nil},
+			internal:   make(map[string][]byte),
 			creator:    "introduceSegment",
 		}
 		newSnapshot.segment = append(newSnapshot.segment, newSegmentSnapshot)
@@ -215,18 +218,16 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		// queued for persistence.
 		atomic.AddUint64(&s.stats.TotIntroducedItems, newSegmentSnapshot.Count())
 		atomic.AddUint64(&s.stats.TotIntroducedSegmentsBatch, 1)
+
+		// set new values and apply deletes in the segment snapshot. since this
+		// is more like a in-memory data that's not yet persisted, this is more
+		// like a soft commit - the hard commit which is done directly on the
+		// index snapshot is done as part of the persist operation.
+		newSegmentSnapshot.internal = next.internal
 	}
 	// copy old values
 	for key, oldVal := range root.internal {
 		newSnapshot.internal[key] = oldVal
-	}
-	// set new values and apply deletes
-	for key, newVal := range next.internal {
-		if newVal != nil {
-			newSnapshot.internal[key] = newVal
-		} else {
-			delete(newSnapshot.internal, key)
-		}
 	}
 
 	newSnapshot.updateSize()
@@ -298,6 +299,7 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 				creator:    "introducePersist",
 				mmaped:     1,
 			}
+			// need to handle the internal value update here
 			newIndexSnapshot.segment[i] = newSegmentSnapshot
 			delete(persist.persisted, segmentSnapshot.id)
 
@@ -323,6 +325,14 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 		newIndexSnapshot.internal[k] = v
 	}
 
+	for k, v := range persist.internalData {
+		if v != nil {
+			newIndexSnapshot.internal[k] = v
+		} else {
+			delete(newIndexSnapshot.internal, k)
+		}
+	}
+
 	atomic.StoreUint64(&s.stats.TotItemsToPersist, docsToPersistCount)
 	atomic.StoreUint64(&s.stats.TotMemorySegmentsAtRoot, memSegments)
 	atomic.StoreUint64(&s.stats.TotFileSegmentsAtRoot, fileSegments)
@@ -340,6 +350,10 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 	close(persist.applied)
 }
 
+// t0 = in-memory Merge -> participating ith segment (seg x) (live count = 3 > 0, deleted count = 2, total count = 5)
+// t1 = seg x gets updated with the new obsoletes (live count = 0, deleted count = 5), newSnapshot doesnt hvae seg x.
+// t2 = introduceMerge starts
+
 // The introducer should definitely handle the segmentMerge.notify
 // channel before exiting the introduceMerge.
 func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
@@ -355,9 +369,22 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 
 	newSnapshot := &IndexSnapshot{
 		parent:   s,
-		internal: root.internal,
+		internal: make(map[string][]byte),
 		refs:     1,
 		creator:  "introduceMerge",
+	}
+
+	for k, v := range root.internal {
+		newSnapshot.internal[k] = v
+	}
+
+	// hard-commit the new internal values introduced as part of in-memory merge
+	for k, v := range nextMerge.internal {
+		if v != nil {
+			newSnapshot.internal[k] = v
+		} else {
+			delete(newSnapshot.internal, k)
+		}
 	}
 
 	var running, docsToPersistCount, memSegments, fileSegments uint64
@@ -403,6 +430,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 				cachedDocs: root.segment[i].cachedDocs,
 				cachedMeta: root.segment[i].cachedMeta,
 				creator:    root.segment[i].creator,
+				internal:   root.segment[i].internal,
 			})
 			root.segment[i].segment.AddRef()
 			newSnapshot.offsets = append(newSnapshot.offsets, running)

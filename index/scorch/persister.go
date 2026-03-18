@@ -496,9 +496,25 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 		return false, nil
 	}
 
+	// update the internalData with the merged-out segments' internal value,
+	// the excluded segments from the persistence will have their internal values
+	// retained for now and committed to the bolt and index snapshot in the later iterations
+	internalData := make(map[string][]byte)
+	for _, idx := range oldSegIdxs {
+		// as idx increases, we get the newer segment snapshots introduced
+		// into the system, so override the internal values in the final map
+		for key, val := range snapshot.segment[idx].internal {
+			if val != nil {
+				internalData[key] = val
+			} else {
+				delete(internalData, key)
+			}
+		}
+	}
+
 	// the newSnapshot at this point would contain the newly created file segments
 	// and updated with the root.
-	newSnapshot, newSegmentIDs, err := s.mergeAndPersistInMemorySegments(snapshot, flushSet)
+	newSnapshot, newSegmentIDs, err := s.mergeAndPersistInMemorySegments(snapshot, flushSet, internalData)
 	if err != nil {
 		return false, err
 	}
@@ -520,15 +536,26 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	for _, id := range newSegmentIDs {
 		newMergedSegmentIDs[id] = struct{}{}
 	}
-
 	// construct a snapshot that's logically equivalent to the input
 	// snapshot, but with merged segments replaced by the new segment
 	equiv := &IndexSnapshot{
 		parent:   snapshot.parent,
 		segment:  make([]*SegmentSnapshot, 0, len(snapshot.segment)),
-		internal: snapshot.internal,
+		internal: make(map[string][]byte),
 		epoch:    snapshot.epoch,
 		creator:  "persistSnapshotMaybeMerge",
+	}
+
+	for k, v := range snapshot.internal {
+		equiv.internal[k] = v
+	}
+
+	for k, v := range internalData {
+		if v != nil {
+			equiv.internal[k] = v
+		} else {
+			delete(equiv.internal, k)
+		}
 	}
 
 	// to track which segments haven't participated in the in-memory merge
@@ -541,6 +568,9 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	for _, segment := range snapshot.segment {
 		if _, wasMerged := mergedSegmentIDs[segment.id]; !wasMerged {
 			equiv.segment = append(equiv.segment, segment)
+			// this can be either in-memory or persisted segment, but while
+			// preparing the bolt snapshot we ignore the persisted segments' check
+			// since they have to be retained
 			exclude[segment.id] = struct{}{}
 		}
 	}
@@ -549,10 +579,11 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	for _, segment := range newSnapshot.segment {
 		if _, ok := newMergedSegmentIDs[segment.id]; ok {
 			equiv.segment = append(equiv.segment, &SegmentSnapshot{
-				id:      segment.id,
-				segment: segment.segment,
-				deleted: nil, // nil since merging handled deletions
-				stats:   nil,
+				id:       segment.id,
+				segment:  segment.segment,
+				deleted:  nil, // nil since merging handled deletions
+				stats:    nil,
+				internal: nil, // segment is persisted and equiv is already updated
 			})
 		}
 	}
@@ -664,11 +695,17 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 	if err != nil {
 		return nil, nil, err
 	}
-	// TODO optimize writing these in order?
-	for k, v := range snapshot.internal {
-		err = internalBucket.Put([]byte(k), v)
-		if err != nil {
-			return nil, nil, err
+
+	internalData := make(map[string][]byte, len(snapshot.internal))
+	// there might be some in-memory segments remaining since this was a merge+persist operation
+	// in which case the internal map is already computed
+	if len(exclude) > 0 {
+		internalData = snapshot.internal
+	} else {
+		// deep copy the internal map since we'll be updating it extra info from the
+		// in-memory segments as well in a direct flush
+		for k, v := range snapshot.internal {
+			internalData[k] = v
 		}
 	}
 
@@ -692,6 +729,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 		if err != nil {
 			return nil, nil, err
 		}
+		var persistedSeg bool
 		switch seg := segmentSnapshot.segment.(type) {
 		case segment.PersistedSegment:
 			segPath := seg.Path()
@@ -705,6 +743,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 				return nil, nil, err
 			}
 			filenames = append(filenames, filename)
+			persistedSeg = true
 		case segment.UnpersistedSegment:
 			// need to persist this to disk if its not part of exclude list (which
 			// restricts which in-memory segment to be persisted to disk)
@@ -721,42 +760,68 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 					return nil, nil, err
 				}
 				filenames = append(filenames, filename)
+				// apply the internal value updates in-order since they're supposed
+				// to be in-line with the order of segments' creation.
+				for k, v := range segmentSnapshot.internal {
+					if v != nil {
+						internalData[k] = v
+					} else {
+						delete(internalData, k)
+					}
+				}
+				persistedSeg = false
 			}
 		default:
 			return nil, nil, fmt.Errorf("unknown segment type: %T", seg)
 		}
-		// store current deleted bits
-		var roaringBuf bytes.Buffer
-		if segmentSnapshot.deleted != nil {
-			_, err = segmentSnapshot.deleted.WriteTo(&roaringBuf)
-			if err != nil {
-				return nil, nil, fmt.Errorf("error persisting roaring bytes: %v", err)
+
+		// if the segment was excluded from persistence, then skip updating the metadata
+		// or helper data corresponding to it - we need to keep things in-line with
+		// the on-disk information
+		if persistedSeg {
+			// store current deleted bits
+			var roaringBuf bytes.Buffer
+			if segmentSnapshot.deleted != nil {
+				_, err = segmentSnapshot.deleted.WriteTo(&roaringBuf)
+				if err != nil {
+					return nil, nil, fmt.Errorf("error persisting roaring bytes: %v", err)
+				}
+				err = snapshotSegmentBucket.Put(util.BoltDeletedKey, roaringBuf.Bytes())
+				if err != nil {
+					return nil, nil, err
+				}
 			}
-			err = snapshotSegmentBucket.Put(util.BoltDeletedKey, roaringBuf.Bytes())
-			if err != nil {
-				return nil, nil, err
+
+			// store segment stats
+			if segmentSnapshot.stats != nil {
+				b, err := json.Marshal(segmentSnapshot.stats.Fetch())
+				if err != nil {
+					return nil, nil, err
+				}
+				err = snapshotSegmentBucket.Put(util.BoltStatsKey, b)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+
+			// store updated field info
+			if segmentSnapshot.updatedFields != nil {
+				b, err := json.Marshal(segmentSnapshot.updatedFields)
+				if err != nil {
+					return nil, nil, err
+				}
+				err = snapshotSegmentBucket.Put(util.BoltUpdatedFieldsKey, b)
+				if err != nil {
+					return nil, nil, err
+				}
 			}
 		}
 
-		// store segment stats
-		if segmentSnapshot.stats != nil {
-			b, err := json.Marshal(segmentSnapshot.stats.Fetch())
-			if err != nil {
-				return nil, nil, err
-			}
-			err = snapshotSegmentBucket.Put(util.BoltStatsKey, b)
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-
-		// store updated field info
-		if segmentSnapshot.updatedFields != nil {
-			b, err := json.Marshal(segmentSnapshot.updatedFields)
-			if err != nil {
-				return nil, nil, err
-			}
-			err = snapshotSegmentBucket.Put(util.BoltUpdatedFieldsKey, b)
+		// TODO optimize writing these in order?
+		// NOTE: this is a hard-commit of the internal values which can be referenced
+		// to load a previously consistent state of the index
+		for k, v := range internalData {
+			err = internalBucket.Put([]byte(k), v)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -810,9 +875,21 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot, exclude map[uint
 			}
 		}
 
+		internalData := make(map[string][]byte)
+		for _, ss := range snapshot.segment {
+			for k, v := range ss.internal {
+				if v != nil {
+					internalData[k] = v
+				} else {
+					delete(internalData, k)
+				}
+			}
+		}
+
 		persist := &persistIntroduction{
-			persisted: newSegments,
-			applied:   make(notificationChan),
+			internalData: internalData,
+			persisted:    newSegments,
+			applied:      make(notificationChan),
 		}
 
 		select {
