@@ -36,7 +36,7 @@ func TestIndexMeta(t *testing.T) {
 		t.Errorf("expected error, got nil")
 	}
 
-	writer, err := util.NewFileWriter([]byte(metaFilename))
+	writer, err := util.NewFileWriter([]byte(indexMetaPath(testIndexPath)))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -196,7 +196,6 @@ func NewScorch(storeName string,
 	if ok {
 		rv.onAsyncError = RegistryAsyncErrorCallbacks[aecbName]
 	}
-
 	// validate any custom persistor options to
 	// prevent an async error in the persistor routine
 	_, err = rv.parsePersisterOptions()
@@ -1032,13 +1031,13 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 				return fmt.Errorf("meta-data bucket missing")
 			}
 
-			writer, err := util.NewFileWriter(util.BoltWriterContext)
+			writer, err := util.NewFileWriter([]byte(s.path + string(os.PathSeparator) + "root.bolt"))
 			if err != nil {
 				return fmt.Errorf("unable to load correct writer: %v", err)
 			}
 
 			readerId := string(metaBucket.Get(boltMetaDataWriterIdKey))
-			reader, err := util.NewFileReader(readerId, util.BoltWriterContext)
+			reader, err := util.NewFileReader(readerId, []byte(s.path+string(os.PathSeparator)+"root.bolt"))
 			if err != nil {
 				return fmt.Errorf("unable to load correct reader: %v", err)
 			}

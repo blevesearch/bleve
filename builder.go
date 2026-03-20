@@ -75,7 +75,7 @@ func newBuilder(path string, mapping mapping.IndexMapping, config map[string]int
 	// not the resulting index
 	meta := newIndexMeta(scorch.Name, scorch.Name, map[string]interface{}{})
 
-	writer, err := util.NewFileWriter([]byte(metaFilename))
+	writer, err := util.NewFileWriter([]byte(indexMetaPath(path)))
 	if err != nil {
 		return nil, err
 	}

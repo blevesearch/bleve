@@ -89,11 +89,11 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 		return nil, fmt.Errorf("bleve not configured for file based indexing")
 	}
 
-	fileWriter, err := util.NewFileWriter([]byte(path + "/" + metaFilename))
+	fileWriter, err := util.NewFileWriter([]byte(indexMetaPath(path)))
 	if err != nil {
 		return nil, err
 	}
-	fileReader, err := util.NewFileReader(fileWriter.Id(), []byte(metaFilename))
+	fileReader, err := util.NewFileReader(fileWriter.Id(), []byte(indexMetaPath(path)))
 	if err != nil {
 		return nil, err
 	}

@@ -643,7 +643,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segP
 	if err != nil {
 		return nil, nil, err
 	}
-	writer, err := util.NewFileWriter(util.BoltWriterContext)
+	writer, err := util.NewFileWriter([]byte(path + string(os.PathSeparator) + "root.bolt"))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -992,7 +992,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 			"unable to load correct segment wrapper: %v", err)
 	}
 	readerId := string(metaBucket.Get(boltMetaDataWriterIdKey))
-	reader, err := util.NewFileReader(readerId, util.BoltWriterContext)
+	reader, err := util.NewFileReader(readerId, []byte(s.path+string(os.PathSeparator)+"root.bolt"))
 	if err != nil {
 		_ = rv.DecRef()
 		return nil, fmt.Errorf("unable to load correct reader: %v", err)
@@ -1157,7 +1157,7 @@ func (s *Scorch) removeBoltKeys(ids []string) error {
 	for _, id := range ids {
 		keyMap[id] = struct{}{}
 	}
-	writer, err := util.NewFileWriter(util.BoltWriterContext)
+	writer, err := util.NewFileWriter([]byte(s.path + string(os.PathSeparator) + "root.bolt"))
 	if err != nil {
 		return err
 	}
@@ -1179,7 +1179,7 @@ func (s *Scorch) removeBoltKeys(ids []string) error {
 			}
 			readerId := string(metaBucket.Get(boltMetaDataWriterIdKey))
 			if _, ok := keyMap[readerId]; ok {
-				reader, err := util.NewFileReader(readerId, util.BoltWriterContext)
+				reader, err := util.NewFileReader(readerId, []byte(s.path+string(os.PathSeparator)+"root.bolt"))
 				if err != nil {
 					return fmt.Errorf("unable to load correct reader: %v", err)
 				}

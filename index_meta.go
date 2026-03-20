@@ -67,7 +67,7 @@ func openIndexMeta(path string) (*indexMeta, *util.FileReader, error) {
 		}
 
 		writerId := metaBytes[pos : pos+writerIdLen]
-		fileReader, err = util.NewFileReader(string(writerId), []byte(metaFilename))
+		fileReader, err = util.NewFileReader(string(writerId), []byte(indexMetaPath))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -171,7 +171,7 @@ func (i *indexMeta) UpdateWriter(path string) error {
 	}
 
 	writerId := metaBytes[pos : pos+writerIdLen]
-	fileReader, err := util.NewFileReader(string(writerId), []byte(metaFilename))
+	fileReader, err := util.NewFileReader(string(writerId), []byte(indexMetaPath))
 	if err != nil {
 		return err
 	}
@@ -181,7 +181,7 @@ func (i *indexMeta) UpdateWriter(path string) error {
 		return err
 	}
 
-	writer, err := util.NewFileWriter([]byte(metaFilename))
+	writer, err := util.NewFileWriter([]byte(indexMetaPath))
 	if err != nil {
 		return err
 	}
