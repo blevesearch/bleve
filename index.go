@@ -391,8 +391,8 @@ type SynonymIndex interface {
 
 type CustomizableIndex interface {
 	Index
-	KeysInUse() (map[string]struct{}, error)
-	DropKeys(ids map[string]struct{}) error
+	WriterIdsInUse() (map[string]struct{}, error)
+	DropWriterIds(ids map[string]struct{}) error
 }
 
 type InsightsIndex interface {

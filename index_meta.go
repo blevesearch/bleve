@@ -51,6 +51,19 @@ func openIndexMeta(path string) (*indexMeta, *util.FileReader, error) {
 		return nil, nil, ErrorIndexMetaMissing
 	}
 
+	// check if indexMetaPath+_temp exists, if so, this means a writer update was in progress
+	// and we should attempt to recover using the temp file
+	if _, err := os.Stat(indexMetaPath + "_temp"); err == nil {
+		tempBytes, err := os.ReadFile(indexMetaPath + "_temp")
+		if err == nil {
+			err = os.Rename(indexMetaPath+"_temp", indexMetaPath)
+			if err != nil {
+				return nil, nil, err
+			}
+			metaBytes = tempBytes
+		}
+	}
+
 	var im indexMeta
 	fileReader := &util.FileReader{}
 	err = util.UnmarshalJSON(metaBytes, &im)
@@ -152,50 +165,84 @@ func (i *indexMeta) CopyTo(d index.Directory) (err error) {
 	return err
 }
 
-func (i *indexMeta) UpdateWriter(path string) error {
+func (i *indexMeta) UpdateWriter(path string) (*util.FileWriter, *util.FileReader, error) {
 	indexMetaPath := indexMetaPath(path)
 	metaBytes, err := os.ReadFile(indexMetaPath)
 	if err != nil {
-		return ErrorIndexMetaMissing
+		return nil, nil, ErrorIndexMetaMissing
 	}
 
 	if len(metaBytes) < 4 {
-		return ErrorIndexMetaCorrupt
+		return nil, nil, ErrorIndexMetaCorrupt
 	}
 
 	pos := len(metaBytes) - 4
 	writerIdLen := int(binary.BigEndian.Uint32(metaBytes[pos:]))
 	pos -= writerIdLen
 	if pos < 0 {
-		return ErrorIndexMetaCorrupt
+		return nil, nil, ErrorIndexMetaCorrupt
 	}
 
 	writerId := metaBytes[pos : pos+writerIdLen]
 	fileReader, err := util.NewFileReader(string(writerId), []byte(indexMetaPath))
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	metaBytes, err = fileReader.Process(metaBytes[0:pos])
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	writer, err := util.NewFileWriter([]byte(indexMetaPath))
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	metaBytes = writer.Process(metaBytes)
 
-	metaBytes = append(metaBytes, []byte(writer.Id())...)
-	binary.BigEndian.PutUint32(metaBytes, uint32(len(writer.Id())))
-	err = os.WriteFile(indexMetaPath, metaBytes, 0666)
+	// write out new meta with new writer id, using temp file and rename to ensure atomicity
+	// if we crash in the middle of this, on next open we will see the temp file and recover using it
+	tempMetaPath := indexMetaPath + "_temp"
+	tempMetaFile, err := os.OpenFile(tempMetaPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
-		return err
+		if os.IsExist(err) {
+			return nil, nil, ErrorIndexPathExists
+		}
+		return nil, nil, err
 	}
 
-	return nil
+	_, err = tempMetaFile.Write(metaBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	_, err = tempMetaFile.Write([]byte(writer.Id()))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = binary.Write(tempMetaFile, binary.BigEndian, uint32(len(writer.Id())))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = tempMetaFile.Close()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = os.Rename(tempMetaPath, indexMetaPath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	reader, err := util.NewFileReader(string(writer.Id()), []byte(indexMetaPath))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return writer, reader, nil
 }
 
 func indexMetaPath(path string) string {

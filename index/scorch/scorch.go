@@ -1012,6 +1012,7 @@ func (s *Scorch) OpenMeta() error {
 
 // Merge and update deleted field info and rewrite index mapping
 func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mappingBytes []byte) error {
+	filePath := s.path + string(os.PathSeparator) + "root.bolt"
 	return s.rootBolt.Update(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 		if snapshots == nil {
@@ -1031,13 +1032,13 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 				return fmt.Errorf("meta-data bucket missing")
 			}
 
-			writer, err := util.NewFileWriter([]byte(s.path + string(os.PathSeparator) + "root.bolt"))
+			writer, err := util.NewFileWriter([]byte(filePath))
 			if err != nil {
 				return fmt.Errorf("unable to load correct writer: %v", err)
 			}
 
-			readerId := string(metaBucket.Get(boltMetaDataWriterIdKey))
-			reader, err := util.NewFileReader(readerId, []byte(s.path+string(os.PathSeparator)+"root.bolt"))
+			readerId := string(metaBucket.Get(util.BoltMetaDataWriterIdKey))
+			reader, err := util.NewFileReader(readerId, []byte(filePath))
 			if err != nil {
 				return fmt.Errorf("unable to load correct reader: %v", err)
 			}
@@ -1160,9 +1161,9 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 	})
 }
 
-func (s *Scorch) KeysInUse() ([]string, error) {
+// returns the set of writer ids in use by both the segments and boltdb
+func (s *Scorch) WriterIdsInUse() (map[string]struct{}, error) {
 	s.rootLock.RLock()
-	defer s.rootLock.RUnlock()
 
 	keyMap := make(map[string]struct{})
 	for _, segmentSnapShot := range s.root.segment {
@@ -1171,57 +1172,65 @@ func (s *Scorch) KeysInUse() ([]string, error) {
 		}
 	}
 
-	boltKeys, err := s.boltKeysInUse()
+	fmt.Printf("ENC: Segment Keys - %+v\n", keyMap)
+
+	boltKeys, err := s.boltWriterIdsInUse()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, k := range boltKeys {
+	fmt.Printf("ENC: Bolt Keys - %+v\n", boltKeys)
+
+	for k, _ := range boltKeys {
 		keyMap[k] = struct{}{}
 	}
+	s.rootLock.RUnlock()
 
-	rv := make([]string, 0, len(keyMap))
-	for k := range keyMap {
-		rv = append(rv, k)
-	}
-
-	return rv, nil
+	return keyMap, nil
 }
 
-func (s *Scorch) DropKeys(ids []string) error {
+// refreshes boltdb, removing writer ids given. Also forces a blocking merge
+// of all segments with those writer ids to remove them from the segments as well
+func (s *Scorch) DropWriterIds(ids map[string]struct{}) error {
 
-	keyMap := make(map[string]struct{})
-	for _, k := range ids {
-		keyMap[k] = struct{}{}
-	}
-
-	err := s.removeBoltKeys(ids)
+	err := s.removeBoltWriterIds(ids)
 	if err != nil {
 		return err
 	}
 
 	s.rootLock.Lock()
-	defer s.rootLock.Unlock()
 
 	segsToCompact := make([]mergeplan.Segment, 0)
 	for _, segmentSnapShot := range s.root.segment {
 		if seg, ok := segmentSnapShot.segment.(segment.CustomizableSegment); ok {
-			if _, ok := keyMap[seg.CallbackId()]; ok {
+			if _, ok := ids[seg.CallbackId()]; ok {
 				segsToCompact = append(segsToCompact, segmentSnapShot)
 			}
 		}
 	}
 
 	if len(segsToCompact) > 0 {
-		return s.forceMergeSegs(segsToCompact)
+		ctx := context.Background()
+		doneCh := make(chan error)
+		ctx = context.WithValue(ctx, mergeDoneKey, doneCh)
+		err := s.forceMergeSegs(segsToCompact, ctx)
+		if err != nil {
+			return err
+		}
+		s.rootLock.Unlock()
+		err = <-doneCh
+		close(doneCh)
+		return err
 	}
 
+	s.rootLock.Unlock()
 	return nil
 }
 
 // Force merge all given segments regardless of their elibility for compaction
 // Large segments will be rewritten instead of merging
-func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment) error {
+func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment,
+	ctx context.Context) error {
 	// Create a merge plan with the filtered segments and force a merge
 	// to remove the callback from the segments.
 	mergePlannerOptions, err := s.parseMergePlannerOptions()
@@ -1268,7 +1277,7 @@ func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment) error {
 
 	s.forceMergeRequestCh <- &mergerCtrl{
 		plan: mergePlan,
-		ctx:  context.Background(),
+		ctx:  ctx,
 	}
 
 	return nil

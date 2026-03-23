@@ -4,28 +4,56 @@ import (
 	zapv17 "github.com/blevesearch/zapx/v17"
 )
 
-var WriterHook func(context []byte) (string, func(data []byte) []byte, error)
-var ReaderHook func(id string, context []byte) (func(data []byte) ([]byte, error), error)
+// This file provides a mechanism for users of bleve to provide callbacks
+// that can process data before it is written to disk, and after it is read
+// from disk.  This can be used for things like encryption, compression, etc.
 
-func init() {
+// The user is responsible for ensuring that the writer and reader callbacks
+// are compatible with each other, and that any state needed by the callbacks
+// is managed appropriately.  For example, if the writer callback uses a
+// unique key or nonce per write, the reader callback must be able to
+// determine the correct key or nonce to use for each read.
+
+// The callbacks are identified by an id string, which is returned by the
+// WriterHook. The same id string is passed to the ReaderHook when creating a reader.
+// This allows the reader to determine which callback to use for a given file.
+
+// Support for identifying all callbacks used by a given index and to remove
+// selected callbacks associated with ids is provided via index.WriterIdsInUse()
+// and index.DropWriterIds().
+
+// Default no-op implementation. Is called before writing any user data to a file.
+var WriterHook func(context []byte) (string, func(data []byte) []byte, error)
+
+// Default no-op implementation. Is called after reading any user data from a file.
+var ReaderHook func(id string, context []byte) (
+	func(data []byte) ([]byte, error), error)
+
+// Register callbacks with zapv17. This should be called in init() of the package
+// that defines the callbacks, after the callbacks have been set. This allows
+// zapv17 to use the callbacks when creating file readers and writers.
+// This should be called before any indexes are opened or created that will
+// use the callbacks.
+func RegisterFileCallbacks() {
 	zapv17.WriterHook = WriterHook
 	zapv17.ReaderHook = ReaderHook
 }
 
+// FileWriter and FileReader are wrappers around the callback functions provided
+// by the user. They provide a convenient way to apply the callbacks to data
+// being written to or read from a file. They also store the id the callbacks,
+// which can be useful for managing state across multiple reads and writes.
 type FileWriter struct {
 	processor func(data []byte) []byte
-	context   []byte
 	id        string
 }
 
 func NewFileWriter(context []byte) (*FileWriter, error) {
-	rv := &FileWriter{
-		context: context,
-	}
+	rv := &FileWriter{}
 
 	if WriterHook != nil {
 		var err error
-		rv.id, rv.processor, err = WriterHook(rv.context)
+		rv.id, rv.processor, err = WriterHook(context)
 		if err != nil {
 			return nil, err
 		}
@@ -48,7 +76,6 @@ func (w *FileWriter) Id() string {
 type FileReader struct {
 	processor func(data []byte) ([]byte, error)
 	id        string
-	context   []byte
 }
 
 func NewFileReader(id string, context []byte) (*FileReader, error) {

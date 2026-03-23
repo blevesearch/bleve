@@ -89,11 +89,13 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 		return nil, fmt.Errorf("bleve not configured for file based indexing")
 	}
 
-	fileWriter, err := util.NewFileWriter([]byte(indexMetaPath(path)))
+	// Set up readers and writers for the index
+	metaPath := indexMetaPath(path)
+	fileWriter, err := util.NewFileWriter([]byte(metaPath))
 	if err != nil {
 		return nil, err
 	}
-	fileReader, err := util.NewFileReader(fileWriter.Id(), []byte(indexMetaPath(path)))
+	fileReader, err := util.NewFileReader(fileWriter.Id(), []byte(metaPath))
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +111,6 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	rv.stats = &IndexStat{i: &rv}
 	// at this point there is hope that we can be successful, so save index meta
 	if path != "" {
-		kvconfig["callback_id"] = rv.writer.Id()
 		err = rv.meta.Save(path, rv.writer)
 		if err != nil {
 			return nil, err
@@ -493,38 +494,46 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 	return i.SearchInContext(context.Background(), req)
 }
 
-func (i *indexImpl) KeysInUse() (map[string]struct{}, error) {
+// returns the set of writer ids in use by the index
+func (i *indexImpl) WriterIdsInUse() (map[string]struct{}, error) {
 
-	keys := map[string]struct{}{}
-	keys[i.reader.Id()] = struct{}{}
+	ids := map[string]struct{}{}
+	ids[i.reader.Id()] = struct{}{}
 
 	if cidx, ok := i.i.(index.CustomizableIndex); ok {
-		cKeys, err := cidx.KeysInUse()
+		cIds, err := cidx.WriterIdsInUse()
 		if err != nil {
 			return nil, err
 		}
-		for k := range cKeys {
-			keys[k] = struct{}{}
+		for k := range cIds {
+			ids[k] = struct{}{}
 		}
+	} else {
+		ids[""] = struct{}{}
 	}
 
-	return keys, nil
+	return ids, nil
 }
 
-func (i *indexImpl) DropKeys(keys map[string]struct{}) error {
+// drops the writer ids from the index and re-processes data with the latest
+// writer id
+func (i *indexImpl) DropWriterIds(ids map[string]struct{}) error {
 
-	if _, ok := keys[i.reader.Id()]; ok {
-		err := i.meta.UpdateWriter(i.path)
+	i.mutex.Lock()
+	if _, ok := ids[i.reader.Id()]; ok {
+		var err error
+		i.writer, i.reader, err = i.meta.UpdateWriter(i.path)
 		if err != nil {
 			return err
 		}
 	}
+	i.mutex.Unlock()
 
 	if cidx, ok := i.i.(index.CustomizableIndex); ok {
-		return cidx.DropKeys(keys)
+		return cidx.DropWriterIds(ids)
 	} else {
-		if _, ok := keys[""]; ok {
-			return fmt.Errorf("underlying index does not support DropKeys")
+		if _, ok := ids[""]; ok {
+			return fmt.Errorf("underlying index does not support DropWriterIds")
 		}
 	}
 

@@ -30,6 +30,7 @@ import (
 )
 
 const merger = "merger"
+const mergeDoneKey = "mergeDone"
 
 func (s *Scorch) mergerLoop() {
 	defer func() {
@@ -333,6 +334,13 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 func (s *Scorch) executePlanMergeAtSnapshot(plan *mergeplan.MergePlan, cw *closeChWrapper) error {
 	var filenames []string
+	var err error
+	defer func() {
+		// send error to done channel if present
+		if done, ok := cw.ctx.Value(mergeDoneKey).(chan error); ok {
+			done <- err
+		}
+	}()
 
 	for _, task := range plan.Tasks {
 		if len(task.Segments) == 0 {
@@ -385,7 +393,8 @@ func (s *Scorch) executePlanMergeAtSnapshot(plan *mergeplan.MergePlan, cw *close
 
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
 			prevBytesReadTotal := cumulateBytesRead(segmentsToMerge)
-			newDocNums, _, err := s.segPlugin.MergeUsing(segmentsToMerge, docsToDrop, path,
+			var newDocNums [][]uint64
+			newDocNums, _, err = s.segPlugin.MergeUsing(segmentsToMerge, docsToDrop, path,
 				cw.cancelCh, s, s.segmentConfig)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
 
@@ -438,7 +447,8 @@ func (s *Scorch) executePlanMergeAtSnapshot(plan *mergeplan.MergePlan, cw *close
 		select {
 		case <-s.closeCh:
 			_ = seg.Close()
-			return segment.ErrClosed
+			err = segment.ErrClosed
+			return err
 		case s.merges <- sm:
 			atomic.AddUint64(&s.stats.TotFileMergeIntroductions, 1)
 		}
