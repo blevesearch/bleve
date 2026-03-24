@@ -1172,14 +1172,10 @@ func (s *Scorch) WriterIdsInUse() (map[string]struct{}, error) {
 		}
 	}
 
-	fmt.Printf("ENC: Segment Keys - %+v\n", keyMap)
-
 	boltKeys, err := s.boltWriterIdsInUse()
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Printf("ENC: Bolt Keys - %+v\n", boltKeys)
 
 	for k, _ := range boltKeys {
 		keyMap[k] = struct{}{}
@@ -1201,10 +1197,12 @@ func (s *Scorch) DropWriterIds(ids map[string]struct{}) error {
 	s.rootLock.Lock()
 
 	segsToCompact := make([]mergeplan.Segment, 0)
+	filePaths := make([]string, 0)
 	for _, segmentSnapShot := range s.root.segment {
 		if seg, ok := segmentSnapShot.segment.(segment.CustomizableSegment); ok {
 			if _, ok := ids[seg.CallbackId()]; ok {
 				segsToCompact = append(segsToCompact, segmentSnapShot)
+				filePaths = append(filePaths, zapFileName(segmentSnapShot.id))
 			}
 		}
 	}
@@ -1213,6 +1211,10 @@ func (s *Scorch) DropWriterIds(ids map[string]struct{}) error {
 		ctx := context.Background()
 		doneCh := make(chan error)
 		ctx = context.WithValue(ctx, mergeDoneKey, doneCh)
+
+		// Ensure only merged segments survive
+		prevNumSnapshotsToKeep := s.numSnapshotsToKeep
+		s.numSnapshotsToKeep = 1
 		err := s.forceMergeSegs(segsToCompact, ctx)
 		if err != nil {
 			return err
@@ -1220,7 +1222,17 @@ func (s *Scorch) DropWriterIds(ids map[string]struct{}) error {
 		s.rootLock.Unlock()
 		err = <-doneCh
 		close(doneCh)
-		return err
+		if err != nil {
+			return err
+		}
+
+		err = s.waitTillFileCleanup(filePaths)
+		if err != nil {
+			return err
+		}
+
+		s.rootLock.Lock()
+		s.numSnapshotsToKeep = prevNumSnapshotsToKeep
 	}
 
 	s.rootLock.Unlock()
@@ -1281,4 +1293,34 @@ func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment,
 	}
 
 	return nil
+}
+
+func (s *Scorch) waitTillFileCleanup(filePaths []string) error {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	timeout := time.After(5 * time.Minute)
+
+	for {
+		select {
+		case <-ticker.C:
+			files, err := os.ReadDir(s.path)
+			if err != nil {
+				return err
+			}
+			for _, f := range files {
+				fname := f.Name()
+				if filepath.Ext(fname) == ".zap" {
+					for _, filePath := range filePaths {
+						if fname == filePath {
+							continue
+						}
+					}
+				}
+			}
+			return nil
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for file cleanup for files: %v", filePaths)
+		}
+	}
 }
