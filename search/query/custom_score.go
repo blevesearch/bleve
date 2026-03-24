@@ -26,16 +26,15 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
+// CustomScoreQuery wraps a child query and re-scores its candidate matches via
+// an embedder-provided per-hit callback. Fields lists stored fields to expose
+// to the callback, Params carries caller-provided values passed as the second
+// UDF argument, and Source carries the embedder-defined callback source.
 type CustomScoreQuery struct {
-	// Query is the child query whose candidate matches are re-scored.
-	Query Query `json:"query"`
-	// Fields lists stored fields to load into doc.fields for callback execution.
-	// Nil or empty means no stored fields are loaded.
-	Fields []string `json:"fields,omitempty"`
-	// Params carries caller-provided values passed as the second UDF argument.
+	Query  Query                  `json:"query"`
+	Fields []string               `json:"fields,omitempty"`
 	Params map[string]interface{} `json:"params,omitempty"`
-	// Source carries embedding-defined callback source that travels with the query.
-	Source string `json:"source"`
+	Source string                 `json:"source"`
 }
 
 func NewCustomScoreQuery(query Query, source string) *CustomScoreQuery {
@@ -46,6 +45,10 @@ func NewCustomScoreQuery(query Query, source string) *CustomScoreQuery {
 }
 
 func (q *CustomScoreQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+	if q == nil {
+		return nil, fmt.Errorf("custom score query is nil")
+	}
+
 	// Build the inner searcher first; custom scoring wraps its output.
 	childSearcher, err := q.Query.Searcher(ctx, i, m, options)
 	if err != nil {
@@ -69,6 +72,9 @@ func (q *CustomScoreQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 }
 
 func (q *CustomScoreQuery) Validate() error {
+	if q == nil {
+		return fmt.Errorf("custom score query is nil")
+	}
 	if q.Query == nil {
 		return fmt.Errorf("custom score query must have a query")
 	}
