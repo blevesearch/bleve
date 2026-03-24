@@ -905,7 +905,6 @@ func (s *Scorch) loadFromBolt() error {
 				_ = rootPrev.DecRef()
 			}
 
-			mappingBytes, err = indexSnapshot.GetInternal(util.MappingInternalKey)
 			foundRoot = true
 		}
 

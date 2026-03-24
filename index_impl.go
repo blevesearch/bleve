@@ -72,9 +72,9 @@ func indexStorePath(path string) string {
 	return path + string(os.PathSeparator) + storePath
 }
 
-func newIndexUsing(path string, im mapping.IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (*indexImpl, error) {
+func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (*indexImpl, error) {
 	// first validate the mapping
-	err := im.Validate()
+	err := mapping.Validate()
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func newIndexUsing(path string, im mapping.IndexMapping, indexType string, kvsto
 	rv := indexImpl{
 		path: path,
 		name: path,
-		m:    im,
+		m:    mapping,
 		meta: newIndexMeta(indexType, kvstore, kvconfig),
 	}
 	rv.stats = &IndexStat{i: &rv}
@@ -106,12 +106,6 @@ func newIndexUsing(path string, im mapping.IndexMapping, indexType string, kvsto
 	} else {
 		kvconfig["path"] = ""
 	}
-
-	mappingBytes, err := util.MarshalJSON(im)
-	if err != nil {
-		return nil, err
-	}
-	kvconfig["index_mapping"] = mappingBytes
 
 	// open the index
 	indexTypeConstructor := registry.IndexTypeConstructorByName(rv.meta.IndexType)
@@ -134,6 +128,10 @@ func newIndexUsing(path string, im mapping.IndexMapping, indexType string, kvsto
 	}(&rv)
 
 	// now persist the mapping
+	mappingBytes, err := util.MarshalJSON(mapping)
+	if err != nil {
+		return nil, err
+	}
 	err = rv.i.SetInternal(util.MappingInternalKey, mappingBytes)
 	if err != nil {
 		return nil, err
