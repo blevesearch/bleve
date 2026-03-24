@@ -864,7 +864,7 @@ func (s *Scorch) loadFromBolt() error {
 		if snapshots == nil {
 			return nil
 		}
-		var mappingBytes []byte
+
 		foundRoot := false
 		c := snapshots.Cursor()
 		for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
@@ -906,13 +906,11 @@ func (s *Scorch) loadFromBolt() error {
 				_ = rootPrev.DecRef()
 			}
 
-			mappingBytes, err = indexSnapshot.GetInternal(util.MappingInternalKey)
 			foundRoot = true
 		}
 
 		// try init trainer with the mapping details
 		if s.trainer == nil {
-			s.config["index_mapping"] = mappingBytes
 			s.trainer = initTrainer(s, s.config)
 		}
 		trainerBucket := snapshots.Bucket(util.BoltTrainerKey)
