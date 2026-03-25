@@ -4776,7 +4776,6 @@ func TestFilteredBooleanQuery(t *testing.T) {
 	req.Fields = []string{"title"}
 	req.Sort = make(search.SortOrder, 0)
 	req.Sort = append(req.Sort, titleSort)
-
 	res, err = idx.Search(req)
 	if err != nil {
 		t.Fatal(err)
