@@ -1167,7 +1167,7 @@ func (s *Scorch) WriterIdsInUse() (map[string]struct{}, error) {
 
 	keyMap := make(map[string]struct{})
 	for _, segmentSnapShot := range s.root.segment {
-		if seg, ok := segmentSnapShot.segment.(segment.CustomizableSegment); ok {
+		if seg, ok := segmentSnapShot.segment.(segment.SegmentWithCallbacks); ok {
 			keyMap[seg.CallbackId()] = struct{}{}
 		}
 	}
@@ -1199,7 +1199,7 @@ func (s *Scorch) DropWriterIds(ids map[string]struct{}) error {
 	segsToCompact := make([]mergeplan.Segment, 0)
 	filePaths := make([]string, 0)
 	for _, segmentSnapShot := range s.root.segment {
-		if seg, ok := segmentSnapShot.segment.(segment.CustomizableSegment); ok {
+		if seg, ok := segmentSnapShot.segment.(segment.SegmentWithCallbacks); ok {
 			if _, ok := ids[seg.CallbackId()]; ok {
 				segsToCompact = append(segsToCompact, segmentSnapShot)
 				filePaths = append(filePaths, zapFileName(segmentSnapShot.id))

@@ -148,8 +148,8 @@ func (i *indexMeta) Save(path string, writer *util.FileWriter) (err error) {
 	return nil
 }
 
-func (i *indexMeta) CopyTo(d index.Directory) (err error) {
-	metaBytes, err := util.MarshalJSON(i)
+func (i *indexMeta) CopyTo(path string, d index.Directory) (err error) {
+	metaBytes, err := os.ReadFile(indexMetaPath(path))
 	if err != nil {
 		return err
 	}

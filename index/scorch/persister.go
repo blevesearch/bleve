@@ -644,7 +644,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segP
 		return nil, nil, err
 	}
 	writer, err := util.NewFileWriter(
-		[]byte(path + string(os.PathSeparator) + "root.bolt"))
+		[]byte(snapshot.parent.path + string(os.PathSeparator) + "root.bolt"))
 	if err != nil {
 		return nil, nil, err
 	}

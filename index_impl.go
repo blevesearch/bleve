@@ -500,7 +500,7 @@ func (i *indexImpl) WriterIdsInUse() (map[string]struct{}, error) {
 	ids := map[string]struct{}{}
 	ids[i.reader.Id()] = struct{}{}
 
-	if cidx, ok := i.i.(index.CustomizableIndex); ok {
+	if cidx, ok := i.i.(index.IndexWithCallbacks); ok {
 		cIds, err := cidx.WriterIdsInUse()
 		if err != nil {
 			return nil, err
@@ -529,7 +529,7 @@ func (i *indexImpl) DropWriterIds(ids map[string]struct{}) error {
 	}
 	i.mutex.Unlock()
 
-	if cidx, ok := i.i.(index.CustomizableIndex); ok {
+	if cidx, ok := i.i.(index.IndexWithCallbacks); ok {
 		return cidx.DropWriterIds(ids)
 	} else {
 		if _, ok := ids[""]; ok {
@@ -1507,7 +1507,7 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 	}
 
 	// copy the metadata
-	return i.meta.CopyTo(d)
+	return i.meta.CopyTo(i.path, d)
 }
 
 func (f FileSystemDirectory) GetWriter(filePath string) (io.WriteCloser,

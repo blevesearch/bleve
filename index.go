@@ -389,7 +389,7 @@ type SynonymIndex interface {
 	IndexSynonym(id string, collection string, definition *SynonymDefinition) error
 }
 
-type CustomizableIndex interface {
+type IndexWithCallbacks interface {
 	Index
 	WriterIdsInUse() (map[string]struct{}, error)
 	DropWriterIds(ids map[string]struct{}) error
