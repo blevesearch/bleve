@@ -4773,7 +4773,7 @@ func TestFilteredBooleanQuery(t *testing.T) {
 
 	req = NewSearchRequest(q)
 	req.Explain = true
-	req.Fields = []string{"*"}
+	req.Fields = []string{"title"}
 	req.Sort = make(search.SortOrder, 0)
 	req.Sort = append(req.Sort, titleSort)
 

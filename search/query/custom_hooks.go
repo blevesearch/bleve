@@ -20,14 +20,9 @@ import (
 	"github.com/blevesearch/bleve/v2/search/searcher"
 )
 
-// Context keys used by CustomFilterQuery/CustomScoreQuery to retrieve
-// request-scoped hooks from the embedding application (e.g. cbft).
-type customFilterKey string
-type customScoreKey string
-
 const (
-	CustomFilterContextKey customFilterKey = "custom_filter"
-	CustomScoreContextKey  customScoreKey  = "custom_score"
+	CustomFilterContextKey string = "custom_filter"
+	CustomScoreContextKey  string = "custom_score"
 )
 
 // CustomFilterFactory lets the embedding application provide request-scoped
