@@ -4777,17 +4777,10 @@ func TestFilteredBooleanQuery(t *testing.T) {
 	req.Sort = make(search.SortOrder, 0)
 	req.Sort = append(req.Sort, titleSort)
 
-	xyz, err := json.Marshal(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("request: %s", string(xyz))
-
 	res, err = idx.Search(req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(res)
 	if len(res.Hits) != 3 {
 		t.Fatalf("expected 3 hits, got %d", len(res.Hits))
 	}
