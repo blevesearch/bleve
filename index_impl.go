@@ -380,7 +380,7 @@ func (i *indexImpl) Train(batch *Batch) error {
 	if vi, ok := i.i.(index.TrainableIndex); ok {
 		return vi.Train(batch.internal)
 	}
-	return fmt.Errorf("not a vector index")
+	return ErrorTrainingNotSupported
 }
 
 // IndexAdvanced takes a document.Document object

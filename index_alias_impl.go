@@ -115,10 +115,10 @@ func (i *indexAliasImpl) Train(batch *Batch) error {
 		return err
 	}
 
-	if vi, ok := i.indexes[0].(VectorIndex); ok {
+	if vi, ok := i.indexes[0].(TrainableIndex); ok {
 		return vi.Train(batch)
 	}
-	return fmt.Errorf("not a vector index")
+	return ErrorTrainingNotSupported
 }
 
 func (i *indexAliasImpl) Delete(id string) error {

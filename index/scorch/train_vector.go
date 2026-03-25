@@ -26,7 +26,6 @@ import (
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/go-faiss"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	bolt "go.etcd.io/bbolt"
 )
@@ -37,12 +36,12 @@ type trainRequest struct {
 	ackCh    chan error
 }
 
-const IndexTrainedWithFastMerge = "fast-merge"
+const IndexTrainedWithFastMerge = "vector_index_fast_merge"
 
 func initTrainer(s *Scorch, config map[string]interface{}) *vectorTrainer {
-	if f, ok := config["vector_index_merge"]; ok {
-		feature, ok := f.(string)
-		if ok && feature == IndexTrainedWithFastMerge {
+	if f, ok := config[IndexTrainedWithFastMerge]; ok {
+		feature, ok := f.(bool)
+		if ok && feature {
 			return &vectorTrainer{
 				parent:  s,
 				trainCh: make(chan *trainRequest),
@@ -260,7 +259,7 @@ func (t *vectorTrainer) getInternal(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (t *vectorTrainer) getCentroidIndex(field string) (*faiss.IndexImpl, error) {
+func (t *vectorTrainer) getCentroidIndex(field string) (interface{}, error) {
 	// return the coarse quantizer of the centroid index belonging to the field
 	trainedSegment, ok := t.centroidIndex.segment.(segment.TrainedSegment)
 	if !ok {
