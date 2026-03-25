@@ -37,10 +37,12 @@ type trainRequest struct {
 	ackCh    chan error
 }
 
+const IndexTrainedWithFastMerge = "fast-merge"
+
 func initTrainer(s *Scorch, config map[string]interface{}) *vectorTrainer {
 	if f, ok := config["vector_index_merge"]; ok {
 		feature, ok := f.(string)
-		if ok && feature == index.IndexTrainedWithFastMerge {
+		if ok && feature == IndexTrainedWithFastMerge {
 			return &vectorTrainer{
 				parent:  s,
 				trainCh: make(chan *trainRequest),
