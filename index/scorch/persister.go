@@ -649,7 +649,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segP
 		return nil, nil, err
 	}
 
-	err = metaBucket.Put(util.BoltMetaDataWriterIdKey, []byte(writer.Id()))
+	err = metaBucket.Put(util.BoltMetaDataFileWriterIDKey, []byte(writer.Id()))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -978,9 +978,9 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 		return nil, fmt.Errorf(
 			"unable to load correct segment wrapper: %v", err)
 	}
-	readerId := string(metaBucket.Get(util.BoltMetaDataWriterIdKey))
+	fileWriterID := string(metaBucket.Get(util.BoltMetaDataFileWriterIDKey))
 	reader, err := util.NewFileReader(
-		readerId, []byte(s.path+string(os.PathSeparator)+"root.bolt"))
+		fileWriterID, []byte(s.path+string(os.PathSeparator)+"root.bolt"))
 	if err != nil {
 		_ = rv.DecRef()
 		return nil, fmt.Errorf("unable to load correct reader: %v", err)
@@ -1107,8 +1107,8 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket, reader *util.FileReader
 	return rv, nil
 }
 
-// identify all the file callback ids that are in use by boltdb
-func (s *Scorch) boltWriterIdsInUse() (map[string]struct{}, error) {
+// identify all the file callback writer ids that are in use by boltdb
+func (s *Scorch) boltFileWriterIDsInUse() (map[string]struct{}, error) {
 	idMap := make(map[string]struct{})
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
@@ -1125,7 +1125,7 @@ func (s *Scorch) boltWriterIdsInUse() (map[string]struct{}, error) {
 			if metaBucket == nil {
 				continue
 			}
-			id := string(metaBucket.Get(util.BoltMetaDataWriterIdKey))
+			id := string(metaBucket.Get(util.BoltMetaDataFileWriterIDKey))
 			idMap[id] = struct{}{}
 		}
 		return nil
@@ -1137,9 +1137,9 @@ func (s *Scorch) boltWriterIdsInUse() (map[string]struct{}, error) {
 	return idMap, nil
 }
 
-// remove all content in boltdb associated with the callback ids
-// and process the data using the latest writer
-func (s *Scorch) removeBoltWriterIds(ids map[string]struct{}) error {
+// remove all content in boltdb associated with the file callback
+// writer ids and process the data using the latest file writer
+func (s *Scorch) removeBoltFileWriterIDs(ids map[string]struct{}) error {
 	filePath := s.path + string(os.PathSeparator) + "root.bolt"
 	writer, err := util.NewFileWriter([]byte(filePath))
 	if err != nil {
@@ -1161,9 +1161,9 @@ func (s *Scorch) removeBoltWriterIds(ids map[string]struct{}) error {
 			if metaBucket == nil {
 				continue
 			}
-			readerId := string(metaBucket.Get(util.BoltMetaDataWriterIdKey))
-			if _, ok := ids[readerId]; ok {
-				reader, err := util.NewFileReader(readerId, []byte(filePath))
+			fileWriterID := string(metaBucket.Get(util.BoltMetaDataFileWriterIDKey))
+			if _, ok := ids[fileWriterID]; ok {
+				reader, err := util.NewFileReader(fileWriterID, []byte(filePath))
 				if err != nil {
 					return fmt.Errorf("unable to load correct reader: %v", err)
 				}
@@ -1222,7 +1222,7 @@ func (s *Scorch) removeBoltWriterIds(ids map[string]struct{}) error {
 						}
 					}
 				}
-				err = metaBucket.Put(util.BoltMetaDataWriterIdKey,
+				err = metaBucket.Put(util.BoltMetaDataFileWriterIDKey,
 					[]byte(writer.Id()))
 				if err != nil {
 					return err

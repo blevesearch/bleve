@@ -390,9 +390,8 @@ type SynonymIndex interface {
 }
 
 type IndexWithCallbacks interface {
-	Index
-	WriterIdsInUse() (map[string]struct{}, error)
-	DropWriterIds(ids map[string]struct{}) error
+	FileWriterIDsInUse() (map[string]struct{}, error)
+	DropFileWriterIDs(ids map[string]struct{}) error
 }
 
 type InsightsIndex interface {

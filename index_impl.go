@@ -46,16 +46,16 @@ import (
 )
 
 type indexImpl struct {
-	path   string
-	name   string
-	meta   *indexMeta
-	i      index.Index
-	m      mapping.IndexMapping
-	mutex  sync.RWMutex
-	open   bool
-	stats  *IndexStat
-	writer *util.FileWriter
-	reader *util.FileReader
+	path       string
+	name       string
+	meta       *indexMeta
+	i          index.Index
+	m          mapping.IndexMapping
+	mutex      sync.RWMutex
+	open       bool
+	stats      *IndexStat
+	fileWriter *util.FileWriter
+	fileReader *util.FileReader
 }
 
 const storePath = "store"
@@ -101,17 +101,17 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	}
 
 	rv := indexImpl{
-		path:   path,
-		name:   path,
-		m:      mapping,
-		meta:   newIndexMeta(indexType, kvstore, kvconfig),
-		writer: fileWriter,
-		reader: fileReader,
+		path:       path,
+		name:       path,
+		m:          mapping,
+		meta:       newIndexMeta(indexType, kvstore, kvconfig),
+		fileWriter: fileWriter,
+		fileReader: fileReader,
 	}
 	rv.stats = &IndexStat{i: &rv}
 	// at this point there is hope that we can be successful, so save index meta
 	if path != "" {
-		err = rv.meta.Save(path, rv.writer)
+		err = rv.meta.Save(path, rv.fileWriter)
 		if err != nil {
 			return nil, err
 		}
@@ -167,7 +167,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	}
 	rv.stats = &IndexStat{i: rv}
 
-	rv.meta, rv.reader, err = openIndexMeta(path)
+	rv.meta, rv.fileReader, err = openIndexMeta(path)
 	if err != nil {
 		return nil, err
 	}
@@ -494,14 +494,14 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 	return i.SearchInContext(context.Background(), req)
 }
 
-// returns the set of writer ids in use by the index
-func (i *indexImpl) WriterIdsInUse() (map[string]struct{}, error) {
+// returns the set of file callback writer ids in use by the index
+func (i *indexImpl) FileWriterIDsInUse() (map[string]struct{}, error) {
 
 	ids := map[string]struct{}{}
-	ids[i.reader.Id()] = struct{}{}
+	ids[i.fileReader.Id()] = struct{}{}
 
-	if cidx, ok := i.i.(index.IndexWithCallbacks); ok {
-		cIds, err := cidx.WriterIdsInUse()
+	if cidx, ok := i.i.(IndexWithCallbacks); ok {
+		cIds, err := cidx.FileWriterIDsInUse()
 		if err != nil {
 			return nil, err
 		}
@@ -515,25 +515,25 @@ func (i *indexImpl) WriterIdsInUse() (map[string]struct{}, error) {
 	return ids, nil
 }
 
-// drops the writer ids from the index and re-processes data with the latest
-// writer id
-func (i *indexImpl) DropWriterIds(ids map[string]struct{}) error {
+// drops the file callback writer ids from the index and
+// re-processes data with the latest file callback writer id
+func (i *indexImpl) DropFileWriterIDs(ids map[string]struct{}) error {
 
 	i.mutex.Lock()
-	if _, ok := ids[i.reader.Id()]; ok {
+	if _, ok := ids[i.fileReader.Id()]; ok {
 		var err error
-		i.writer, i.reader, err = i.meta.UpdateWriter(i.path)
+		i.fileWriter, i.fileReader, err = i.meta.UpdateWriter(i.path)
 		if err != nil {
 			return err
 		}
 	}
 	i.mutex.Unlock()
 
-	if cidx, ok := i.i.(index.IndexWithCallbacks); ok {
-		return cidx.DropWriterIds(ids)
+	if cidx, ok := i.i.(IndexWithCallbacks); ok {
+		return cidx.DropFileWriterIDs(ids)
 	} else {
 		if _, ok := ids[""]; ok {
-			return fmt.Errorf("underlying index does not support DropWriterIds")
+			return fmt.Errorf("underlying index does not support DropFileWriterIDs")
 		}
 	}
 

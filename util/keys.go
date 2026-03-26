@@ -27,7 +27,7 @@ var (
 	BoltStatsKey                  = []byte("stats")
 	BoltUpdatedFieldsKey          = []byte("fields")
 	TotBytesWrittenKey            = []byte("TotBytesWritten")
-	BoltMetaDataWriterIdKey       = []byte("writerId")
+	BoltMetaDataFileWriterIDKey   = []byte("fileWriterID")
 
 	MappingInternalKey = []byte("_mapping")
 )

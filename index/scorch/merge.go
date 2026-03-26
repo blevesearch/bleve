@@ -99,6 +99,10 @@ OUTER:
 				startTime := time.Now()
 				var err error
 				// lets get started
+				// if there is no plan, then we are doing a regular merge at
+				// napshot based on the current state of the index. If there is
+				// a plan, then we are doing a force merge based on the segments
+				// specified in the plan.
 				if ctrlMsg.plan == nil {
 					err = s.planMergeAtSnapshot(ctrlMsg.ctx, ctrlMsg.options,
 						ourSnapshot)

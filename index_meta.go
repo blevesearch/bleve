@@ -73,14 +73,14 @@ func openIndexMeta(path string) (*indexMeta, *util.FileReader, error) {
 		}
 
 		pos := len(metaBytes) - 4
-		writerIdLen := int(binary.BigEndian.Uint32(metaBytes[pos:]))
-		pos -= writerIdLen
+		fileWriterIDLen := int(binary.BigEndian.Uint32(metaBytes[pos:]))
+		pos -= fileWriterIDLen
 		if pos < 0 {
 			return nil, nil, ErrorIndexMetaCorrupt
 		}
 
-		writerId := metaBytes[pos : pos+writerIdLen]
-		fileReader, err = util.NewFileReader(string(writerId), []byte(indexMetaPath))
+		fileWriterID := metaBytes[pos : pos+fileWriterIDLen]
+		fileReader, err = util.NewFileReader(string(fileWriterID), []byte(indexMetaPath))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -165,6 +165,10 @@ func (i *indexMeta) CopyTo(path string, d index.Directory) (err error) {
 	return err
 }
 
+// updates the file callback writer id in the index meta,
+// and re-processes data with the latest file callback writer
+// returns the new file callback writer and reader to be used for
+// future processing of index meta data
 func (i *indexMeta) UpdateWriter(path string) (*util.FileWriter, *util.FileReader, error) {
 	indexMetaPath := indexMetaPath(path)
 	metaBytes, err := os.ReadFile(indexMetaPath)
@@ -177,14 +181,14 @@ func (i *indexMeta) UpdateWriter(path string) (*util.FileWriter, *util.FileReade
 	}
 
 	pos := len(metaBytes) - 4
-	writerIdLen := int(binary.BigEndian.Uint32(metaBytes[pos:]))
-	pos -= writerIdLen
+	fileWriterIDLen := int(binary.BigEndian.Uint32(metaBytes[pos:]))
+	pos -= fileWriterIDLen
 	if pos < 0 {
 		return nil, nil, ErrorIndexMetaCorrupt
 	}
 
-	writerId := metaBytes[pos : pos+writerIdLen]
-	fileReader, err := util.NewFileReader(string(writerId), []byte(indexMetaPath))
+	fileWriterID := metaBytes[pos : pos+fileWriterIDLen]
+	fileReader, err := util.NewFileReader(string(fileWriterID), []byte(indexMetaPath))
 	if err != nil {
 		return nil, nil, err
 	}

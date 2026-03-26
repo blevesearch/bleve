@@ -1037,13 +1037,13 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 				return fmt.Errorf("unable to load correct writer: %v", err)
 			}
 
-			readerId := string(metaBucket.Get(util.BoltMetaDataWriterIdKey))
-			reader, err := util.NewFileReader(readerId, []byte(filePath))
+			fileWriterID := string(metaBucket.Get(util.BoltMetaDataFileWriterIDKey))
+			reader, err := util.NewFileReader(fileWriterID, []byte(filePath))
 			if err != nil {
 				return fmt.Errorf("unable to load correct reader: %v", err)
 			}
 
-			err = metaBucket.Put(util.BoltMetaDataWriterIdKey, []byte(writer.Id()))
+			err = metaBucket.Put(util.BoltMetaDataFileWriterIDKey, []byte(writer.Id()))
 			if err != nil {
 				return err
 			}
@@ -1161,8 +1161,8 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 	})
 }
 
-// returns the set of writer ids in use by both the segments and boltdb
-func (s *Scorch) WriterIdsInUse() (map[string]struct{}, error) {
+// returns the set of file callback writer ids in use by all of the segments and boltdb
+func (s *Scorch) FileWriterIDsInUse() (map[string]struct{}, error) {
 	s.rootLock.RLock()
 
 	keyMap := make(map[string]struct{})
@@ -1172,7 +1172,7 @@ func (s *Scorch) WriterIdsInUse() (map[string]struct{}, error) {
 		}
 	}
 
-	boltKeys, err := s.boltWriterIdsInUse()
+	boltKeys, err := s.boltFileWriterIDsInUse()
 	if err != nil {
 		return nil, err
 	}
@@ -1185,17 +1185,20 @@ func (s *Scorch) WriterIdsInUse() (map[string]struct{}, error) {
 	return keyMap, nil
 }
 
-// refreshes boltdb, removing writer ids given. Also forces a blocking merge
-// of all segments with those writer ids to remove them from the segments as well
-func (s *Scorch) DropWriterIds(ids map[string]struct{}) error {
+// removes all file callback writer ids in use from all of the segments and boltdb
+// boltdb is updated with the latest callback writer while segments are force
+// merged blockingly until snapshot is persisted with the latest callback writer
+func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 
-	err := s.removeBoltWriterIds(ids)
+	err := s.removeBoltFileWriterIDs(ids)
 	if err != nil {
 		return err
 	}
 
 	s.rootLock.Lock()
 
+	// tag all segments with the callback ids for removal for
+	// force merging.
 	segsToCompact := make([]mergeplan.Segment, 0)
 	filePaths := make([]string, 0)
 	for _, segmentSnapShot := range s.root.segment {
@@ -1208,11 +1211,14 @@ func (s *Scorch) DropWriterIds(ids map[string]struct{}) error {
 	}
 
 	if len(segsToCompact) > 0 {
+		// create a done channel to ensure success of merge
 		ctx := context.Background()
 		doneCh := make(chan error)
 		ctx = context.WithValue(ctx, mergeDoneKey, doneCh)
 
-		// Ensure only merged segments survive
+		// ensure any rollback snapshots are not preserved after
+		// the force merge as they may have references to the
+		// callback ids that are being removed
 		prevNumSnapshotsToKeep := s.numSnapshotsToKeep
 		s.numSnapshotsToKeep = 1
 		err := s.forceMergeSegs(segsToCompact, ctx)
@@ -1220,17 +1226,21 @@ func (s *Scorch) DropWriterIds(ids map[string]struct{}) error {
 			return err
 		}
 		s.rootLock.Unlock()
+
+		// blockingly wait for merge to complete
 		err = <-doneCh
 		close(doneCh)
 		if err != nil {
 			return err
 		}
 
+		// wait for files to be cleaned up by persister
 		err = s.waitTillFileCleanup(filePaths)
 		if err != nil {
 			return err
 		}
 
+		// reset rollback snapshot retention
 		s.rootLock.Lock()
 		s.numSnapshotsToKeep = prevNumSnapshotsToKeep
 	}
@@ -1253,6 +1263,7 @@ func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment,
 
 	atomic.AddUint64(&s.stats.TotFileMergePlan, 1)
 
+	// create a default merge plan incase some of the segments can actually be merged
 	mergePlan, err := mergeplan.Plan(segsToCompact, mergePlannerOptions)
 	if err != nil {
 		atomic.AddUint64(&s.stats.TotFileMergePlanErr, 1)
@@ -1276,6 +1287,7 @@ func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment,
 		}
 	}
 
+	// Create additional merge tasks for segments that are unable to be merged
 	for _, seg := range segsToCompact {
 		if segDictionary[seg.Id()] {
 			mergePlan.Tasks = append(mergePlan.Tasks, &mergeplan.MergeTask{
@@ -1287,6 +1299,7 @@ func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment,
 	atomic.AddUint64(&s.stats.TotFileMergePlanOk, 1)
 	atomic.AddUint64(&s.stats.TotFileMergePlanTasks, uint64(len(mergePlan.Tasks)))
 
+	// trigger the merge with the force merge plan
 	s.forceMergeRequestCh <- &mergerCtrl{
 		plan: mergePlan,
 		ctx:  ctx,
@@ -1295,6 +1308,9 @@ func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment,
 	return nil
 }
 
+// waitTillFileCleanup blocks until the given files are cleaned up by the persister or merger or
+// returns an error after a timeout. It does so by checking the index directory every 5 seconds
+// for the presence of the given files, and returns once they are no longer present.
 func (s *Scorch) waitTillFileCleanup(filePaths []string) error {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
