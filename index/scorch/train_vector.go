@@ -263,16 +263,19 @@ func (t *vectorTrainer) getInternal(key []byte) ([]byte, error) {
 
 func (t *vectorTrainer) getCentroidIndex(field string) (interface{}, error) {
 	// return the coarse quantizer of the centroid index belonging to the field
-	trainedSegment, ok := t.centroidIndex.segment.(segment.TrainedSegment)
-	if !ok {
-		return nil, fmt.Errorf("segment is not a centroid index segment")
-	}
+	if t.centroidIndex != nil {
+		trainedSegment, ok := t.centroidIndex.segment.(segment.TrainedSegment)
+		if !ok {
+			return nil, fmt.Errorf("segment is not a centroid index segment")
+		}
 
-	coarseQuantizer, err := trainedSegment.GetCoarseQuantizer(field)
-	if err != nil {
-		return nil, err
+		coarseQuantizer, err := trainedSegment.GetCoarseQuantizer(field)
+		if err != nil {
+			return nil, err
+		}
+		return coarseQuantizer, nil
 	}
-	return coarseQuantizer, nil
+	return nil, nil
 }
 
 func (t *vectorTrainer) copyFileLOCKED(file string, d index.IndexDirectory) error {

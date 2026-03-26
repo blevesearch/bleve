@@ -79,8 +79,6 @@ type Scorch struct {
 	persisterNotifier        chan *epochWatcher
 	rootBolt                 *bolt.DB
 	asyncTasks               sync.WaitGroup
-	// not a real searchable segment
-	centroidIndex *SegmentSnapshot
 
 	trainer trainer
 
