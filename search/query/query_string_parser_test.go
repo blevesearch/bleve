@@ -934,7 +934,7 @@ func BenchmarkLexer(b *testing.B) {
 		var tokenTypes []int
 		var tokens []yySymType
 		r := strings.NewReader(`+field4:"test phrase 1"`)
-		l := newQueryStringLex(r)
+		l := getQueryStringLex(r)
 		var lval yySymType
 		rv := l.Lex(&lval)
 
@@ -950,5 +950,6 @@ func BenchmarkLexer(b *testing.B) {
 			lval.n = 0
 			rv = l.Lex(&lval)
 		}
+		putQueryStringLex(l)
 	}
 }

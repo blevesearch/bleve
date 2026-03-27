@@ -18,8 +18,39 @@ import (
 	"bufio"
 	"io"
 	"strings"
+	"sync"
 	"unicode"
 )
+
+var queryStringLexPool = sync.Pool{
+	New: func() interface{} {
+		return &queryStringLex{
+			in: bufio.NewReader(strings.NewReader("")),
+		}
+	},
+}
+
+func getQueryStringLex(in io.Reader) *queryStringLex {
+	l := queryStringLexPool.Get().(*queryStringLex)
+	l.in.Reset(in)
+	l.currState = startState
+	l.currConsumed = true
+	l.buf = ""
+	l.inEscape = false
+	l.nextToken = nil
+	l.nextTokenType = 0
+	l.seenDot = false
+	l.nextRune = 0
+	l.nextRuneSize = 0
+	l.atEOF = false
+	return l
+}
+
+func putQueryStringLex(l *queryStringLex) {
+	l.in.Reset(strings.NewReader(""))
+	l.nextToken = nil
+	queryStringLexPool.Put(l)
+}
 
 const reservedChars = "+-=&|><!(){}[]^\"~*?:\\/ "
 
