@@ -91,8 +91,8 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 		path: path,
 		name: path,
 		m:    mapping,
-		meta: newIndexMeta(indexType, kvstore, kvconfig),
 	}
+	rv.meta, err = newIndexMeta(indexType, kvstore, kvconfig, path)
 	rv.stats = &IndexStat{i: &rv}
 	// at this point there is hope that we can be successful, so save index meta
 	if path != "" {
@@ -477,6 +477,50 @@ func (i *indexImpl) DocCount() (count uint64, err error) {
 // Returns a SearchResult object or an error.
 func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 	return i.SearchInContext(context.Background(), req)
+}
+
+// returns the set of file callback writer ids in use by the index
+func (i *indexImpl) FileWriterIDsInUse() (map[string]struct{}, error) {
+	ids := map[string]struct{}{}
+	ids[i.meta.fileWriter.Id()] = struct{}{}
+
+	if cidx, ok := i.i.(IndexWithCallbacks); ok {
+		cIds, err := cidx.FileWriterIDsInUse()
+		if err != nil {
+			return nil, err
+		}
+		for k := range cIds {
+			ids[k] = struct{}{}
+		}
+	} else {
+		ids[""] = struct{}{}
+	}
+
+	return ids, nil
+}
+
+// drops the file callback writer ids from the index and
+// re-processes data with the latest file callback writer id
+func (i *indexImpl) DropFileWriterIDs(ids map[string]struct{}) error {
+	i.mutex.Lock()
+	if _, ok := ids[i.meta.fileWriter.Id()]; ok {
+		var err error
+		err = i.meta.UpdateWriter(i.path)
+		if err != nil {
+			return err
+		}
+	}
+	i.mutex.Unlock()
+
+	if cidx, ok := i.i.(IndexWithCallbacks); ok {
+		return cidx.DropFileWriterIDs(ids)
+	} else {
+		if _, ok := ids[""]; ok {
+			return fmt.Errorf("underlying index does not support DropFileWriterIDs")
+		}
+	}
+
+	return nil
 }
 
 var (
@@ -1446,7 +1490,7 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 	}
 
 	// copy the metadata
-	return i.meta.CopyTo(d)
+	return i.meta.CopyTo(i.path, d)
 }
 
 func (f FileSystemDirectory) GetWriter(filePath string) (io.WriteCloser,

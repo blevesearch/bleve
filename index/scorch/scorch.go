@@ -15,6 +15,7 @@
 package scorch
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -24,6 +25,7 @@ import (
 	"time"
 
 	"github.com/RoaringBitmap/roaring/v2"
+	"github.com/blevesearch/bleve/v2/index/scorch/mergeplan"
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
@@ -1010,6 +1012,7 @@ func (s *Scorch) OpenMeta() error {
 
 // Merge and update deleted field info and rewrite index mapping
 func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mappingBytes []byte) error {
+	filePath := s.path + string(os.PathSeparator) + "root.bolt"
 	return s.rootBolt.Update(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 		if snapshots == nil {
@@ -1024,6 +1027,27 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 				continue
 			}
 			snapshot := snapshots.Bucket(k)
+			metaBucket := snapshot.Bucket(util.BoltMetaDataKey)
+			if metaBucket == nil {
+				return fmt.Errorf("meta-data bucket missing")
+			}
+
+			writer, err := util.NewFileWriter([]byte(filePath))
+			if err != nil {
+				return fmt.Errorf("unable to load correct writer: %v", err)
+			}
+
+			fileWriterID := string(metaBucket.Get(util.BoltMetaDataFileWriterIDKey))
+			reader, err := util.NewFileReader(fileWriterID, []byte(filePath))
+			if err != nil {
+				return fmt.Errorf("unable to load correct reader: %v", err)
+			}
+
+			err = metaBucket.Put(util.BoltMetaDataFileWriterIDKey, []byte(writer.Id()))
+			if err != nil {
+				return err
+			}
+
 			cc := snapshot.Cursor()
 			for kk, _ := cc.First(); kk != nil; kk, _ = cc.Next() {
 				if kk[0] == util.BoltInternalKey[0] {
@@ -1031,9 +1055,34 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 					if internalBucket == nil {
 						return fmt.Errorf("segment key, but bucket missing %x", kk)
 					}
-					err = internalBucket.Put(util.MappingInternalKey, mappingBytes)
+
+					internalVals := make(map[string][]byte)
+					err := internalBucket.ForEach(func(key []byte, val []byte) error {
+						copiedVal, err := reader.Process(append([]byte(nil), val...))
+						if err != nil {
+							return err
+						}
+						internalVals[string(key)] = copiedVal
+						return nil
+					})
 					if err != nil {
 						return err
+					}
+
+					for key, val := range internalVals {
+						valBytes := writer.Process(val)
+						if key == string(util.MappingInternalKey) {
+							buf := writer.Process(mappingBytes)
+							err = internalBucket.Put([]byte(key), buf)
+							if err != nil {
+								return err
+							}
+						} else {
+							err = internalBucket.Put([]byte(key), valBytes)
+							if err != nil {
+								return err
+							}
+						}
 					}
 				} else if kk[0] != util.BoltMetaDataKey[0] {
 					segmentBucket := snapshot.Bucket(kk)
@@ -1043,7 +1092,12 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 					var updatedFields map[string]*index.UpdateFieldInfo
 					updatedFieldBytes := segmentBucket.Get(util.BoltUpdatedFieldsKey)
 					if updatedFieldBytes != nil {
-						err := json.Unmarshal(updatedFieldBytes, &updatedFields)
+						buf, err := reader.Process(updatedFieldBytes)
+						if err != nil {
+							return err
+						}
+
+						err = json.Unmarshal(buf, &updatedFields)
 						if err != nil {
 							return fmt.Errorf("error reading updated field bytes: %v", err)
 						}
@@ -1066,13 +1120,218 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 					if err != nil {
 						return err
 					}
-					err = segmentBucket.Put(util.BoltUpdatedFieldsKey, b)
+					buf := writer.Process(b)
+					err = segmentBucket.Put(util.BoltUpdatedFieldsKey, buf)
 					if err != nil {
 						return err
+					}
+
+					deletedBytes := segmentBucket.Get(util.BoltDeletedKey)
+					if deletedBytes != nil {
+						deletedBytes, err = reader.Process(deletedBytes)
+						if err != nil {
+							return err
+						}
+
+						buf := writer.Process(deletedBytes)
+						err = segmentBucket.Put(util.BoltDeletedKey, buf)
+						if err != nil {
+							return err
+						}
+					}
+
+					statBytes := segmentBucket.Get(util.BoltStatsKey)
+					if statBytes != nil {
+						statBytes, err = reader.Process(statBytes)
+						if err != nil {
+							return err
+						}
+
+						buf := writer.Process(statBytes)
+						err = segmentBucket.Put(util.BoltStatsKey, buf)
+						if err != nil {
+							return err
+						}
 					}
 				}
 			}
 		}
 		return nil
 	})
+}
+
+// returns the set of file callback writer ids in use by all of the segments and boltdb
+func (s *Scorch) FileWriterIDsInUse() (map[string]struct{}, error) {
+	s.rootLock.RLock()
+	keyMap := make(map[string]struct{})
+	for _, segmentSnapShot := range s.root.segment {
+		if seg, ok := segmentSnapShot.segment.(segment.SegmentWithCallbacks); ok {
+			keyMap[seg.CallbackId()] = struct{}{}
+		}
+	}
+
+	boltKeys, err := s.boltFileWriterIDsInUse()
+	if err != nil {
+		return nil, err
+	}
+
+	for k, _ := range boltKeys {
+		keyMap[k] = struct{}{}
+	}
+	s.rootLock.RUnlock()
+
+	return keyMap, nil
+}
+
+// removes all file callback writer ids in use from all of the segments and boltdb
+// boltdb is updated with the latest callback writer while segments are force
+// merged blockingly until snapshot is persisted with the latest callback writer
+func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
+	err := s.removeBoltFileWriterIDs(ids)
+	if err != nil {
+		return err
+	}
+	s.rootLock.Lock()
+
+	// tag all segments with the callback ids for removal for
+	// force merging.
+	segsToCompact := make([]mergeplan.Segment, 0)
+	filePaths := make([]string, 0)
+	for _, segmentSnapShot := range s.root.segment {
+		if seg, ok := segmentSnapShot.segment.(segment.SegmentWithCallbacks); ok {
+			if _, ok := ids[seg.CallbackId()]; ok {
+				segsToCompact = append(segsToCompact, segmentSnapShot)
+				filePaths = append(filePaths, zapFileName(segmentSnapShot.id))
+			}
+		}
+	}
+
+	if len(segsToCompact) > 0 {
+		// create a done channel to ensure success of merge
+		ctx := context.Background()
+		doneCh := make(chan error)
+		ctx = context.WithValue(ctx, mergeDoneKey, doneCh)
+
+		// ensure any rollback snapshots are not preserved after
+		// the force merge as they may have references to the
+		// callback ids that are being removed
+		prevNumSnapshotsToKeep := s.numSnapshotsToKeep
+		s.numSnapshotsToKeep = 1
+		err := s.forceMergeSegs(segsToCompact, ctx)
+		if err != nil {
+			return err
+		}
+		s.rootLock.Unlock()
+
+		// blockingly wait for merge to complete
+		err = <-doneCh
+		close(doneCh)
+		if err != nil {
+			return err
+		}
+
+		// wait for files to be cleaned up by persister
+		err = s.waitTillFileCleanup(filePaths)
+		if err != nil {
+			return err
+		}
+
+		// reset rollback snapshot retention
+		s.rootLock.Lock()
+		s.numSnapshotsToKeep = prevNumSnapshotsToKeep
+	}
+	s.rootLock.Unlock()
+
+	return nil
+}
+
+// Force merge all given segments regardless of their elibility for compaction
+// Large segments will be rewritten instead of merging
+func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment,
+	ctx context.Context) error {
+	// Create a merge plan with the filtered segments and force a merge
+	// to remove the callback from the segments.
+	mergePlannerOptions, err := s.parseMergePlannerOptions()
+	if err != nil {
+		return fmt.Errorf("mergePlannerOption json parsing err: %v", err)
+
+	}
+	atomic.AddUint64(&s.stats.TotFileMergePlan, 1)
+
+	// create a default merge plan incase some of the segments can actually be merged
+	mergePlan, err := mergeplan.Plan(segsToCompact, mergePlannerOptions)
+	if err != nil {
+		atomic.AddUint64(&s.stats.TotFileMergePlanErr, 1)
+		return fmt.Errorf("merge plan creation err: %v", err)
+	}
+
+	segDictionary := make(map[uint64]bool)
+	for _, seg := range segsToCompact {
+		segDictionary[seg.Id()] = true
+	}
+
+	if mergePlan == nil {
+		mergePlan = &mergeplan.MergePlan{
+			Tasks: make([]*mergeplan.MergeTask, 0),
+		}
+	}
+
+	for _, task := range mergePlan.Tasks {
+		for _, seg := range task.Segments {
+			segDictionary[seg.Id()] = false
+		}
+	}
+
+	// Create additional merge tasks for segments that are unable to be merged
+	for _, seg := range segsToCompact {
+		if segDictionary[seg.Id()] {
+			mergePlan.Tasks = append(mergePlan.Tasks, &mergeplan.MergeTask{
+				Segments: []mergeplan.Segment{seg},
+			})
+		}
+	}
+
+	atomic.AddUint64(&s.stats.TotFileMergePlanOk, 1)
+	atomic.AddUint64(&s.stats.TotFileMergePlanTasks, uint64(len(mergePlan.Tasks)))
+
+	// trigger the merge with the force merge plan
+	s.forceMergeRequestCh <- &mergerCtrl{
+		plan: mergePlan,
+		ctx:  ctx,
+	}
+
+	return nil
+}
+
+// waitTillFileCleanup blocks until the given files are cleaned up by the persister or merger or
+// returns an error after a timeout. It does so by checking the index directory every 5 seconds
+// for the presence of the given files, and returns once they are no longer present.
+func (s *Scorch) waitTillFileCleanup(filePaths []string) error {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	timeout := time.After(5 * time.Minute)
+
+	for {
+		select {
+		case <-ticker.C:
+			files, err := os.ReadDir(s.path)
+			if err != nil {
+				return err
+			}
+			for _, f := range files {
+				fname := f.Name()
+				if filepath.Ext(fname) == ".zap" {
+					for _, filePath := range filePaths {
+						if fname == filePath {
+							continue
+						}
+					}
+				}
+			}
+			return nil
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for file cleanup for files: %v", filePaths)
+		}
+	}
 }

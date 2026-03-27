@@ -30,6 +30,7 @@ import (
 )
 
 const merger = "merger"
+const mergeDoneKey = "mergeDone"
 
 func (s *Scorch) mergerLoop() {
 	defer func() {
@@ -96,10 +97,23 @@ OUTER:
 				}
 
 				startTime := time.Now()
-
+				var err error
 				// lets get started
-				err := s.planMergeAtSnapshot(ctrlMsg.ctx, ctrlMsg.options,
-					ourSnapshot)
+				// if there is no plan, then we are doing a regular merge at
+				// napshot based on the current state of the index. If there is
+				// a plan, then we are doing a force merge based on the segments
+				// specified in the plan.
+				if ctrlMsg.plan == nil {
+					err = s.planMergeAtSnapshot(ctrlMsg.ctx, ctrlMsg.options,
+						ourSnapshot)
+				} else {
+					cw := newCloseChWrapper(s.closeCh, ctrlMsg.ctx)
+					defer cw.close()
+					go cw.listen()
+
+					err = s.executePlanMergeAtSnapshot(ctrlMsg.plan, cw)
+				}
+
 				if err != nil {
 					atomic.StoreUint64(&s.iStats.mergeEpoch, 0)
 					if err == segment.ErrClosed {
@@ -173,6 +187,7 @@ OUTER:
 type mergerCtrl struct {
 	ctx     context.Context
 	options *mergeplan.MergePlanOptions
+	plan    *mergeplan.MergePlan
 	doneCh  chan struct{}
 }
 
@@ -313,15 +328,25 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 	atomic.AddUint64(&s.stats.TotFileMergePlanTasks, uint64(len(resultMergePlan.Tasks)))
 
-	// process tasks in serial for now
-	var filenames []string
-
 	cw := newCloseChWrapper(s.closeCh, ctx)
 	defer cw.close()
 
 	go cw.listen()
 
-	for _, task := range resultMergePlan.Tasks {
+	return s.executePlanMergeAtSnapshot(resultMergePlan, cw)
+}
+
+func (s *Scorch) executePlanMergeAtSnapshot(plan *mergeplan.MergePlan, cw *closeChWrapper) error {
+	var filenames []string
+	var err error
+	defer func() {
+		// send error to done channel if present
+		if done, ok := cw.ctx.Value(mergeDoneKey).(chan error); ok {
+			done <- err
+		}
+	}()
+
+	for _, task := range plan.Tasks {
 		if len(task.Segments) == 0 {
 			atomic.AddUint64(&s.stats.TotFileMergePlanTasksSegmentsEmpty, 1)
 			continue
@@ -372,7 +397,8 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
 			prevBytesReadTotal := cumulateBytesRead(segmentsToMerge)
-			newDocNums, _, err := s.segPlugin.MergeUsing(segmentsToMerge, docsToDrop, path,
+			var newDocNums [][]uint64
+			newDocNums, _, err = s.segPlugin.MergeUsing(segmentsToMerge, docsToDrop, path,
 				cw.cancelCh, s, s.segmentConfig)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
 
@@ -425,7 +451,8 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 		select {
 		case <-s.closeCh:
 			_ = seg.Close()
-			return segment.ErrClosed
+			err = segment.ErrClosed
+			return err
 		case s.merges <- sm:
 			atomic.AddUint64(&s.stats.TotFileMergeIntroductions, 1)
 		}
