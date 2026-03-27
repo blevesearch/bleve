@@ -45,3 +45,11 @@ func (t *noopTrainer) loadTrainedData(bucket *bolt.Bucket) error {
 func (t *noopTrainer) getInternal(key []byte) ([]byte, error) {
 	return nil, nil
 }
+
+func (t *noopTrainer) copyFileLOCKED(file string, d index.IndexDirectory) error {
+	return nil
+}
+
+func (t *noopTrainer) updateBolt(snapshotsBucket *bolt.Bucket, key []byte, value []byte) error {
+	return nil
+}

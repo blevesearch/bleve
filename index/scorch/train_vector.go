@@ -18,9 +18,11 @@
 package scorch
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/RoaringBitmap/roaring/v2"
@@ -261,14 +263,60 @@ func (t *vectorTrainer) getInternal(key []byte) ([]byte, error) {
 
 func (t *vectorTrainer) getCentroidIndex(field string) (interface{}, error) {
 	// return the coarse quantizer of the centroid index belonging to the field
-	trainedSegment, ok := t.centroidIndex.segment.(segment.TrainedSegment)
-	if !ok {
-		return nil, fmt.Errorf("segment is not a centroid index segment")
+	if t.centroidIndex != nil {
+		trainedSegment, ok := t.centroidIndex.segment.(segment.TrainedSegment)
+		if !ok {
+			return nil, fmt.Errorf("segment is not a centroid index segment")
+		}
+
+		coarseQuantizer, err := trainedSegment.GetCoarseQuantizer(field)
+		if err != nil {
+			return nil, err
+		}
+		return coarseQuantizer, nil
+	}
+	return nil, nil
+}
+
+func (t *vectorTrainer) copyFileLOCKED(file string, d index.IndexDirectory) error {
+	if strings.HasSuffix(file, index.TrainedIndexFileName) {
+		// centroid index file - this is outside the snapshots domain so the bolt update is different
+		err := d.SetPathInBolt(util.BoltTrainerKey, []byte(file))
+		if err != nil {
+			return fmt.Errorf("error updating dest index bolt: %w", err)
+		}
 	}
 
-	coarseQuantizer, err := trainedSegment.GetCoarseQuantizer(field)
-	if err != nil {
-		return nil, err
+	return nil
+}
+
+func (t *vectorTrainer) updateBolt(snapshotsBucket *bolt.Bucket, key []byte, value []byte) error {
+	if bytes.Equal(key, util.BoltTrainerKey) {
+		trainerBucket, err := snapshotsBucket.CreateBucketIfNotExists(util.BoltTrainerKey)
+		if err != nil {
+			return err
+		}
+		if trainerBucket == nil {
+			return fmt.Errorf("trainer bucket not found")
+		}
+
+		// guard against duplicate updates
+		existingValue := trainerBucket.Get(util.BoltPathKey)
+		if existingValue != nil {
+			return fmt.Errorf("key already exists %v %v", t.parent.path, string(existingValue))
+		}
+
+		err = trainerBucket.Put(util.BoltPathKey, value)
+		if err != nil {
+			return err
+		}
+
+		// update the centroid index pointer
+		t.centroidIndex, err = t.parent.loadSegment(trainerBucket)
+		if err != nil {
+			return err
+		}
 	}
-	return coarseQuantizer, nil
+
+	return nil
 }
