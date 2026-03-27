@@ -1089,7 +1089,6 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 					if segmentBucket == nil {
 						return fmt.Errorf("segment key, but bucket missing %x", kk)
 					}
-
 					var updatedFields map[string]*index.UpdateFieldInfo
 					updatedFieldBytes := segmentBucket.Get(util.BoltUpdatedFieldsKey)
 					if updatedFieldBytes != nil {
@@ -1164,7 +1163,6 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 // returns the set of file callback writer ids in use by all of the segments and boltdb
 func (s *Scorch) FileWriterIDsInUse() (map[string]struct{}, error) {
 	s.rootLock.RLock()
-
 	keyMap := make(map[string]struct{})
 	for _, segmentSnapShot := range s.root.segment {
 		if seg, ok := segmentSnapShot.segment.(segment.SegmentWithCallbacks); ok {
@@ -1189,12 +1187,10 @@ func (s *Scorch) FileWriterIDsInUse() (map[string]struct{}, error) {
 // boltdb is updated with the latest callback writer while segments are force
 // merged blockingly until snapshot is persisted with the latest callback writer
 func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
-
 	err := s.removeBoltFileWriterIDs(ids)
 	if err != nil {
 		return err
 	}
-
 	s.rootLock.Lock()
 
 	// tag all segments with the callback ids for removal for
@@ -1244,8 +1240,8 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 		s.rootLock.Lock()
 		s.numSnapshotsToKeep = prevNumSnapshotsToKeep
 	}
-
 	s.rootLock.Unlock()
+
 	return nil
 }
 
@@ -1260,7 +1256,6 @@ func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment,
 		return fmt.Errorf("mergePlannerOption json parsing err: %v", err)
 
 	}
-
 	atomic.AddUint64(&s.stats.TotFileMergePlan, 1)
 
 	// create a default merge plan incase some of the segments can actually be merged

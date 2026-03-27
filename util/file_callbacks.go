@@ -58,8 +58,8 @@ func RegisterFileCallbacks() {
 // being written to or read from a file. They also store the id the callbacks,
 // which can be useful for managing state across multiple reads and writes.
 type FileWriter struct {
-	processor func(data []byte) []byte
 	id        string
+	processor func(data []byte) []byte
 }
 
 func NewFileWriter(context []byte) (*FileWriter, error) {
@@ -88,8 +88,8 @@ func (w *FileWriter) Id() string {
 }
 
 type FileReader struct {
-	processor func(data []byte) ([]byte, error)
 	id        string
+	processor func(data []byte) ([]byte, error)
 }
 
 func NewFileReader(id string, context []byte) (*FileReader, error) {

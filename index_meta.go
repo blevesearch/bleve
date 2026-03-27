@@ -28,27 +28,40 @@ import (
 const metaFilename = "index_meta.json"
 
 type indexMeta struct {
-	Storage   string                 `json:"storage"`
-	IndexType string                 `json:"index_type"`
-	Config    map[string]interface{} `json:"config,omitempty"`
+	Storage    string                 `json:"storage"`
+	IndexType  string                 `json:"index_type"`
+	Config     map[string]interface{} `json:"config,omitempty"`
+	fileWriter *util.FileWriter
+	fileReader *util.FileReader
 }
 
-func newIndexMeta(indexType string, storage string, config map[string]interface{}) *indexMeta {
-	return &indexMeta{
-		IndexType: indexType,
-		Storage:   storage,
-		Config:    config,
+func newIndexMeta(indexType string, storage string, config map[string]interface{}, path string) (*indexMeta, error) {
+	indexMetaPath := indexMetaPath(path)
+	fileWriter, err := util.NewFileWriter([]byte(indexMetaPath))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create file writer for index meta: %w", err)
 	}
+	fileReader, err := util.NewFileReader(fileWriter.Id(), []byte(indexMetaPath))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create file reader for index meta: %w", err)
+	}
+	return &indexMeta{
+		IndexType:  indexType,
+		Storage:    storage,
+		Config:     config,
+		fileWriter: fileWriter,
+		fileReader: fileReader,
+	}, nil
 }
 
-func openIndexMeta(path string) (*indexMeta, *util.FileReader, error) {
+func openIndexMeta(path string) (*indexMeta, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, nil, ErrorIndexPathDoesNotExist
+		return nil, ErrorIndexPathDoesNotExist
 	}
 	indexMetaPath := indexMetaPath(path)
 	metaBytes, err := os.ReadFile(indexMetaPath)
 	if err != nil {
-		return nil, nil, ErrorIndexMetaMissing
+		return nil, ErrorIndexMetaMissing
 	}
 
 	// check if indexMetaPath+_temp exists, if so, this means a writer update was in progress
@@ -58,7 +71,7 @@ func openIndexMeta(path string) (*indexMeta, *util.FileReader, error) {
 		if err == nil {
 			err = os.Rename(indexMetaPath+"_temp", indexMetaPath)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			metaBytes = tempBytes
 		}
@@ -69,39 +82,40 @@ func openIndexMeta(path string) (*indexMeta, *util.FileReader, error) {
 	err = util.UnmarshalJSON(metaBytes, &im)
 	if err != nil {
 		if len(metaBytes) < 4 {
-			return nil, nil, ErrorIndexMetaCorrupt
+			return nil, ErrorIndexMetaCorrupt
 		}
 
 		pos := len(metaBytes) - 4
 		fileWriterIDLen := int(binary.BigEndian.Uint32(metaBytes[pos:]))
 		pos -= fileWriterIDLen
 		if pos < 0 {
-			return nil, nil, ErrorIndexMetaCorrupt
+			return nil, ErrorIndexMetaCorrupt
 		}
 
 		fileWriterID := metaBytes[pos : pos+fileWriterIDLen]
 		fileReader, err = util.NewFileReader(string(fileWriterID), []byte(indexMetaPath))
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		buf, err := fileReader.Process(metaBytes[0:pos])
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		err = util.UnmarshalJSON(buf, &im)
 		if err != nil {
-			return nil, nil, ErrorIndexMetaCorrupt
+			return nil, ErrorIndexMetaCorrupt
 		}
 	}
+	im.fileReader = fileReader
 
 	if im.IndexType == "" {
 		im.IndexType = upsidedown.Name
 	}
-	return &im, fileReader, nil
+	return &im, nil
 }
 
-func (i *indexMeta) Save(path string, writer *util.FileWriter) (err error) {
+func (i *indexMeta) Save(path string) (err error) {
 	indexMetaPath := indexMetaPath(path)
 	// ensure any necessary parent directories exist
 	err = os.MkdirAll(path, 0700)
@@ -128,19 +142,19 @@ func (i *indexMeta) Save(path string, writer *util.FileWriter) (err error) {
 		}
 	}()
 
-	metaBytes = writer.Process(metaBytes)
+	metaBytes = i.fileWriter.Process(metaBytes)
 
 	_, err = indexMetaFile.Write(metaBytes)
 	if err != nil {
 		return err
 	}
 
-	_, err = indexMetaFile.Write([]byte(writer.Id()))
+	_, err = indexMetaFile.Write([]byte(i.fileWriter.Id()))
 	if err != nil {
 		return err
 	}
 
-	err = binary.Write(indexMetaFile, binary.BigEndian, uint32(len(writer.Id())))
+	err = binary.Write(indexMetaFile, binary.BigEndian, uint32(len(i.fileWriter.Id())))
 	if err != nil {
 		return err
 	}
@@ -169,41 +183,41 @@ func (i *indexMeta) CopyTo(path string, d index.Directory) (err error) {
 // and re-processes data with the latest file callback writer
 // returns the new file callback writer and reader to be used for
 // future processing of index meta data
-func (i *indexMeta) UpdateWriter(path string) (*util.FileWriter, *util.FileReader, error) {
+func (i *indexMeta) UpdateWriter(path string) error {
 	indexMetaPath := indexMetaPath(path)
 	metaBytes, err := os.ReadFile(indexMetaPath)
 	if err != nil {
-		return nil, nil, ErrorIndexMetaMissing
+		return ErrorIndexMetaMissing
 	}
 
 	if len(metaBytes) < 4 {
-		return nil, nil, ErrorIndexMetaCorrupt
+		return ErrorIndexMetaCorrupt
 	}
 
 	pos := len(metaBytes) - 4
 	fileWriterIDLen := int(binary.BigEndian.Uint32(metaBytes[pos:]))
 	pos -= fileWriterIDLen
 	if pos < 0 {
-		return nil, nil, ErrorIndexMetaCorrupt
+		return ErrorIndexMetaCorrupt
 	}
 
 	fileWriterID := metaBytes[pos : pos+fileWriterIDLen]
 	fileReader, err := util.NewFileReader(string(fileWriterID), []byte(indexMetaPath))
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	metaBytes, err = fileReader.Process(metaBytes[0:pos])
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	writer, err := util.NewFileWriter([]byte(indexMetaPath))
+	i.fileWriter, err = util.NewFileWriter([]byte(indexMetaPath))
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	metaBytes = writer.Process(metaBytes)
+	metaBytes = i.fileWriter.Process(metaBytes)
 
 	// write out new meta with new writer id, using temp file and rename to ensure atomicity
 	// if we crash in the middle of this, on next open we will see the temp file and recover using it
@@ -211,42 +225,42 @@ func (i *indexMeta) UpdateWriter(path string) (*util.FileWriter, *util.FileReade
 	tempMetaFile, err := os.OpenFile(tempMetaPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		if os.IsExist(err) {
-			return nil, nil, ErrorIndexPathExists
+			return ErrorIndexPathExists
 		}
-		return nil, nil, err
+		return err
 	}
 
 	_, err = tempMetaFile.Write(metaBytes)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	_, err = tempMetaFile.Write([]byte(writer.Id()))
+	_, err = tempMetaFile.Write([]byte(i.fileWriter.Id()))
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	err = binary.Write(tempMetaFile, binary.BigEndian, uint32(len(writer.Id())))
+	err = binary.Write(tempMetaFile, binary.BigEndian, uint32(len(i.fileWriter.Id())))
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	err = tempMetaFile.Close()
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	err = os.Rename(tempMetaPath, indexMetaPath)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	reader, err := util.NewFileReader(string(writer.Id()), []byte(indexMetaPath))
+	i.fileReader, err = util.NewFileReader(string(i.fileWriter.Id()), []byte(indexMetaPath))
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	return writer, reader, nil
+	return nil
 }
 
 func indexMetaPath(path string) string {
