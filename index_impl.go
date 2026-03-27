@@ -369,6 +369,20 @@ func (i *indexImpl) IndexSynonym(id string, collection string, definition *Synon
 	return err
 }
 
+func (i *indexImpl) Train(batch *Batch) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	if vi, ok := i.i.(index.TrainableIndex); ok {
+		return vi.Train(batch.internal)
+	}
+	return ErrorTrainingNotSupported
+}
+
 // IndexAdvanced takes a document.Document object
 // skips the mapping and indexes it.
 func (i *indexImpl) IndexAdvanced(doc *document.Document) (err error) {
@@ -1442,7 +1456,7 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 
 	err = copyReader.CopyTo(d)
 	if err != nil {
-		return fmt.Errorf("error copying index metadata: %v", err)
+		return fmt.Errorf("error copying index data: %v", err)
 	}
 
 	// copy the metadata
