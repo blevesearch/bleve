@@ -25,7 +25,7 @@ import (
 )
 
 func initTrainer(s *Scorch, config map[string]interface{}) *noopTrainer {
-	return &noopTrainer{}
+	return nil
 }
 
 type noopTrainer struct {
