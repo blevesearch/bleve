@@ -45,6 +45,18 @@ func NewConjunctionQuery(conjuncts ...query.Query) *query.ConjunctionQuery {
 	return query.NewConjunctionQuery(conjuncts)
 }
 
+// NewCustomFilterQuery creates a new query which wraps a child query and
+// applies an embedder-provided per-hit filter callback.
+func NewCustomFilterQuery(child query.Query, source string) *query.CustomFilterQuery {
+	return query.NewCustomFilterQuery(child, source)
+}
+
+// NewCustomScoreQuery creates a new query which wraps a child query and
+// applies an embedder-provided per-hit score callback.
+func NewCustomScoreQuery(child query.Query, source string) *query.CustomScoreQuery {
+	return query.NewCustomScoreQuery(child, source)
+}
+
 // NewDateRangeQuery creates a new Query for ranges
 // of date values.
 // Date strings are parsed using the DateTimeParser configured in the

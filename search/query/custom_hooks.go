@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	CustomFilterContextKey string = "custom_filter"
-	CustomScoreContextKey  string = "custom_score"
+	CustomFilterContextKey = "custom_filter"
+	CustomScoreContextKey  = "custom_score"
 )
 
 // CustomFilterFactory lets the embedding application provide request-scoped
@@ -51,6 +51,24 @@ func WithCustomScoreFactory(ctx context.Context, factory CustomScoreFactory) con
 	return context.WithValue(ctx, CustomScoreContextKey, factory)
 }
 
+// WithCustomFilterFunc returns a context carrying a direct per-hit filter
+// callback for standalone Bleve use-cases that do not need source/params/fields.
+func WithCustomFilterFunc(ctx context.Context, filter searcher.FilterFunc) context.Context {
+	return WithCustomFilterFactory(ctx,
+		func(source string, params map[string]interface{}, fields []string) (searcher.FilterFunc, error) {
+			return filter, nil
+		})
+}
+
+// WithCustomScoreFunc returns a context carrying a direct per-hit score
+// callback for standalone Bleve use-cases that do not need source/params/fields.
+func WithCustomScoreFunc(ctx context.Context, score searcher.ScoreFunc) context.Context {
+	return WithCustomScoreFactory(ctx,
+		func(source string, params map[string]interface{}, fields []string) (searcher.ScoreFunc, error) {
+			return score, nil
+		})
+}
+
 // WithCustomFactories returns a context carrying both request-scoped
 // custom query factories for search execution.
 func WithCustomFactories(ctx context.Context, filterFactory CustomFilterFactory,
@@ -59,18 +77,10 @@ func WithCustomFactories(ctx context.Context, filterFactory CustomFilterFactory,
 	return WithCustomScoreFactory(ctx, scoreFactory)
 }
 
-func customFilterFactoryFromContext(ctx context.Context) CustomFilterFactory {
-	if ctx == nil {
-		return nil
-	}
-	factory, _ := ctx.Value(CustomFilterContextKey).(CustomFilterFactory)
-	return factory
-}
-
-func customScoreFactoryFromContext(ctx context.Context) CustomScoreFactory {
-	if ctx == nil {
-		return nil
-	}
-	factory, _ := ctx.Value(CustomScoreContextKey).(CustomScoreFactory)
-	return factory
+// WithCustomFuncs returns a context carrying direct per-hit callbacks for
+// standalone Bleve use-cases that do not need source/params/fields.
+func WithCustomFuncs(ctx context.Context, filter searcher.FilterFunc,
+	score searcher.ScoreFunc) context.Context {
+	ctx = WithCustomFilterFunc(ctx, filter)
+	return WithCustomScoreFunc(ctx, score)
 }

@@ -83,6 +83,20 @@ func run(index bleve.Index, req *bleve.SearchRequest) (*bleve.SearchResult, erro
 }
 ```
 
+For standalone Bleve usage, if you do not need `source` / `params` / `fields`,
+you can register direct callbacks instead of builders:
+
+```go
+ctx := bleveQuery.WithCustomFuncs(context.Background(),
+	func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
+		return true
+	},
+	func(sctx *search.SearchContext, d *search.DocumentMatch) float64 {
+		return d.Score
+	},
+)
+```
+
 ## Runtime Behavior
 
 - Bleve builds the inner query searcher first.
