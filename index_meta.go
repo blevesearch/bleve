@@ -185,29 +185,7 @@ func (i *indexMeta) CopyTo(path string, d index.Directory) (err error) {
 // future processing of index meta data
 func (i *indexMeta) UpdateWriter(path string) error {
 	indexMetaPath := indexMetaPath(path)
-	metaBytes, err := os.ReadFile(indexMetaPath)
-	if err != nil {
-		return ErrorIndexMetaMissing
-	}
-
-	if len(metaBytes) < 4 {
-		return ErrorIndexMetaCorrupt
-	}
-
-	pos := len(metaBytes) - 4
-	fileWriterIDLen := int(binary.BigEndian.Uint32(metaBytes[pos:]))
-	pos -= fileWriterIDLen
-	if pos < 0 {
-		return ErrorIndexMetaCorrupt
-	}
-
-	fileWriterID := metaBytes[pos : pos+fileWriterIDLen]
-	fileReader, err := util.NewFileReader(string(fileWriterID), []byte(indexMetaPath))
-	if err != nil {
-		return err
-	}
-
-	metaBytes, err = fileReader.Process(metaBytes[0:pos])
+	metaBytes, err := util.MarshalJSON(i)
 	if err != nil {
 		return err
 	}

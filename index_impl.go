@@ -93,6 +93,9 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 		m:    mapping,
 	}
 	rv.meta, err = newIndexMeta(indexType, kvstore, kvconfig, path)
+	if err != nil {
+		return nil, err
+	}
 	rv.stats = &IndexStat{i: &rv}
 	// at this point there is hope that we can be successful, so save index meta
 	if path != "" {
@@ -482,7 +485,7 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 // returns the set of file callback writer ids in use by the index
 func (i *indexImpl) FileWriterIDsInUse() (map[string]struct{}, error) {
 	ids := map[string]struct{}{}
-	ids[i.meta.fileWriter.Id()] = struct{}{}
+	ids[i.meta.fileReader.Id()] = struct{}{}
 
 	if cidx, ok := i.i.(IndexWithCallbacks); ok {
 		cIds, err := cidx.FileWriterIDsInUse()
@@ -503,7 +506,7 @@ func (i *indexImpl) FileWriterIDsInUse() (map[string]struct{}, error) {
 // re-processes data with the latest file callback writer id
 func (i *indexImpl) DropFileWriterIDs(ids map[string]struct{}) error {
 	i.mutex.Lock()
-	if _, ok := ids[i.meta.fileWriter.Id()]; ok {
+	if _, ok := ids[i.meta.fileReader.Id()]; ok {
 		var err error
 		err = i.meta.UpdateWriter(i.path)
 		if err != nil {
