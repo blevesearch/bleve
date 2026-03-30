@@ -401,3 +401,8 @@ type TrainableIndex interface {
 	Index
 	Train(*Batch) error
 }
+
+type IndexFileCopyable interface {
+	SetPathInBolt(key []byte, value []byte) error       //dest index
+	CopyFile(file string, d index.IndexDirectory) error // source index
+}
