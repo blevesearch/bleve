@@ -537,13 +537,15 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	exclude := make(map[uint64]struct{})
 
 	// copy to the equiv the segments that weren't replaced
-	for _, segment := range snapshot.segment {
-		if _, wasMerged := mergedSegmentIDs[segment.id]; !wasMerged {
-			equiv.segment = append(equiv.segment, segment)
+	for _, ss := range snapshot.segment {
+		if _, wasMerged := mergedSegmentIDs[ss.id]; !wasMerged {
+			equiv.segment = append(equiv.segment, ss)
 			// this can be either in-memory or persisted segment, but while
 			// preparing the bolt snapshot we avoid the in-memory segments to be
 			// flushed out
-			exclude[segment.id] = struct{}{}
+			if _, ok := ss.segment.(segment.PersistedSegment); !ok {
+				exclude[ss.id] = struct{}{}
+			}
 		}
 	}
 
@@ -675,9 +677,9 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 
 	// deep copy the internal map since we'll be keeping only the persisted info
 	// in bolt and some of the information might be deleted
-	internalData := make(map[string][]byte, len(snapshot.internal))
+	internal := make(map[string][]byte, len(snapshot.internal))
 	for k, v := range snapshot.internal {
-		internalData[k] = v
+		internal[k] = v
 	}
 
 	if snapshot.parent != nil {
@@ -695,15 +697,15 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 
 	// first ensure that each segment in this snapshot has been persisted
 	for _, segmentSnapshot := range snapshot.segment {
-		snapshotSegmentKey := encodeUvarintAscending(nil, segmentSnapshot.id)
-		snapshotSegmentBucket, err := snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
-		if err != nil {
-			return nil, nil, err
-		}
-
 		var persistedSeg bool
+		var snapshotSegmentBucket *bolt.Bucket
 		switch seg := segmentSnapshot.segment.(type) {
 		case segment.PersistedSegment:
+			snapshotSegmentKey := encodeUvarintAscending(nil, segmentSnapshot.id)
+			snapshotSegmentBucket, err = snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
+			if err != nil {
+				return nil, nil, err
+			}
 			segPath := seg.Path()
 			_, err = copyToDirectory(segPath, d)
 			if err != nil {
@@ -720,9 +722,14 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			// need to persist this to disk if its not part of exclude list (which
 			// restricts which in-memory segment to be persisted to disk)
 			if _, ok := exclude[segmentSnapshot.id]; !ok {
+				snapshotSegmentKey := encodeUvarintAscending(nil, segmentSnapshot.id)
+				snapshotSegmentBucket, err = snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
+				if err != nil {
+					return nil, nil, err
+				}
 				filename := zapFileName(segmentSnapshot.id)
 				path := filepath.Join(path, filename)
-				err := persistToDirectory(seg, d, path)
+				err = persistToDirectory(seg, d, path)
 				if err != nil {
 					return nil, nil, fmt.Errorf("segment: %s persist err: %v", path, err)
 				}
@@ -732,14 +739,14 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 					return nil, nil, err
 				}
 				filenames = append(filenames, filename)
-				persistedSeg = false
+				persistedSeg = true
 			} else {
 				// this segment is not going to be persisted in this cycle, so any
 				// of the corresponding internal values need to be removed since
 				// on recovery they shouldn't be loaded as part of the indexSnapshot
 				for k, v := range segmentSnapshot.internal {
 					if v != nil {
-						delete(internalData, k)
+						delete(internal, k)
 					}
 				}
 			}
@@ -788,15 +795,13 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 				}
 			}
 		}
+	}
 
-		// TODO optimize writing these in order?
-		// NOTE: this is a hard-commit of the internal values which can be referenced
-		// to load a previously consistent state of the index
-		for k, v := range internalData {
-			err = internalBucket.Put([]byte(k), v)
-			if err != nil {
-				return nil, nil, err
-			}
+	// now the internal values are reflective of the on-disk data, update in bolt
+	for k, v := range internal {
+		err = internalBucket.Put([]byte(k), v)
+		if err != nil {
+			return nil, nil, err
 		}
 	}
 
