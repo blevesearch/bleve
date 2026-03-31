@@ -52,10 +52,11 @@ func TestDeleteDuringMemMergeIntroduction(t *testing.T) {
 	}()
 
 	persisterReachedPause := make(chan struct{}, 1)
-	pausePersister := make(chan struct{})
 	mergeIntroStart := make(chan struct{}, 1)
 	mergeIntroComplete := make(chan struct{}, 1)
 	batchIntroComplete := make(chan struct{}, 1)
+	var pausePersister atomic.Value
+	pausePersister.Store(make(chan struct{}))
 
 	var idx index.Index
 	var signalReachedPause, signalIntroStart, signalIntroComplete sync.Once
@@ -68,7 +69,7 @@ func TestDeleteDuringMemMergeIntroduction(t *testing.T) {
 			signalReachedPause.Do(func() {
 				persisterReachedPause <- struct{}{}
 			})
-			<-pausePersister
+			<-pausePersister.Load().(chan struct{})
 		case EventKindBatchMemoryApplied:
 			select {
 			case batchIntroComplete <- struct{}{}:
@@ -78,7 +79,7 @@ func TestDeleteDuringMemMergeIntroduction(t *testing.T) {
 			signalIntroStart.Do(func() {
 				mergeIntroStart <- struct{}{}
 			})
-			<-pausePersister
+			<-pausePersister.Load().(chan struct{})
 		case EventKindMemMergeIntroductionComplete:
 			signalIntroComplete.Do(func() {
 				mergeIntroComplete <- struct{}{}
@@ -150,8 +151,8 @@ func TestDeleteDuringMemMergeIntroduction(t *testing.T) {
 	<-batchIntroComplete
 
 	// 2. Unpause the persister so it sees both in-memory segments and starts a merge
-	close(pausePersister)
-	pausePersister = make(chan struct{}) // Reset for next pause
+	close(pausePersister.Load().(chan struct{}))
+	pausePersister.Store(make(chan struct{})) // Reset for next pause
 
 	// 3. Wait for the persister to start merge and pause
 	<-mergeIntroStart
@@ -166,7 +167,7 @@ func TestDeleteDuringMemMergeIntroduction(t *testing.T) {
 	}()
 	<-batchIntroComplete
 
-	close(pausePersister)
+	close(pausePersister.Load().(chan struct{}))
 
 	// 5. Wait for the merge introduction to complete
 	<-mergeIntroComplete
