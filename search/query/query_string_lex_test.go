@@ -1205,7 +1205,9 @@ func TestLexer(t *testing.T) {
 		t.Run(test.input, func(t *testing.T) {
 
 			r := strings.NewReader(test.input)
-			l := newQueryStringLex(r)
+			l := getQueryStringLex(r)
+			defer putQueryStringLex(l)
+
 			var tokens []token
 			var lval yySymType
 			rv := l.Lex(&lval)
