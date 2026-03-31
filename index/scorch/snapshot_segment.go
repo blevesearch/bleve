@@ -31,12 +31,18 @@ type SegmentSnapshot struct {
 	// segment was mmaped recently, in which case
 	// we consider the loading cost of the metadata
 	// as part of IO stats.
-	mmaped        uint32
-	id            uint64
-	segment       segment.Segment
-	deleted       *roaring.Bitmap
-	creator       string
-	stats         *fieldStats
+	mmaped  uint32
+	id      uint64
+	segment segment.Segment
+	deleted *roaring.Bitmap
+	creator string
+	stats   *fieldStats
+
+	// if this segment is in-memory then we'll try to undo the internal values
+	// in the indexSnapshot internal map before updating the bolt, since its
+	// supposed to be reflective of the on-disk data.
+	internal map[string][]byte
+
 	updatedFields map[string]*index.UpdateFieldInfo
 
 	cachedMeta *cachedMeta
