@@ -15,7 +15,7 @@
 package util
 
 import (
-	zapv17 "github.com/blevesearch/zapx/v17"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 // This file provides a mechanism for users of bleve to provide callbacks
@@ -36,23 +36,6 @@ import (
 // selected callbacks associated with ids is provided via index.WriterIdsInUse()
 // and index.DropWriterIds().
 
-// Default no-op implementation. Is called before writing any user data to a file.
-var WriterHook func(context []byte) (string, func(data []byte) []byte, error)
-
-// Default no-op implementation. Is called after reading any user data from a file.
-var ReaderHook func(id string, context []byte) (
-	func(data []byte) ([]byte, error), error)
-
-// Register callbacks with zapv17. This should be called in init() of the package
-// that defines the callbacks, after the callbacks have been set. This allows
-// zapv17 to use the callbacks when creating file readers and writers.
-// This should be called before any indexes are opened or created that will
-// use the callbacks.
-func RegisterFileCallbacks() {
-	zapv17.WriterHook = WriterHook
-	zapv17.ReaderHook = ReaderHook
-}
-
 // FileWriter and FileReader are wrappers around the callback functions provided
 // by the user. They provide a convenient way to apply the callbacks to data
 // being written to or read from a file. They also store the id the callbacks,
@@ -65,9 +48,9 @@ type FileWriter struct {
 func NewFileWriter(context []byte) (*FileWriter, error) {
 	rv := &FileWriter{}
 
-	if WriterHook != nil {
+	if index.WriterHook != nil {
 		var err error
-		rv.id, rv.processor, err = WriterHook(context)
+		rv.id, rv.processor, err = index.WriterHook(context)
 		if err != nil {
 			return nil, err
 		}
@@ -97,9 +80,9 @@ func NewFileReader(id string, context []byte) (*FileReader, error) {
 		id: id,
 	}
 
-	if ReaderHook != nil {
+	if index.ReaderHook != nil {
 		var err error
-		rv.processor, err = ReaderHook(id, context)
+		rv.processor, err = index.ReaderHook(id, context)
 		if err != nil {
 			return nil, err
 		}

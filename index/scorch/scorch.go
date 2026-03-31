@@ -1197,11 +1197,11 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	// force merging.
 	segsToCompact := make([]mergeplan.Segment, 0)
 	filePaths := make([]string, 0)
-	for _, segmentSnapShot := range s.root.segment {
-		if seg, ok := segmentSnapShot.segment.(segment.SegmentWithCallbacks); ok {
+	for _, ss := range s.root.segment {
+		if seg, ok := ss.segment.(segment.SegmentWithCallbacks); ok {
 			if _, ok := ids[seg.CallbackId()]; ok {
-				segsToCompact = append(segsToCompact, segmentSnapShot)
-				filePaths = append(filePaths, zapFileName(segmentSnapShot.id))
+				segsToCompact = append(segsToCompact, ss)
+				filePaths = append(filePaths, zapFileName(ss.id))
 			}
 		}
 	}
