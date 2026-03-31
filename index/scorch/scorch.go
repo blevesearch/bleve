@@ -24,7 +24,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/RoaringBitmap/roaring/v2"
+	roaring "github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
@@ -473,13 +473,6 @@ func (s *Scorch) Delete(id string) error {
 // Batch applices a batch of changes to the index atomically
 func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	start := time.Now()
-
-	// notify handlers that we're about to index a batch of data
-	s.fireEvent(EventKindBatchIntroductionStart, 0)
-	defer func() {
-		s.fireEvent(EventKindBatchIntroduction, time.Since(start))
-	}()
-
 	resultChan := make(chan index.Document, len(batch.IndexOps))
 
 	var numUpdates uint64
@@ -497,6 +490,12 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		}
 		ids = append(ids, docID)
 	}
+
+	// notify handlers that we're about to index a batch of data
+	s.fireEvent(EventKindBatchIntroductionStart, 0)
+	defer func() {
+		s.fireEvent(EventKindBatchIntroduction, time.Since(start))
+	}()
 
 	// FIXME could sort ids list concurrent with analysis?
 
@@ -643,6 +642,7 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 
 	// block until this segment is applied
 	err := <-introduction.applied
+	s.fireEvent(EventKindBatchMemoryApplied, 0)
 	if err != nil {
 		return err
 	}

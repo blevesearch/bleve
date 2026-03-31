@@ -76,4 +76,19 @@ const (
 	// EventKindPurgerCheck is fired before the purge code is invoked and decides
 	// whether to execute or not. For unit test purposes
 	EventKindPurgerCheck
+
+	// EventKindMemMergeIntroductionStart is fired by the persister just before
+	// it sends an in-memory merge task to the introducer (inside
+	// mergeAndPersistInMemorySegments). Tests can use this to inject concurrent
+	// mutations while the merge introduction is in progress.
+	EventKindMemMergeIntroductionStart
+
+	// EventKindMemMergeIntroductionComplete is fired by the persister once
+	// the in-memory merge introduction has finished (i.e. the introducer has
+	// updated the root snapshot).
+	EventKindMemMergeIntroductionComplete
+
+	// EventKindBatchMemoryApplied is fired by the batch code after
+	// it finishes the in-memory introduction but before it blocks for persistence.
+	EventKindBatchMemoryApplied
 )

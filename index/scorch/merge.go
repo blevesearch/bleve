@@ -515,6 +515,8 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 
 	atomic.AddUint64(&s.stats.TotMemMergeZapBeg, 1)
 
+	s.fireEvent(EventKindMemMergeIntroductionStart, 0)
+
 	var wg sync.WaitGroup
 	// we're tracking the merged segments and their doc number per worker
 	// to be able to introduce them all at once, so the first dimension of the
@@ -640,6 +642,8 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			newSnapshot = nil
 		}
 	}
+
+	s.fireEvent(EventKindMemMergeIntroductionComplete, 0)
 
 	return newSnapshot, newMergedSegmentIDs, nil
 }

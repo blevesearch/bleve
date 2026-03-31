@@ -550,8 +550,12 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 			equiv.segment = append(equiv.segment, &SegmentSnapshot{
 				id:      segment.id,
 				segment: segment.segment,
-				deleted: nil, // nil since merging handled deletions
-				stats:   nil,
+				// we must carry over the deleted and stats
+				// because it might have some concurrent
+				// deletions/updates which are not part of
+				// the merged segments
+				deleted: segment.deleted,
+				stats:   segment.stats,
 			})
 		}
 	}

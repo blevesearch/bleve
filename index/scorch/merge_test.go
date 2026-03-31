@@ -23,6 +23,199 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
+// TestDeleteDuringFileMergeIntroduction is a variant of
+// TestObsoleteSegmentMergeIntroduction that uses nested documents and
+// verifies that after a close+reopen, the live document count is correct.
+//
+// This test targets the bug in introduceMerge / persistSnapshotMaybeMerge where
+// concurrent deletions that arrive during a file-segment merge introduction are
+// correctly tracked in newSegmentDeleted[i] (via the deletedSince logic in
+// introduceMerge), but then the persisted BoltDB snapshot drops those deletions
+// because persistSnapshotMaybeMerge builds its equiv SegmentSnapshot with
+// TestDeleteDuringMemMergeIntroduction reproduces the bug in Scorch where
+// concurrent deletions (including cascaded nested deletions) are lost
+// when merging in-memory segments.
+// The bug is in persister.go where persistSnapshotMaybeMerge constructs an
+// equivalent snapshot but sets deleted: nil, losing any concurrent deletions
+// picked up by introduceMerge.
+func TestDeleteDuringMemMergeIntroduction(t *testing.T) {
+	testConfig := CreateConfig("TestDeleteDuringMemMergeIntroduction")
+	err := InitTest(testConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := DestroyTest(testConfig)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	persisterReachedPause := make(chan struct{}, 1)
+	pausePersister := make(chan struct{})
+	mergeIntroStart := make(chan struct{}, 1)
+	mergeIntroComplete := make(chan struct{}, 1)
+	batchIntroComplete := make(chan struct{}, 1)
+
+	var idx index.Index
+	var signalReachedPause, signalIntroStart, signalIntroComplete sync.Once
+	RegistryEventCallbacks["testMemNested"] = func(e Event) bool {
+		if name, ok := e.Scorch.config["eventCallbackName"].(string); !ok || name != "testMemNested" {
+			return true
+		}
+		switch e.Kind {
+		case EventKindPurgerCheck:
+			signalReachedPause.Do(func() {
+				persisterReachedPause <- struct{}{}
+			})
+			<-pausePersister
+		case EventKindBatchMemoryApplied:
+			select {
+			case batchIntroComplete <- struct{}{}:
+			default:
+			}
+		case EventKindMemMergeIntroductionStart:
+			signalIntroStart.Do(func() {
+				mergeIntroStart <- struct{}{}
+			})
+			<-pausePersister
+		case EventKindMemMergeIntroductionComplete:
+			signalIntroComplete.Do(func() {
+				mergeIntroComplete <- struct{}{}
+			})
+		}
+		return true
+	}
+
+	ourConfig := make(map[string]interface{}, len(testConfig))
+	for k, v := range testConfig {
+		ourConfig[k] = v
+	}
+	ourConfig["eventCallbackName"] = "testMemNested"
+
+	// Ensure in-memory merge is triggered for 2 segments
+	originalMinSegments := DefaultMinSegmentsForInMemoryMerge
+	originalNapTime := DefaultPersisterNapTimeMSec
+	DefaultMinSegmentsForInMemoryMerge = 2
+	// Increase nap time to avoid tight loop and give us time to pause
+	DefaultPersisterNapTimeMSec = 100
+	defer func() {
+		DefaultMinSegmentsForInMemoryMerge = originalMinSegments
+		DefaultPersisterNapTimeMSec = originalNapTime
+		delete(RegistryEventCallbacks, "testMemNested")
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	defer analysisQueue.Close()
+
+	idx, err = NewScorch(Name, ourConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Open()
+	if err != nil {
+		t.Fatalf("error opening index: %v", err)
+	}
+
+	<-persisterReachedPause
+
+	// 1. Introduce two segments.
+	batch := index.NewBatch()
+	parent1 := document.NewDocument("1")
+	parent1.AddField(document.NewTextField("name", []uint64{}, []byte("parent")))
+	child1 := document.NewDocument("1/c1")
+	child1.AddField(document.NewTextField("name", []uint64{}, []byte("child1")))
+	child2 := document.NewDocument("1/c2")
+	child2.AddField(document.NewTextField("name", []uint64{}, []byte("child2")))
+	parent1.AddNestedDocument(child1)
+	parent1.AddNestedDocument(child2)
+	batch.Update(parent1)
+	go func() {
+		err := idx.Batch(batch)
+		if err != nil {
+		}
+	}()
+	<-batchIntroComplete
+
+	batch.Reset()
+	doc2 := document.NewDocument("2")
+	doc2.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
+	batch.Update(doc2)
+	go func() {
+		err := idx.Batch(batch)
+		if err != nil {
+		}
+	}()
+	<-batchIntroComplete
+
+	// 2. Unpause the persister so it sees both in-memory segments and starts a merge
+	close(pausePersister)
+	pausePersister = make(chan struct{}) // Reset for next pause
+
+	// 3. Wait for the persister to start merge and pause
+	<-mergeIntroStart
+
+	// 4. Issue a concurrent deletion while the merge is in-flight
+	batch.Reset()
+	batch.Delete("1")
+	go func() {
+		err := idx.Batch(batch)
+		if err != nil {
+		}
+	}()
+	<-batchIntroComplete
+
+	close(pausePersister)
+
+	// 5. Wait for the merge introduction to complete
+	<-mergeIntroComplete
+
+	// 6. Close and reopen the index to see if the deletion was persisted
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Reopen
+	idx, err = NewScorch(Name, ourConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Fatalf("error opening index: %v", err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	idxr, err := idx.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idxr.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	docCount, err := idxr.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// WITHOUT THE FIX: docCount will be 2 because doc "1" was resurrected
+	// WITH THE FIX: docCount will be 1
+	if docCount != 1 {
+		t.Errorf("Expected doc count 1, but got %d. Doc '1' might have leaked.", docCount)
+	}
+}
+
+
 func TestObsoleteSegmentMergeIntroduction(t *testing.T) {
 	testConfig := CreateConfig("TestObsoleteSegmentMergeIntroduction")
 	err := InitTest(testConfig)
