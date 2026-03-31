@@ -2812,6 +2812,12 @@ func TestPersistorMergerOptions(t *testing.T) {
 	}
 }
 
+// TestPersistenceExclude tests that when we persist a snapshot, and exclude a
+// segment from being persisted, this means that any close and reopen of the index
+// will not retain the excluded segment since it was volatile and not updated in
+// the bolt storage. On reopen we check whether the addtional data associated with
+// the segment like the internal values are also not retained, since they're also
+// volatile.
 func TestPersistenceExclude(t *testing.T) {
 	// Setup config and analysis queue
 	cfg := CreateConfig("TestPersistenceExclude")
@@ -3037,6 +3043,10 @@ func TestPersistenceExclude(t *testing.T) {
 	}
 }
 
+// TestPersistenceWithoutExclude is homologous to TestPersistenceExclude but tests
+// persistence without excluding any segments and introducing another segment after
+// persistence works as expected, in the sense that we don't retain the volatile segment
+// since the next persister cycle never ran
 func TestPersistenceWithoutExclude(t *testing.T) {
 	// Setup config and analysis queue
 	cfg := CreateConfig("TestPersistenceWithoutExclude")
