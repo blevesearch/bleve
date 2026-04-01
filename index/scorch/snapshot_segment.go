@@ -42,6 +42,11 @@ type SegmentSnapshot struct {
 	creator string
 	stats   *fieldStats
 
+	// if this segment is in-memory then we'll try to undo the internal values
+	// in the indexSnapshot internal map before updating the bolt, since its
+	// supposed to be reflective of the on-disk data.
+	internal map[string][]byte
+
 	cachedMeta *cachedMeta
 
 	cachedDocs *cachedDocs
