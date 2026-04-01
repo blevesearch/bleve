@@ -161,11 +161,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		if root.segment[i].deleted == nil {
 			newss.deleted = delta
 		} else {
-			if delta.IsEmpty() {
-				newss.deleted = root.segment[i].deleted
-			} else {
-				newss.deleted = roaring.Or(root.segment[i].deleted, delta)
-			}
+			newss.deleted = roaring.Or(root.segment[i].deleted, delta)
 		}
 		if newss.deleted.IsEmpty() {
 			newss.deleted = nil
