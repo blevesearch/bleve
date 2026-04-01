@@ -79,7 +79,7 @@ func (t *vectorTrainer) trainLoop() {
 		t.parent.asyncTasks.Done()
 	}()
 	// initialize stuff
-	t.parent.segmentConfig[index.TrainedIndexCallback] = t.getCentroidIndex
+	t.parent.segmentConfig[index.TrainedIndexCallback] = index.TrainedIndexCallbackFn(t.getCentroidIndex)
 	path := filepath.Join(t.parent.path, index.TrainedIndexFileName)
 	for {
 		select {
