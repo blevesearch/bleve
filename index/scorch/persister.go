@@ -1038,7 +1038,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 	return rv, nil
 }
 
-func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket, reader *util.FileReader) (
+func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket, reader util.FileReader) (
 	*SegmentSnapshot, error) {
 	pathBytes := segmentBucket.Get(util.BoltPathKey)
 	if pathBytes == nil {

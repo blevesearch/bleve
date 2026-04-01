@@ -499,7 +499,7 @@ func (i *indexImpl) FileWriterIDsInUse() (map[string]struct{}, error) {
 		// if the underlying index does not support callbacks, we
 		// assume that the data being written is with the default
 		// writer id which is the empty string
-		ids[""] = struct{}{}
+		ids[util.DefaultFileCallbackId] = struct{}{}
 	}
 
 	return ids, nil
@@ -524,7 +524,7 @@ func (i *indexImpl) DropFileWriterIDs(ids map[string]struct{}) error {
 		// if the underlying index does not support callbacks and the request is
 		// to drop the empty id, which is the default id, we return an error
 		// because it is not possible to drop it
-		if _, ok := ids[""]; ok {
+		if _, ok := ids[util.DefaultFileCallbackId]; ok {
 			return fmt.Errorf("underlying index does not support DropFileWriterIDs")
 		}
 	}

@@ -36,17 +36,23 @@ import (
 // selected callbacks associated with ids is provided via index.WriterIdsInUse()
 // and index.DropWriterIds().
 
-// FileWriter and FileReader are wrappers around the callback functions provided
-// by the user. They provide a convenient way to apply the callbacks to data
+const DefaultFileCallbackId = ""
+
+// FileWriter and FileReader interfaces are wrappers around the callback functions
+// provided by the user. They provide a convenient way to apply the callbacks to data
 // being written to or read from a file. They also store the id the callbacks,
 // which can be useful for managing state across multiple reads and writes.
-type FileWriter struct {
+type FileWriter interface {
+	Process(data []byte) []byte
+	Id() string
+}
+type fileWriterImpl struct {
 	id        string
 	processor func(data []byte) []byte
 }
 
-func NewFileWriter(context []byte) (*FileWriter, error) {
-	rv := &FileWriter{}
+func NewFileWriter(context []byte) (FileWriter, error) {
+	rv := &fileWriterImpl{}
 
 	if index.WriterHook != nil {
 		var err error
@@ -59,24 +65,29 @@ func NewFileWriter(context []byte) (*FileWriter, error) {
 	return rv, nil
 }
 
-func (w *FileWriter) Process(data []byte) []byte {
+func (w *fileWriterImpl) Process(data []byte) []byte {
 	if w.processor != nil {
 		return w.processor(data)
 	}
 	return data
 }
 
-func (w *FileWriter) Id() string {
+func (w *fileWriterImpl) Id() string {
 	return w.id
 }
 
-type FileReader struct {
+type FileReader interface {
+	Process(data []byte) ([]byte, error)
+	Id() string
+}
+
+type fileReaderImpl struct {
 	id        string
 	processor func(data []byte) ([]byte, error)
 }
 
-func NewFileReader(id string, context []byte) (*FileReader, error) {
-	rv := &FileReader{
+func NewFileReader(id string, context []byte) (FileReader, error) {
+	rv := &fileReaderImpl{
 		id: id,
 	}
 
@@ -91,13 +102,13 @@ func NewFileReader(id string, context []byte) (*FileReader, error) {
 	return rv, nil
 }
 
-func (r *FileReader) Process(data []byte) ([]byte, error) {
+func (r *fileReaderImpl) Process(data []byte) ([]byte, error) {
 	if r.processor != nil {
 		return r.processor(data)
 	}
 	return data, nil
 }
 
-func (r *FileReader) Id() string {
+func (r *fileReaderImpl) Id() string {
 	return r.id
 }

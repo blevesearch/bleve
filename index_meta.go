@@ -31,8 +31,8 @@ type indexMeta struct {
 	Storage    string                 `json:"storage"`
 	IndexType  string                 `json:"index_type"`
 	Config     map[string]interface{} `json:"config,omitempty"`
-	fileWriter *util.FileWriter
-	fileReader *util.FileReader
+	fileWriter util.FileWriter
+	fileReader util.FileReader
 }
 
 func newIndexMeta(indexType string, storage string, config map[string]interface{}, path string) (*indexMeta, error) {
@@ -78,7 +78,7 @@ func openIndexMeta(path string) (*indexMeta, error) {
 	}
 
 	var im indexMeta
-	fileReader := &util.FileReader{}
+	var fileReader util.FileReader
 	err = util.UnmarshalJSON(metaBytes, &im)
 	if err != nil {
 		if len(metaBytes) < 4 {
