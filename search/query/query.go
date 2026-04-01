@@ -310,21 +310,17 @@ func ParseQuery(input []byte) (Query, error) {
 	}
 	_, hasCustomFilter := tmp["custom_filter"]
 	if hasCustomFilter {
-		var rv CustomFilterQuery
-		err := util.UnmarshalJSON(input, &rv)
-		if err != nil {
-			return nil, err
+		if CustomFilterQueryParser == nil {
+			return nil, fmt.Errorf("custom filter query parser is not registered")
 		}
-		return &rv, nil
+		return CustomFilterQueryParser(input)
 	}
 	_, hasCustomScore := tmp["custom_score"]
 	if hasCustomScore {
-		var rv CustomScoreQuery
-		err := util.UnmarshalJSON(input, &rv)
-		if err != nil {
-			return nil, err
+		if CustomScoreQueryParser == nil {
+			return nil, fmt.Errorf("custom score query parser is not registered")
 		}
-		return &rv, nil
+		return CustomScoreQueryParser(input)
 	}
 	_, hasDocIds := tmp["ids"]
 	if hasDocIds {
@@ -395,6 +391,9 @@ func ParseQuery(input []byte) (Query, error) {
 
 	return nil, fmt.Errorf("unknown query type")
 }
+
+var CustomFilterQueryParser func([]byte) (Query, error)
+var CustomScoreQueryParser func([]byte) (Query, error)
 
 // expandQuery traverses the input query tree and returns a new tree where
 // query string queries have been expanded into base queries. Returned tree may

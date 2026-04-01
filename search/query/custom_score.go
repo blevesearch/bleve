@@ -22,31 +22,48 @@ import (
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
-	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
 // CustomScoreQuery wraps a child query and re-scores its candidate matches via
-// an embedder-provided per-hit callback. Fields lists stored fields to expose
-// to the callback, Params carries caller-provided values passed as the second
-// UDF argument, and Source carries the embedder-defined callback source.
+// an embedder-provided per-hit callback.
 type CustomScoreQuery struct {
-	Query  Query                  `json:"query"`
-	Fields []string               `json:"fields,omitempty"`
-	Params map[string]interface{} `json:"params,omitempty"`
-	Source string                 `json:"source"`
+	Query Query `json:"query"`
+
+	scoreFunc searcher.ScoreFunc
+	payload map[string]interface{}
 }
 
-func NewCustomScoreQuery(query Query, source string) *CustomScoreQuery {
+func NewCustomScoreQuery(query Query) *CustomScoreQuery {
 	return &CustomScoreQuery{
-		Query:  query,
-		Source: source,
+		Query: query,
+	}
+}
+
+func NewCustomScoreQueryWithScorer(query Query, score searcher.ScoreFunc) *CustomScoreQuery {
+	return &CustomScoreQuery{
+		Query:     query,
+		scoreFunc: score,
+	}
+}
+
+func NewCustomScoreQueryWithScorerAndPayload(query Query, score searcher.ScoreFunc, payload map[string]interface{}) *CustomScoreQuery {
+	return &CustomScoreQuery{
+		Query:     query,
+		scoreFunc: score,
+		payload:   cloneCustomQueryPayload(payload),
 	}
 }
 
 func (q *CustomScoreQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	if q == nil {
 		return nil, fmt.Errorf("custom score query is nil")
+	}
+	if q.Query == nil {
+		return nil, fmt.Errorf("custom score query must have a query")
+	}
+	if q.scoreFunc == nil {
+		return nil, fmt.Errorf("custom score query must have a score callback")
 	}
 
 	// Build the inner searcher first; custom scoring wraps its output.
@@ -55,23 +72,8 @@ func (q *CustomScoreQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		return nil, err
 	}
 
-	// Resolve the request-scoped callback builder injected by the embedder.
-	if ctx == nil {
-		return nil, fmt.Errorf("no custom score factory registered in context")
-	}
-	factory, _ := ctx.Value(CustomScoreContextKey).(CustomScoreFactory)
-	if factory == nil {
-		return nil, fmt.Errorf("no custom score factory registered in context")
-	}
-
-	// Build the per-hit score callback from query-provided source/params/fields.
-	scoreFunc, err := factory(q.Source, q.Params, q.Fields)
-	if err != nil {
-		return nil, err
-	}
-
 	// Wrap the child so Next/Advance mutates score on each candidate hit.
-	return searcher.NewScoreMutatingSearcher(ctx, childSearcher, scoreFunc), nil
+	return searcher.NewScoreMutatingSearcher(ctx, childSearcher, q.scoreFunc), nil
 }
 
 func (q *CustomScoreQuery) Validate() error {
@@ -81,9 +83,6 @@ func (q *CustomScoreQuery) Validate() error {
 	if q.Query == nil {
 		return fmt.Errorf("custom score query must have a query")
 	}
-	if q.Source == "" {
-		return fmt.Errorf("custom score query must have source")
-	}
 	if vq, ok := q.Query.(ValidatableQuery); ok {
 		return vq.Validate()
 	}
@@ -92,45 +91,30 @@ func (q *CustomScoreQuery) Validate() error {
 
 func (q *CustomScoreQuery) MarshalJSON() ([]byte, error) {
 	type customScoreInner struct {
-		Query  Query                  `json:"query"`
-		Fields []string               `json:"fields,omitempty"`
-		Params map[string]interface{} `json:"params,omitempty"`
-		Source string                 `json:"source"`
+		Query Query `json:"query"`
+	}
+
+	if len(q.payload) > 0 {
+		inner := cloneCustomQueryPayload(q.payload)
+		inner["query"] = q.Query
+		return json.Marshal(map[string]interface{}{
+			"custom_score": inner,
+		})
 	}
 
 	return json.Marshal(map[string]interface{}{
 		"custom_score": customScoreInner{
-			Query:  q.Query,
-			Fields: q.Fields,
-			Params: q.Params,
-			Source: q.Source,
+			Query: q.Query,
 		},
 	})
 }
 
 func (q *CustomScoreQuery) UnmarshalJSON(data []byte) error {
-	tmp := struct {
-		CustomScore struct {
-			Query  json.RawMessage        `json:"query"`
-			Fields []string               `json:"fields,omitempty"`
-			Params map[string]interface{} `json:"params,omitempty"`
-			Source string                 `json:"source,omitempty"`
-		} `json:"custom_score"`
-	}{}
-	err := util.UnmarshalJSON(data, &tmp)
+	child, payload, err := unmarshalCustomQueryPayload(data, "custom_score")
 	if err != nil {
 		return err
 	}
-
-	if tmp.CustomScore.Query != nil {
-		q.Query, err = ParseQuery(tmp.CustomScore.Query)
-		if err != nil {
-			return err
-		}
-	}
-	q.Fields = tmp.CustomScore.Fields
-	q.Params = tmp.CustomScore.Params
-	q.Source = tmp.CustomScore.Source
-
+	q.Query = child
+	q.payload = payload
 	return nil
 }

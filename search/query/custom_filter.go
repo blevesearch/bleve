@@ -22,31 +22,47 @@ import (
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
-	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
 // CustomFilterQuery wraps a child query and filters its candidate matches via
-// an embedder-provided per-hit callback. Fields lists stored fields to expose
-// to the callback, Params carries caller-provided values passed as the second
-// UDF argument, and Source carries the embedder-defined callback source.
+// an embedder-provided per-hit callback.
 type CustomFilterQuery struct {
-	Query  Query                  `json:"query"`
-	Fields []string               `json:"fields,omitempty"`
-	Params map[string]interface{} `json:"params,omitempty"`
-	Source string                 `json:"source"`
+	Query      Query `json:"query"`
+	filterFunc searcher.FilterFunc
+	payload    map[string]interface{}
 }
 
-func NewCustomFilterQuery(query Query, source string) *CustomFilterQuery {
+func NewCustomFilterQuery(query Query) *CustomFilterQuery {
 	return &CustomFilterQuery{
-		Query:  query,
-		Source: source,
+		Query: query,
+	}
+}
+
+func NewCustomFilterQueryWithFilter(query Query, filter searcher.FilterFunc) *CustomFilterQuery {
+	return &CustomFilterQuery{
+		Query:      query,
+		filterFunc: filter,
+	}
+}
+
+func NewCustomFilterQueryWithFilterAndPayload(query Query, filter searcher.FilterFunc, payload map[string]interface{}) *CustomFilterQuery {
+	return &CustomFilterQuery{
+		Query:      query,
+		filterFunc: filter,
+		payload:    cloneCustomQueryPayload(payload),
 	}
 }
 
 func (q *CustomFilterQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	if q == nil {
 		return nil, fmt.Errorf("custom filter query is nil")
+	}
+	if q.Query == nil {
+		return nil, fmt.Errorf("custom filter query must have a query")
+	}
+	if q.filterFunc == nil {
+		return nil, fmt.Errorf("custom filter query must have a filter callback")
 	}
 
 	// Build the inner searcher first; custom filtering wraps its output.
@@ -55,23 +71,8 @@ func (q *CustomFilterQuery) Searcher(ctx context.Context, i index.IndexReader, m
 		return nil, err
 	}
 
-	// Resolve the request-scoped callback builder injected by the embedder.
-	if ctx == nil {
-		return nil, fmt.Errorf("no custom filter factory registered in context")
-	}
-	factory, _ := ctx.Value(CustomFilterContextKey).(CustomFilterFactory)
-	if factory == nil {
-		return nil, fmt.Errorf("no custom filter factory registered in context")
-	}
-
-	// Build the per-hit filter callback from query-provided source/params/fields.
-	filterFunc, err := factory(q.Source, q.Params, q.Fields)
-	if err != nil {
-		return nil, err
-	}
-
 	// Wrap the child so Next/Advance applies the callback on each candidate hit.
-	return searcher.NewFilteringSearcher(ctx, childSearcher, filterFunc), nil
+	return searcher.NewFilteringSearcher(ctx, childSearcher, q.filterFunc), nil
 }
 
 func (q *CustomFilterQuery) Validate() error {
@@ -81,9 +82,6 @@ func (q *CustomFilterQuery) Validate() error {
 	if q.Query == nil {
 		return fmt.Errorf("custom filter query must have a query")
 	}
-	if q.Source == "" {
-		return fmt.Errorf("custom filter query must have source")
-	}
 	if vq, ok := q.Query.(ValidatableQuery); ok {
 		return vq.Validate()
 	}
@@ -92,45 +90,30 @@ func (q *CustomFilterQuery) Validate() error {
 
 func (q *CustomFilterQuery) MarshalJSON() ([]byte, error) {
 	type customFilterInner struct {
-		Query  Query                  `json:"query"`
-		Fields []string               `json:"fields,omitempty"`
-		Params map[string]interface{} `json:"params,omitempty"`
-		Source string                 `json:"source"`
+		Query Query `json:"query"`
+	}
+
+	if len(q.payload) > 0 {
+		inner := cloneCustomQueryPayload(q.payload)
+		inner["query"] = q.Query
+		return json.Marshal(map[string]interface{}{
+			"custom_filter": inner,
+		})
 	}
 
 	return json.Marshal(map[string]interface{}{
 		"custom_filter": customFilterInner{
-			Query:  q.Query,
-			Fields: q.Fields,
-			Params: q.Params,
-			Source: q.Source,
+			Query: q.Query,
 		},
 	})
 }
 
 func (q *CustomFilterQuery) UnmarshalJSON(data []byte) error {
-	tmp := struct {
-		CustomFilter struct {
-			Query  json.RawMessage        `json:"query"`
-			Fields []string               `json:"fields,omitempty"`
-			Params map[string]interface{} `json:"params,omitempty"`
-			Source string                 `json:"source,omitempty"`
-		} `json:"custom_filter"`
-	}{}
-	err := util.UnmarshalJSON(data, &tmp)
+	child, payload, err := unmarshalCustomQueryPayload(data, "custom_filter")
 	if err != nil {
 		return err
 	}
-
-	if tmp.CustomFilter.Query != nil {
-		q.Query, err = ParseQuery(tmp.CustomFilter.Query)
-		if err != nil {
-			return err
-		}
-	}
-	q.Fields = tmp.CustomFilter.Fields
-	q.Params = tmp.CustomFilter.Params
-	q.Source = tmp.CustomFilter.Source
-
+	q.Query = child
+	q.payload = payload
 	return nil
 }

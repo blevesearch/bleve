@@ -1,114 +1,63 @@
 # Custom Query Hooks: `custom_filter` and `custom_score`
 
-Bleve supports two query nodes for embedding-defined per-hit logic:
+Bleve exposes two query nodes for embedding-defined per-hit logic:
 
-- `custom_filter`: keep/drop each hit.
-- `custom_score`: override each hit score.
+- `custom_filter`: keep or drop each candidate hit.
+- `custom_score`: mutate each candidate hit score.
 
-Bleve treats `source` as an opaque payload. The embedding application provides execution via request-scoped callbacks in `context.Context`.
+Bleve itself only executes already-bound callbacks. It does not interpret any
+embedder-specific payload such as callback source, params, or requested fields.
 
-## Query Object
+## Query Objects
 
-### `custom_filter`
+`CustomFilterQuery` contains:
 
-```json
-{
-  "query": {
-    "custom_filter": {
-      "query": { "match": "beer" },
-      "source": "my_filter_source",
-      "params": { "min": 10.0 },
-      "fields": ["abv", "type"]
-    }
-  }
-}
-```
+- a child query
+- a bound `searcher.FilterFunc`
 
-### `custom_score`
+`CustomScoreQuery` contains:
 
-```json
-{
-  "query": {
-    "custom_score": {
-      "query": { "match": "beer" },
-      "source": "my_score_source",
-      "params": { "mult": 0.05 },
-      "fields": ["abv"]
-    }
-  }
-}
-```
+- a child query
+- a bound `searcher.ScoreFunc`
 
-## Integrating From an Embedding Application
+## Constructors
 
-Register callback builders in request context before calling `SearchInContext`.
+Embedding applications can construct the nodes directly with callbacks:
 
 ```go
-package main
-
-import (
-	"context"
-
-	"github.com/blevesearch/bleve/v2"
-	"github.com/blevesearch/bleve/v2/search"
-	bleveQuery "github.com/blevesearch/bleve/v2/search/query"
-	"github.com/blevesearch/bleve/v2/search/searcher"
-)
-
-func withCustomHooks(ctx context.Context) context.Context {
-	filterBuilder := bleveQuery.CustomFilterFactory(
-		func(source string, params map[string]interface{}, fields []string) (searcher.FilterFunc, error) {
-			// Build a per-hit filter callback from source/params/fields.
-			return func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
-				// Evaluate hit here; source interpretation is embedder-defined.
-				return true
-			}, nil
-		})
-
-	scoreBuilder := bleveQuery.CustomScoreFactory(
-		func(source string, params map[string]interface{}, fields []string) (searcher.ScoreFunc, error) {
-			// Build a per-hit score callback from source/params/fields.
-			return func(sctx *search.SearchContext, d *search.DocumentMatch) float64 {
-				// Evaluate hit here; source interpretation is embedder-defined.
-				return d.Score
-			}, nil
-		})
-
-	return bleveQuery.WithCustomFactories(ctx, filterBuilder, scoreBuilder)
-}
-
-func run(index bleve.Index, req *bleve.SearchRequest) (*bleve.SearchResult, error) {
-	ctx := withCustomHooks(context.Background())
-	return index.SearchInContext(ctx, req)
-}
-```
-
-For standalone Bleve usage, if you do not need `source` / `params` / `fields`,
-you can register direct callbacks instead of builders:
-
-```go
-ctx := bleveQuery.WithCustomFuncs(context.Background(),
+filterQuery := bleve.NewCustomFilterQueryWithFilter(childQuery,
 	func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
 		return true
 	},
+)
+
+scoreQuery := bleve.NewCustomScoreQueryWithScorer(childQuery,
 	func(sctx *search.SearchContext, d *search.DocumentMatch) float64 {
 		return d.Score
 	},
 )
 ```
 
+The bare constructors are also available when the callback will be attached by
+the embedding application before search execution:
+
+```go
+filterQuery := bleve.NewCustomFilterQuery(childQuery)
+scoreQuery := bleve.NewCustomScoreQuery(childQuery)
+```
+
 ## Runtime Behavior
 
-- Bleve builds the inner query searcher first.
-- On `custom_filter`/`custom_score`, Bleve retrieves the corresponding callback builder from context.
-- Bleve wraps the child searcher:
-  - `custom_filter` -> `FilteringSearcher`
-  - `custom_score` -> `ScoreMutatingSearcher`
-- Callback runs per hit during `Next()`/`Advance()`.
+- Bleve builds the child query searcher first.
+- `custom_filter` wraps it with `FilteringSearcher`.
+- `custom_score` wraps it with `ScoreMutatingSearcher`.
+- the bound callback is reused for each hit during `Next()` / `Advance()`.
 
 ## Error Cases
 
-- Missing callback builder in context:
-  - `custom_filter`: `no custom filter factory registered in context`
-  - `custom_score`: `no custom score factory registered in context`
-- If builder returns an error, searcher construction fails for that query branch.
+- missing child query:
+  - `custom filter query must have a query`
+  - `custom score query must have a query`
+- missing bound callback:
+  - `custom filter query must have a filter callback`
+  - `custom score query must have a score callback`

@@ -58,7 +58,6 @@ import (
 	"github.com/blevesearch/bleve/v2/search/highlight/highlighter/ansi"
 	"github.com/blevesearch/bleve/v2/search/highlight/highlighter/html"
 	"github.com/blevesearch/bleve/v2/search/query"
-	"github.com/blevesearch/bleve/v2/search/searcher"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -4832,75 +4831,42 @@ func TestCustomFilterQueryEndToEnd(t *testing.T) {
 	fictionQuery := NewTermQuery("fiction")
 	fictionQuery.SetField("genre")
 
-	q := NewCustomFilterQuery(fictionQuery, "keep-selected")
-	q.Fields = []string{"title"}
-	q.Params = map[string]interface{}{
-		"allowedIDs": []interface{}{"0", "2", "7"},
+	allowedIDs := map[string]struct{}{
+		"0": {},
+		"2": {},
+		"7": {},
 	}
 
-	var gotSource string
-	var gotFields []string
-	ctx := query.WithCustomFilterFactory(context.Background(),
-		func(source string, params map[string]interface{}, fields []string) (searcher.FilterFunc, error) {
-			gotSource = source
-			gotFields = append([]string(nil), fields...)
-
-			rawIDs, ok := params["allowedIDs"].([]interface{})
-			if !ok {
-				return nil, fmt.Errorf("expected allowedIDs in params")
-			}
-
-			allowedIDs := make(map[string]struct{}, len(rawIDs))
-			for _, rawID := range rawIDs {
-				id, ok := rawID.(string)
-				if !ok {
-					return nil, fmt.Errorf("expected string allowedID")
-				}
-				allowedIDs[id] = struct{}{}
-			}
-
-			return func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
-				id, err := sctx.IndexReader.ExternalID(d.IndexInternalID)
-				if err != nil {
-					return false
-				}
-				_, ok := allowedIDs[id]
-				return ok
-			}, nil
-		})
+	q := NewCustomFilterQueryWithFilter(fictionQuery, func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
+		id, err := sctx.IndexReader.ExternalID(d.IndexInternalID)
+		if err != nil {
+			return false
+		}
+		_, ok := allowedIDs[id]
+		return ok
+	})
 
 	req := NewSearchRequest(q)
 	req.Fields = []string{"title"}
 	req.Size = 10
 
-	res, err := idx.SearchInContext(ctx, req)
+	res, err := idx.SearchInContext(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if gotSource != "keep-selected" {
-		t.Fatalf("expected source keep-selected, got %s", gotSource)
-	}
-	if !reflect.DeepEqual(gotFields, []string{"title"}) {
-		t.Fatalf("expected query fields [title], got %#v", gotFields)
-	}
 	if res.Total != 3 {
 		t.Fatalf("expected 3 hits, got %d", res.Total)
 	}
 
-	expectedIDs := map[string]struct{}{
-		"0": {},
-		"2": {},
-		"7": {},
-	}
+	hitIDs := map[string]struct{}{}
 	for _, hit := range res.Hits {
-		if _, ok := expectedIDs[hit.ID]; !ok {
-			t.Fatalf("unexpected hit id %s", hit.ID)
-		}
-		delete(expectedIDs, hit.ID)
+		hitIDs[hit.ID] = struct{}{}
 	}
-	if len(expectedIDs) != 0 {
-		t.Fatalf("missing expected hit ids: %#v", expectedIDs)
+	for id := range allowedIDs {
+		if _, ok := hitIDs[id]; !ok {
+			t.Fatalf("missing expected hit id %s", id)
+		}
 	}
 }
 
@@ -4916,61 +4882,29 @@ func TestCustomScoreQueryEndToEnd(t *testing.T) {
 	fictionQuery := NewTermQuery("fiction")
 	fictionQuery.SetField("genre")
 
-	q := NewCustomScoreQuery(fictionQuery, "boost-selected")
-	q.Fields = []string{"title"}
-	q.Params = map[string]interface{}{
-		"boosts": map[string]interface{}{
-			"7": 100.0,
-			"2": 10.0,
-			"0": 1.0,
-		},
+	boosts := map[string]float64{
+		"7": 100.0,
+		"2": 10.0,
+		"0": 1.0,
 	}
 
-	var gotSource string
-	var gotFields []string
-	ctx := query.WithCustomScoreFactory(context.Background(),
-		func(source string, params map[string]interface{}, fields []string) (searcher.ScoreFunc, error) {
-			gotSource = source
-			gotFields = append([]string(nil), fields...)
-
-			rawBoosts, ok := params["boosts"].(map[string]interface{})
-			if !ok {
-				return nil, fmt.Errorf("expected boosts in params")
-			}
-
-			boosts := make(map[string]float64, len(rawBoosts))
-			for rawID, rawBoost := range rawBoosts {
-				boost, ok := rawBoost.(float64)
-				if !ok {
-					return nil, fmt.Errorf("expected float64 boost")
-				}
-				boosts[rawID] = boost
-			}
-
-			return func(sctx *search.SearchContext, d *search.DocumentMatch) float64 {
-				id, err := sctx.IndexReader.ExternalID(d.IndexInternalID)
-				if err != nil {
-					return d.Score
-				}
-				return d.Score + boosts[id]
-			}, nil
-		})
+	q := NewCustomScoreQueryWithScorer(fictionQuery, func(sctx *search.SearchContext, d *search.DocumentMatch) float64 {
+		id, err := sctx.IndexReader.ExternalID(d.IndexInternalID)
+		if err != nil {
+			return d.Score
+		}
+		return d.Score + boosts[id]
+	})
 
 	req := NewSearchRequest(q)
 	req.Fields = []string{"title"}
 	req.Size = 4
 
-	res, err := idx.SearchInContext(ctx, req)
+	res, err := idx.SearchInContext(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if gotSource != "boost-selected" {
-		t.Fatalf("expected source boost-selected, got %s", gotSource)
-	}
-	if !reflect.DeepEqual(gotFields, []string{"title"}) {
-		t.Fatalf("expected query fields [title], got %#v", gotFields)
-	}
 	if len(res.Hits) != 4 {
 		t.Fatalf("expected 4 hits, got %d", len(res.Hits))
 	}

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/v2/search/query"
+	"github.com/blevesearch/bleve/v2/search/searcher"
 )
 
 // NewBoolFieldQuery creates a new Query for boolean fields
@@ -45,16 +46,26 @@ func NewConjunctionQuery(conjuncts ...query.Query) *query.ConjunctionQuery {
 	return query.NewConjunctionQuery(conjuncts)
 }
 
-// NewCustomFilterQuery creates a new query which wraps a child query and
-// applies an embedder-provided per-hit filter callback.
-func NewCustomFilterQuery(child query.Query, source string) *query.CustomFilterQuery {
-	return query.NewCustomFilterQuery(child, source)
+// NewCustomFilterQuery creates a new custom filter query wrapping a child query.
+func NewCustomFilterQuery(child query.Query) *query.CustomFilterQuery {
+	return query.NewCustomFilterQuery(child)
 }
 
-// NewCustomScoreQuery creates a new query which wraps a child query and
-// applies an embedder-provided per-hit score callback.
-func NewCustomScoreQuery(child query.Query, source string) *query.CustomScoreQuery {
-	return query.NewCustomScoreQuery(child, source)
+// NewCustomFilterQueryWithFilter creates a new custom filter query wrapping a
+// child query
+func NewCustomFilterQueryWithFilter(child query.Query, filter searcher.FilterFunc) *query.CustomFilterQuery {
+	return query.NewCustomFilterQueryWithFilter(child, filter)
+}
+
+// NewCustomScoreQuery creates a new custom score query wrapping a child query.
+func NewCustomScoreQuery(child query.Query) *query.CustomScoreQuery {
+	return query.NewCustomScoreQuery(child)
+}
+
+// NewCustomScoreQueryWithScorer creates a new custom score query wrapping a
+// child query and binding the provided per-hit score callback.
+func NewCustomScoreQueryWithScorer(child query.Query, score searcher.ScoreFunc) *query.CustomScoreQuery {
+	return query.NewCustomScoreQueryWithScorer(child, score)
 }
 
 // NewDateRangeQuery creates a new Query for ranges
