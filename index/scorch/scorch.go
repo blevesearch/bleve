@@ -471,9 +471,9 @@ func (s *Scorch) Delete(id string) error {
 	return s.Batch(b)
 }
 
-func (s *Scorch) isTrained() (bool, error) {
+func (s *Scorch) isTrained(batch *index.Batch) (bool, error) {
 	trained := true
-	if s.trainer != nil {
+	if len(batch.IndexOps) > 0 && s.trainer != nil {
 		val, err := s.getInternal(util.BoltTrainCompleteKey)
 		if err != nil {
 			return false, err
@@ -499,7 +499,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		s.fireEvent(EventKindBatchIntroduction, time.Since(start))
 	}()
 
-	trained, err := s.isTrained()
+	trained, err := s.isTrained(batch)
 	if err != nil {
 		return err
 	}

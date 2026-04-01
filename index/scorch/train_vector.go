@@ -61,7 +61,7 @@ func initTrainer(s *Scorch, config map[string]interface{}) *vectorTrainer {
 				trainCh: make(chan *trainRequest, 1),
 			}
 			// update the parent scorch config with the trainer's callback to fetch the centroid index
-			s.segmentConfig[index.TrainedIndexCallback] = trainer.getCentroidIndex
+			s.segmentConfig[index.TrainedIndexCallback] = index.TrainedIndexCallbackFn(trainer.getCentroidIndex)
 			return &trainer
 		}
 	}
@@ -257,6 +257,8 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	if err != nil {
 		return fmt.Errorf("train_vector: train() err'd out with: %w", err)
 	}
+
+	fmt.Println("trained on", len(trainData), "documents")
 
 	return err
 }
