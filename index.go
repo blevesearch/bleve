@@ -401,3 +401,8 @@ type InsightsIndex interface {
 	// CentroidCardinalities returns the centroids (clusters) from IVF indexes ordered by data density.
 	CentroidCardinalities(field string, limit int, desceding bool) ([]index.CentroidCardinality, error)
 }
+
+type TrainableIndex interface {
+	Index
+	Train(*Batch) error
+}

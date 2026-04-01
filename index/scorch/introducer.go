@@ -154,6 +154,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			cachedDocs: root.segment[i].cachedDocs,
 			cachedMeta: root.segment[i].cachedMeta,
 			creator:    root.segment[i].creator,
+			internal:   root.segment[i].internal,
 		}
 
 		// apply new obsoletions
@@ -206,6 +207,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			stats:      next.stats,
 			cachedDocs: &cachedDocs{cache: nil},
 			cachedMeta: &cachedMeta{meta: nil},
+			internal:   make(map[string][]byte),
 			creator:    "introduceSegment",
 		}
 		newSnapshot.segment = append(newSnapshot.segment, newSegmentSnapshot)
@@ -215,6 +217,12 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		// queued for persistence.
 		atomic.AddUint64(&s.stats.TotIntroducedItems, newSegmentSnapshot.Count())
 		atomic.AddUint64(&s.stats.TotIntroducedSegmentsBatch, 1)
+
+		// track the internal values of this segment so that when we update the
+		// bolt we keep the internal values in sync with the segments on disk, and
+		// if this segment didn't get persisted we need to undo that info from the
+		// indexSnapshot's internal map as part of the bolt update.
+		newSegmentSnapshot.internal = next.internal
 	}
 	// copy old values
 	for key, oldVal := range root.internal {
@@ -403,6 +411,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 				cachedDocs: root.segment[i].cachedDocs,
 				cachedMeta: root.segment[i].cachedMeta,
 				creator:    root.segment[i].creator,
+				internal:   root.segment[i].internal,
 			})
 			root.segment[i].segment.AddRef()
 			newSnapshot.offsets = append(newSnapshot.offsets, running)

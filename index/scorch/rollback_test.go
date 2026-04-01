@@ -421,6 +421,13 @@ func TestLatestSnapshotProtected(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	scorchi, ok := idx.(*Scorch)
 	if !ok {
 		t.Fatalf("Not a scorch index?")
@@ -499,7 +506,12 @@ func TestBackupRacingWithPurge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	scorchi, ok := idx.(*Scorch)
 	if !ok {

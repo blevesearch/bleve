@@ -15,6 +15,8 @@
 package util
 
 import (
+	"fmt"
+
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -97,6 +99,8 @@ func NewFileReader(id string, context []byte) (FileReader, error) {
 		if err != nil {
 			return nil, err
 		}
+	} else if id != "" {
+		return nil, fmt.Errorf("reader callback id %s provided but no ReaderHook is set", id)
 	}
 
 	return rv, nil
