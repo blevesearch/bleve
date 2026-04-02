@@ -19,12 +19,15 @@ package scorch
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/util"
@@ -34,13 +37,17 @@ import (
 )
 
 type trainRequest struct {
-	sample segment.Segment
-	ackCh  chan error
+	finalSample bool
+	sampleSize  int
+	ackCh       chan error
+	sample      segment.Segment
 }
 
 type vectorTrainer struct {
-	parent *Scorch
-	config map[string]interface{}
+	trainingComplete atomic.Bool
+	trainedSamples   uint64
+	parent           *Scorch
+	config           map[string]interface{}
 
 	m sync.RWMutex
 	// not a searchable segment in the sense that it won't return
@@ -77,12 +84,11 @@ func moveFile(sourcePath, destPath string) error {
 	return nil
 }
 
-func (t *vectorTrainer) persistToBolt() error {
+func (t *vectorTrainer) persistToBolt(trainReq *trainRequest) error {
 	tx, err := t.parent.rootBolt.Begin(true)
 	if err != nil {
 		return fmt.Errorf("error starting bolt transaction: %v", err)
 	}
-
 	defer tx.Rollback()
 
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
@@ -94,10 +100,21 @@ func (t *vectorTrainer) persistToBolt() error {
 	if err != nil {
 		return fmt.Errorf("error creating centroid bucket: %v", err)
 	}
-
 	err = trainerBucket.Put(util.BoltPathKey, []byte(index.TrainedIndexFileName))
 	if err != nil {
 		return fmt.Errorf("error updating centroid bucket: %v", err)
+	}
+
+	t.trainingComplete.Store(trainReq.finalSample)
+	err = trainerBucket.Put(util.BoltTrainCompleteKey, []byte(strconv.FormatBool(trainReq.finalSample)))
+	if err != nil {
+		return fmt.Errorf("error updating train complete key: %v", err)
+	}
+
+	totSamples := atomic.AddUint64(&t.trainedSamples, uint64(trainReq.sampleSize))
+	err = trainerBucket.Put(util.BoltTrainedSamplesKey, binary.LittleEndian.AppendUint64(nil, totSamples))
+	if err != nil {
+		return fmt.Errorf("error updating trained samples key: %v", err)
 	}
 
 	err = tx.Commit()
@@ -105,12 +122,7 @@ func (t *vectorTrainer) persistToBolt() error {
 		return fmt.Errorf("error committing bolt transaction: %v", err)
 	}
 
-	err = t.parent.rootBolt.Sync()
-	if err != nil {
-		return fmt.Errorf("error on bolt sync: %v", err)
-	}
-
-	return nil
+	return t.parent.rootBolt.Sync()
 }
 
 // this is not a routine that will be running throughout the lifetime of the index. It's purpose
@@ -177,7 +189,7 @@ func (t *vectorTrainer) trainLoop() {
 			// code will help in tracking the progress a lot better and avoid any redudant data streaming operations.
 			//
 			// todo: rethink the frequency of bolt writes
-			err := t.persistToBolt()
+			err := t.persistToBolt(trainReq)
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error persisting to bolt: %v", err)
 				close(trainReq.ackCh)
@@ -198,6 +210,12 @@ func (t *vectorTrainer) trainLoop() {
 			}
 			t.m.Unlock()
 			close(trainReq.ackCh)
+
+			// exit the trainer loop we've ingested the final sample set and training
+			// is assumed to be complete.
+			if t.trainingComplete.Load() {
+				return
+			}
 		}
 	}
 }
@@ -212,6 +230,16 @@ func (t *vectorTrainer) loadTrainedData(bucket *bolt.Bucket) error {
 	if err != nil {
 		return err
 	}
+
+	// get the training status out of bolt
+	trainComplete := bucket.Get(util.BoltTrainCompleteKey)
+	trainedSamples := bucket.Get(util.BoltTrainedSamplesKey)
+	atomic.StoreUint64(&t.trainedSamples, binary.LittleEndian.Uint64(trainedSamples))
+	comp, err := strconv.ParseBool(string(trainComplete))
+	if err != nil {
+		return fmt.Errorf("error parsing train complete: %v", err)
+	}
+	t.trainingComplete.Store(comp)
 
 	t.m.Lock()
 	defer t.m.Unlock()
@@ -234,6 +262,15 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 		trainData = append(trainData, doc)
 	}
 
+	trainComplete := batch.InternalOps[string(util.BoltTrainCompleteKey)]
+	if trainComplete == nil {
+		trainComplete = []byte("false")
+	}
+	fin, err := strconv.ParseBool(string(trainComplete))
+	if err != nil {
+		return fmt.Errorf("error parsing train complete: %v", err)
+	}
+
 	// just builds a new vector index out of the train data provided
 	// this is not necessarily the final train data since this is submitted
 	// as a request to the trainer component to be merged. once the training
@@ -248,8 +285,10 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	}
 
 	trainReq := &trainRequest{
-		sample: seg,
-		ackCh:  make(chan error),
+		finalSample: fin,
+		sampleSize:  len(trainData),
+		ackCh:       make(chan error),
+		sample:      seg,
 	}
 
 	t.trainCh <- trainReq
@@ -257,8 +296,6 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	if err != nil {
 		return fmt.Errorf("train_vector: train() err'd out with: %w", err)
 	}
-
-	fmt.Println("trained on", len(trainData), "documents")
 
 	return err
 }
