@@ -16,6 +16,7 @@ package query
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/blevesearch/bleve/v2/util"
 )
@@ -46,15 +47,21 @@ func cloneCustomQueryPayload(in map[string]interface{}) map[string]interface{} {
 }
 
 func unmarshalCustomQueryPayload(data []byte, key string) (Query, map[string]interface{}, error) {
-	tmp := map[string]map[string]json.RawMessage{}
+	tmp := map[string]json.RawMessage{}
 	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	inner := tmp[key]
-	if len(inner) == 0 {
+	innerRaw, ok := tmp[key]
+	if !ok || innerRaw == nil {
 		return nil, nil, nil
+	}
+
+	var inner map[string]json.RawMessage
+	err = util.UnmarshalJSON(innerRaw, &inner)
+	if err != nil || inner == nil {
+		return nil, nil, fmt.Errorf("%s query must be a JSON object", key)
 	}
 
 	var child Query
@@ -74,7 +81,8 @@ func unmarshalCustomQueryPayload(data []byte, key string) (Query, map[string]int
 		if raw != nil {
 			err = util.UnmarshalJSON(raw, &v)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, fmt.Errorf("%s query has invalid %q payload: %w",
+					key, k, err)
 			}
 		}
 		payload[k] = v

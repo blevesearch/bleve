@@ -23,36 +23,36 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-var reflectStaticSizeScoreMutatingSearcher int
+var reflectStaticSizeCustomScoreSearcher int
 
 func init() {
-	var sfs ScoreMutatingSearcher
-	reflectStaticSizeScoreMutatingSearcher = int(reflect.TypeOf(sfs).Size())
+	var sfs CustomScoreSearcher
+	reflectStaticSizeCustomScoreSearcher = int(reflect.TypeOf(sfs).Size())
 }
 
 // ScoreFunc defines a function which can mutate document scores
 type ScoreFunc func(sctx *search.SearchContext, d *search.DocumentMatch) float64
 
-// ScoreMutatingSearcher wraps any other searcher, but mutates the score
-// of any Next/Advance call using the supplied ScoreFunc
-type ScoreMutatingSearcher struct {
+// CustomScoreSearcher wraps any other searcher, but mutates the score
+// of any Next/Advance call using the supplied ScoreFunc.
+type CustomScoreSearcher struct {
 	child  search.Searcher
 	mutate ScoreFunc
 }
 
-func NewScoreMutatingSearcher(ctx context.Context, s search.Searcher, mutate ScoreFunc) *ScoreMutatingSearcher {
-	return &ScoreMutatingSearcher{
+func NewCustomScoreSearcher(ctx context.Context, s search.Searcher, mutate ScoreFunc) *CustomScoreSearcher {
+	return &CustomScoreSearcher{
 		child:  s,
 		mutate: mutate,
 	}
 }
 
-func (f *ScoreMutatingSearcher) Size() int {
-	return reflectStaticSizeScoreMutatingSearcher + size.SizeOfPtr +
+func (f *CustomScoreSearcher) Size() int {
+	return reflectStaticSizeCustomScoreSearcher + size.SizeOfPtr +
 		f.child.Size()
 }
 
-func (f *ScoreMutatingSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+func (f *CustomScoreSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	next, err := f.child.Next(ctx)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (f *ScoreMutatingSearcher) Next(ctx *search.SearchContext) (*search.Documen
 	return next, nil
 }
 
-func (f *ScoreMutatingSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
+func (f *CustomScoreSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
 	adv, err := f.child.Advance(ctx, ID)
 	if err != nil {
 		return nil, err
@@ -74,26 +74,26 @@ func (f *ScoreMutatingSearcher) Advance(ctx *search.SearchContext, ID index.Inde
 	return adv, nil
 }
 
-func (f *ScoreMutatingSearcher) Close() error {
+func (f *CustomScoreSearcher) Close() error {
 	return f.child.Close()
 }
 
-func (f *ScoreMutatingSearcher) Weight() float64 {
+func (f *CustomScoreSearcher) Weight() float64 {
 	return f.child.Weight()
 }
 
-func (f *ScoreMutatingSearcher) SetQueryNorm(n float64) {
+func (f *CustomScoreSearcher) SetQueryNorm(n float64) {
 	f.child.SetQueryNorm(n)
 }
 
-func (f *ScoreMutatingSearcher) Count() uint64 {
+func (f *CustomScoreSearcher) Count() uint64 {
 	return f.child.Count()
 }
 
-func (f *ScoreMutatingSearcher) Min() int {
+func (f *CustomScoreSearcher) Min() int {
 	return f.child.Min()
 }
 
-func (f *ScoreMutatingSearcher) DocumentMatchPoolSize() int {
+func (f *CustomScoreSearcher) DocumentMatchPoolSize() int {
 	return f.child.DocumentMatchPoolSize()
 }

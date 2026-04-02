@@ -392,9 +392,6 @@ func ParseQuery(input []byte) (Query, error) {
 	return nil, fmt.Errorf("unknown query type")
 }
 
-var CustomFilterQueryParser func([]byte) (Query, error)
-var CustomScoreQueryParser func([]byte) (Query, error)
-
 // expandQuery traverses the input query tree and returns a new tree where
 // query string queries have been expanded into base queries. Returned tree may
 // reference queries from the input tree or new queries.

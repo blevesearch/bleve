@@ -4837,7 +4837,7 @@ func TestCustomFilterQueryEndToEnd(t *testing.T) {
 		"7": {},
 	}
 
-	q := NewCustomFilterQueryWithFilter(fictionQuery, func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
+	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
 		id, err := sctx.IndexReader.ExternalID(d.IndexInternalID)
 		if err != nil {
 			return false
@@ -4888,7 +4888,7 @@ func TestCustomScoreQueryEndToEnd(t *testing.T) {
 		"0": 1.0,
 	}
 
-	q := NewCustomScoreQueryWithScorer(fictionQuery, func(sctx *search.SearchContext, d *search.DocumentMatch) float64 {
+	q := query.NewCustomScoreQueryWithScorer(fictionQuery, func(sctx *search.SearchContext, d *search.DocumentMatch) float64 {
 		id, err := sctx.IndexReader.ExternalID(d.IndexInternalID)
 		if err != nil {
 			return d.Score

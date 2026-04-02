@@ -31,8 +31,18 @@ type CustomScoreQuery struct {
 	Query Query `json:"query"`
 
 	scoreFunc searcher.ScoreFunc
-	payload map[string]interface{}
+	payload   map[string]interface{}
 }
+
+// CustomScoreQueryParser lets an embedder override parsing of
+// {"custom_score": ...} nodes. It is intended to be assigned once during
+// process startup or init, before any queries are parsed; callers must not
+// mutate it concurrently with ParseQuery(). For example:
+//
+//	func init() {
+//		query.CustomScoreQueryParser = parseCustomScoreQuery
+//	}
+var CustomScoreQueryParser func([]byte) (Query, error)
 
 func NewCustomScoreQuery(query Query) *CustomScoreQuery {
 	return &CustomScoreQuery{
@@ -40,18 +50,15 @@ func NewCustomScoreQuery(query Query) *CustomScoreQuery {
 	}
 }
 
-func NewCustomScoreQueryWithScorer(query Query, score searcher.ScoreFunc) *CustomScoreQuery {
-	return &CustomScoreQuery{
-		Query:     query,
-		scoreFunc: score,
+func NewCustomScoreQueryWithScorer(query Query, score searcher.ScoreFunc, payload ...map[string]interface{}) *CustomScoreQuery {
+	var clonedPayload map[string]interface{}
+	if len(payload) > 0 {
+		clonedPayload = cloneCustomQueryPayload(payload[0])
 	}
-}
-
-func NewCustomScoreQueryWithScorerAndPayload(query Query, score searcher.ScoreFunc, payload map[string]interface{}) *CustomScoreQuery {
 	return &CustomScoreQuery{
 		Query:     query,
 		scoreFunc: score,
-		payload:   cloneCustomQueryPayload(payload),
+		payload:   clonedPayload,
 	}
 }
 
@@ -73,7 +80,7 @@ func (q *CustomScoreQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 	}
 
 	// Wrap the child so Next/Advance mutates score on each candidate hit.
-	return searcher.NewScoreMutatingSearcher(ctx, childSearcher, q.scoreFunc), nil
+	return searcher.NewCustomScoreSearcher(ctx, childSearcher, q.scoreFunc), nil
 }
 
 func (q *CustomScoreQuery) Validate() error {

@@ -16,6 +16,7 @@ package query
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -66,6 +67,36 @@ func TestCustomScoreQueryUnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestCustomFilterQueryUnmarshalJSONRejectsNonObjectPayload(t *testing.T) {
+	jsonBytes := []byte(`{
+		"custom_filter": "beer"
+	}`)
+
+	var cfq CustomFilterQuery
+	err := cfq.UnmarshalJSON(jsonBytes)
+	if err == nil {
+		t.Fatal("expected error for malformed custom_filter payload")
+	}
+	if !strings.Contains(err.Error(), "custom_filter query must be a JSON object") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCustomScoreQueryUnmarshalJSONRejectsNonObjectPayload(t *testing.T) {
+	jsonBytes := []byte(`{
+		"custom_score": "beer"
+	}`)
+
+	var csq CustomScoreQuery
+	err := csq.UnmarshalJSON(jsonBytes)
+	if err == nil {
+		t.Fatal("expected error for malformed custom_score payload")
+	}
+	if !strings.Contains(err.Error(), "custom_score query must be a JSON object") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestCustomFilterQueryMarshalJSONPreservesPayloadAndRewritesChild(t *testing.T) {
 	payload := map[string]interface{}{
 		"fields": []string{"abv"},
@@ -73,7 +104,7 @@ func TestCustomFilterQueryMarshalJSONPreservesPayloadAndRewritesChild(t *testing
 		"source": "function keep(doc, params){ return true; }",
 	}
 
-	q := NewCustomFilterQueryWithFilterAndPayload(NewMatchQuery("ipa"),
+	q := NewCustomFilterQueryWithFilter(NewMatchQuery("ipa"),
 		func(sctx *search.SearchContext, d *search.DocumentMatch) bool { return true }, payload)
 
 	out, err := q.MarshalJSON()
@@ -124,7 +155,7 @@ func TestCustomScoreQueryMarshalJSONPreservesPayloadAndRewritesChild(t *testing.
 		"source": "function score(doc, params){ return doc.score; }",
 	}
 
-	q := NewCustomScoreQueryWithScorerAndPayload(NewMatchQuery("ipa"),
+	q := NewCustomScoreQueryWithScorer(NewMatchQuery("ipa"),
 		func(sctx *search.SearchContext, d *search.DocumentMatch) float64 { return d.Score }, payload)
 
 	out, err := q.MarshalJSON()

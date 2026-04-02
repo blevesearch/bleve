@@ -33,24 +33,31 @@ type CustomFilterQuery struct {
 	payload    map[string]interface{}
 }
 
+// CustomFilterQueryParser lets an embedder override parsing of
+// {"custom_filter": ...} nodes. It is intended to be assigned once during
+// process startup or init, before any queries are parsed; callers must not
+// mutate it concurrently with ParseQuery(). For example:
+//
+//	func init() {
+//		query.CustomFilterQueryParser = parseCustomFilterQuery
+//	}
+var CustomFilterQueryParser func([]byte) (Query, error)
+
 func NewCustomFilterQuery(query Query) *CustomFilterQuery {
 	return &CustomFilterQuery{
 		Query: query,
 	}
 }
 
-func NewCustomFilterQueryWithFilter(query Query, filter searcher.FilterFunc) *CustomFilterQuery {
-	return &CustomFilterQuery{
-		Query:      query,
-		filterFunc: filter,
+func NewCustomFilterQueryWithFilter(query Query, filter searcher.FilterFunc, payload ...map[string]interface{}) *CustomFilterQuery {
+	var clonedPayload map[string]interface{}
+	if len(payload) > 0 {
+		clonedPayload = cloneCustomQueryPayload(payload[0])
 	}
-}
-
-func NewCustomFilterQueryWithFilterAndPayload(query Query, filter searcher.FilterFunc, payload map[string]interface{}) *CustomFilterQuery {
 	return &CustomFilterQuery{
 		Query:      query,
 		filterFunc: filter,
-		payload:    cloneCustomQueryPayload(payload),
+		payload:    clonedPayload,
 	}
 }
 
