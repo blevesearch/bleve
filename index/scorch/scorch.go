@@ -1417,9 +1417,6 @@ func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment,
 		}
 	}
 
-	atomic.AddUint64(&s.stats.TotFileMergePlanOk, 1)
-	atomic.AddUint64(&s.stats.TotFileMergePlanTasks, uint64(len(mergePlan.Tasks)))
-
 	// trigger the merge with the force merge plan
 	s.forceMergeRequestCh <- &mergerCtrl{
 		plan: mergePlan,

@@ -96,24 +96,9 @@ OUTER:
 					continue OUTER
 				}
 
-				startTime := time.Now()
-				var err error
 				// lets get started
-				// if there is no plan, then we are doing a regular merge at
-				// napshot based on the current state of the index. If there is
-				// a plan, then we are doing a force merge based on the segments
-				// specified in the plan.
-				if ctrlMsg.plan == nil {
-					err = s.planMergeAtSnapshot(ctrlMsg.ctx, ctrlMsg.options,
-						ourSnapshot)
-				} else {
-					cw := newCloseChWrapper(s.closeCh, ctrlMsg.ctx)
-					defer cw.close()
-					go cw.listen()
-
-					err = s.executePlanMergeAtSnapshot(ctrlMsg.plan, cw)
-				}
-
+				startTime := time.Now()
+				err := s.planMergeAtSnapshot(ctrlMsg, ourSnapshot)
 				if err != nil {
 					atomic.StoreUint64(&s.iStats.mergeEpoch, 0)
 					if err == segment.ErrClosed {
@@ -301,42 +286,44 @@ func (w *closeChWrapper) listen() {
 	}
 }
 
-func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
-	options *mergeplan.MergePlanOptions, ourSnapshot *IndexSnapshot) error {
-	// build list of persisted segments in this snapshot
-	var onlyPersistedSnapshots []mergeplan.Segment
-	for _, segmentSnapshot := range ourSnapshot.segment {
-		if _, ok := segmentSnapshot.segment.(segment.PersistedSegment); ok {
-			onlyPersistedSnapshots = append(onlyPersistedSnapshots, segmentSnapshot)
+// if there is no plan, then we are doing a regular merge at
+// the snapshot based on the current state of the index. If there is
+// a plan, then we are doing a force merge based on the segments
+// specified in the plan.
+func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnapshot) error {
+	mergePlan := ctrlMsg.plan
+	if mergePlan == nil {
+		// build list of persisted segments in this snapshot
+		var onlyPersistedSnapshots []mergeplan.Segment
+		for _, segmentSnapshot := range ourSnapshot.segment {
+			if _, ok := segmentSnapshot.segment.(segment.PersistedSegment); ok {
+				onlyPersistedSnapshots = append(onlyPersistedSnapshots, segmentSnapshot)
+			}
+		}
+
+		atomic.AddUint64(&s.stats.TotFileMergePlan, 1)
+
+		// give this list to the planner
+		var err error
+		mergePlan, err = mergeplan.Plan(onlyPersistedSnapshots, ctrlMsg.options)
+		if err != nil {
+			atomic.AddUint64(&s.stats.TotFileMergePlanErr, 1)
+			return fmt.Errorf("merge planning err: %v", err)
+		}
+		if mergePlan == nil {
+			// nothing to do
+			atomic.AddUint64(&s.stats.TotFileMergePlanNone, 1)
+			return nil
 		}
 	}
 
-	atomic.AddUint64(&s.stats.TotFileMergePlan, 1)
-
-	// give this list to the planner
-	resultMergePlan, err := mergeplan.Plan(onlyPersistedSnapshots, options)
-	if err != nil {
-		atomic.AddUint64(&s.stats.TotFileMergePlanErr, 1)
-		return fmt.Errorf("merge planning err: %v", err)
-	}
-	if resultMergePlan == nil {
-		// nothing to do
-		atomic.AddUint64(&s.stats.TotFileMergePlanNone, 1)
-		return nil
-	}
 	atomic.AddUint64(&s.stats.TotFileMergePlanOk, 1)
+	atomic.AddUint64(&s.stats.TotFileMergePlanTasks, uint64(len(mergePlan.Tasks)))
 
-	atomic.AddUint64(&s.stats.TotFileMergePlanTasks, uint64(len(resultMergePlan.Tasks)))
-
-	cw := newCloseChWrapper(s.closeCh, ctx)
+	cw := newCloseChWrapper(s.closeCh, ctrlMsg.ctx)
 	defer cw.close()
-
 	go cw.listen()
 
-	return s.executePlanMergeAtSnapshot(resultMergePlan, cw)
-}
-
-func (s *Scorch) executePlanMergeAtSnapshot(plan *mergeplan.MergePlan, cw *closeChWrapper) error {
 	var filenames []string
 	var err error
 	defer func() {
@@ -346,7 +333,7 @@ func (s *Scorch) executePlanMergeAtSnapshot(plan *mergeplan.MergePlan, cw *close
 		}
 	}()
 
-	for _, task := range plan.Tasks {
+	for _, task := range mergePlan.Tasks {
 		if len(task.Segments) == 0 {
 			atomic.AddUint64(&s.stats.TotFileMergePlanTasksSegmentsEmpty, 1)
 			continue

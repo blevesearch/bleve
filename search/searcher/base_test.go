@@ -67,7 +67,6 @@ func initTwoDocs(twoDocIndex index.Index) {
 		panic(err)
 	}
 	batch := index.NewBatch()
-
 	for _, doc := range twoDocIndexDocs {
 		batch.Update(doc)
 	}

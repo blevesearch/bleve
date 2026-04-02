@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/RoaringBitmap/roaring/v2 v2.14.5
 	github.com/bits-and-blooms/bitset v1.24.2
-	github.com/blevesearch/bleve_index_api v1.3.7
+	github.com/blevesearch/bleve_index_api v1.3.9
 	github.com/blevesearch/geo v0.2.5
 	github.com/blevesearch/go-faiss v1.0.30
 	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475

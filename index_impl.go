@@ -498,8 +498,7 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 
 // returns the set of file callback writer ids in use by the index
 func (i *indexImpl) FileWriterIDsInUse() (map[string]struct{}, error) {
-	ids := map[string]struct{}{}
-	ids[i.meta.fileReader.Id()] = struct{}{}
+	ids := map[string]struct{}{i.meta.fileReader.Id(): {}}
 
 	if cidx, ok := i.i.(IndexWithCallbacks); ok {
 		cIds, err := cidx.FileWriterIDsInUse()
@@ -1517,7 +1516,7 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 }
 
 type IndexFileCopyable interface {
-	SetPathInBolt(key []byte, value []byte) error //dest index
+	SetPathInBolt(key []byte, value []byte) error       //dest index
 	CopyFile(file string, d index.IndexDirectory) error // source index
 }
 
