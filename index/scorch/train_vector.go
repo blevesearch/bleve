@@ -28,6 +28,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/util"
@@ -131,6 +132,8 @@ func (t *vectorTrainer) trainLoop() {
 	defer func() {
 		t.parent.asyncTasks.Done()
 	}()
+
+	trainLoopStartTime := time.Now()
 	path := filepath.Join(t.parent.path, index.TrainedIndexFileName)
 	for {
 		select {
@@ -214,6 +217,8 @@ func (t *vectorTrainer) trainLoop() {
 			// exit the trainer loop we've ingested the final sample set and training
 			// is assumed to be complete.
 			if t.trainingComplete.Load() {
+				atomic.StoreUint64(&t.parent.stats.TotTrainedSamples, t.trainedSamples)
+				atomic.StoreUint64(&t.parent.stats.TotTrainTime, uint64(time.Since(trainLoopStartTime).Milliseconds()))
 				return
 			}
 		}
@@ -301,19 +306,16 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 }
 
 func (t *vectorTrainer) getInternal(key []byte) ([]byte, error) {
-	// todo: return the total number of vectors that have been processed so far in training
-	// in cbft use that as a checkpoint to resume training for n-x samples.
 	switch string(key) {
 	case string(util.BoltTrainCompleteKey):
-		t.m.RLock()
-		defer t.m.RUnlock()
-		return []byte(fmt.Sprintf("%t", t.centroidIndex != nil)), nil
+		return []byte(strconv.FormatBool(t.trainingComplete.Load())), nil
 	}
 	return nil, nil
 }
 
 func (t *vectorTrainer) getCentroidIndex(field string) (interface{}, error) {
-	// return the coarse quantizer of the centroid index belonging to the field
+	// return the coarse quantizer of the trained faiss index belonging to the field
+	// if its not available then zap performs naive merge
 	t.m.RLock()
 	defer t.m.RUnlock()
 	if t.centroidIndex != nil {

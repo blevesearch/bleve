@@ -136,6 +136,9 @@ type Stats struct {
 	MaxMemMergeZapTime      uint64
 	TotMemMergeSegments     uint64
 	TotMemorySegmentsAtRoot uint64
+
+	TotTrainedSamples uint64
+	TotTrainTime      uint64
 }
 
 // atomically populates the returned map
