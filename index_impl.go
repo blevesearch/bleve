@@ -1463,11 +1463,6 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 	return i.meta.CopyTo(d)
 }
 
-type IndexFileCopyable interface {
-	SetPathInBolt(key []byte, value []byte) error //dest index
-	CopyFile(file string, d index.IndexDirectory) error // source index
-}
-
 func (i *indexImpl) CopyFile(file string, d index.IndexDirectory) (err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -1478,7 +1473,7 @@ func (i *indexImpl) CopyFile(file string, d index.IndexDirectory) (err error) {
 
 	fileCopyIndex, ok := i.i.(IndexFileCopyable)
 	if !ok {
-		return fmt.Errorf("index implementation does not support copy reader")
+		return fmt.Errorf("index implementation does not support file copy reader")
 	}
 
 	return fileCopyIndex.CopyFile(file, d)
