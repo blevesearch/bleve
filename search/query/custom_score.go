@@ -79,8 +79,9 @@ func (q *CustomScoreQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		return nil, err
 	}
 
-	// Wrap the child so Next/Advance mutates score on each candidate hit.
-	return searcher.NewCustomScoreSearcher(ctx, childSearcher, q.scoreFunc), nil
+	// Wrap the child so Next/Advance loads fields and mutates score.
+	fields := payloadFields(q.payload, "fields")
+	return searcher.NewCustomScoreSearcher(ctx, childSearcher, q.scoreFunc, i, fields), nil
 }
 
 func (q *CustomScoreQuery) Validate() error {

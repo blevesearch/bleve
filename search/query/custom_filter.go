@@ -78,8 +78,9 @@ func (q *CustomFilterQuery) Searcher(ctx context.Context, i index.IndexReader, m
 		return nil, err
 	}
 
-	// Wrap the child so Next/Advance applies the callback on each candidate hit.
-	return searcher.NewFilteringSearcher(ctx, childSearcher, q.filterFunc), nil
+	// Wrap the child so Next/Advance loads fields and applies the callback.
+	fields := payloadFields(q.payload, "fields")
+	return searcher.NewCustomFilterSearcher(ctx, childSearcher, q.filterFunc, i, fields), nil
 }
 
 func (q *CustomFilterQuery) Validate() error {

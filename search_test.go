@@ -4917,6 +4917,89 @@ func TestCustomScoreQueryEndToEnd(t *testing.T) {
 	}
 }
 
+func TestCustomFilterQueryEndToEndUsesDocumentMatchIDWithoutFields(t *testing.T) {
+	idx := newCustomQueryTestIndex(t)
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	fictionQuery := NewTermQuery("fiction")
+	fictionQuery.SetField("genre")
+
+	allowedIDs := map[string]struct{}{
+		"0": {},
+		"2": {},
+		"7": {},
+	}
+
+	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(_ *search.SearchContext, d *search.DocumentMatch) bool {
+		_, ok := allowedIDs[d.ID]
+		return ok
+	})
+
+	req := NewSearchRequest(q)
+	req.Size = 10
+
+	res, err := idx.SearchInContext(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 3 {
+		t.Fatalf("expected 3 hits, got %d", res.Total)
+	}
+
+	expectedOrder := []string{"0", "2", "7"}
+	for i, hit := range res.Hits {
+		if hit.ID != expectedOrder[i] {
+			t.Fatalf("expected hit %d to be %s, got %s", i, expectedOrder[i], hit.ID)
+		}
+	}
+}
+
+func TestCustomScoreQueryEndToEndUsesPreloadedFieldsWithoutSearchContext(t *testing.T) {
+	idx := newCustomDateCustomQueryTestIndex(t)
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	fictionQuery := NewTermQuery("fiction")
+	fictionQuery.SetField("genre")
+
+	payload := map[string]interface{}{
+		"fields": []string{"published"},
+	}
+
+	q := query.NewCustomScoreQueryWithScorer(fictionQuery, func(_ *search.SearchContext, d *search.DocumentMatch) float64 {
+		published, ok := d.Fields["published"].(string)
+		if ok && strings.HasPrefix(published, "2024-01-02") {
+			return d.Score + 100
+		}
+		return d.Score
+	}, payload)
+
+	req := NewSearchRequest(q)
+	req.Size = 4
+
+	res, err := idx.SearchInContext(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "1" {
+		t.Fatalf("expected boosted hit 1 first, got %s", res.Hits[0].ID)
+	}
+}
+
 func newCustomQueryTestIndex(t *testing.T) Index {
 	t.Helper()
 
@@ -4944,6 +5027,44 @@ func newCustomQueryTestIndex(t *testing.T) Index {
 		{"title": "Atomic Habits", "genre": "self-help"},
 		{"title": "Educated", "genre": "non-fiction"},
 		{"title": "1984", "genre": "fiction"},
+	}
+
+	b := idx.NewBatch()
+	for i, doc := range docs {
+		err := b.Index(strconv.Itoa(i), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = idx.Batch(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return idx
+}
+
+func newCustomDateCustomQueryTestIndex(t *testing.T) Index {
+	t.Helper()
+
+	imap := mapping.NewIndexMapping()
+
+	genreMapping := mapping.NewTextFieldMapping()
+	genreMapping.Analyzer = keyword.Name
+	imap.DefaultMapping.AddFieldMappingsAt("genre", genreMapping)
+
+	publishedMapping := mapping.NewDateTimeFieldMapping()
+	imap.DefaultMapping.AddFieldMappingsAt("published", publishedMapping)
+
+	idx, err := NewMemOnly(imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	docs := []map[string]interface{}{
+		{"genre": "fiction", "published": "2023-01-01"},
+		{"genre": "fiction", "published": "2024-01-02"},
 	}
 
 	b := idx.NewBatch()

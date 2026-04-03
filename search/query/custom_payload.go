@@ -90,3 +90,28 @@ func unmarshalCustomQueryPayload(data []byte, key string) (Query, map[string]int
 
 	return child, payload, nil
 }
+
+// payloadFields extracts a string slice from an opaque payload map.
+// It handles both []string (from direct construction) and []interface{}
+// (from JSON round-trip unmarshal).
+func payloadFields(payload map[string]interface{}, key string) []string {
+	v, ok := payload[key]
+	if !ok || v == nil {
+		return nil
+	}
+	switch t := v.(type) {
+	case []string:
+		return t
+	case []interface{}:
+		out := make([]string, 0, len(t))
+		for _, elem := range t {
+			if s, ok := elem.(string); ok {
+				out = append(out, s)
+			}
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+	return nil
+}
