@@ -17,6 +17,7 @@ package scorch
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -79,6 +80,8 @@ type Scorch struct {
 	rootBolt                 *bolt.DB
 	asyncTasks               sync.WaitGroup
 
+	trainer trainer
+
 	onEvent      func(event Event) bool
 	onAsyncError func(err error, path string)
 
@@ -87,6 +90,33 @@ type Scorch struct {
 	segPlugin SegmentPlugin
 
 	spatialPlugin index.SpatialAnalyzerPlugin
+}
+
+// trainer interface is used for training an index that has the concept
+// of "learning". Naturally, a vector index is one such thing that would
+// implement this interface. There can be multiple implementations of the
+// training itself even for the same index type.
+//
+// this component is not supposed to interact with the other master routines
+// of scorch and will be used only for training the index before the actual data
+// ingestion starts. The routine should also be released once the
+// training is marked as complete - which can be done using the BoltTrainCompleteKey
+// key and a bool value. However the struct is still maintained for the pointer to
+// the instance so that we can use in the later stages of the index lifecycle.
+type trainer interface {
+	// ephemeral
+	trainLoop()
+	// for the training state and the ingestion of the samples
+	train(batch *index.Batch) error
+
+	// to load the metadata from the bolt under the BoltTrainerKey
+	loadTrainedData(*bolt.Bucket) error
+	// to fetch the internal data from the component
+	getInternal(key []byte) ([]byte, error)
+
+	// trainer specific file transfer operations
+	copyFileLOCKED(file string, d index.IndexDirectory) error
+	updateBolt(snapshotsBucket *bolt.Bucket, key []byte, value []byte) error
 }
 
 type ScorchErrorType string
@@ -170,6 +200,11 @@ func NewScorch(storeName string,
 		}
 	}
 
+	segConfig, ok := config["segmentConfig"].(map[string]interface{})
+	if ok {
+		rv.segmentConfig = segConfig
+	}
+
 	typ, ok := config["spatialPlugin"].(string)
 	if ok {
 		if err := rv.loadSpatialAnalyzerPlugin(typ); err != nil {
@@ -205,6 +240,10 @@ func NewScorch(storeName string,
 	_, err = rv.parseMergePlannerOptions()
 	if err != nil {
 		return nil, err
+	}
+
+	if trainer := initTrainer(rv, config); trainer != nil {
+		rv.trainer = trainer
 	}
 
 	return rv, nil
@@ -260,6 +299,11 @@ func (s *Scorch) Open() error {
 
 	s.asyncTasks.Add(1)
 	go s.introducerLoop()
+
+	if s.trainer != nil {
+		s.asyncTasks.Add(1)
+		go s.trainer.trainLoop()
+	}
 
 	if !s.readOnly && s.path != "" {
 		s.asyncTasks.Add(1)
@@ -532,6 +576,29 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	atomic.AddUint64(&s.stats.TotIndexTime, uint64(time.Since(indexStart)))
 
 	return err
+}
+
+func (s *Scorch) getInternal(key []byte) ([]byte, error) {
+	s.rootLock.RLock()
+	defer s.rootLock.RUnlock()
+
+	switch string(key) {
+	case string(util.BoltTrainCompleteKey):
+		if s.trainer != nil {
+			return s.trainer.getInternal(key)
+		} else {
+			return nil, fmt.Errorf("get on BoltTrainCompleteKey is not supported" +
+				" with this build")
+		}
+	}
+	return nil, nil
+}
+
+func (s *Scorch) Train(batch *index.Batch) error {
+	if s.trainer != nil {
+		return s.trainer.train(batch)
+	}
+	return fmt.Errorf("training is not supported with this build")
 }
 
 func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
@@ -977,6 +1044,65 @@ func (s *Scorch) CopyReader() index.CopyReader {
 	}
 	s.rootLock.Unlock()
 	return rv
+}
+
+func (s *Scorch) SetPathInBolt(key []byte, value []byte) error {
+	tx, err := s.rootBolt.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	snapshotsBucket, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
+	if err != nil {
+		return err
+	}
+
+	// currently this is specific to centroid index file update
+	err = s.trainer.updateBolt(snapshotsBucket, key, value)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return s.rootBolt.Sync()
+}
+
+// CopyFile copies a specific file to a destination directory which has an access to a bleve index
+// doing a io.Copy() isn't enough because the file needs to be tracked in bolt file as well
+func (s *Scorch) CopyFile(file string, d index.IndexDirectory) error {
+	s.rootLock.Lock()
+	defer s.rootLock.Unlock()
+
+	dest, err := d.GetWriter(filepath.Join("store", file))
+	if err != nil {
+		return err
+	}
+
+	source, err := os.Open(filepath.Join(s.path, file))
+	if err != nil {
+		return err
+	}
+
+	defer source.Close()
+	defer dest.Close()
+	_, err = io.Copy(dest, source)
+	if err != nil {
+		return err
+	}
+
+	// this code is currently specific to copying trained data but is future proofed for other files
+	// to be updated in the dest's bolt
+	err = s.trainer.copyFileLOCKED(file, d)
+	return err
 }
 
 // external API to fire a scorch event (EventKindIndexStart) externally from bleve

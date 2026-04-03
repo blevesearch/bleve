@@ -28,6 +28,7 @@ const (
 	ErrorIndexReadInconsistency
 	ErrorTwoPhaseSearchInconsistency
 	ErrorSynonymSearchNotSupported
+	ErrorTrainingNotSupported
 )
 
 // Error represents a more strongly typed bleve error for detecting

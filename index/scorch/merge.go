@@ -329,7 +329,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 		atomic.AddUint64(&s.stats.TotFileMergePlanTasksSegments, uint64(len(task.Segments)))
 
-		oldMap := make(map[uint64]*SegmentSnapshot, len(task.Segments))
 		newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
 		segmentsToMerge := make([]segment.Segment, 0, len(task.Segments))
 		docsToDrop := make([]*roaring.Bitmap, 0, len(task.Segments))
@@ -337,7 +336,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 		for _, planSegment := range task.Segments {
 			if segSnapshot, ok := planSegment.(*SegmentSnapshot); ok {
-				oldMap[segSnapshot.id] = segSnapshot
 				mergedSegHistory[segSnapshot.id] = &mergedSegmentHistory{
 					workerID:   0,
 					oldSegment: segSnapshot,
@@ -345,7 +343,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 				if persistedSeg, ok := segSnapshot.segment.(segment.PersistedSegment); ok {
 					if segSnapshot.LiveSize() == 0 {
 						atomic.AddUint64(&s.stats.TotFileMergeSegmentsEmpty, 1)
-						oldMap[segSnapshot.id] = nil
 						delete(mergedSegHistory, segSnapshot.id)
 					} else {
 						segmentsToMerge = append(segmentsToMerge, segSnapshot.segment)

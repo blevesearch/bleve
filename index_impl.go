@@ -369,6 +369,20 @@ func (i *indexImpl) IndexSynonym(id string, collection string, definition *Synon
 	return err
 }
 
+func (i *indexImpl) Train(batch *Batch) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	if vi, ok := i.i.(index.TrainableIndex); ok {
+		return vi.Train(batch.internal)
+	}
+	return ErrorTrainingNotSupported
+}
+
 // IndexAdvanced takes a document.Document object
 // skips the mapping and indexes it.
 func (i *indexImpl) IndexAdvanced(doc *document.Document) (err error) {
@@ -1442,11 +1456,48 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 
 	err = copyReader.CopyTo(d)
 	if err != nil {
-		return fmt.Errorf("error copying index metadata: %v", err)
+		return fmt.Errorf("error copying index data: %v", err)
 	}
 
 	// copy the metadata
 	return i.meta.CopyTo(d)
+}
+
+type IndexFileCopyable interface {
+	SetPathInBolt(key []byte, value []byte) error //dest index
+	CopyFile(file string, d index.IndexDirectory) error // source index
+}
+
+func (i *indexImpl) CopyFile(file string, d index.IndexDirectory) (err error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	fileCopyIndex, ok := i.i.(IndexFileCopyable)
+	if !ok {
+		return fmt.Errorf("index implementation does not support copy reader")
+	}
+
+	return fileCopyIndex.CopyFile(file, d)
+}
+
+func (i *indexImpl) SetPathInBolt(key []byte, value []byte) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	fileCopyIndex, ok := i.i.(IndexFileCopyable)
+	if !ok {
+		return fmt.Errorf("index implementation does not support file copy")
+	}
+
+	return fileCopyIndex.SetPathInBolt(key, value)
 }
 
 func (f FileSystemDirectory) GetWriter(filePath string) (io.WriteCloser,
