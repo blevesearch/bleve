@@ -1530,7 +1530,7 @@ func (i *indexImpl) CopyFile(file string, d index.IndexDirectory) (err error) {
 
 	fileCopyIndex, ok := i.i.(IndexFileCopyable)
 	if !ok {
-		return fmt.Errorf("index implementation does not support copy reader")
+		return fmt.Errorf("index implementation does not support file copy reader")
 	}
 
 	return fileCopyIndex.CopyFile(file, d)

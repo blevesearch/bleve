@@ -913,10 +913,6 @@ func zapFileName(epoch uint64) string {
 	return fmt.Sprintf("%012x.zap", epoch)
 }
 
-func (s *Scorch) loadTrainedData(bucket *bolt.Bucket) error {
-	return s.trainer.loadTrainedData(bucket)
-}
-
 // bolt snapshot code
 func (s *Scorch) loadFromBolt() error {
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {

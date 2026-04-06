@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -472,6 +473,24 @@ func (s *Scorch) Delete(id string) error {
 	return s.Batch(b)
 }
 
+func (s *Scorch) isTrained(batch *index.Batch) (bool, error) {
+	trained := true
+	if len(batch.IndexOps) > 0 && s.trainer != nil {
+		val, err := s.getInternal(util.BoltTrainCompleteKey)
+		if err != nil {
+			return false, err
+		}
+
+		if val != nil {
+			trained, err = strconv.ParseBool(string(val))
+			if err != nil {
+				return false, err
+			}
+		}
+	}
+	return trained, nil
+}
+
 // Batch applices a batch of changes to the index atomically
 func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	start := time.Now()
@@ -481,6 +500,15 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	defer func() {
 		s.fireEvent(EventKindBatchIntroduction, time.Since(start))
 	}()
+
+	trained, err := s.isTrained(batch)
+	if err != nil {
+		return err
+	}
+
+	if !trained {
+		return fmt.Errorf("index is not trained yet")
+	}
 
 	resultChan := make(chan index.Document, len(batch.IndexOps))
 
