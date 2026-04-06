@@ -15,6 +15,8 @@
 package searcher
 
 import (
+	"time"
+
 	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
@@ -84,11 +86,10 @@ func decodeDocValueTerm(term []byte, fieldType string) interface{} {
 			return nil
 		}
 		if fieldType == "datetime" {
-			// Datetime doc values store time.UnixNano() directly as int64,
-			// so callbacks receive a float64 of nanoseconds since Unix epoch
-			// (e.g. 1.6468704e+18 for 2022-03-10T00:00:00Z), not a
-			// formatted date string.
-			return float64(i64)
+			// Datetime doc values store time.UnixNano() directly as int64.
+			// Convert back to a formatted string so callbacks (including
+			// JS UDFs) receive a human-readable date like "2022-03-10T00:00:00Z".
+			return time.Unix(0, i64).UTC().Format(time.RFC3339Nano)
 		}
 		// Numeric float64 fields use Float64ToInt64 bit manipulation encoding.
 		return numeric.Int64ToFloat64(i64)

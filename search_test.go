@@ -5125,19 +5125,19 @@ func TestCustomFilterQueryDateTimeDocValues(t *testing.T) {
 	fictionQuery := NewTermQuery("fiction")
 	fictionQuery.SetField("genre")
 
-	// Datetime doc values are decoded as float64 nanoseconds since epoch.
-	cutoffNanos := float64(cutoff.UnixNano())
+	// Datetime doc values are decoded as RFC 3339 strings.
+	cutoffStr := cutoff.UTC().Format(time.RFC3339Nano)
 
 	payload := map[string]interface{}{
 		"fields": []string{"published"},
 	}
 
 	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(_ *search.SearchContext, d *search.DocumentMatch) bool {
-		pubNanos, ok := d.Fields["published"].(float64)
+		pubStr, ok := d.Fields["published"].(string)
 		if !ok {
 			return false
 		}
-		return pubNanos >= cutoffNanos
+		return pubStr >= cutoffStr
 	}, payload)
 
 	req := NewSearchRequest(q)

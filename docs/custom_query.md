@@ -83,28 +83,30 @@ from **doc values** (column-oriented, memory-mapped), not stored fields.
 does not have doc values enabled in the index mapping, its value will not be
 available to the callback at query time.
 
-To enable doc values for a field in the index mapping:
+Doc values are enabled by default for all field types (`DocValues: true`) and
+for dynamic mappings (`DocValuesDynamic: true`), so no extra configuration is
+needed unless these defaults have been explicitly disabled. If they have been
+disabled, re-enable them:
 
 ```go
 fm := mapping.NewTextFieldMapping()
-fm.DocValues = true                    // required for custom_filter / custom_score field access
+fm.DocValues = true                    // default is true; only needed if previously disabled
 imap.DefaultMapping.AddFieldMappingsAt("genre", fm)
 ```
 
-For dynamic mappings, ensure `docvalues_dynamic` is set to `true` on the
-document mapping so that dynamically discovered fields also have doc values
-indexed.
+For dynamic mappings, ensure `docvalues_dynamic` has not been set to `false` on
+the document mapping.
 
 ### Field type decoding
 
-Doc values are decoded based on the field's mapping type:
+At the bleve layer, doc values are decoded based on the field's mapping type:
 
 | Mapping type | Go type in `d.Fields` | Notes |
 |---|---|---|
 | `text` / `keyword` | `string` | Raw text bytes |
 | `number` | `float64` | IEEE 754 decoded |
 | `boolean` | `bool` | `true` / `false` |
-| `datetime` | `float64` | Nanoseconds since Unix epoch (`time.UnixNano()`), not a formatted string |
+| `datetime` | `string` | RFC 3339 formatted (e.g. `"2022-03-10T00:00:00Z"`) |
 
 ## Runtime Behavior
 
