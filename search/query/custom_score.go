@@ -50,15 +50,11 @@ func NewCustomScoreQuery(query Query) *CustomScoreQuery {
 	}
 }
 
-func NewCustomScoreQueryWithScorer(query Query, score searcher.ScoreFunc, payload ...map[string]interface{}) *CustomScoreQuery {
-	var clonedPayload map[string]interface{}
-	if len(payload) > 0 {
-		clonedPayload = cloneCustomQueryPayload(payload[0])
-	}
+func NewCustomScoreQueryWithScorer(query Query, score searcher.ScoreFunc, payload map[string]interface{}) *CustomScoreQuery {
 	return &CustomScoreQuery{
 		Query:     query,
 		scoreFunc: score,
-		payload:   clonedPayload,
+		payload:   payload,
 	}
 }
 
@@ -79,9 +75,22 @@ func (q *CustomScoreQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		return nil, err
 	}
 
-	// Wrap the child so Next/Advance loads fields and mutates score.
+	// Create a doc value reader for the requested fields (if any) so the
+	// searcher can populate d.Fields before invoking the callback.
 	fields := payloadFields(q.payload, "fields")
-	return searcher.NewCustomScoreSearcher(ctx, childSearcher, q.scoreFunc, i, fields), nil
+	var dvReader index.DocValueReader
+	var fieldTypes map[string]string
+	if len(fields) > 0 {
+		var err2 error
+		dvReader, err2 = i.DocValueReader(fields)
+		if err2 != nil {
+			_ = childSearcher.Close()
+			return nil, err2
+		}
+		fieldTypes = resolveFieldTypes(fields, m)
+	}
+
+	return searcher.NewCustomScoreSearcher(ctx, childSearcher, q.scoreFunc, dvReader, i, fieldTypes), nil
 }
 
 func (q *CustomScoreQuery) Validate() error {
@@ -98,22 +107,13 @@ func (q *CustomScoreQuery) Validate() error {
 }
 
 func (q *CustomScoreQuery) MarshalJSON() ([]byte, error) {
-	type customScoreInner struct {
-		Query Query `json:"query"`
+	inner := make(map[string]interface{}, len(q.payload)+1)
+	for k, v := range q.payload {
+		inner[k] = v
 	}
-
-	if len(q.payload) > 0 {
-		inner := cloneCustomQueryPayload(q.payload)
-		inner["query"] = q.Query
-		return json.Marshal(map[string]interface{}{
-			"custom_score": inner,
-		})
-	}
-
+	inner["query"] = q.Query
 	return json.Marshal(map[string]interface{}{
-		"custom_score": customScoreInner{
-			Query: q.Query,
-		},
+		"custom_score": inner,
 	})
 }
 

@@ -49,15 +49,11 @@ func NewCustomFilterQuery(query Query) *CustomFilterQuery {
 	}
 }
 
-func NewCustomFilterQueryWithFilter(query Query, filter searcher.FilterFunc, payload ...map[string]interface{}) *CustomFilterQuery {
-	var clonedPayload map[string]interface{}
-	if len(payload) > 0 {
-		clonedPayload = cloneCustomQueryPayload(payload[0])
-	}
+func NewCustomFilterQueryWithFilter(query Query, filter searcher.FilterFunc, payload map[string]interface{}) *CustomFilterQuery {
 	return &CustomFilterQuery{
 		Query:      query,
 		filterFunc: filter,
-		payload:    clonedPayload,
+		payload:    payload,
 	}
 }
 
@@ -78,9 +74,22 @@ func (q *CustomFilterQuery) Searcher(ctx context.Context, i index.IndexReader, m
 		return nil, err
 	}
 
-	// Wrap the child so Next/Advance loads fields and applies the callback.
+	// Create a doc value reader for the requested fields (if any) so the
+	// searcher can populate d.Fields before invoking the callback.
 	fields := payloadFields(q.payload, "fields")
-	return searcher.NewCustomFilterSearcher(ctx, childSearcher, q.filterFunc, i, fields), nil
+	var dvReader index.DocValueReader
+	var fieldTypes map[string]string
+	if len(fields) > 0 {
+		var err2 error
+		dvReader, err2 = i.DocValueReader(fields)
+		if err2 != nil {
+			_ = childSearcher.Close()
+			return nil, err2
+		}
+		fieldTypes = resolveFieldTypes(fields, m)
+	}
+
+	return searcher.NewCustomFilterSearcher(ctx, childSearcher, q.filterFunc, dvReader, i, fieldTypes), nil
 }
 
 func (q *CustomFilterQuery) Validate() error {
@@ -97,22 +106,13 @@ func (q *CustomFilterQuery) Validate() error {
 }
 
 func (q *CustomFilterQuery) MarshalJSON() ([]byte, error) {
-	type customFilterInner struct {
-		Query Query `json:"query"`
+	inner := make(map[string]interface{}, len(q.payload)+1)
+	for k, v := range q.payload {
+		inner[k] = v
 	}
-
-	if len(q.payload) > 0 {
-		inner := cloneCustomQueryPayload(q.payload)
-		inner["query"] = q.Query
-		return json.Marshal(map[string]interface{}{
-			"custom_filter": inner,
-		})
-	}
-
+	inner["query"] = q.Query
 	return json.Marshal(map[string]interface{}{
-		"custom_filter": customFilterInner{
-			Query: q.Query,
-		},
+		"custom_filter": inner,
 	})
 }
 

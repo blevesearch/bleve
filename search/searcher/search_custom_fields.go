@@ -15,29 +15,28 @@
 package searcher
 
 import (
-	"strconv"
-	"time"
-
-	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/microseconds"
-	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/milliseconds"
-	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/nanoseconds"
-	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/seconds"
+	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-// loadFieldsOnHit resolves the external document ID and loads the requested
-// stored fields into hit.Fields using the supplied IndexReader.
-// It always resolves hit.ID; stored field loading is a no-op when fields is
-// empty.
-func loadFieldsOnHit(hit *search.DocumentMatch, r index.IndexReader, fields []string) error {
-	if hit == nil || r == nil {
-		return nil
-	}
+// loadDocValuesOnHit uses the supplied DocValueReader to visit doc values
+// for the given hit and populate hit.Fields. It also resolves hit.ID if empty.
+// It is a no-op when dvReader is nil.
+//
+// fieldTypes maps field name → mapping type (e.g. "datetime", "number").
+// When provided, datetime fields are decoded as nanosecond int64s (cast to
+// float64) rather than using the IEEE 754 bit reinterpretation used for
+// numeric fields. When nil, all prefix-coded values use the numeric path.
+func loadDocValuesOnHit(hit *search.DocumentMatch, dvReader index.DocValueReader,
+	r index.IndexReader) error {
+	return loadDocValuesOnHitWithTypes(hit, dvReader, r, nil)
+}
 
-	// Resolve external ID so the callback can read hit.ID and so we can
-	// load the stored document.
-	if hit.ID == "" {
+func loadDocValuesOnHitWithTypes(hit *search.DocumentMatch, dvReader index.DocValueReader,
+	r index.IndexReader, fieldTypes map[string]string) error {
+	// Always resolve external ID so the callback can read hit.ID.
+	if hit.ID == "" && r != nil {
 		extID, err := r.ExternalID(hit.IndexInternalID)
 		if err != nil {
 			return err
@@ -45,89 +44,66 @@ func loadFieldsOnHit(hit *search.DocumentMatch, r index.IndexReader, fields []st
 		hit.ID = extID
 	}
 
-	if len(fields) == 0 {
+	if dvReader == nil {
 		return nil
 	}
 
-	doc, err := r.Document(hit.ID)
-	if err != nil {
-		return err
-	}
-	if doc == nil {
-		return nil
-	}
-
-	wantAll := false
-	want := make(map[string]struct{}, len(fields))
-	for _, f := range fields {
-		if f == "*" {
-			wantAll = true
-			break
-		}
-		if f != "" {
-			want[f] = struct{}{}
-		}
-	}
-
-	doc.VisitFields(func(docF index.Field) {
-		name := docF.Name()
-		if !wantAll {
-			if _, ok := want[name]; !ok {
-				return
-			}
-		}
-
-		var value interface{}
-		switch typedF := docF.(type) {
-		case index.TextField:
-			value = typedF.Text()
-		case index.NumericField:
-			if num, err := typedF.Number(); err == nil {
-				value = num
-			}
-		case index.BooleanField:
-			if b, err := typedF.Boolean(); err == nil {
-				value = b
-			}
-		case index.DateTimeField:
-			if dt, layout, err := typedF.DateTime(); err == nil {
-				if layout == "" {
-					value = dt.Format(time.RFC3339)
-				} else {
-					switch layout {
-					case seconds.Name:
-						value = strconv.FormatInt(dt.Unix(), 10)
-					case milliseconds.Name:
-						value = strconv.FormatInt(dt.UnixMilli(), 10)
-					case microseconds.Name:
-						value = strconv.FormatInt(dt.UnixMicro(), 10)
-					case nanoseconds.Name:
-						value = strconv.FormatInt(dt.UnixNano(), 10)
-					default:
-						value = dt.Format(layout)
-					}
-				}
-			}
-		case index.GeoPointField:
-			if lon, err := typedF.Lon(); err == nil {
-				if lat, err := typedF.Lat(); err == nil {
-					value = []float64{lon, lat}
-				}
-			}
-		case index.IPField:
-			if ip, err := typedF.IP(); err == nil {
-				value = ip.String()
-			}
-		case index.GeoShapeField:
-			if shape, err := typedF.GeoShape(); err == nil {
-				value = shape
-			}
-		}
-
+	err := dvReader.VisitDocValues(hit.IndexInternalID, func(field string, term []byte) {
+		value := decodeDocValueTerm(term, fieldTypes[field])
 		if value != nil {
-			hit.AddFieldValue(name, value)
+			hit.AddFieldValue(field, value)
 		}
 	})
 
-	return nil
+	return err
+}
+
+// decodeDocValueTerm converts raw doc value bytes into a typed Go value.
+// Numeric fields are prefix-coded int64s (only shift-0 terms carry values).
+// Boolean fields are stored as "T" or "F".
+// Everything else (text/keyword) is returned as a string.
+//
+// fieldType is the mapping type string for the field (e.g. "datetime",
+// "number"). When fieldType is "datetime", the prefix-coded int64 is
+// treated as raw nanoseconds (time.UnixNano()) and cast directly to float64.
+// For numeric fields the int64 is decoded via Int64ToFloat64 (IEEE 754 bit
+// reinterpretation).
+func decodeDocValueTerm(term []byte, fieldType string) interface{} {
+	if len(term) == 0 {
+		return nil
+	}
+
+	// Check if it's a prefix-coded numeric term.
+	if valid, shift := numeric.ValidPrefixCodedTermBytes(term); valid {
+		// Only shift-0 terms carry the actual value.
+		if shift != 0 {
+			return nil
+		}
+		i64, err := numeric.PrefixCoded(term).Int64()
+		if err != nil {
+			return nil
+		}
+		if fieldType == "datetime" {
+			// Datetime doc values store time.UnixNano() directly as int64,
+			// so callbacks receive a float64 of nanoseconds since Unix epoch
+			// (e.g. 1.6468704e+18 for 2022-03-10T00:00:00Z), not a
+			// formatted date string.
+			return float64(i64)
+		}
+		// Numeric float64 fields use Float64ToInt64 bit manipulation encoding.
+		return numeric.Int64ToFloat64(i64)
+	}
+
+	// Boolean fields are stored as "T" or "F".
+	if len(term) == 1 {
+		if term[0] == 'T' {
+			return true
+		}
+		if term[0] == 'F' {
+			return false
+		}
+	}
+
+	// Default: text/keyword — return as string.
+	return string(term)
 }

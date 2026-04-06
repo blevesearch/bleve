@@ -30,24 +30,28 @@ func init() {
 	reflectStaticSizeCustomFilterSearcher = int(reflect.TypeOf(cfs).Size())
 }
 
-// CustomFilterSearcher wraps a child searcher, optionally loads stored fields
+// CustomFilterSearcher wraps a child searcher, optionally loads doc values
 // into each DocumentMatch, then applies a FilterFunc to decide whether to keep
 // the hit. Unlike FilteringSearcher this variant is purpose-built for custom
 // queries that need field values at callback time.
 type CustomFilterSearcher struct {
 	child       search.Searcher
 	accept      FilterFunc
+	dvReader    index.DocValueReader
 	indexReader index.IndexReader
-	fields      []string
+	fieldTypes  map[string]string
 }
 
 func NewCustomFilterSearcher(ctx context.Context, child search.Searcher,
-	filter FilterFunc, indexReader index.IndexReader, fields []string) *CustomFilterSearcher {
+	filter FilterFunc, dvReader index.DocValueReader,
+	indexReader index.IndexReader,
+	fieldTypes map[string]string) *CustomFilterSearcher {
 	return &CustomFilterSearcher{
 		child:       child,
 		accept:      filter,
+		dvReader:    dvReader,
 		indexReader: indexReader,
-		fields:      fields,
+		fieldTypes:  fieldTypes,
 	}
 }
 
@@ -59,7 +63,7 @@ func (f *CustomFilterSearcher) Size() int {
 func (f *CustomFilterSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	next, err := f.child.Next(ctx)
 	for next != nil && err == nil {
-		if err = loadFieldsOnHit(next, f.indexReader, f.fields); err != nil {
+		if err = loadDocValuesOnHitWithTypes(next, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
 		if f.accept(ctx, next) {
@@ -78,7 +82,7 @@ func (f *CustomFilterSearcher) Advance(ctx *search.SearchContext, ID index.Index
 	if adv == nil {
 		return nil, nil
 	}
-	if err = loadFieldsOnHit(adv, f.indexReader, f.fields); err != nil {
+	if err = loadDocValuesOnHitWithTypes(adv, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 		return nil, err
 	}
 	if f.accept(ctx, adv) {

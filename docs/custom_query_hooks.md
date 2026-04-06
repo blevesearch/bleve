@@ -30,16 +30,19 @@ filterQuery := query.NewCustomFilterQueryWithFilter(childQuery,
 	func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
 		return true
 	},
+	nil, // payload; nil when no fields/params/source are needed
 )
 
 scoreQuery := query.NewCustomScoreQueryWithScorer(childQuery,
 	func(sctx *search.SearchContext, d *search.DocumentMatch) float64 {
 		return d.Score
 	},
+	nil,
 )
 ```
 
-These constructors also accept an optional payload map as the third argument:
+The third argument is a payload map that carries fields, params, and source through
+JSON round-trips (e.g. distributed fan-out). Pass nil when not needed:
 
 ```go
 payload := map[string]interface{}{
@@ -52,7 +55,7 @@ scoreQuery := query.NewCustomScoreQueryWithScorer(childQuery,
 	func(sctx *search.SearchContext, d *search.DocumentMatch) float64 {
 		return d.Score
 	},
-	payload, // optional; nil is valid
+	payload,
 )
 ```
 
@@ -70,12 +73,46 @@ filterQuery := query.NewCustomFilterQuery(childQuery)
 scoreQuery := query.NewCustomScoreQuery(childQuery)
 ```
 
+## Field Access and Doc Values Requirement
+
+When the payload includes a `"fields"` key, bleve loads the listed field values
+into `DocumentMatch.Fields` before invoking the callback. Field values are read
+from **doc values** (column-oriented, memory-mapped), not stored fields.
+
+**Doc values must be enabled for every field listed in `"fields"`.** If a field
+does not have doc values enabled in the index mapping, its value will not be
+available to the callback at query time.
+
+To enable doc values for a field in the index mapping:
+
+```go
+fm := mapping.NewTextFieldMapping()
+fm.DocValues = true                    // required for custom_filter / custom_score field access
+imap.DefaultMapping.AddFieldMappingsAt("genre", fm)
+```
+
+For dynamic mappings, ensure `docvalues_dynamic` is set to `true` on the
+document mapping so that dynamically discovered fields also have doc values
+indexed.
+
+### Field type decoding
+
+Doc values are decoded based on the field's mapping type:
+
+| Mapping type | Go type in `d.Fields` | Notes |
+|---|---|---|
+| `text` / `keyword` | `string` | Raw text bytes |
+| `number` | `float64` | IEEE 754 decoded |
+| `boolean` | `bool` | `true` / `false` |
+| `datetime` | `float64` | Nanoseconds since Unix epoch (`time.UnixNano()`), not a formatted string |
+
 ## Runtime Behavior
 
 - Bleve builds the child query searcher first.
-- `custom_filter` wraps it with `FilteringSearcher`.
-- `custom_score` wraps it with `CustomScoreSearcher`.
-- the attached callback is reused for each hit during `Next()` / `Advance()`.
+- If `"fields"` is present in the payload, a `DocValueReader` is created for those fields.
+- `custom_filter` wraps the child with `CustomFilterSearcher`.
+- `custom_score` wraps the child with `CustomScoreSearcher`.
+- On each hit, doc values are loaded into `DocumentMatch.Fields`, then the callback is invoked.
 
 ## Error Cases
 

@@ -18,33 +18,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/util"
 )
-
-func cloneCustomQueryPayload(in map[string]interface{}) map[string]interface{} {
-	if len(in) == 0 {
-		return nil
-	}
-
-	out := make(map[string]interface{}, len(in))
-	for k, v := range in {
-		switch t := v.(type) {
-		case []interface{}:
-			out[k] = append([]interface{}(nil), t...)
-		case []string:
-			out[k] = append([]string(nil), t...)
-		case []float64:
-			out[k] = append([]float64(nil), t...)
-		case []int:
-			out[k] = append([]int(nil), t...)
-		case []int64:
-			out[k] = append([]int64(nil), t...)
-		default:
-			out[k] = t
-		}
-	}
-	return out
-}
 
 func unmarshalCustomQueryPayload(data []byte, key string) (Query, map[string]interface{}, error) {
 	tmp := map[string]json.RawMessage{}
@@ -89,6 +65,26 @@ func unmarshalCustomQueryPayload(data []byte, key string) (Query, map[string]int
 	}
 
 	return child, payload, nil
+}
+
+// resolveFieldTypes looks up each field name in the index mapping and returns
+// a map of field name → mapping type (e.g. "datetime", "number", "text").
+// This is used by the searcher layer to correctly decode doc value bytes.
+func resolveFieldTypes(fields []string, m mapping.IndexMapping) map[string]string {
+	if m == nil || len(fields) == 0 {
+		return nil
+	}
+	types := make(map[string]string, len(fields))
+	for _, f := range fields {
+		fm := m.FieldMappingForPath(f)
+		if fm.Type != "" {
+			types[f] = fm.Type
+		}
+	}
+	if len(types) == 0 {
+		return nil
+	}
+	return types
 }
 
 // payloadFields extracts a string slice from an opaque payload map.

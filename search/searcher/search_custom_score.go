@@ -33,22 +33,25 @@ func init() {
 // ScoreFunc defines a function which can mutate document scores
 type ScoreFunc func(sctx *search.SearchContext, d *search.DocumentMatch) float64
 
-// CustomScoreSearcher wraps any other searcher, optionally loads stored fields
+// CustomScoreSearcher wraps any other searcher, optionally loads doc values
 // into each DocumentMatch, then mutates the score using the supplied ScoreFunc.
 type CustomScoreSearcher struct {
 	child       search.Searcher
 	mutate      ScoreFunc
+	dvReader    index.DocValueReader
 	indexReader index.IndexReader
-	fields      []string
+	fieldTypes  map[string]string
 }
 
 func NewCustomScoreSearcher(ctx context.Context, s search.Searcher, mutate ScoreFunc,
-	indexReader index.IndexReader, fields []string) *CustomScoreSearcher {
+	dvReader index.DocValueReader, indexReader index.IndexReader,
+	fieldTypes map[string]string) *CustomScoreSearcher {
 	return &CustomScoreSearcher{
 		child:       s,
 		mutate:      mutate,
+		dvReader:    dvReader,
 		indexReader: indexReader,
-		fields:      fields,
+		fieldTypes:  fieldTypes,
 	}
 }
 
@@ -63,7 +66,7 @@ func (f *CustomScoreSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 		return nil, err
 	}
 	if next != nil {
-		if err = loadFieldsOnHit(next, f.indexReader, f.fields); err != nil {
+		if err = loadDocValuesOnHitWithTypes(next, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
 		next.Score = f.mutate(ctx, next)
@@ -77,7 +80,7 @@ func (f *CustomScoreSearcher) Advance(ctx *search.SearchContext, ID index.IndexI
 		return nil, err
 	}
 	if adv != nil {
-		if err = loadFieldsOnHit(adv, f.indexReader, f.fields); err != nil {
+		if err = loadDocValuesOnHitWithTypes(adv, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
 		adv.Score = f.mutate(ctx, adv)
