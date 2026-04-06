@@ -653,6 +653,8 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segP
 	if err != nil {
 		return nil, nil, err
 	}
+	// always obtain the path from the parent snapshot if available
+	// since that is the primary source of truth for context
 	if snapshot.parent != nil {
 		path = snapshot.parent.path
 	}
@@ -662,6 +664,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segP
 		return nil, nil, err
 	}
 
+	// persist the writer ID used for the bolt snapshot
 	err = metaBucket.Put(util.BoltMetaDataFileWriterIDKey, []byte(writer.Id()))
 	if err != nil {
 		return nil, nil, err

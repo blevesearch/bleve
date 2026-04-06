@@ -1345,110 +1345,122 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	if err != nil {
 		return err
 	}
-	s.rootLock.Lock()
 
-	// tag all segments with the callback ids for removal for
-	// force merging.
-	segsToCompact := make([]mergeplan.Segment, 0)
+	s.rootLock.Lock()
+	// create a done channel to ensure success of merge
+	ctx := context.Background()
+	doneCh := make(chan error)
+	ctx = context.WithValue(ctx, mergeDoneKey, doneCh)
+
+	// ensure any rollback snapshots are not preserved after
+	// the force merge as they may have references to the
+	// callback ids that are being removed
+	prevNumSnapshotsToKeep := s.numSnapshotsToKeep
+	s.numSnapshotsToKeep = 1
+
+	// track the zapx files that are expected to be removed after
+	// the merge so that we can block until they are removed by the persister
 	filePaths := make([]string, 0)
-	for _, ss := range s.root.segment {
-		if seg, ok := ss.segment.(segment.SegmentWithCallbacks); ok {
-			if _, ok := ids[seg.CallbackId()]; ok {
-				segsToCompact = append(segsToCompact, ss)
-				filePaths = append(filePaths, zapFileName(ss.id))
+
+	mergePlanFunc := func(ourSnapshot *IndexSnapshot) (*mergeplan.MergePlan, error) {
+		// Create a merge plan with the filtered segments and force a merge
+		// to remove the callback from the segments.
+		mergePlannerOptions, err := s.parseMergePlannerOptions()
+		if err != nil {
+			return nil, fmt.Errorf("mergePlannerOption json parsing err: %v", err)
+		}
+		atomic.AddUint64(&s.stats.TotFileMergePlan, 1)
+
+		// filter all segments that have callbacks that need to be removed
+		// and add them to the list of segments to compact
+		segsToCompact := make([]mergeplan.Segment, 0)
+		for _, ss := range ourSnapshot.segment {
+			if segWithCallbacks, ok := ss.segment.(segment.SegmentWithCallbacks); ok {
+				if _, ok := ids[segWithCallbacks.CallbackId()]; ok {
+					segsToCompact = append(segsToCompact, ss)
+					filePaths = append(filePaths, zapFileName(ss.id))
+				}
 			}
 		}
+
+		// attempt a merge plan with the default merge planner options
+		mergePlan, err := mergeplan.Plan(segsToCompact, mergePlannerOptions)
+		if err != nil {
+			atomic.AddUint64(&s.stats.TotFileMergePlanErr, 1)
+			return nil, fmt.Errorf("merge plan creation err: %v", err)
+		}
+
+		// create a map to track segments included in the default merge plan
+		segDictionary := make(map[uint64]bool)
+		for _, seg := range segsToCompact {
+			segDictionary[seg.Id()] = true
+		}
+
+		// create a merge plan if the default merge planner is unable
+		// to create one with the given segments
+		if mergePlan == nil {
+			mergePlan = &mergeplan.MergePlan{
+				Tasks: make([]*mergeplan.MergeTask, 0),
+			}
+		}
+
+		// mark all segments included in the default merge plan
+		for _, task := range mergePlan.Tasks {
+			for _, seg := range task.Segments {
+				segDictionary[seg.Id()] = false
+			}
+		}
+
+		// Create additional merge tasks for segments that are unable to be merged
+		for _, seg := range segsToCompact {
+			if segDictionary[seg.Id()] {
+				mergePlan.Tasks = append(mergePlan.Tasks, &mergeplan.MergeTask{
+					Segments: []mergeplan.Segment{seg},
+				})
+			}
+		}
+
+		return mergePlan, nil
 	}
 
-	if len(segsToCompact) > 0 {
-		// create a done channel to ensure success of merge
-		ctx := context.Background()
-		doneCh := make(chan error)
-		ctx = context.WithValue(ctx, mergeDoneKey, doneCh)
+	// set the merge plan func in the context for the merger to use when it receives the merge request
+	// this is to ensure that the merge request is triggered with the latest snapshot, thus avoiding
+	// any races
+	ctx = context.WithValue(ctx, mergePlanFuncKey, mergePlanFunc)
 
-		// ensure any rollback snapshots are not preserved after
-		// the force merge as they may have references to the
-		// callback ids that are being removed
-		prevNumSnapshotsToKeep := s.numSnapshotsToKeep
-		s.numSnapshotsToKeep = 1
-		err := s.forceMergeSegs(segsToCompact, ctx)
-		if err != nil {
-			return err
-		}
-		s.rootLock.Unlock()
-
-		// blockingly wait for merge to complete
-		err = <-doneCh
-		close(doneCh)
-		if err != nil {
-			return err
-		}
-
-		// wait for files to be cleaned up by persister
-		err = s.waitTillFileCleanup(filePaths)
-		if err != nil {
-			return err
-		}
-
-		// reset rollback snapshot retention
-		s.rootLock.Lock()
-		s.numSnapshotsToKeep = prevNumSnapshotsToKeep
+	// trigger the merge with the force merge plan
+	s.forceMergeRequestCh <- &mergerCtrl{
+		ctx: ctx,
 	}
+	s.rootLock.Unlock()
+
+	// blockingly wait for merge to complete
+	err = <-doneCh
+	close(doneCh)
+	if err != nil {
+		return err
+	}
+
+	// wait for files to be cleaned up by persister
+	err = s.waitTillFileCleanup(filePaths)
+	if err != nil {
+		return err
+	}
+
+	// reset rollback snapshot retention
+	s.rootLock.Lock()
+	s.numSnapshotsToKeep = prevNumSnapshotsToKeep
 	s.rootLock.Unlock()
 
 	return nil
 }
 
-// Force merge all given segments regardless of their elibility for compaction
+// Force merge all given segments regardless of their eligibility for compaction
 // Large segments will be rewritten instead of merging
-func (s *Scorch) forceMergeSegs(segsToCompact []mergeplan.Segment,
+func (s *Scorch) forceMergeFileCallbackIds(ids map[string]struct{},
 	ctx context.Context) error {
-	// Create a merge plan with the filtered segments and force a merge
-	// to remove the callback from the segments.
-	mergePlannerOptions, err := s.parseMergePlannerOptions()
-	if err != nil {
-		return fmt.Errorf("mergePlannerOption json parsing err: %v", err)
-
-	}
-	atomic.AddUint64(&s.stats.TotFileMergePlan, 1)
-
-	// create a default merge plan incase some of the segments can actually be merged
-	mergePlan, err := mergeplan.Plan(segsToCompact, mergePlannerOptions)
-	if err != nil {
-		atomic.AddUint64(&s.stats.TotFileMergePlanErr, 1)
-		return fmt.Errorf("merge plan creation err: %v", err)
-	}
-
-	segDictionary := make(map[uint64]bool)
-	for _, seg := range segsToCompact {
-		segDictionary[seg.Id()] = true
-	}
-
-	if mergePlan == nil {
-		mergePlan = &mergeplan.MergePlan{
-			Tasks: make([]*mergeplan.MergeTask, 0),
-		}
-	}
-
-	for _, task := range mergePlan.Tasks {
-		for _, seg := range task.Segments {
-			segDictionary[seg.Id()] = false
-		}
-	}
-
-	// Create additional merge tasks for segments that are unable to be merged
-	for _, seg := range segsToCompact {
-		if segDictionary[seg.Id()] {
-			mergePlan.Tasks = append(mergePlan.Tasks, &mergeplan.MergeTask{
-				Segments: []mergeplan.Segment{seg},
-			})
-		}
-	}
-
-	// trigger the merge with the force merge plan
-	s.forceMergeRequestCh <- &mergerCtrl{
-		plan: mergePlan,
-		ctx:  ctx,
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
 	return nil

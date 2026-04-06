@@ -79,12 +79,19 @@ func openIndexMeta(path string) (*indexMeta, error) {
 
 	var im indexMeta
 	var fileReader util.FileReader
+	// attempt to unmarshal metabytes directly. If this succeeds,
+	// then we know there was no file callback writer used and we can
+	// proceed as normal.
 	err = util.UnmarshalJSON(metaBytes, &im)
 	if err != nil {
+		// on failure, we expect the last 4 bytes to be the length of the file
+		// callback id and the preceding bytes to be the file callback id, which
+		// we can use to obtain the file reader to read the actual meta data bytes
 		if len(metaBytes) < 4 {
 			return nil, ErrorIndexMetaCorrupt
 		}
 
+		// read the length of the file callback id from the last 4 bytes
 		pos := len(metaBytes) - 4
 		fileWriterIDLen := int(binary.BigEndian.Uint32(metaBytes[pos:]))
 		pos -= fileWriterIDLen
@@ -92,6 +99,7 @@ func openIndexMeta(path string) (*indexMeta, error) {
 			return nil, ErrorIndexMetaCorrupt
 		}
 
+		// read and initialize the file reader using the file callback id
 		fileWriterID := metaBytes[pos : pos+fileWriterIDLen]
 		fileReader, err = util.NewFileReader(string(fileWriterID), []byte(indexMetaPath))
 		if err != nil {
@@ -194,7 +202,6 @@ func (i *indexMeta) UpdateWriter(path string) error {
 	if err != nil {
 		return err
 	}
-
 	metaBytes = i.fileWriter.Process(metaBytes)
 
 	// write out new meta with new writer id, using temp file and rename to ensure atomicity
@@ -208,31 +215,33 @@ func (i *indexMeta) UpdateWriter(path string) error {
 		return err
 	}
 
+	// write the meta bytes
 	_, err = tempMetaFile.Write(metaBytes)
 	if err != nil {
 		return err
 	}
-
+	// write the file callback id
 	_, err = tempMetaFile.Write([]byte(i.fileWriter.Id()))
 	if err != nil {
 		return err
 	}
-
+	// write the length of the file callback id
 	err = binary.Write(tempMetaFile, binary.BigEndian, uint32(len(i.fileWriter.Id())))
 	if err != nil {
 		return err
 	}
-
+	// close file before renaming
 	err = tempMetaFile.Close()
 	if err != nil {
 		return err
 	}
-
+	// atomically rename temp file to index meta file
 	err = os.Rename(tempMetaPath, indexMetaPath)
 	if err != nil {
 		return err
 	}
 
+	// initialize the new file reader for index meta
 	i.fileReader, err = util.NewFileReader(string(i.fileWriter.Id()), []byte(indexMetaPath))
 	if err != nil {
 		return err

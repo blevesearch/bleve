@@ -1515,11 +1515,6 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 	return i.meta.CopyTo(i.path, d)
 }
 
-type IndexFileCopyable interface {
-	SetPathInBolt(key []byte, value []byte) error       //dest index
-	CopyFile(file string, d index.IndexDirectory) error // source index
-}
-
 func (i *indexImpl) CopyFile(file string, d index.IndexDirectory) (err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()

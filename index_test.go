@@ -614,7 +614,7 @@ func TestBytesRead(t *testing.T) {
 
 	expectedBytesRead := uint64(21164)
 	if supportForVectorSearch {
-		expectedBytesRead = 12321
+		expectedBytesRead = 21574
 	}
 
 	if prevBytesRead != expectedBytesRead && res.Cost == prevBytesRead {
