@@ -97,6 +97,13 @@ imap.DefaultMapping.AddFieldMappingsAt("genre", fm)
 For dynamic mappings, ensure `docvalues_dynamic` has not been set to `false` on
 the document mapping.
 
+**Datetime fields require an explicit datetime mapping.** Dynamic mapping indexes
+date-like strings as text, which means the standard analyzer tokenizes the value
+(e.g. `"2010-07-22 20:00:20"` becomes `["2010", "07", "22", ...]`). The doc
+value then contains tokens instead of the original date, making comparisons
+fail. To use datetime fields in custom_filter or custom_score callbacks, add an
+explicit field mapping with `"type": "datetime"` in the index definition.
+
 ### Field type decoding
 
 At the bleve layer, doc values are decoded based on the field's mapping type:
