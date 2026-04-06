@@ -1352,9 +1352,11 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	doneCh := make(chan error)
 	ctx = context.WithValue(ctx, mergeDoneKey, doneCh)
 
-	// ensure any rollback snapshots are not preserved after
-	// the force merge as they may have references to the
-	// callback ids that are being removed
+	// ROLLBACKING IS DISABLED FOR THIS OPERATION
+	// this is done because all of the rollback snapshots
+	// are likely to have the same sequence numbers and
+	// morever, it is not functionally correct to hold
+	// data with writer ids that have been removed
 	prevNumSnapshotsToKeep := s.numSnapshotsToKeep
 	s.numSnapshotsToKeep = 1
 
@@ -1362,7 +1364,7 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	// the merge so that we can block until they are removed by the persister
 	filePaths := make([]string, 0)
 
-	mergePlanFunc := func(ourSnapshot *IndexSnapshot) (*mergeplan.MergePlan, error) {
+	var mergePlanner mergePlanFunc = func(ourSnapshot *IndexSnapshot) (*mergeplan.MergePlan, error) {
 		// Create a merge plan with the filtered segments and force a merge
 		// to remove the callback from the segments.
 		mergePlannerOptions, err := s.parseMergePlannerOptions()
@@ -1426,7 +1428,7 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	// set the merge plan func in the context for the merger to use when it receives the merge request
 	// this is to ensure that the merge request is triggered with the latest snapshot, thus avoiding
 	// any races
-	ctx = context.WithValue(ctx, mergePlanFuncKey, mergePlanFunc)
+	ctx = context.WithValue(ctx, mergePlanFuncKey, mergePlanner)
 
 	// trigger the merge with the force merge plan
 	s.forceMergeRequestCh <- &mergerCtrl{
@@ -1451,17 +1453,6 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	s.rootLock.Lock()
 	s.numSnapshotsToKeep = prevNumSnapshotsToKeep
 	s.rootLock.Unlock()
-
-	return nil
-}
-
-// Force merge all given segments regardless of their eligibility for compaction
-// Large segments will be rewritten instead of merging
-func (s *Scorch) forceMergeFileCallbackIds(ids map[string]struct{},
-	ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 
 	return nil
 }
