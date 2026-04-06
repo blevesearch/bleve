@@ -1,4 +1,4 @@
-# Custom Query Hooks: `custom_filter` and `custom_score`
+# Custom Queries: `custom_filter` and `custom_score`
 
 Bleve exposes two query nodes for embedding-defined per-hit logic:
 
@@ -65,14 +65,6 @@ Payload rules:
 - do not include `query` in payload; `query` always comes from the child query argument
 - use `nil` or omit the third argument when payload round-trip is not needed
 
-The bare constructors are also available when the callback will be attached by
-the embedding application before search execution:
-
-```go
-filterQuery := query.NewCustomFilterQuery(childQuery)
-scoreQuery := query.NewCustomScoreQuery(childQuery)
-```
-
 ## Field Access and Doc Values Requirement
 
 When the payload includes a `"fields"` key, bleve loads the listed field values
@@ -80,8 +72,10 @@ into `DocumentMatch.Fields` before invoking the callback. Field values are read
 from **doc values** (column-oriented, memory-mapped), not stored fields.
 
 **Doc values must be enabled for every field listed in `"fields"`.** If a field
-does not have doc values enabled in the index mapping, its value will not be
-available to the callback at query time.
+does not have doc values enabled in the index mapping, its value will be silently
+absent from `DocumentMatch.Fields` at callback time — no error is raised, the
+field simply won't appear. This can cause filters to drop all hits or scores to
+compute incorrectly if the callback assumes the field is present.
 
 Doc values are enabled by default for all field types (`DocValues: true`) and
 for dynamic mappings (`DocValuesDynamic: true`), so no extra configuration is

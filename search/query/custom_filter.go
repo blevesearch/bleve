@@ -43,12 +43,6 @@ type CustomFilterQuery struct {
 //	}
 var CustomFilterQueryParser func([]byte) (Query, error)
 
-func NewCustomFilterQuery(query Query) *CustomFilterQuery {
-	return &CustomFilterQuery{
-		Query: query,
-	}
-}
-
 func NewCustomFilterQueryWithFilter(query Query, filter searcher.FilterFunc, payload map[string]interface{}) *CustomFilterQuery {
 	return &CustomFilterQuery{
 		Query:      query,

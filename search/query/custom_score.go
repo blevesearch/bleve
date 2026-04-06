@@ -44,12 +44,6 @@ type CustomScoreQuery struct {
 //	}
 var CustomScoreQueryParser func([]byte) (Query, error)
 
-func NewCustomScoreQuery(query Query) *CustomScoreQuery {
-	return &CustomScoreQuery{
-		Query: query,
-	}
-}
-
 func NewCustomScoreQueryWithScorer(query Query, score searcher.ScoreFunc, payload map[string]interface{}) *CustomScoreQuery {
 	return &CustomScoreQuery{
 		Query:     query,
