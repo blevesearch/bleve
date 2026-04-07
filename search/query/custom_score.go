@@ -31,7 +31,7 @@ type CustomScoreQuery struct {
 	Query  Query    `json:"query"`
 	Fields []string `json:"fields,omitempty"`
 
-	scoreFunc searcher.ScoreFunc
+	scoreFunc searcher.CustomScoreFunc
 	payload   map[string]interface{}
 }
 
@@ -45,7 +45,7 @@ type CustomScoreQuery struct {
 //	}
 var CustomScoreQueryParser func([]byte) (Query, error)
 
-func NewCustomScoreQueryWithScorer(query Query, score searcher.ScoreFunc, fields []string, payload map[string]interface{}) *CustomScoreQuery {
+func NewCustomScoreQueryWithScorer(query Query, score searcher.CustomScoreFunc, fields []string, payload map[string]interface{}) *CustomScoreQuery {
 	return &CustomScoreQuery{
 		Query:     query,
 		Fields:    fields,

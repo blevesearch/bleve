@@ -30,20 +30,21 @@ func init() {
 	reflectStaticSizeCustomScoreSearcher = int(reflect.TypeOf(sfs).Size())
 }
 
-// ScoreFunc defines a function which can mutate document scores
-type ScoreFunc func(d *search.DocumentMatch) float64
+// CustomScoreFunc defines a function which can mutate document scores.
+type CustomScoreFunc func(d *search.DocumentMatch) float64
 
 // CustomScoreSearcher wraps any other searcher, optionally loads doc values
-// into each DocumentMatch, then mutates the score using the supplied ScoreFunc.
+// into each DocumentMatch, then mutates the score using the supplied
+// CustomScoreFunc.
 type CustomScoreSearcher struct {
 	child       search.Searcher
-	mutate      ScoreFunc
+	mutate      CustomScoreFunc
 	dvReader    index.DocValueReader
 	indexReader index.IndexReader
 	fieldTypes  map[string]string
 }
 
-func NewCustomScoreSearcher(ctx context.Context, s search.Searcher, mutate ScoreFunc,
+func NewCustomScoreSearcher(ctx context.Context, s search.Searcher, mutate CustomScoreFunc,
 	dvReader index.DocValueReader, indexReader index.IndexReader,
 	fieldTypes map[string]string) *CustomScoreSearcher {
 	return &CustomScoreSearcher{
