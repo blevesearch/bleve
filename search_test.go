@@ -4819,6 +4819,328 @@ func TestFilteredBooleanQuery(t *testing.T) {
 	}
 }
 
+func TestCustomFilterQuery(t *testing.T) {
+	idx := newCustomQueryTestIndex(t)
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	fictionQuery := NewTermQuery("fiction")
+	fictionQuery.SetField("genre")
+
+	allowedIDs := map[string]struct{}{
+		"0": {},
+		"2": {},
+		"7": {},
+	}
+
+	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(d *search.DocumentMatch) bool {
+		_, ok := allowedIDs[d.ID]
+		return ok
+	}, nil, nil)
+
+	req := NewSearchRequest(q)
+	req.Fields = []string{"title"}
+	req.Size = 10
+
+	res, err := idx.SearchInContext(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 3 {
+		t.Fatalf("expected 3 hits, got %d", res.Total)
+	}
+
+	hitIDs := map[string]struct{}{}
+	for _, hit := range res.Hits {
+		hitIDs[hit.ID] = struct{}{}
+	}
+	for id := range allowedIDs {
+		if _, ok := hitIDs[id]; !ok {
+			t.Fatalf("missing expected hit id %s", id)
+		}
+	}
+}
+
+func TestCustomScoreQuery(t *testing.T) {
+	idx := newCustomQueryTestIndex(t)
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	fictionQuery := NewTermQuery("fiction")
+	fictionQuery.SetField("genre")
+
+	boosts := map[string]float64{
+		"7": 100.0,
+		"2": 10.0,
+		"0": 1.0,
+	}
+
+	q := query.NewCustomScoreQueryWithScorer(fictionQuery, func(d *search.DocumentMatch) float64 {
+		return d.Score + boosts[d.ID]
+	}, nil, nil)
+
+	req := NewSearchRequest(q)
+	req.Fields = []string{"title"}
+	req.Size = 4
+
+	res, err := idx.SearchInContext(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Hits) != 4 {
+		t.Fatalf("expected 4 hits, got %d", len(res.Hits))
+	}
+
+	expectedOrder := []string{"7", "2", "0", "4"}
+	for i, hit := range res.Hits {
+		if hit.ID != expectedOrder[i] {
+			t.Fatalf("expected hit %d to be %s, got %s", i, expectedOrder[i], hit.ID)
+		}
+	}
+}
+
+func TestCustomFilterQueryDocumentMatchIDWithoutFields(t *testing.T) {
+	idx := newCustomQueryTestIndex(t)
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	fictionQuery := NewTermQuery("fiction")
+	fictionQuery.SetField("genre")
+
+	allowedIDs := map[string]struct{}{
+		"0": {},
+		"2": {},
+		"7": {},
+	}
+
+	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(d *search.DocumentMatch) bool {
+		_, ok := allowedIDs[d.ID]
+		return ok
+	}, nil, nil)
+
+	req := NewSearchRequest(q)
+	req.Size = 10
+
+	res, err := idx.SearchInContext(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 3 {
+		t.Fatalf("expected 3 hits, got %d", res.Total)
+	}
+
+	expectedOrder := []string{"0", "2", "7"}
+	for i, hit := range res.Hits {
+		if hit.ID != expectedOrder[i] {
+			t.Fatalf("expected hit %d to be %s, got %s", i, expectedOrder[i], hit.ID)
+		}
+	}
+}
+
+func TestCustomScoreQueryWithDocValues(t *testing.T) {
+	idx := newCustomQueryDocValueTestIndex(t)
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	fictionQuery := NewTermQuery("fiction")
+	fictionQuery.SetField("genre")
+
+	q := query.NewCustomScoreQueryWithScorer(fictionQuery, func(d *search.DocumentMatch) float64 {
+		rating, ok := d.Fields["rating"].(float64)
+		if ok && rating >= 9 {
+			return d.Score + 100
+		}
+		return d.Score
+	}, []string{"rating"}, nil)
+
+	req := NewSearchRequest(q)
+	req.Size = 4
+
+	res, err := idx.SearchInContext(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+	if res.Hits[0].ID != "1" {
+		t.Fatalf("expected boosted hit 1 first, got %s", res.Hits[0].ID)
+	}
+}
+
+func newCustomQueryTestIndex(t *testing.T) Index {
+	t.Helper()
+
+	imap := mapping.NewIndexMapping()
+
+	genreMapping := mapping.NewTextFieldMapping()
+	genreMapping.Analyzer = keyword.Name
+	imap.DefaultMapping.AddFieldMappingsAt("genre", genreMapping)
+
+	titleMapping := mapping.NewTextFieldMapping()
+	titleMapping.Analyzer = en.AnalyzerName
+	imap.DefaultMapping.AddFieldMappingsAt("title", titleMapping)
+
+	idx, err := NewMemOnly(imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	docs := []map[string]interface{}{
+		{"title": "The Catcher in the Rye", "genre": "fiction"},
+		{"title": "Sapiens", "genre": "non-fiction"},
+		{"title": "To Kill a Mockingbird", "genre": "fiction"},
+		{"title": "The Power of Habit", "genre": "self-help"},
+		{"title": "The Great Gatsby", "genre": "fiction"},
+		{"title": "Atomic Habits", "genre": "self-help"},
+		{"title": "Educated", "genre": "non-fiction"},
+		{"title": "1984", "genre": "fiction"},
+	}
+
+	b := idx.NewBatch()
+	for i, doc := range docs {
+		err := b.Index(strconv.Itoa(i), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = idx.Batch(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return idx
+}
+
+func newCustomQueryDocValueTestIndex(t *testing.T) Index {
+	t.Helper()
+
+	imap := mapping.NewIndexMapping()
+
+	genreMapping := mapping.NewTextFieldMapping()
+	genreMapping.Analyzer = keyword.Name
+	imap.DefaultMapping.AddFieldMappingsAt("genre", genreMapping)
+
+	ratingMapping := mapping.NewNumericFieldMapping()
+	imap.DefaultMapping.AddFieldMappingsAt("rating", ratingMapping)
+
+	idx, err := NewMemOnly(imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	docs := []map[string]interface{}{
+		{"genre": "fiction", "rating": 5},
+		{"genre": "fiction", "rating": 9},
+	}
+
+	b := idx.NewBatch()
+	for i, doc := range docs {
+		err := b.Index(strconv.Itoa(i), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = idx.Batch(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return idx
+}
+
+func TestCustomFilterQueryDateTimeDocValues(t *testing.T) {
+	imap := mapping.NewIndexMapping()
+
+	genreMapping := mapping.NewTextFieldMapping()
+	genreMapping.Analyzer = keyword.Name
+	imap.DefaultMapping.AddFieldMappingsAt("genre", genreMapping)
+
+	dateMapping := mapping.NewDateTimeFieldMapping()
+	imap.DefaultMapping.AddFieldMappingsAt("published", dateMapping)
+
+	idx, err := NewMemOnly(imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	cutoff := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	docs := []map[string]interface{}{
+		{"genre": "fiction", "published": "2019-06-15T00:00:00Z"},
+		{"genre": "fiction", "published": "2022-03-10T00:00:00Z"},
+		{"genre": "fiction", "published": "2018-01-01T00:00:00Z"},
+	}
+
+	b := idx.NewBatch()
+	for i, doc := range docs {
+		if err := b.Index(strconv.Itoa(i), doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := idx.Batch(b); err != nil {
+		t.Fatal(err)
+	}
+
+	fictionQuery := NewTermQuery("fiction")
+	fictionQuery.SetField("genre")
+
+	// Datetime doc values are decoded as RFC 3339 strings.
+	cutoffStr := cutoff.UTC().Format(time.RFC3339Nano)
+
+	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(d *search.DocumentMatch) bool {
+		pubStr, ok := d.Fields["published"].(string)
+		if !ok {
+			return false
+		}
+		return pubStr >= cutoffStr
+	}, []string{"published"}, nil)
+
+	req := NewSearchRequest(q)
+	req.Size = 10
+
+	res, err := idx.SearchInContext(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Only doc "1" (2022-03-10) is >= 2020-01-01.
+	if res.Total != 1 {
+		t.Fatalf("expected 1 hit, got %d", res.Total)
+	}
+	if res.Hits[0].ID != "1" {
+		t.Fatalf("expected hit id 1, got %s", res.Hits[0].ID)
+	}
+}
+
 func TestGeoDistanceInSortAlias(t *testing.T) {
 	tmpIndexPath1 := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath1)
