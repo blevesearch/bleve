@@ -22,49 +22,57 @@ import (
 	"github.com/blevesearch/bleve/v2/util"
 )
 
-func unmarshalCustomQueryPayload(data []byte, key string) (Query, map[string]interface{}, error) {
+func unmarshalCustomQueryPayload(data []byte, key string) (Query, []string, map[string]interface{}, error) {
 	tmp := map[string]json.RawMessage{}
 	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	innerRaw, ok := tmp[key]
 	if !ok || innerRaw == nil {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	var inner map[string]json.RawMessage
 	err = util.UnmarshalJSON(innerRaw, &inner)
 	if err != nil || inner == nil {
-		return nil, nil, fmt.Errorf("%s query must be a JSON object", key)
+		return nil, nil, nil, fmt.Errorf("%s query must be a JSON object", key)
 	}
 
 	var child Query
 	if childQuery, ok := inner["query"]; ok && childQuery != nil {
 		child, err = ParseQuery(childQuery)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
+		}
+	}
+
+	var fields []string
+	if rawFields, ok := inner["fields"]; ok && rawFields != nil {
+		if err := util.UnmarshalJSON(rawFields, &fields); err != nil {
+			return nil, nil, nil, fmt.Errorf("%s query has invalid %q: %w",
+				key, "fields", err)
 		}
 	}
 
 	payload := make(map[string]interface{}, len(inner))
 	for k, raw := range inner {
-		if k == "query" {
+		if k == "query" || k == "fields" {
 			continue
 		}
 		var v interface{}
 		if raw != nil {
 			err = util.UnmarshalJSON(raw, &v)
 			if err != nil {
-				return nil, nil, fmt.Errorf("%s query has invalid %q payload: %w",
+				return nil, nil, nil, fmt.Errorf("%s query has invalid %q payload: %w",
 					key, k, err)
 			}
 		}
 		payload[k] = v
 	}
 
-	return child, payload, nil
+	return child, fields, payload, nil
 }
 
 // resolveFieldTypes looks up each field name in the index mapping and returns
@@ -87,27 +95,3 @@ func resolveFieldTypes(fields []string, m mapping.IndexMapping) map[string]strin
 	return types
 }
 
-// payloadFields extracts a string slice from an opaque payload map.
-// It handles both []string (from direct construction) and []interface{}
-// (from JSON round-trip unmarshal).
-func payloadFields(payload map[string]interface{}, key string) []string {
-	v, ok := payload[key]
-	if !ok || v == nil {
-		return nil
-	}
-	switch t := v.(type) {
-	case []string:
-		return t
-	case []interface{}:
-		out := make([]string, 0, len(t))
-		for _, elem := range t {
-			if s, ok := elem.(string); ok {
-				out = append(out, s)
-			}
-		}
-		if len(out) > 0 {
-			return out
-		}
-	}
-	return nil
-}

@@ -4840,7 +4840,7 @@ func TestCustomFilterQuery(t *testing.T) {
 	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(d *search.DocumentMatch) bool {
 		_, ok := allowedIDs[d.ID]
 		return ok
-	}, nil)
+	}, nil, nil)
 
 	req := NewSearchRequest(q)
 	req.Fields = []string{"title"}
@@ -4886,7 +4886,7 @@ func TestCustomScoreQuery(t *testing.T) {
 
 	q := query.NewCustomScoreQueryWithScorer(fictionQuery, func(d *search.DocumentMatch) float64 {
 		return d.Score + boosts[d.ID]
-	}, nil)
+	}, nil, nil)
 
 	req := NewSearchRequest(q)
 	req.Fields = []string{"title"}
@@ -4930,7 +4930,7 @@ func TestCustomFilterQueryDocumentMatchIDWithoutFields(t *testing.T) {
 	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(d *search.DocumentMatch) bool {
 		_, ok := allowedIDs[d.ID]
 		return ok
-	}, nil)
+	}, nil, nil)
 
 	req := NewSearchRequest(q)
 	req.Size = 10
@@ -4964,17 +4964,13 @@ func TestCustomScoreQueryWithDocValues(t *testing.T) {
 	fictionQuery := NewTermQuery("fiction")
 	fictionQuery.SetField("genre")
 
-	payload := map[string]interface{}{
-		"fields": []string{"rating"},
-	}
-
 	q := query.NewCustomScoreQueryWithScorer(fictionQuery, func(d *search.DocumentMatch) float64 {
 		rating, ok := d.Fields["rating"].(float64)
 		if ok && rating >= 9 {
 			return d.Score + 100
 		}
 		return d.Score
-	}, payload)
+	}, []string{"rating"}, nil)
 
 	req := NewSearchRequest(q)
 	req.Size = 4
@@ -5120,17 +5116,13 @@ func TestCustomFilterQueryDateTimeDocValues(t *testing.T) {
 	// Datetime doc values are decoded as RFC 3339 strings.
 	cutoffStr := cutoff.UTC().Format(time.RFC3339Nano)
 
-	payload := map[string]interface{}{
-		"fields": []string{"published"},
-	}
-
 	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(d *search.DocumentMatch) bool {
 		pubStr, ok := d.Fields["published"].(string)
 		if !ok {
 			return false
 		}
 		return pubStr >= cutoffStr
-	}, payload)
+	}, []string{"published"}, nil)
 
 	req := NewSearchRequest(q)
 	req.Size = 10

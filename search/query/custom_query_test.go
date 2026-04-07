@@ -99,13 +99,12 @@ func TestCustomScoreQueryUnmarshalJSONRejectsNonObjectPayload(t *testing.T) {
 
 func TestCustomFilterQueryMarshalJSONPreservesPayloadAndRewritesChild(t *testing.T) {
 	payload := map[string]interface{}{
-		"fields": []string{"abv"},
 		"params": map[string]interface{}{"min": float64(5)},
 		"source": "function keep(doc, params){ return true; }",
 	}
 
 	q := NewCustomFilterQueryWithFilter(NewMatchQuery("ipa"),
-		func(d *search.DocumentMatch) bool { return true }, payload)
+		func(d *search.DocumentMatch) bool { return true }, []string{"abv"}, payload)
 
 	out, err := q.MarshalJSON()
 	if err != nil {
@@ -150,13 +149,12 @@ func TestCustomFilterQueryMarshalJSONPreservesPayloadAndRewritesChild(t *testing
 
 func TestCustomScoreQueryMarshalJSONPreservesPayloadAndRewritesChild(t *testing.T) {
 	payload := map[string]interface{}{
-		"fields": []string{"ibu"},
 		"params": map[string]interface{}{"weight": 0.05},
 		"source": "function score(doc, params){ return doc.score; }",
 	}
 
 	q := NewCustomScoreQueryWithScorer(NewMatchQuery("ipa"),
-		func(d *search.DocumentMatch) float64 { return d.Score }, payload)
+		func(d *search.DocumentMatch) float64 { return d.Score }, []string{"ibu"}, payload)
 
 	out, err := q.MarshalJSON()
 	if err != nil {

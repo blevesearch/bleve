@@ -28,7 +28,9 @@ import (
 // CustomFilterQuery wraps a child query and filters its candidate matches via
 // an embedder-provided per-hit callback.
 type CustomFilterQuery struct {
-	Query      Query `json:"query"`
+	Query  Query    `json:"query"`
+	Fields []string `json:"fields,omitempty"`
+
 	filterFunc searcher.CustomFilterFunc
 	payload    map[string]interface{}
 }
@@ -43,9 +45,10 @@ type CustomFilterQuery struct {
 //	}
 var CustomFilterQueryParser func([]byte) (Query, error)
 
-func NewCustomFilterQueryWithFilter(query Query, filter searcher.CustomFilterFunc, payload map[string]interface{}) *CustomFilterQuery {
+func NewCustomFilterQueryWithFilter(query Query, filter searcher.CustomFilterFunc, fields []string, payload map[string]interface{}) *CustomFilterQuery {
 	return &CustomFilterQuery{
 		Query:      query,
+		Fields:     fields,
 		filterFunc: filter,
 		payload:    payload,
 	}
@@ -70,17 +73,16 @@ func (q *CustomFilterQuery) Searcher(ctx context.Context, i index.IndexReader, m
 
 	// Create a doc value reader for the requested fields (if any) so the
 	// searcher can populate d.Fields before invoking the callback.
-	fields := payloadFields(q.payload, "fields")
 	var dvReader index.DocValueReader
 	var fieldTypes map[string]string
-	if len(fields) > 0 {
+	if len(q.Fields) > 0 {
 		var err2 error
-		dvReader, err2 = i.DocValueReader(fields)
+		dvReader, err2 = i.DocValueReader(q.Fields)
 		if err2 != nil {
 			_ = childSearcher.Close()
 			return nil, err2
 		}
-		fieldTypes = resolveFieldTypes(fields, m)
+		fieldTypes = resolveFieldTypes(q.Fields, m)
 	}
 
 	return searcher.NewCustomFilterSearcher(ctx, childSearcher, q.filterFunc, dvReader, i, fieldTypes), nil
@@ -103,22 +105,26 @@ func (q *CustomFilterQuery) Validate() error {
 }
 
 func (q *CustomFilterQuery) MarshalJSON() ([]byte, error) {
-	inner := make(map[string]interface{}, len(q.payload)+1)
+	inner := make(map[string]interface{}, len(q.payload)+2)
 	for k, v := range q.payload {
 		inner[k] = v
 	}
 	inner["query"] = q.Query
+	if len(q.Fields) > 0 {
+		inner["fields"] = q.Fields
+	}
 	return json.Marshal(map[string]interface{}{
 		"custom_filter": inner,
 	})
 }
 
 func (q *CustomFilterQuery) UnmarshalJSON(data []byte) error {
-	child, payload, err := unmarshalCustomQueryPayload(data, "custom_filter")
+	child, fields, payload, err := unmarshalCustomQueryPayload(data, "custom_filter")
 	if err != nil {
 		return err
 	}
 	q.Query = child
+	q.Fields = fields
 	q.payload = payload
 	return nil
 }
