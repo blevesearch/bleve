@@ -1352,7 +1352,7 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	doneCh := make(chan error)
 	ctx = context.WithValue(ctx, mergeDoneKey, doneCh)
 
-	// ROLLBACKING IS DISABLED FOR THIS OPERATION
+	// PARTIAL ROLLBACK WILL NOT BE SUPPORTED DURING THIS OPERATION
 	// this is done because all of the rollback snapshots
 	// are likely to have the same sequence numbers and
 	// morever, it is not functionally correct to hold
