@@ -27,9 +27,10 @@ import (
 // It is a no-op when dvReader is nil.
 //
 // fieldTypes maps field name → mapping type (e.g. "datetime", "number").
-// When provided, datetime fields are decoded as nanosecond int64s (cast to
-// float64) rather than using the IEEE 754 bit reinterpretation used for
-// numeric fields. When nil, all prefix-coded values use the numeric path.
+// When provided, datetime fields are decoded from their stored nanosecond
+// int64 into an RFC3339Nano string, while numeric fields use IEEE 754 bit
+// reinterpretation to recover the original float64. When nil, all prefix-coded
+// values use the numeric (float64) path.
 func loadDocValuesOnHit(hit *search.DocumentMatch, dvReader index.DocValueReader,
 	r index.IndexReader) error {
 	return loadDocValuesOnHitWithTypes(hit, dvReader, r, nil)
@@ -67,9 +68,9 @@ func loadDocValuesOnHitWithTypes(hit *search.DocumentMatch, dvReader index.DocVa
 //
 // fieldType is the mapping type string for the field (e.g. "datetime",
 // "number"). When fieldType is "datetime", the prefix-coded int64 is
-// treated as raw nanoseconds (time.UnixNano()) and cast directly to float64.
-// For numeric fields the int64 is decoded via Int64ToFloat64 (IEEE 754 bit
-// reinterpretation).
+// treated as raw nanoseconds (time.UnixNano()) and converted to a UTC
+// RFC3339Nano-formatted string. For numeric fields the int64 is decoded via
+// Int64ToFloat64 (IEEE 754 bit reinterpretation).
 func decodeDocValueTerm(term []byte, fieldType string) interface{} {
 	if len(term) == 0 {
 		return nil

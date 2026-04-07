@@ -4837,12 +4837,8 @@ func TestCustomFilterQuery(t *testing.T) {
 		"7": {},
 	}
 
-	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
-		id, err := sctx.IndexReader.ExternalID(d.IndexInternalID)
-		if err != nil {
-			return false
-		}
-		_, ok := allowedIDs[id]
+	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(d *search.DocumentMatch) bool {
+		_, ok := allowedIDs[d.ID]
 		return ok
 	}, nil)
 
@@ -4888,12 +4884,8 @@ func TestCustomScoreQuery(t *testing.T) {
 		"0": 1.0,
 	}
 
-	q := query.NewCustomScoreQueryWithScorer(fictionQuery, func(sctx *search.SearchContext, d *search.DocumentMatch) float64 {
-		id, err := sctx.IndexReader.ExternalID(d.IndexInternalID)
-		if err != nil {
-			return d.Score
-		}
-		return d.Score + boosts[id]
+	q := query.NewCustomScoreQueryWithScorer(fictionQuery, func(d *search.DocumentMatch) float64 {
+		return d.Score + boosts[d.ID]
 	}, nil)
 
 	req := NewSearchRequest(q)
@@ -4935,7 +4927,7 @@ func TestCustomFilterQueryDocumentMatchIDWithoutFields(t *testing.T) {
 		"7": {},
 	}
 
-	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(_ *search.SearchContext, d *search.DocumentMatch) bool {
+	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(d *search.DocumentMatch) bool {
 		_, ok := allowedIDs[d.ID]
 		return ok
 	}, nil)
@@ -4976,7 +4968,7 @@ func TestCustomScoreQueryWithDocValues(t *testing.T) {
 		"fields": []string{"rating"},
 	}
 
-	q := query.NewCustomScoreQueryWithScorer(fictionQuery, func(_ *search.SearchContext, d *search.DocumentMatch) float64 {
+	q := query.NewCustomScoreQueryWithScorer(fictionQuery, func(d *search.DocumentMatch) float64 {
 		rating, ok := d.Fields["rating"].(float64)
 		if ok && rating >= 9 {
 			return d.Score + 100
@@ -5132,7 +5124,7 @@ func TestCustomFilterQueryDateTimeDocValues(t *testing.T) {
 		"fields": []string{"published"},
 	}
 
-	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(_ *search.SearchContext, d *search.DocumentMatch) bool {
+	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(d *search.DocumentMatch) bool {
 		pubStr, ok := d.Fields["published"].(string)
 		if !ok {
 			return false

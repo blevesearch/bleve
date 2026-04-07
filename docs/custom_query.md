@@ -63,7 +63,7 @@ Payload rules:
 
 - pass only custom-node attributes like `source`, `params`, `fields`
 - do not include `query` in payload; `query` always comes from the child query argument
-- use `nil` or omit the third argument when payload round-trip is not needed
+- pass `nil` as the third argument when payload round-trip is not needed
 
 ## Field Access and Doc Values Requirement
 

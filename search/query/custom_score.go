@@ -94,6 +94,9 @@ func (q *CustomScoreQuery) Validate() error {
 	if q.Query == nil {
 		return fmt.Errorf("custom score query must have a query")
 	}
+	if q.scoreFunc == nil {
+		return fmt.Errorf("custom score query must have a score callback")
+	}
 	if vq, ok := q.Query.(ValidatableQuery); ok {
 		return vq.Validate()
 	}

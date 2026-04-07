@@ -29,7 +29,7 @@ import (
 // an embedder-provided per-hit callback.
 type CustomFilterQuery struct {
 	Query      Query `json:"query"`
-	filterFunc searcher.FilterFunc
+	filterFunc searcher.CustomFilterFunc
 	payload    map[string]interface{}
 }
 
@@ -43,7 +43,7 @@ type CustomFilterQuery struct {
 //	}
 var CustomFilterQueryParser func([]byte) (Query, error)
 
-func NewCustomFilterQueryWithFilter(query Query, filter searcher.FilterFunc, payload map[string]interface{}) *CustomFilterQuery {
+func NewCustomFilterQueryWithFilter(query Query, filter searcher.CustomFilterFunc, payload map[string]interface{}) *CustomFilterQuery {
 	return &CustomFilterQuery{
 		Query:      query,
 		filterFunc: filter,
@@ -92,6 +92,9 @@ func (q *CustomFilterQuery) Validate() error {
 	}
 	if q.Query == nil {
 		return fmt.Errorf("custom filter query must have a query")
+	}
+	if q.filterFunc == nil {
+		return fmt.Errorf("custom filter query must have a filter callback")
 	}
 	if vq, ok := q.Query.(ValidatableQuery); ok {
 		return vq.Validate()

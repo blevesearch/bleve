@@ -31,7 +31,7 @@ func init() {
 }
 
 // ScoreFunc defines a function which can mutate document scores
-type ScoreFunc func(sctx *search.SearchContext, d *search.DocumentMatch) float64
+type ScoreFunc func(d *search.DocumentMatch) float64
 
 // CustomScoreSearcher wraps any other searcher, optionally loads doc values
 // into each DocumentMatch, then mutates the score using the supplied ScoreFunc.
@@ -69,7 +69,7 @@ func (f *CustomScoreSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 		if err = loadDocValuesOnHitWithTypes(next, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
-		next.Score = f.mutate(ctx, next)
+		next.Score = f.mutate(next)
 	}
 	return next, nil
 }
@@ -83,7 +83,7 @@ func (f *CustomScoreSearcher) Advance(ctx *search.SearchContext, ID index.IndexI
 		if err = loadDocValuesOnHitWithTypes(adv, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
-		adv.Score = f.mutate(ctx, adv)
+		adv.Score = f.mutate(adv)
 	}
 	return adv, nil
 }

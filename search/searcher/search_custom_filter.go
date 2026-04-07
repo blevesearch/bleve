@@ -30,20 +30,25 @@ func init() {
 	reflectStaticSizeCustomFilterSearcher = int(reflect.TypeOf(cfs).Size())
 }
 
+// CustomFilterFunc decides whether a hit (with doc-value fields populated)
+// should be kept. Unlike FilterFunc it does not receive a SearchContext since
+// custom-query callbacks only need the DocumentMatch.
+type CustomFilterFunc func(d *search.DocumentMatch) bool
+
 // CustomFilterSearcher wraps a child searcher, optionally loads doc values
-// into each DocumentMatch, then applies a FilterFunc to decide whether to keep
-// the hit. Unlike FilteringSearcher this variant is purpose-built for custom
-// queries that need field values at callback time.
+// into each DocumentMatch, then applies a CustomFilterFunc to decide whether
+// to keep the hit. Unlike FilteringSearcher this variant is purpose-built for
+// custom queries that need field values at callback time.
 type CustomFilterSearcher struct {
 	child       search.Searcher
-	accept      FilterFunc
+	accept      CustomFilterFunc
 	dvReader    index.DocValueReader
 	indexReader index.IndexReader
 	fieldTypes  map[string]string
 }
 
 func NewCustomFilterSearcher(ctx context.Context, child search.Searcher,
-	filter FilterFunc, dvReader index.DocValueReader,
+	filter CustomFilterFunc, dvReader index.DocValueReader,
 	indexReader index.IndexReader,
 	fieldTypes map[string]string) *CustomFilterSearcher {
 	return &CustomFilterSearcher{
@@ -66,7 +71,7 @@ func (f *CustomFilterSearcher) Next(ctx *search.SearchContext) (*search.Document
 		if err = loadDocValuesOnHitWithTypes(next, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
-		if f.accept(ctx, next) {
+		if f.accept(next) {
 			return next, nil
 		}
 		next, err = f.child.Next(ctx)
@@ -85,7 +90,7 @@ func (f *CustomFilterSearcher) Advance(ctx *search.SearchContext, ID index.Index
 	if err = loadDocValuesOnHitWithTypes(adv, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 		return nil, err
 	}
-	if f.accept(ctx, adv) {
+	if f.accept(adv) {
 		return adv, nil
 	}
 	return f.Next(ctx)
