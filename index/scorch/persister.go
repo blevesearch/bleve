@@ -1251,6 +1251,21 @@ func (s *Scorch) removeBoltFileWriterIDs(ids map[string]struct{}) error {
 						if segmentBucket == nil {
 							continue
 						}
+						// process the updated field key
+						updatedFieldBytes := segmentBucket.Get(util.BoltUpdatedFieldsKey)
+						if updatedFieldBytes != nil {
+							buf, err := reader.Process(updatedFieldBytes)
+							if err != nil {
+								return err
+							}
+
+							newBuf := writer.Process(buf)
+							err = segmentBucket.Put(util.BoltUpdatedFieldsKey, newBuf)
+							if err != nil {
+								return err
+							}
+						}
+
 						// process the deleted key
 						deletedBytes := segmentBucket.Get(util.BoltDeletedKey)
 						if deletedBytes != nil {
