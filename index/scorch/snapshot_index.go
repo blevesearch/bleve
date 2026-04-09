@@ -89,6 +89,8 @@ type IndexSnapshot struct {
 	// UpdateFieldInfo.Index or .Store or .DocValues).
 	// Used to short circuit queries trying to read stale data
 	updatedFields map[string]*index.UpdateFieldInfo
+
+	fileWriterID string // the file callback writer id associated with this snapshot
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {

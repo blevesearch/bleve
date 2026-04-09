@@ -17,6 +17,8 @@ package bleve
 import (
 	"os"
 	"testing"
+
+	"github.com/blevesearch/bleve/v2/util"
 )
 
 func TestIndexMeta(t *testing.T) {
@@ -34,8 +36,19 @@ func TestIndexMeta(t *testing.T) {
 		t.Errorf("expected error, got nil")
 	}
 
+	// create file reader and writer for meta
+	metaPath := indexMetaPath(testIndexPath)
+	fileWriter, err := util.NewFileWriter([]byte(metaPath))
+	if err != nil {
+		t.Error(err)
+	}
+	fileReader, err := util.NewFileReader(fileWriter.Id(), []byte(metaPath))
+	if err != nil {
+		t.Error(err)
+	}
+
 	// create meta
-	im := &indexMeta{Storage: "boltdb"}
+	im := &indexMeta{Storage: "boltdb", fileWriter: fileWriter, fileReader: fileReader}
 	err = im.Save(testIndexPath)
 	if err != nil {
 		t.Error(err)

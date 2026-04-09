@@ -231,7 +231,7 @@ func (t *vectorTrainer) loadTrainedData(bucket *bolt.Bucket) error {
 	if bucket == nil {
 		return nil
 	}
-	segmentSnapshot, err := t.parent.loadSegment(bucket)
+	segmentSnapshot, err := t.parent.loadSegment(bucket, nil)
 	if err != nil {
 		return err
 	}
@@ -367,7 +367,7 @@ func (t *vectorTrainer) updateBolt(snapshotsBucket *bolt.Bucket, key []byte, val
 		}
 
 		// update the centroid index pointer
-		t.centroidIndex, err = t.parent.loadSegment(trainerBucket)
+		t.centroidIndex, err = t.parent.loadSegment(trainerBucket, nil)
 		if err != nil {
 			return err
 		}
