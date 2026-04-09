@@ -934,7 +934,8 @@ func BenchmarkLexer(b *testing.B) {
 		var tokenTypes []int
 		var tokens []yySymType
 		r := strings.NewReader(`+field4:"test phrase 1"`)
-		l := newQueryStringLex(r)
+		l := getQueryStringLex(r)
+
 		var lval yySymType
 		rv := l.Lex(&lval)
 
@@ -950,5 +951,34 @@ func BenchmarkLexer(b *testing.B) {
 			lval.n = 0
 			rv = l.Lex(&lval)
 		}
+		putQueryStringLex(l)
 	}
+}
+
+func BenchmarkLexer_Parallel(b *testing.B) {
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			var tokenTypes []int
+			var tokens []yySymType
+			r := strings.NewReader(`+field4:"test phrase 1"`)
+			l := getQueryStringLex(r)
+			
+			var lval yySymType
+			rv := l.Lex(&lval)
+
+			for rv > 0 {
+				tokenTypes = append(tokenTypes, rv)
+				tokens = append(tokens, lval)
+
+				// use the slice to silence the compiler warning
+				_ = tokenTypes
+				_ = tokens
+
+				lval.s = ""
+				lval.n = 0
+				rv = l.Lex(&lval)
+			}
+			putQueryStringLex(l)
+		}
+	})
 }
