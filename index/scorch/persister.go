@@ -626,9 +626,8 @@ func persistToDirectory(seg segment.UnpersistedSegment, d index.Directory,
 	return err
 }
 
-func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
-	segPlugin SegmentPlugin, exclude map[uint64]struct{}, d index.Directory) (
-	[]string, map[uint64]string, error) {
+func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string, segPlugin SegmentPlugin,
+	exclude map[uint64]struct{}, d index.Directory) ([]string, map[uint64]string, error) {
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
 	if err != nil {
 		return nil, nil, err
@@ -651,6 +650,22 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 	buf := make([]byte, binary.MaxVarintLen32)
 	binary.BigEndian.PutUint32(buf, segPlugin.Version())
 	err = metaBucket.Put(util.BoltMetaDataSegmentVersionKey, buf)
+	if err != nil {
+		return nil, nil, err
+	}
+	// always obtain the path from the parent snapshot if available
+	// since that is the primary source of truth for context
+	if snapshot.parent != nil {
+		path = snapshot.parent.path
+	}
+	writer, err := util.NewFileWriter(
+		[]byte(path + string(os.PathSeparator) + "root.bolt"))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// persist the writer ID used for the bolt snapshot
+	err = metaBucket.Put(util.BoltMetaDataFileWriterIDKey, []byte(writer.Id()))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -686,7 +701,8 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 		val := make([]byte, 8)
 		bytesWritten := atomic.LoadUint64(&snapshot.parent.stats.TotBytesWrittenAtIndexTime)
 		binary.LittleEndian.PutUint64(val, bytesWritten)
-		err = internalBucket.Put(util.TotBytesWrittenKey, val)
+		buf := writer.Process(val)
+		err = internalBucket.Put(util.TotBytesWrittenKey, buf)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -765,7 +781,8 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 				if err != nil {
 					return nil, nil, fmt.Errorf("error persisting roaring bytes: %v", err)
 				}
-				err = snapshotSegmentBucket.Put(util.BoltDeletedKey, roaringBuf.Bytes())
+				roaringBytes := writer.Process(roaringBuf.Bytes())
+				err = snapshotSegmentBucket.Put(util.BoltDeletedKey, roaringBytes)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -777,7 +794,8 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 				if err != nil {
 					return nil, nil, err
 				}
-				err = snapshotSegmentBucket.Put(util.BoltStatsKey, b)
+				statsBytes := writer.Process(b)
+				err = snapshotSegmentBucket.Put(util.BoltStatsKey, statsBytes)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -789,7 +807,9 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 				if err != nil {
 					return nil, nil, err
 				}
-				err = snapshotSegmentBucket.Put(util.BoltUpdatedFieldsKey, b)
+				updatedFieldsBytes := writer.Process(b)
+				err = snapshotSegmentBucket.Put(
+					util.BoltUpdatedFieldsKey, updatedFieldsBytes)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -799,7 +819,8 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 
 	// now the internal values are reflective of the on-disk data, update in bolt
 	for k, v := range internal {
-		err = internalBucket.Put([]byte(k), v)
+		buf := writer.Process(v)
+		err = internalBucket.Put([]byte(k), buf)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -895,12 +916,7 @@ func zapFileName(epoch uint64) string {
 	return fmt.Sprintf("%012x.zap", epoch)
 }
 
-func (s *Scorch) loadTrainedData(bucket *bolt.Bucket) error {
-	return s.trainer.loadTrainedData(bucket)
-}
-
 // bolt snapshot code
-
 func (s *Scorch) loadFromBolt() error {
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
@@ -1021,6 +1037,14 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 		return nil, fmt.Errorf(
 			"unable to load correct segment wrapper: %v", err)
 	}
+	fileWriterID := string(metaBucket.Get(util.BoltMetaDataFileWriterIDKey))
+	reader, err := util.NewFileReader(
+		fileWriterID, []byte(s.path+string(os.PathSeparator)+"root.bolt"))
+	if err != nil {
+		_ = rv.DecRef()
+		return nil, fmt.Errorf("unable to load correct reader: %v", err)
+	}
+
 	var running uint64
 	c := snapshot.Cursor()
 	for k, _ := c.First(); k != nil; k, _ = c.Next() {
@@ -1031,7 +1055,10 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 				return nil, fmt.Errorf("internal bucket missing")
 			}
 			err := internalBucket.ForEach(func(key []byte, val []byte) error {
-				copiedVal := append([]byte(nil), val...)
+				copiedVal, err := reader.Process(append([]byte(nil), val...))
+				if err != nil {
+					return err
+				}
 				rv.internal[string(key)] = copiedVal
 				return nil
 			})
@@ -1045,7 +1072,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 				_ = rv.DecRef()
 				return nil, fmt.Errorf("segment key, but bucket missing %x", k)
 			}
-			segmentSnapshot, err := s.loadSegment(segmentBucket)
+			segmentSnapshot, err := s.loadSegment(segmentBucket, reader)
 			if err != nil {
 				_ = rv.DecRef()
 				return nil, fmt.Errorf("failed to load segment: %v", err)
@@ -1067,7 +1094,8 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 	return rv, nil
 }
 
-func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, error) {
+func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket, reader util.FileReader) (
+	*SegmentSnapshot, error) {
 	pathBytes := segmentBucket.Get(util.BoltPathKey)
 	if pathBytes == nil {
 		return nil, fmt.Errorf("segment path missing")
@@ -1085,6 +1113,11 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	}
 	deletedBytes := segmentBucket.Get(util.BoltDeletedKey)
 	if deletedBytes != nil {
+		deletedBytes, err = reader.Process(deletedBytes)
+		if err != nil {
+			_ = seg.Close()
+			return nil, err
+		}
 		deletedBitmap := roaring.NewBitmap()
 		r := bytes.NewReader(deletedBytes)
 		_, err := deletedBitmap.ReadFrom(r)
@@ -1099,7 +1132,11 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	statBytes := segmentBucket.Get(util.BoltStatsKey)
 	if statBytes != nil {
 		var statsMap map[string]map[string]uint64
-
+		statBytes, err = reader.Process(statBytes)
+		if err != nil {
+			_ = seg.Close()
+			return nil, err
+		}
 		err := json.Unmarshal(statBytes, &statsMap)
 		stats := &fieldStats{statMap: statsMap}
 		if err != nil {
@@ -1111,8 +1148,12 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	updatedFieldBytes := segmentBucket.Get(util.BoltUpdatedFieldsKey)
 	if updatedFieldBytes != nil {
 		var updatedFields map[string]*index.UpdateFieldInfo
-
-		err := json.Unmarshal(updatedFieldBytes, &updatedFields)
+		updatedFieldBytes, err := reader.Process(updatedFieldBytes)
+		if err != nil {
+			_ = seg.Close()
+			return nil, err
+		}
+		err = json.Unmarshal(updatedFieldBytes, &updatedFields)
 		if err != nil {
 			_ = seg.Close()
 			return nil, fmt.Errorf("error reading updated field bytes: %v", err)
@@ -1123,6 +1164,151 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	}
 
 	return rv, nil
+}
+
+// identify all the file callback writer ids that are in use by boltdb
+func (s *Scorch) boltFileWriterIDsInUse() (map[string]struct{}, error) {
+	idMap := make(map[string]struct{})
+	err := s.rootBolt.View(func(tx *bolt.Tx) error {
+		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
+		if snapshots == nil {
+			return nil
+		}
+		c := snapshots.Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			snapshot := snapshots.Bucket(k)
+			if snapshot == nil {
+				continue
+			}
+			metaBucket := snapshot.Bucket(util.BoltMetaDataKey)
+			if metaBucket == nil {
+				continue
+			}
+			id := string(metaBucket.Get(util.BoltMetaDataFileWriterIDKey))
+			idMap[id] = struct{}{}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return idMap, nil
+}
+
+// remove all content in boltdb associated with the file callback
+// writer ids and process the data using the latest file writer
+func (s *Scorch) removeBoltFileWriterIDs(ids map[string]struct{}) error {
+	filePath := s.path + string(os.PathSeparator) + "root.bolt"
+	writer, err := util.NewFileWriter([]byte(filePath))
+	if err != nil {
+		return err
+	}
+
+	err = s.rootBolt.Update(func(tx *bolt.Tx) error {
+		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
+		if snapshots == nil {
+			return nil
+		}
+		c := snapshots.Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			snapshot := snapshots.Bucket(k)
+			if snapshot == nil {
+				continue
+			}
+			metaBucket := snapshot.Bucket(util.BoltMetaDataKey)
+			if metaBucket == nil {
+				continue
+			}
+			fileWriterID := string(metaBucket.Get(util.BoltMetaDataFileWriterIDKey))
+			if _, ok := ids[fileWriterID]; ok {
+				reader, err := util.NewFileReader(fileWriterID, []byte(filePath))
+				if err != nil {
+					return fmt.Errorf("unable to load correct reader: %v", err)
+				}
+				c := snapshots.Cursor()
+				for kk, _ := c.First(); kk != nil; kk, _ = c.Next() {
+					if k[0] == util.BoltInternalKey[0] {
+						internalBucket := snapshot.Bucket(kk)
+						if internalBucket == nil {
+							continue
+						}
+						// process all of the internal values and replace them with new values
+						err := internalBucket.ForEach(func(key []byte, val []byte) error {
+							buf, err := reader.Process(val)
+							if err != nil {
+								return err
+							}
+
+							newBuf := writer.Process(buf)
+							return internalBucket.Put(key, newBuf)
+						})
+						if err != nil {
+							return err
+						}
+					} else if kk[0] != util.BoltMetaDataKey[0] {
+						segmentBucket := snapshot.Bucket(kk)
+						if segmentBucket == nil {
+							continue
+						}
+						// process the updated field key
+						updatedFieldBytes := segmentBucket.Get(util.BoltUpdatedFieldsKey)
+						if updatedFieldBytes != nil {
+							buf, err := reader.Process(updatedFieldBytes)
+							if err != nil {
+								return err
+							}
+
+							newBuf := writer.Process(buf)
+							err = segmentBucket.Put(util.BoltUpdatedFieldsKey, newBuf)
+							if err != nil {
+								return err
+							}
+						}
+
+						// process the deleted key
+						deletedBytes := segmentBucket.Get(util.BoltDeletedKey)
+						if deletedBytes != nil {
+							buf, err := reader.Process(deletedBytes)
+							if err != nil {
+								return err
+							}
+
+							newBuf := writer.Process(buf)
+							err = segmentBucket.Put(util.BoltDeletedKey, newBuf)
+							if err != nil {
+								return err
+							}
+						}
+						// process the stats key
+						statsBytes := segmentBucket.Get(util.BoltStatsKey)
+						if statsBytes != nil {
+							buf, err := reader.Process(statsBytes)
+							if err != nil {
+								return err
+							}
+
+							newBuf := writer.Process(buf)
+							err = segmentBucket.Put(util.BoltStatsKey, newBuf)
+							if err != nil {
+								return err
+							}
+						}
+					}
+				}
+				err = metaBucket.Put(util.BoltMetaDataFileWriterIDKey,
+					[]byte(writer.Id()))
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Scorch) removeOldData() {

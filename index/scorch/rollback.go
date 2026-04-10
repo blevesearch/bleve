@@ -85,6 +85,17 @@ func RollbackPoints(path string) ([]*RollbackPoint, error) {
 			continue
 		}
 
+		metaBucket := snapshot.Bucket(util.BoltMetaDataKey)
+		if metaBucket == nil {
+			return nil, fmt.Errorf("meta-data bucket missing")
+		}
+
+		fileWriterID := string(metaBucket.Get(util.BoltMetaDataFileWriterIDKey))
+		reader, err := util.NewFileReader(fileWriterID, []byte(rootBoltPath))
+		if err != nil {
+			return nil, fmt.Errorf("unable to load correct reader: %v", err)
+		}
+
 		meta := map[string][]byte{}
 		c2 := snapshot.Cursor()
 		for j, _ := c2.First(); j != nil; j, _ = c2.Next() {
@@ -95,6 +106,10 @@ func RollbackPoints(path string) ([]*RollbackPoint, error) {
 					break
 				}
 				err = internalBucket.ForEach(func(key []byte, val []byte) error {
+					val, err = reader.Process(val)
+					if err != nil {
+						return err
+					}
 					copiedVal := append([]byte(nil), val...)
 					meta[string(key)] = copiedVal
 					return nil

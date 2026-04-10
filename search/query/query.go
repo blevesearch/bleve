@@ -308,6 +308,20 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
+	_, hasCustomFilter := tmp["custom_filter"]
+	if hasCustomFilter {
+		if CustomFilterQueryParser == nil {
+			return nil, fmt.Errorf("custom filter query parser is not registered")
+		}
+		return CustomFilterQueryParser(input)
+	}
+	_, hasCustomScore := tmp["custom_score"]
+	if hasCustomScore {
+		if CustomScoreQueryParser == nil {
+			return nil, fmt.Errorf("custom score query parser is not registered")
+		}
+		return CustomScoreQueryParser(input)
+	}
 	_, hasDocIds := tmp["ids"]
 	if hasDocIds {
 		var rv DocIDQuery
