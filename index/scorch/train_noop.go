@@ -20,6 +20,7 @@ package scorch
 import (
 	"fmt"
 
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
