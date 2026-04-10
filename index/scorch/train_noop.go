@@ -37,7 +37,7 @@ func (t *noopTrainer) train(batch *index.Batch) error {
 	return fmt.Errorf("training is not supported with this build")
 }
 
-func (t *noopTrainer) loadTrainedData(bucket *util.BoltBucket) error {
+func (t *noopTrainer) loadTrainedData(bucket *util.BoltBucketImpl) error {
 	// noop
 	return nil
 }
@@ -50,6 +50,6 @@ func (t *noopTrainer) copyFileLOCKED(file string, d index.IndexDirectory) error 
 	return nil
 }
 
-func (t *noopTrainer) updateBolt(snapshotsBucket *util.BoltBucket, key []byte, value []byte) error {
+func (t *noopTrainer) updateBolt(snapshotsBucket *util.BoltBucketImpl, key []byte, value []byte) error {
 	return nil
 }
