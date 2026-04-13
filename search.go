@@ -15,9 +15,11 @@
 package bleve
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -829,4 +831,17 @@ func ParseParams(r *SearchRequest, input []byte) (*RequestParams, error) {
 	}
 
 	return params, nil
+}
+
+// OptionalRawMessage is a wrapper around json.RawMessage that treats empty or null JSON as nil,
+// to allow for optional parameters in search requests without requiring clients to send null explicitly.
+type OptionalRawMessage []byte
+
+func (n *OptionalRawMessage) UnmarshalJSON(data []byte) error {
+	if len(data) == 0 || bytes.Equal(data, []byte("null")) {
+		*n = nil
+		return nil
+	}
+	*n = slices.Clone(data)
+	return nil
 }

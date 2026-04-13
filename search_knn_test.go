@@ -2936,3 +2936,26 @@ func TestHierarchicalNestedVectorSearch(t *testing.T) {
 		}
 	}
 }
+
+func TestKNNNullParams(t *testing.T) {
+	queries := []struct {
+		query []byte
+	}{
+		{query: []byte(`{"knn": [{"field": "emb", "vector": [1, 2], "k": 3}]}`)},
+		{query: []byte(`{"knn": [{"field": "emb", "params": null, "vector": [1, 2], "k": 3}]}`)},
+	}
+
+	for _, q := range queries {
+		var searchReq SearchRequest
+		err := json.Unmarshal(q.query, &searchReq)
+		if err != nil {
+			t.Fatalf("failed to parse query: %v", err)
+		}
+		for _, req := range searchReq.KNN {
+			fmt.Println("Parsed KNN request:", req)
+			if len(req.Params) > 0 {
+				t.Fatalf("expected no params for query: %s, got %v", q.query, req.Params)
+			}
+		}
+	}
+}
