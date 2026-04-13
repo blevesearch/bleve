@@ -27,6 +27,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -125,35 +126,35 @@ func (r *SearchRequest) AddKNNOperator(operator knnOperator) {
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	type tempKNNReq struct {
-		Field        string          `json:"field"`
-		Vector       []float32       `json:"vector"`
-		VectorBase64 string          `json:"vector_base64"`
-		K            int64           `json:"k"`
-		Boost        *query.Boost    `json:"boost,omitempty"`
-		Params       json.RawMessage `json:"params"`
-		FilterQuery  json.RawMessage `json:"filter,omitempty"`
+		Field        string             `json:"field"`
+		Vector       []float32          `json:"vector"`
+		VectorBase64 string             `json:"vector_base64"`
+		K            int64              `json:"k"`
+		Boost        *query.Boost       `json:"boost,omitempty"`
+		Params       OptionalRawMessage `json:"params"`
+		FilterQuery  OptionalRawMessage `json:"filter,omitempty"`
 	}
 
 	var temp struct {
-		Q                json.RawMessage   `json:"query"`
-		Size             *int              `json:"size"`
-		From             int               `json:"from"`
-		Highlight        *HighlightRequest `json:"highlight"`
-		Fields           []string          `json:"fields"`
-		Facets           FacetsRequest     `json:"facets"`
-		Explain          bool              `json:"explain"`
-		Sort             []json.RawMessage `json:"sort"`
-		IncludeLocations bool              `json:"includeLocations"`
-		Score            string            `json:"score"`
-		SearchAfter      []string          `json:"search_after"`
-		SearchBefore     []string          `json:"search_before"`
-		KNN              []*tempKNNReq     `json:"knn"`
-		KNNOperator      knnOperator       `json:"knn_operator"`
-		PreSearchData    json.RawMessage   `json:"pre_search_data"`
-		Params           json.RawMessage   `json:"params"`
+		Q                json.RawMessage    `json:"query"`
+		Size             *int               `json:"size"`
+		From             int                `json:"from"`
+		Highlight        *HighlightRequest  `json:"highlight"`
+		Fields           []string           `json:"fields"`
+		Facets           FacetsRequest      `json:"facets"`
+		Explain          bool               `json:"explain"`
+		Sort             []json.RawMessage  `json:"sort"`
+		IncludeLocations bool               `json:"includeLocations"`
+		Score            string             `json:"score"`
+		SearchAfter      []string           `json:"search_after"`
+		SearchBefore     []string           `json:"search_before"`
+		KNN              []*tempKNNReq      `json:"knn"`
+		KNNOperator      knnOperator        `json:"knn_operator"`
+		PreSearchData    OptionalRawMessage `json:"pre_search_data"`
+		Params           OptionalRawMessage `json:"params"`
 	}
 
-	err := json.Unmarshal(input, &temp)
+	err := util.UnmarshalJSON(input, &temp)
 	if err != nil {
 		return err
 	}
@@ -193,7 +194,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	}
 
 	if IsScoreFusionRequested(r) {
-		if temp.Params == nil {
+		if len(temp.Params) == 0 {
 			// If params is not present and it is requires rescoring, assign
 			// default values
 			r.Params = NewDefaultParams(r.From, r.Size)
@@ -216,11 +217,10 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.KNN[i].VectorBase64 = temp.KNN[i].VectorBase64
 		r.KNN[i].K = temp.KNN[i].K
 		r.KNN[i].Boost = temp.KNN[i].Boost
-		r.KNN[i].Params = temp.KNN[i].Params
-		if len(knnReq.FilterQuery) == 0 {
-			// Setting this to nil to avoid ParseQuery() setting it to a match none
-			r.KNN[i].FilterQuery = nil
-		} else {
+		if len(temp.KNN[i].Params) > 0 {
+			r.KNN[i].Params = json.RawMessage(temp.KNN[i].Params)
+		}
+		if len(temp.KNN[i].FilterQuery) > 0 {
 			r.KNN[i].FilterQuery, err = query.ParseQuery(knnReq.FilterQuery)
 			if err != nil {
 				return err
@@ -232,7 +232,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.KNNOperator = knnOperatorOr
 	}
 
-	if temp.PreSearchData != nil {
+	if len(temp.PreSearchData) > 0 {
 		r.PreSearchData, err = query.ParsePreSearchData(temp.PreSearchData)
 		if err != nil {
 			return err
