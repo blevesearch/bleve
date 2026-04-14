@@ -24,6 +24,10 @@ import (
 // setGPUErrorCallbacks forwards GPU error callbacks from the user-supplied
 // config into the segment config so that zapx can invoke them on GPU failures.
 func setGPUErrorCallbacks(config, segmentConfig map[string]interface{}) {
+	if segmentConfig == nil {
+		return
+	}
+
 	if cb, ok := config[index.GPUToCPUCloneErrorKey]; ok {
 		segmentConfig[index.GPUToCPUCloneErrorKey] = cb
 	}
