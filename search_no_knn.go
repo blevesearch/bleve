@@ -143,7 +143,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	}
 
 	if IsScoreFusionRequested(r) {
-		if len(temp.Params) == 0 {
+		if temp.Params == nil {
 			// If params is not present and it is requires rescoring, assign
 			// default values
 			r.Params = NewDefaultParams(r.From, r.Size)
@@ -158,7 +158,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		}
 	}
 
-	if len(temp.PreSearchData) > 0 {
+	if temp.PreSearchData != nil {
 		r.PreSearchData, err = query.ParsePreSearchData(temp.PreSearchData)
 		if err != nil {
 			return err
