@@ -2955,7 +2955,7 @@ func TestKNNNullParams(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to parse query: %v", err)
 		}
-		if len(searchReq.Params) > 0 {
+		if searchReq.Params != nil {
 			t.Fatalf("expected no top-level params for query: %s, got %v", q.query, searchReq.Params)
 		}
 		if len(searchReq.PreSearchData) > 0 {
@@ -2978,7 +2978,7 @@ func TestKNNNullParams(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to unmarshal marshalled search request: %v", err)
 		}
-		if len(unmarshalled.Params) > 0 {
+		if unmarshalled.Params != nil {
 			t.Fatalf("expected no top-level params after marshal/unmarshal for query: %s, got %v", q.query, unmarshalled.Params)
 		}
 		if len(unmarshalled.PreSearchData) > 0 {
