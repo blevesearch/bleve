@@ -834,8 +834,7 @@ func ParseParams(r *SearchRequest, input []byte) (*RequestParams, error) {
 	return params, nil
 }
 
-// OptionalRawMessage is a wrapper around json.RawMessage that treats empty or null JSON as nil,
-// to allow for optional parameters in search requests without requiring clients to send null explicitly.
+// OptionalRawMessage is a wrapper around json.RawMessage that treats empty or `null` JSON as nil.
 type OptionalRawMessage json.RawMessage
 
 func (n *OptionalRawMessage) UnmarshalJSON(data []byte) error {
