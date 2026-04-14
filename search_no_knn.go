@@ -86,20 +86,20 @@ type SearchRequest struct {
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	var temp struct {
-		Q                json.RawMessage   `json:"query"`
-		Size             *int              `json:"size"`
-		From             int               `json:"from"`
-		Highlight        *HighlightRequest `json:"highlight"`
-		Fields           []string          `json:"fields"`
-		Facets           FacetsRequest     `json:"facets"`
-		Explain          bool              `json:"explain"`
-		Sort             []json.RawMessage `json:"sort"`
-		IncludeLocations bool              `json:"includeLocations"`
-		Score            string            `json:"score"`
-		SearchAfter      []string          `json:"search_after"`
-		SearchBefore     []string          `json:"search_before"`
-		PreSearchData    json.RawMessage   `json:"pre_search_data"`
-		Params           json.RawMessage   `json:"params"`
+		Q                json.RawMessage    `json:"query"`
+		Size             *int               `json:"size"`
+		From             int                `json:"from"`
+		Highlight        *HighlightRequest  `json:"highlight"`
+		Fields           []string           `json:"fields"`
+		Facets           FacetsRequest      `json:"facets"`
+		Explain          bool               `json:"explain"`
+		Sort             []json.RawMessage  `json:"sort"`
+		IncludeLocations bool               `json:"includeLocations"`
+		Score            string             `json:"score"`
+		SearchAfter      []string           `json:"search_after"`
+		SearchBefore     []string           `json:"search_before"`
+		PreSearchData    OptionalRawMessage `json:"pre_search_data"`
+		Params           OptionalRawMessage `json:"params"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -142,7 +142,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	}
 
 	if IsScoreFusionRequested(r) {
-		if temp.Params == nil {
+		if len(temp.Params) == 0 {
 			// If params is not present and it is requires rescoring, assign
 			// default values
 			r.Params = NewDefaultParams(r.From, r.Size)
@@ -157,7 +157,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		}
 	}
 
-	if temp.PreSearchData != nil {
+	if len(temp.PreSearchData) > 0 {
 		r.PreSearchData, err = query.ParsePreSearchData(temp.PreSearchData)
 		if err != nil {
 			return err

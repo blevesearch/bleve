@@ -2943,6 +2943,7 @@ func TestKNNNullParams(t *testing.T) {
 	}{
 		{query: []byte(`{"knn": [{"field": "emb", "vector": [1, 2], "k": 3}]}`)},
 		{query: []byte(`{"knn": [{"field": "emb", "params": null, "vector": [1, 2], "k": 3}]}`)},
+		{query: []byte(`{"knn": [{"field": "emb","vector": [1, 2], "k": 3, "filter": null}]}`)},
 	}
 
 	for _, q := range queries {
@@ -2952,9 +2953,11 @@ func TestKNNNullParams(t *testing.T) {
 			t.Fatalf("failed to parse query: %v", err)
 		}
 		for _, req := range searchReq.KNN {
-			fmt.Println("Parsed KNN request:", req)
 			if len(req.Params) > 0 {
 				t.Fatalf("expected no params for query: %s, got %v", q.query, req.Params)
+			}
+			if req.FilterQuery != nil {
+				t.Fatalf("expected no filter for query: %s, got %v", q.query, req.FilterQuery)
 			}
 		}
 	}

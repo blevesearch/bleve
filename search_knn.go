@@ -43,18 +43,18 @@ type SearchRequest struct {
 	Query            query.Query       `json:"query"`
 	Size             int               `json:"size"`
 	From             int               `json:"from"`
-	Highlight        *HighlightRequest `json:"highlight"`
-	Fields           []string          `json:"fields"`
-	Facets           FacetsRequest     `json:"facets"`
+	Highlight        *HighlightRequest `json:"highlight,omitempty"`
+	Fields           []string          `json:"fields,omitempty"`
+	Facets           FacetsRequest     `json:"facets,omitempty"`
 	Explain          bool              `json:"explain"`
 	Sort             search.SortOrder  `json:"sort"`
 	IncludeLocations bool              `json:"includeLocations"`
 	Score            string            `json:"score,omitempty"`
-	SearchAfter      []string          `json:"search_after"`
-	SearchBefore     []string          `json:"search_before"`
+	SearchAfter      []string          `json:"search_after,omitempty"`
+	SearchBefore     []string          `json:"search_before,omitempty"`
 
-	KNN         []*KNNRequest `json:"knn"`
-	KNNOperator knnOperator   `json:"knn_operator"`
+	KNN         []*KNNRequest `json:"knn,omitempty"`
+	KNNOperator knnOperator   `json:"knn_operator,omitempty"`
 
 	// PreSearchData will be a  map that will be used
 	// in the second phase of any 2-phase search, to provide additional
