@@ -28,8 +28,8 @@ func setGPUErrorCallbacks(config, segmentConfig map[string]interface{}) {
 		return
 	}
 
-	if cb, ok := config[index.GPUToCPUCloneErrorKey]; ok {
-		segmentConfig[index.GPUToCPUCloneErrorKey] = cb
+	if cb, ok := config[index.CPUToGPUCloneErrorKey]; ok {
+		segmentConfig[index.CPUToGPUCloneErrorKey] = cb
 	}
 	if cb, ok := config[index.GPUErrorKey]; ok {
 		segmentConfig[index.GPUErrorKey] = cb

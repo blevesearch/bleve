@@ -2,8 +2,8 @@ github.com/RoaringBitmap/roaring/v2 v2.14.5 h1:ckd0o545JqDPeVJDgeFoaM21eBixUnlWf
 github.com/RoaringBitmap/roaring/v2 v2.14.5/go.mod h1:eq4wdNXxtJIS/oikeCzdX1rBzek7ANzbth041hrU8Q4=
 github.com/bits-and-blooms/bitset v1.24.2 h1:M7/NzVbsytmtfHbumG+K2bremQPMJuqv1JD3vOaFxp0=
 github.com/bits-and-blooms/bitset v1.24.2/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
-github.com/blevesearch/bleve_index_api v1.3.11-0.20260413142030-e3378dec252d h1:wSDXDST7sQ4e685jtR0aSWzjuhYkn9I4wF660GJNd0I=
-github.com/blevesearch/bleve_index_api v1.3.11-0.20260413142030-e3378dec252d/go.mod h1:xvd48t5XMeeioWQ5/jZvgLrV98flT2rdvEJ3l/ki4Ko=
+github.com/blevesearch/bleve_index_api v1.3.11-0.20260414054256-b05ed209441f h1:KHtlQg472zvl946nfpepfhq4fvuzf204Xoo9T16Iojo=
+github.com/blevesearch/bleve_index_api v1.3.11-0.20260414054256-b05ed209441f/go.mod h1:xvd48t5XMeeioWQ5/jZvgLrV98flT2rdvEJ3l/ki4Ko=
 github.com/blevesearch/geo v0.2.5 h1:yJg9FX1oRwLnjXSXF+ECHfXFTF4diF02Ca/qUGVjJhE=
 github.com/blevesearch/geo v0.2.5/go.mod h1:Jhq7WE2K6mJTx1xS44M2pUO6Io+wjCSHh1+co3YOgH4=
 github.com/blevesearch/go-faiss v1.0.31-0.20260408101658-f3af3cfbdc5e h1:qftUblyzrOzJeQf3CnPh2M3jkHcAaZ/roPZ6Gx3ClIc=
@@ -45,8 +45,8 @@ github.com/blevesearch/zapx/v15 v15.4.3 h1:iJiMJOHrz216jyO6lS0m9RTCEkprUnzvqAI2l
 github.com/blevesearch/zapx/v15 v15.4.3/go.mod h1:1pssev/59FsuWcgSnTa0OeEpOzmhtmr/0/11H0Z8+Nw=
 github.com/blevesearch/zapx/v16 v16.3.2 h1:R8alnAeYxzKO4JjQY4FBqJduJwcPE3YjcgevWgI+XT0=
 github.com/blevesearch/zapx/v16 v16.3.2/go.mod h1:zCFjv7McXWm1C8rROL+3mUoD5WYe2RKsZP3ufqcYpLY=
-github.com/blevesearch/zapx/v17 v17.0.9-0.20260413153133-647262957bf1 h1:/Oa0KEpGwGZHL0lCduQENFW3HX2EWm5GcRZ83ZKX8K4=
-github.com/blevesearch/zapx/v17 v17.0.9-0.20260413153133-647262957bf1/go.mod h1:q5bIBbp5dbz6bQmdJfw19tvR/3OGuyLOYQ6vwLwMoj8=
+github.com/blevesearch/zapx/v17 v17.0.9-0.20260414061224-e1eac3f388f5 h1:BeIcmO3Fgky99PsQbTmXrZa4FPsGotAiINn1kJ+wVmA=
+github.com/blevesearch/zapx/v17 v17.0.9-0.20260414061224-e1eac3f388f5/go.mod h1:q5bIBbp5dbz6bQmdJfw19tvR/3OGuyLOYQ6vwLwMoj8=
 github.com/couchbase/ghistogram v0.1.0 h1:b95QcQTCzjTUocDXp/uMgSNQi8oj1tGwnJ4bODWZnps=
 github.com/couchbase/ghistogram v0.1.0/go.mod h1:s1Jhy76zqfEecpNWJfWUiKZookAFaiGOEoyzgHt9i7k=
 github.com/couchbase/moss v0.2.0 h1:VCYrMzFwEryyhRSeI+/b3tRBSeTpi/8gn5Kf6dxqn+o=
