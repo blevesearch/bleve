@@ -25,6 +25,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -102,7 +103,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Params           OptionalRawMessage `json:"params"`
 	}
 
-	err := json.Unmarshal(input, &temp)
+	err := util.UnmarshalJSON(input, &temp)
 	if err != nil {
 		return err
 	}
