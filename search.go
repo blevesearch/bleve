@@ -847,8 +847,8 @@ func (n *OptionalRawMessage) UnmarshalJSON(data []byte) error {
 }
 
 func (n OptionalRawMessage) MarshalJSON() ([]byte, error) {
-	if n == nil {
-		return nil, nil
+	if len(n) == 0 {
+		return []byte("null"), nil
 	}
 	return n, nil
 }

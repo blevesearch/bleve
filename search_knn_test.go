@@ -2944,6 +2944,9 @@ func TestKNNNullParams(t *testing.T) {
 		{query: []byte(`{"knn": [{"field": "emb", "vector": [1, 2], "k": 3}]}`)},
 		{query: []byte(`{"knn": [{"field": "emb", "params": null, "vector": [1, 2], "k": 3}]}`)},
 		{query: []byte(`{"knn": [{"field": "emb","vector": [1, 2], "k": 3, "filter": null}]}`)},
+		{query: []byte(`{"score": "rrf", "params": null, "knn": [{"field": "emb", "vector": [1, 2], "k": 3}]}`)},
+		{query: []byte(`{"score": "rsf", "params": null, "knn": [{"field": "emb", "vector": [1, 2], "k": 3}]}`)},
+		{query: []byte(`{"pre_search_data": null, "knn": [{"field": "emb", "vector": [1, 2], "k": 3}]}`)},
 	}
 
 	for _, q := range queries {
@@ -2951,6 +2954,12 @@ func TestKNNNullParams(t *testing.T) {
 		err := json.Unmarshal(q.query, &searchReq)
 		if err != nil {
 			t.Fatalf("failed to parse query: %v", err)
+		}
+		if len(searchReq.Params) > 0 {
+			t.Fatalf("expected no top-level params for query: %s, got %v", q.query, searchReq.Params)
+		}
+		if len(searchReq.PreSearchData) > 0 {
+			t.Fatalf("expected no pre_search_data for query: %s, got %v", q.query, searchReq.PreSearchData)
 		}
 		for _, req := range searchReq.KNN {
 			if len(req.Params) > 0 {
@@ -2968,6 +2977,12 @@ func TestKNNNullParams(t *testing.T) {
 		err = json.Unmarshal(marshalled, &unmarshalled)
 		if err != nil {
 			t.Fatalf("failed to unmarshal marshalled search request: %v", err)
+		}
+		if len(unmarshalled.Params) > 0 {
+			t.Fatalf("expected no top-level params after marshal/unmarshal for query: %s, got %v", q.query, unmarshalled.Params)
+		}
+		if len(unmarshalled.PreSearchData) > 0 {
+			t.Fatalf("expected no pre_search_data after marshal/unmarshal for query: %s, got %v", q.query, unmarshalled.PreSearchData)
 		}
 		for _, req := range unmarshalled.KNN {
 			if len(req.Params) > 0 {
