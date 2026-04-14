@@ -208,6 +208,9 @@ func NewScorch(storeName string,
 		rv.segmentConfig = segConfig
 	}
 
+	// pass in error callbacks to be called in zapx in the segment config
+	setGPUErrorCallbacks(config, rv.segmentConfig)
+
 	typ, ok := config["spatialPlugin"].(string)
 	if ok {
 		if err := rv.loadSpatialAnalyzerPlugin(typ); err != nil {
