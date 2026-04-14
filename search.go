@@ -845,3 +845,10 @@ func (n *OptionalRawMessage) UnmarshalJSON(data []byte) error {
 	*n = slices.Clone(data)
 	return nil
 }
+
+func (n OptionalRawMessage) MarshalJSON() ([]byte, error) {
+	if n == nil {
+		return nil, nil
+	}
+	return n, nil
+}

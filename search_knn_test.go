@@ -2960,5 +2960,22 @@ func TestKNNNullParams(t *testing.T) {
 				t.Fatalf("expected no filter for query: %s, got %v", q.query, req.FilterQuery)
 			}
 		}
+		marshalled, err := json.Marshal(searchReq)
+		if err != nil {
+			t.Fatalf("failed to marshal search request: %v", err)
+		}
+		var unmarshalled SearchRequest
+		err = json.Unmarshal(marshalled, &unmarshalled)
+		if err != nil {
+			t.Fatalf("failed to unmarshal marshalled search request: %v", err)
+		}
+		for _, req := range unmarshalled.KNN {
+			if len(req.Params) > 0 {
+				t.Fatalf("expected no params after marshal/unmarshal for query: %s, got %v", q.query, req.Params)
+			}
+			if req.FilterQuery != nil {
+				t.Fatalf("expected no filter after marshal/unmarshal for query: %s, got %v", q.query, req.FilterQuery)
+			}
+		}
 	}
 }
