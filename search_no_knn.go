@@ -61,7 +61,7 @@ type SearchRequest struct {
 	Facets           FacetsRequest     `json:"facets,omitempty"`
 	Explain          bool              `json:"explain"`
 	Sort             search.SortOrder  `json:"sort"`
-	IncludeLocations bool              `json:"includeLocations,omitempty"`
+	IncludeLocations bool              `json:"includeLocations"`
 	Score            string            `json:"score,omitempty"`
 	SearchAfter      []string          `json:"search_after,omitempty"`
 	SearchBefore     []string          `json:"search_before,omitempty"`
