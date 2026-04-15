@@ -138,6 +138,57 @@ type FieldTermLocation struct {
 
 type FieldFragmentMap map[string][]string
 
+// InnerHitsResult contains the additional documents from a collapsed group.
+// Similar to Elasticsearch's inner_hits response structure.
+type InnerHitsResult struct {
+	Hits  DocumentMatchCollection `json:"hits"`
+	Total uint64                  `json:"total"` // Total documents in this group before pagination
+}
+
+// InnerHitsRequest describes how to retrieve additional documents from each collapsed group.
+// Similar to Elasticsearch's inner_hits feature.
+type InnerHitsRequest struct {
+	Name   string    `json:"name"`             // Name for this inner_hits section
+	Size   int       `json:"size,omitempty"`   // Number of documents to return (default: 3)
+	From   int       `json:"from,omitempty"`   // Offset for pagination within the group
+	Sort   SortOrder `json:"sort,omitempty"`   // Independent sort order for inner hits
+	Fields []string  `json:"fields,omitempty"` // Fields to include in inner hit documents
+
+	// Second-level collapse for hierarchical grouping
+	Collapse *CollapseRequest `json:"collapse,omitempty"`
+}
+
+// NewInnerHitsRequest creates a new inner_hits request with the given name.
+func NewInnerHitsRequest(name string) *InnerHitsRequest {
+	return &InnerHitsRequest{
+		Name: name,
+		Size: 3, // Elasticsearch default
+	}
+}
+
+// CollapseRequest describes field collapsing for search results.
+// Collapses search results based on a field value, returning one representative
+// document per unique field value in the main results, with optional inner_hits
+// containing additional documents from each group.
+// Similar to Elasticsearch's collapse feature with inner_hits.
+type CollapseRequest struct {
+	Field string `json:"field"`
+
+	// InnerHits configurations for retrieving additional documents per group.
+	// Each inner_hits configuration can have independent sort order, pagination, and field selection.
+	InnerHits []*InnerHitsRequest `json:"inner_hits,omitempty"`
+}
+
+// NewCollapseRequest creates a new collapse request for the specified field.
+// Returns one representative document per unique field value.
+// Use InnerHits to retrieve additional documents from each group.
+func NewCollapseRequest(field string, innerHits ...*InnerHitsRequest) *CollapseRequest {
+	return &CollapseRequest{
+		Field:     field,
+		InnerHits: innerHits,
+	}
+}
+
 type DocumentMatch struct {
 	Index           string                `json:"index,omitempty"`
 	ID              string                `json:"id"`
@@ -153,6 +204,11 @@ type DocumentMatch struct {
 	// SearchRequest.Fields. Text fields are returned as strings, numeric
 	// fields as float64s and date fields as strings.
 	Fields map[string]interface{} `json:"fields,omitempty"`
+
+	// InnerHits contains additional documents from the same collapsed group.
+	// Only populated when collapse with inner_hits is configured.
+	// Map key is the inner_hits name.
+	InnerHits map[string]*InnerHitsResult `json:"inner_hits,omitempty"`
 
 	// used to maintain natural index order
 	HitNumber uint64 `json:"-"`

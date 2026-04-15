@@ -17,6 +17,7 @@ package collector
 import (
 	"context"
 	"reflect"
+	"sort"
 	"strconv"
 	"time"
 
@@ -53,6 +54,12 @@ type collectorCompare func(i, j *search.DocumentMatch) int
 
 type collectorFixup func(d *search.DocumentMatch) error
 
+// collapseGroup tracks documents for a single collapsed group
+type collapseGroup struct {
+	representative *search.DocumentMatch              // the representative document (selected by main sort)
+	innerHits      map[string][]*search.DocumentMatch // inner_hits name -> documents
+}
+
 // TopNCollector collects the top N hits, optionally skipping some results
 type TopNCollector struct {
 	size          int
@@ -81,6 +88,19 @@ type TopNCollector struct {
 	hybridMergeCallback search.HybridMergeCallbackFn
 
 	nestedStore *collectStoreNested
+
+	// Collapse support - new architecture supporting inner_hits
+	collapseRequest        *search.CollapseRequest           // full collapse configuration
+	collapseGroups         map[string]*collapseGroup         // field_value -> group state
+	collapseFieldValue     string                            // current document's collapse field value
+	collapseInnerHitsSorts map[string]*sortContext           // inner_hits name -> cached sort context
+}
+
+// sortContext holds cached sort comparison data for a specific sort order
+type sortContext struct {
+	sort    search.SortOrder
+	scoring []bool
+	desc    []bool
 }
 
 // CheckDoneEvery controls how frequently we check the context deadline
@@ -313,6 +333,10 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			hc.facetsBuilder.UpdateVisitor(field, term)
 		}
 		hc.sort.UpdateVisitor(field, term)
+		// Capture collapse field value
+		if hc.collapseRequest != nil && field == hc.collapseRequest.Field {
+			hc.collapseFieldValue = string(term)
+		}
 	}
 
 	dmHandlerMaker := MakeTopNDocumentMatchHandler
@@ -468,6 +492,9 @@ func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
 	reader index.IndexReader, d *search.DocumentMatch, isKnnDoc bool) (err error) {
 
+	// Reset collapse field value for each document
+	hc.collapseFieldValue = ""
+
 	// visit field terms for features that require it (sort, facets)
 	if !isKnnDoc && len(hc.neededFields) > 0 {
 		err = hc.visitFieldTerms(reader, d, hc.updateFieldVisitor)
@@ -557,6 +584,24 @@ func MakeTopNDocumentMatchHandler(
 				}
 			}
 
+			// Handle field collapsing
+			if hc.collapseRequest != nil {
+				collapseKey := hc.collapseFieldValue
+				// Following Elasticsearch behavior: treat missing values as empty string
+				// and group them together
+
+				group := hc.collapseGroups[collapseKey]
+				if group == nil {
+					group = &collapseGroup{}
+					hc.collapseGroups[collapseKey] = group
+				}
+
+				// Maintain representative + per-inner_hits lists
+				if !hc.handleInnerHitsCollapse(group, d, ctx) {
+					return nil // Document was rejected
+				}
+			}
+
 			removed := hc.store.AddNotExceedingSize(d, hc.size+hc.skip)
 			if removed != nil {
 				if hc.lowestMatchOutsideResults == nil {
@@ -635,7 +680,7 @@ func (hc *TopNCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
 // and does final doc id lookup (if necessary)
 func (hc *TopNCollector) finalizeResults(r index.IndexReader) error {
 	var err error
-	hc.results, err = hc.store.Final(hc.skip, func(doc *search.DocumentMatch) error {
+	results, err := hc.store.Final(hc.skip, func(doc *search.DocumentMatch) error {
 		if doc.ID == "" {
 			// look up the id since we need it for lookup
 			var err error
@@ -647,8 +692,81 @@ func (hc *TopNCollector) finalizeResults(r index.IndexReader) error {
 		doc.Complete(nil)
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
-	return err
+	// If collapse is enabled, build hierarchical response
+	if hc.collapseRequest != nil {
+		hc.results = hc.buildInnerHitsResponse(results)
+	} else {
+		hc.results = results
+	}
+
+	return nil
+}
+
+// buildInnerHitsResponse builds hierarchical response with inner_hits nested under representatives
+func (hc *TopNCollector) buildInnerHitsResponse(results search.DocumentMatchCollection) search.DocumentMatchCollection {
+	// Create a set of representative documents
+	representatives := make(map[*search.DocumentMatch]*collapseGroup)
+	for _, group := range hc.collapseGroups {
+		if group.representative != nil {
+			representatives[group.representative] = group
+		}
+	}
+
+	// Filter results to only include representatives
+	filtered := make(search.DocumentMatchCollection, 0, len(representatives))
+	for _, doc := range results {
+		if group, isRep := representatives[doc]; isRep {
+			// Attach inner_hits to this representative
+			doc.InnerHits = make(map[string]*search.InnerHitsResult)
+
+			for _, ihReq := range hc.collapseRequest.InnerHits {
+				docs := group.innerHits[ihReq.Name]
+				if docs == nil {
+					docs = []*search.DocumentMatch{}
+				}
+
+				// Apply pagination (from/size)
+				from := ihReq.From
+				size := ihReq.Size
+				if size < 1 {
+					size = 3 // Elasticsearch default
+				}
+
+				total := uint64(len(docs))
+
+				// Sort the docs according to this inner_hits' sort order
+				if sortCtx := hc.collapseInnerHitsSorts[ihReq.Name]; sortCtx != nil {
+					// Use sort.Slice with the sort order's Compare method
+					sort.Slice(docs, func(i, j int) bool {
+						cmp := sortCtx.sort.Compare(sortCtx.scoring, sortCtx.desc, docs[i], docs[j])
+						return cmp < 0
+					})
+				}
+
+				// Apply from/size pagination
+				if from >= len(docs) {
+					docs = []*search.DocumentMatch{}
+				} else if from+size > len(docs) {
+					docs = docs[from:]
+				} else {
+					docs = docs[from : from+size]
+				}
+
+				doc.InnerHits[ihReq.Name] = &search.InnerHitsResult{
+					Hits:  docs,
+					Total: total,
+				}
+			}
+
+			filtered = append(filtered, doc)
+		}
+	}
+
+	return filtered
 }
 
 // Results returns the collected hits
@@ -685,4 +803,110 @@ func (hc *TopNCollector) SetKNNHits(knnHits search.DocumentMatchCollection, hybr
 		hc.knnHits[hit.ID] = hit
 	}
 	hc.hybridMergeCallback = hybridMergeCallback
+}
+
+// SetCollapse enables field collapsing on the collector.
+// The collapse field must be a stored field with doc values.
+func (hc *TopNCollector) SetCollapse(collapseReq *search.CollapseRequest) {
+	if collapseReq == nil {
+		return
+	}
+
+	hc.collapseRequest = collapseReq
+	hc.collapseGroups = make(map[string]*collapseGroup)
+
+	// Add collapse field to needed fields for doc value reading
+	found := false
+	for _, f := range hc.neededFields {
+		if f == collapseReq.Field {
+			found = true
+			break
+		}
+	}
+	if !found {
+		hc.neededFields = append(hc.neededFields, collapseReq.Field)
+	}
+
+	// If inner_hits are configured, set up sort contexts for each
+	if collapseReq.InnerHits != nil && len(collapseReq.InnerHits) > 0 {
+		hc.collapseInnerHitsSorts = make(map[string]*sortContext)
+		for _, ih := range collapseReq.InnerHits {
+			sortOrder := ih.Sort
+			if sortOrder == nil {
+				// Default to main sort order if not specified
+				sortOrder = hc.sort
+			}
+			scoring := sortOrder.CacheIsScore()
+			desc := sortOrder.CacheDescending()
+			hc.collapseInnerHitsSorts[ih.Name] = &sortContext{
+				sort:    sortOrder,
+				scoring: scoring,
+				desc:    desc,
+			}
+		}
+	}
+}
+
+// handleInnerHitsCollapse handles collapse with inner_hits configurations
+// Returns false if document should be rejected (not in any list)
+func (hc *TopNCollector) handleInnerHitsCollapse(group *collapseGroup, d *search.DocumentMatch, ctx *search.SearchContext) bool {
+	// First, check if this should be the new representative (based on main sort)
+	if group.representative == nil {
+		group.representative = d
+	} else {
+		cmp := hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, d, group.representative)
+		if cmp < 0 {
+			// New doc is better, make it the representative
+			// Old representative might still be in inner_hits lists
+			group.representative = d
+		}
+	}
+
+	// Initialize inner_hits map if needed
+	if group.innerHits == nil {
+		group.innerHits = make(map[string][]*search.DocumentMatch)
+	}
+
+	// Try to add to each inner_hits list (using their independent sort orders)
+	addedToAny := false
+	for _, ihReq := range hc.collapseRequest.InnerHits {
+		sortCtx := hc.collapseInnerHitsSorts[ihReq.Name]
+		docs := group.innerHits[ihReq.Name]
+
+		size := ihReq.Size
+		if size < 1 {
+			size = 3 // Elasticsearch default
+		}
+
+		if len(docs) < size {
+			// List not full yet, add document
+			group.innerHits[ihReq.Name] = append(docs, d)
+			addedToAny = true
+		} else {
+			// List is full, find worst document according to this inner_hits' sort order
+			worstIdx := 0
+			for i := 1; i < len(docs); i++ {
+				cmp := sortCtx.sort.Compare(sortCtx.scoring, sortCtx.desc, docs[i], docs[worstIdx])
+				if cmp > 0 {
+					worstIdx = i
+				}
+			}
+
+			// Compare new document with worst
+			cmp := sortCtx.sort.Compare(sortCtx.scoring, sortCtx.desc, d, docs[worstIdx])
+			if cmp < 0 {
+				// New doc is better, replace worst
+				docs[worstIdx] = d
+				addedToAny = true
+			}
+		}
+	}
+
+	// Only keep document if it's the representative or in at least one inner_hits list
+	if d != group.representative && !addedToAny {
+		ctx.DocumentMatchPool.Put(d)
+		return false
+	}
+
+	return true
 }
