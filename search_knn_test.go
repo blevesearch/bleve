@@ -2936,3 +2936,53 @@ func TestHierarchicalNestedVectorSearch(t *testing.T) {
 		}
 	}
 }
+
+func TestKNNNullParams(t *testing.T) {
+	queries := []struct {
+		query []byte
+	}{
+		{query: []byte(`{"knn": [{"field": "emb", "vector": [1, 2], "k": 3}]}`)},
+		{query: []byte(`{"knn": [{"field": "emb", "params": null, "vector": [1, 2], "k": 3}]}`)},
+		{query: []byte(`{"knn": [{"field": "emb","vector": [1, 2], "k": 3, "filter": null}]}`)},
+		{query: []byte(`{"pre_search_data": null, "knn": [{"field": "emb", "vector": [1, 2], "k": 3}]}`)},
+	}
+
+	for _, q := range queries {
+		var searchReq SearchRequest
+		err := json.Unmarshal(q.query, &searchReq)
+		if err != nil {
+			t.Fatalf("failed to parse query: %v", err)
+		}
+		if len(searchReq.PreSearchData) > 0 {
+			t.Fatalf("expected no pre_search_data for query: %s, got %v", q.query, searchReq.PreSearchData)
+		}
+		for _, req := range searchReq.KNN {
+			if len(req.Params) > 0 {
+				t.Fatalf("expected no params for query: %s, got %v", q.query, req.Params)
+			}
+			if req.FilterQuery != nil {
+				t.Fatalf("expected no filter for query: %s, got %v", q.query, req.FilterQuery)
+			}
+		}
+		marshalled, err := json.Marshal(searchReq)
+		if err != nil {
+			t.Fatalf("failed to marshal search request: %v", err)
+		}
+		var unmarshalled SearchRequest
+		err = json.Unmarshal(marshalled, &unmarshalled)
+		if err != nil {
+			t.Fatalf("failed to unmarshal marshalled search request: %v", err)
+		}
+		if len(unmarshalled.PreSearchData) > 0 {
+			t.Fatalf("expected no pre_search_data after marshal/unmarshal for query: %s, got %v", q.query, unmarshalled.PreSearchData)
+		}
+		for _, req := range unmarshalled.KNN {
+			if len(req.Params) > 0 {
+				t.Fatalf("expected no params after marshal/unmarshal for query: %s, got %v", q.query, req.Params)
+			}
+			if req.FilterQuery != nil {
+				t.Fatalf("expected no filter after marshal/unmarshal for query: %s, got %v", q.query, req.FilterQuery)
+			}
+		}
+	}
+}
