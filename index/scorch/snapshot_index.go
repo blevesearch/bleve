@@ -27,11 +27,11 @@ import (
 
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	"github.com/blevesearch/vellum"
 	lev "github.com/blevesearch/vellum/levenshtein"
-	bolt "go.etcd.io/bbolt"
 )
 
 // re usable, threadsafe levenshtein builders
@@ -993,7 +993,7 @@ func (is *IndexSnapshot) CopyTo(d index.Directory) error {
 		return fmt.Errorf("invalid root.bolt file found")
 	}
 
-	copyBolt, err := bolt.Open(rootFile.Name(), 0o600, nil)
+	copyBolt, err := util.OpenBolt(rootFile.Name(), 0o600, nil)
 	if err != nil {
 		return err
 	}

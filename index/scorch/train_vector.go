@@ -34,7 +34,6 @@ import (
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
-	bolt "go.etcd.io/bbolt"
 )
 
 type trainRequest struct {
@@ -101,19 +100,19 @@ func (t *vectorTrainer) persistToBolt(trainReq *trainRequest) error {
 	if err != nil {
 		return fmt.Errorf("error creating centroid bucket: %v", err)
 	}
-	err = trainerBucket.Put(util.BoltPathKey, []byte(index.TrainedIndexFileName))
+	err = trainerBucket.Put(util.BoltPathKey, []byte(index.TrainedIndexFileName), nil)
 	if err != nil {
 		return fmt.Errorf("error updating centroid bucket: %v", err)
 	}
 
 	t.trainingComplete.Store(trainReq.finalSample)
-	err = trainerBucket.Put(util.BoltTrainCompleteKey, []byte(strconv.FormatBool(trainReq.finalSample)))
+	err = trainerBucket.Put(util.BoltTrainCompleteKey, []byte(strconv.FormatBool(trainReq.finalSample)), nil)
 	if err != nil {
 		return fmt.Errorf("error updating train complete key: %v", err)
 	}
 
 	totSamples := atomic.AddUint64(&t.trainedSamples, uint64(trainReq.sampleSize))
-	err = trainerBucket.Put(util.BoltTrainedSamplesKey, binary.LittleEndian.AppendUint64(nil, totSamples))
+	err = trainerBucket.Put(util.BoltTrainedSamplesKey, binary.LittleEndian.AppendUint64(nil, totSamples), nil)
 	if err != nil {
 		return fmt.Errorf("error updating trained samples key: %v", err)
 	}
@@ -227,7 +226,7 @@ func (t *vectorTrainer) trainLoop() {
 
 // loads the metadata specific to the centroid index from boltdb, happens during init
 // no lock needed
-func (t *vectorTrainer) loadTrainedData(bucket *bolt.Bucket) error {
+func (t *vectorTrainer) loadTrainedData(bucket *util.BoltBucketImpl) error {
 	if bucket == nil {
 		return nil
 	}
@@ -237,8 +236,14 @@ func (t *vectorTrainer) loadTrainedData(bucket *bolt.Bucket) error {
 	}
 
 	// get the training status out of bolt
-	trainComplete := bucket.Get(util.BoltTrainCompleteKey)
-	trainedSamples := bucket.Get(util.BoltTrainedSamplesKey)
+	trainComplete, err := bucket.Get(util.BoltTrainCompleteKey, nil)
+	if err != nil {
+		return fmt.Errorf("error getting train complete: %v", err)
+	}
+	trainedSamples, err := bucket.Get(util.BoltTrainedSamplesKey, nil)
+	if err != nil {
+		return fmt.Errorf("error getting trained samples: %v", err)
+	}
 	atomic.StoreUint64(&t.trainedSamples, binary.LittleEndian.Uint64(trainedSamples))
 	comp, err := strconv.ParseBool(string(trainComplete))
 	if err != nil {
@@ -345,7 +350,7 @@ func (t *vectorTrainer) copyFileLOCKED(file string, d index.IndexDirectory) erro
 	return nil
 }
 
-func (t *vectorTrainer) updateBolt(snapshotsBucket *bolt.Bucket, key []byte, value []byte) error {
+func (t *vectorTrainer) updateBolt(snapshotsBucket *util.BoltBucketImpl, key []byte, value []byte) error {
 	if bytes.Equal(key, util.BoltTrainerKey) {
 		trainerBucket, err := snapshotsBucket.CreateBucketIfNotExists(util.BoltTrainerKey)
 		if err != nil {
@@ -356,12 +361,15 @@ func (t *vectorTrainer) updateBolt(snapshotsBucket *bolt.Bucket, key []byte, val
 		}
 
 		// guard against duplicate updates
-		existingValue := trainerBucket.Get(util.BoltPathKey)
+		existingValue, err := trainerBucket.Get(util.BoltPathKey, nil)
+		if err != nil {
+			return fmt.Errorf("error checking existing value: %v", err)
+		}
 		if existingValue != nil {
 			return fmt.Errorf("key already exists %v %v", t.parent.path, string(existingValue))
 		}
 
-		err = trainerBucket.Put(util.BoltPathKey, value)
+		err = trainerBucket.Put(util.BoltPathKey, value, nil)
 		if err != nil {
 			return err
 		}

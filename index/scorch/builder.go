@@ -20,9 +20,9 @@ import (
 	"sync"
 
 	"github.com/RoaringBitmap/roaring/v2"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
-	bolt "go.etcd.io/bbolt"
 )
 
 const DefaultBuilderBatchSize = 1000
@@ -291,7 +291,7 @@ func (o *Builder) Close() error {
 
 	// create the root bolt
 	rootBoltPath := o.path + string(os.PathSeparator) + "root.bolt"
-	rootBolt, err := bolt.Open(rootBoltPath, 0600, nil)
+	rootBolt, err := util.OpenBolt(rootBoltPath, 0600, nil)
 	if err != nil {
 		return err
 	}
