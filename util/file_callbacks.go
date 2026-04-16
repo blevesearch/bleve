@@ -116,3 +116,14 @@ func (r *fileReaderImpl) Process(data []byte) ([]byte, error) {
 func (r *fileReaderImpl) Id() string {
 	return r.id
 }
+
+// -----------------------------------------------------------------------
+
+// set of bolt keys and bucket names that require processing by the reader
+// and writer callbacks.
+var boltKeysProcessed = map[string]struct{}{
+	string(BoltDeletedKey):       {},
+	string(BoltInternalKey):      {},
+	string(BoltStatsKey):         {},
+	string(BoltUpdatedFieldsKey): {},
+}
