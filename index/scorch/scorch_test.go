@@ -31,6 +31,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
@@ -39,6 +40,7 @@ import (
 	"github.com/blevesearch/bleve/v2/index/scorch/mergeplan"
 	"github.com/blevesearch/bleve/v2/mapping"
 	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
 
 func init() {
@@ -3292,5 +3294,258 @@ func TestPersistenceWithoutExclude(t *testing.T) {
 
 	if val != nil {
 		t.Fatalf("expected internal value to be nil, got %s", val)
+	}
+}
+
+// mockSegmentBase satisfies segment.Segment but does NOT implement
+// GPUFieldStatsReporter. Both mock types embed this so the stubs are
+// not duplicated, while keeping the interface sets distinct.
+type mockSegmentBase struct {
+	fields []string
+}
+
+func (m *mockSegmentBase) Dictionary(_ string) (segment.TermDictionary, error) { return nil, nil }
+func (m *mockSegmentBase) VisitStoredFields(_ uint64, _ segment.StoredFieldValueVisitor) error {
+	return nil
+}
+func (m *mockSegmentBase) DocID(_ uint64) ([]byte, error) { return nil, nil }
+func (m *mockSegmentBase) Count() uint64                  { return 0 }
+func (m *mockSegmentBase) DocNumbers(_ []string) (*roaring.Bitmap, error) {
+	return roaring.New(), nil
+}
+func (m *mockSegmentBase) Fields() []string        { return m.fields }
+func (m *mockSegmentBase) Close() error            { return nil }
+func (m *mockSegmentBase) Size() int               { return 0 }
+func (m *mockSegmentBase) AddRef()                 {}
+func (m *mockSegmentBase) DecRef() error           { return nil }
+func (m *mockSegmentBase) BytesRead() uint64       { return 0 }
+func (m *mockSegmentBase) BytesWritten() uint64    { return 0 }
+func (m *mockSegmentBase) ResetBytesRead(_ uint64) {}
+func (m *mockSegmentBase) Ancestors(_ uint64, prealloc []index.AncestorID) []index.AncestorID {
+	return prealloc
+}
+
+// mockGPUSegment adds GPUFieldStatsReporter on top of the base.
+// inGPU controls whether the segment reports GPU or CPU memory.
+type mockGPUSegment struct {
+	mockSegmentBase
+	inGPU bool
+}
+
+func (m *mockGPUSegment) UpdateGPUFieldStats(stats segment.FieldStats) {
+	for _, f := range m.fields {
+		if m.inGPU {
+			stats.Store("num_gpu_segments_in_gpu_memory", f, 1)
+		} else {
+			stats.Store("num_gpu_segments_in_cpu_memory", f, 1)
+		}
+	}
+}
+
+// mockPlainSegment is a segment that does NOT implement GPUFieldStatsReporter.
+// It is used to verify that non-GPU segments are silently skipped.
+type mockPlainSegment struct {
+	mockSegmentBase
+}
+
+// makeSegmentSnapshot wraps a segment in a SegmentSnapshot without any static
+// field stats (stats == nil), matching the state of a live in-memory segment
+// before it has been persisted.
+func makeSegmentSnapshot(id uint64, seg segment.Segment) *SegmentSnapshot {
+	return &SegmentSnapshot{
+		id:         id,
+		segment:    seg,
+		cachedDocs: &cachedDocs{cache: nil},
+		cachedMeta: &cachedMeta{meta: nil},
+	}
+}
+
+// TestGPUFieldStatsAggregation verifies that StatsMap correctly aggregates
+// num_gpu_segments_in_gpu_memory and num_gpu_segments_in_cpu_memory across
+// multiple segments.
+//
+// Setup:
+//   - seg1: field "vec" -> in GPU
+//   - seg2: field "vec" -> in GPU
+//   - seg3: field "vec" -> fell back to CPU
+//   - seg4: plain segment (no GPUFieldStatsReporter) -> must be ignored
+//
+// Expected:
+//
+//	field:vec:num_gpu_segments_in_gpu_memory  = 2
+//	field:vec:num_gpu_segments_in_cpu_memory  = 1
+func TestGPUFieldStatsAggregation(t *testing.T) {
+	cfg := CreateConfig("TestGPUFieldStatsAggregation")
+	if err := InitTest(cfg); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := DestroyTest(cfg); err != nil {
+			t.Log(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := idx.(*Scorch)
+	if err = s.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Log(err)
+		}
+	}()
+
+	seg1 := &mockGPUSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}, inGPU: true}
+	seg2 := &mockGPUSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}, inGPU: true}
+	seg3 := &mockGPUSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}, inGPU: false}
+	seg4 := &mockPlainSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}}
+
+	s.rootLock.Lock()
+	s.root.segment = append(s.root.segment,
+		makeSegmentSnapshot(100, seg1),
+		makeSegmentSnapshot(101, seg2),
+		makeSegmentSnapshot(102, seg3),
+		makeSegmentSnapshot(103, seg4),
+	)
+	s.rootLock.Unlock()
+
+	m := s.StatsMap()
+	if m == nil {
+		t.Fatal("StatsMap returned nil")
+	}
+
+	checkUint64Stat(t, m, "field:vec:num_gpu_segments_in_gpu_memory", 2)
+	checkUint64Stat(t, m, "field:vec:num_gpu_segments_in_cpu_memory", 1)
+	// plain segment must not contribute — value must still be 2, not 3
+	checkUint64Stat(t, m, "field:vec:num_gpu_segments_in_gpu_memory", 2)
+}
+
+// TestGPUFieldStatsMultipleFields verifies that stats are tracked independently
+// per field when a segment exposes more than one GPU-backed vector field.
+func TestGPUFieldStatsMultipleFields(t *testing.T) {
+	cfg := CreateConfig("TestGPUFieldStatsMultipleFields")
+	if err := InitTest(cfg); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := DestroyTest(cfg); err != nil {
+			t.Log(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := idx.(*Scorch)
+	if err = s.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Log(err)
+		}
+	}()
+
+	// seg1: fieldA in GPU, fieldB in GPU
+	// seg2: fieldA fell back to CPU
+	// seg3: fieldB in GPU
+	seg1 := &mockGPUSegment{mockSegmentBase: mockSegmentBase{fields: []string{"fieldA", "fieldB"}}, inGPU: true}
+	seg2 := &mockGPUSegment{mockSegmentBase: mockSegmentBase{fields: []string{"fieldA"}}, inGPU: false}
+	seg3 := &mockGPUSegment{mockSegmentBase: mockSegmentBase{fields: []string{"fieldB"}}, inGPU: true}
+
+	s.rootLock.Lock()
+	s.root.segment = append(s.root.segment,
+		makeSegmentSnapshot(200, seg1),
+		makeSegmentSnapshot(201, seg2),
+		makeSegmentSnapshot(202, seg3),
+	)
+	s.rootLock.Unlock()
+
+	m := s.StatsMap()
+	if m == nil {
+		t.Fatal("StatsMap returned nil")
+	}
+
+	// fieldA: 1 GPU (seg1), 1 CPU (seg2)
+	checkUint64Stat(t, m, "field:fieldA:num_gpu_segments_in_gpu_memory", 1)
+	checkUint64Stat(t, m, "field:fieldA:num_gpu_segments_in_cpu_memory", 1)
+
+	// fieldB: 2 GPU (seg1 + seg3), 0 CPU
+	checkUint64Stat(t, m, "field:fieldB:num_gpu_segments_in_gpu_memory", 2)
+	if _, ok := m["field:fieldB:num_gpu_segments_in_cpu_memory"]; ok {
+		t.Errorf("expected no cpu_memory stat for fieldB, but got one")
+	}
+}
+
+// TestGPUFieldStatsNoGPUSegments verifies that when no segment implements
+// GPUFieldStatsReporter, the GPU stat keys are absent from StatsMap.
+func TestGPUFieldStatsNoGPUSegments(t *testing.T) {
+	cfg := CreateConfig("TestGPUFieldStatsNoGPUSegments")
+	if err := InitTest(cfg); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := DestroyTest(cfg); err != nil {
+			t.Log(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := idx.(*Scorch)
+	if err = s.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Log(err)
+		}
+	}()
+
+	s.rootLock.Lock()
+	s.root.segment = append(s.root.segment,
+		makeSegmentSnapshot(300, &mockPlainSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}}),
+	)
+	s.rootLock.Unlock()
+
+	m := s.StatsMap()
+	if m == nil {
+		t.Fatal("StatsMap returned nil")
+	}
+
+	for _, key := range []string{
+		"field:vec:num_gpu_segments_in_gpu_memory",
+		"field:vec:num_gpu_segments_in_cpu_memory",
+	} {
+		if _, ok := m[key]; ok {
+			t.Errorf("expected key %q to be absent for non-GPU segments, but it was present", key)
+		}
+	}
+}
+
+func checkUint64Stat(t *testing.T, m map[string]interface{}, key string, want uint64) {
+	t.Helper()
+	v, ok := m[key]
+	if !ok {
+		t.Errorf("expected stat %q to be present in StatsMap, but it was missing", key)
+		return
+	}
+	got, ok := v.(uint64)
+	if !ok {
+		t.Errorf("stat %q: expected uint64, got %T (%v)", key, v, v)
+		return
+	}
+	if got != want {
+		t.Errorf("stat %q: got %d, want %d", key, got, want)
 	}
 }
