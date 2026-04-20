@@ -50,6 +50,13 @@ aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distanc
   * **All vectors in the field must share the same dimensionality**.
   * For single-kNN queries, each document is scored using its single best-matching vector.
   * For multi-kNN queries, the system selects the best-matching vector for each query vector within the document.
+* GPU-Accelerated vector search (v2.6.0+):
+  * Requires FAISS built with `-DFAISS_ENABLE_GPU=ON` CMake option (needs NVIDIA CUDA toolkit).
+  * Requires the `gpu` go tag in addition to the `vectors` tag when building bleve.
+  * GPU acceleration is enabled per vector field via the field mapping's GPU option.
+  * Bleve will use any available GPUs to offload training, indexing, and kNN searches for GPU-enabled vector fields.
+  * Multi-GPU support: when multiple GPUs are available, a load balancer distributes vector search workloads across devices.
+  * See [GPU setup instructions](#gpu-setup-instructions) below for building FAISS with GPU support.
 
 ## Indexing
 
@@ -86,6 +93,7 @@ textFieldMapping := bleve.NewTextFieldMapping()
 vectorFieldMapping := bleve.NewVectorFieldMapping()
 vectorFieldMapping.Dims = 10              // Set vector dimensionality
 vectorFieldMapping.Similarity = "l2_norm" // Euclidean distance
+vectorFieldMapping.GPU = true             // Enable GPU acceleration (requires `gpu` build tag and CUDA-enabled FAISS)
 
 // Sub-document mappings
 sectionsMapping := bleve.NewDocumentMapping()
@@ -290,4 +298,42 @@ Once the supporting library is built and made available, a sanity run is recomme
 
 ```shell
 go test -ldflags "-r /usr/local/lib" ./... -tags=vectors
+```
+
+## GPU Setup Instructions
+
+GPU-accelerated vector search requires FAISS to be compiled with CUDA support and the `gpu` go tag to be set when building bleve.
+
+### Pre-requisites
+
+* An NVIDIA GPU with CUDA support (Pascal architecture / CC 6.0+ recommended).
+* [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit) installed and available on your system.
+* The FAISS C API shared library built with GPU support.
+
+### Linux (GPU)
+
+```shell
+git clone https://github.com/blevesearch/faiss.git
+cd faiss
+cmake -B build -DFAISS_ENABLE_GPU=ON -DFAISS_ENABLE_C_API=ON -DBUILD_SHARED_LIBS=ON .
+make -C build
+sudo make -C build install
+sudo cp build/c_api/libfaiss_c.so /usr/local/lib
+```
+
+### Sanity check (GPU)
+
+Run the full test suite with both the `vectors` and `gpu` build tags:
+
+```shell
+go test -ldflags "-r /usr/local/lib" ./... -tags=vectors,gpu
+```
+
+### Running your application with GPU support
+
+When building or running your application, include both the `vectors` and `gpu` build tags:
+
+```shell
+go build -tags=vectors,gpu -ldflags "-r /usr/local/lib" -o myapp .
+go run -tags=vectors,gpu -ldflags "-r /usr/local/lib" main.go
 ```

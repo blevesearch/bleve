@@ -27,19 +27,19 @@ Embedding applications can construct the nodes directly with callbacks:
 
 ```go
 filterQuery := query.NewCustomFilterQueryWithFilter(childQuery,
-	func(d *search.DocumentMatch) bool {
-		return true
-	},
-	nil, // fields; nil when callback does not need field values
-	nil, // payload; nil when no source/params round-trip is needed
+    func(d *search.DocumentMatch) bool {
+        return true
+    },
+    nil, // fields; nil when callback does not need field values
+    nil, // payload; nil when no source/params round-trip is needed
 )
 
 scoreQuery := query.NewCustomScoreQueryWithScorer(childQuery,
-	func(d *search.DocumentMatch) float64 {
-		return d.Score
-	},
-	nil, // fields
-	nil, // payload
+    func(d *search.DocumentMatch) float64 {
+        return d.Score
+    },
+    nil, // fields
+    nil, // payload
 )
 ```
 
@@ -52,17 +52,17 @@ Pass `nil` for either when not needed:
 
 ```go
 payload := map[string]interface{}{
-	"params": map[string]interface{}{"weight": 0.05},
-	"source": "function score(doc, params) { ... }",
+    "params": map[string]interface{}{"weight": 0.05},
+    "source": "function score(doc, params) { ... }",
 }
 
 scoreQuery := query.NewCustomScoreQueryWithScorer(childQuery,
-	func(d *search.DocumentMatch) float64 {
-		f := d.Fields
-		return d.Score + (f["abv"].(float64) * 0.05)
-	},
-	[]string{"abv", "ibu"},
-	payload,
+    func(d *search.DocumentMatch) float64 {
+        f := d.Fields
+        return d.Score + (f["abv"].(float64) * 0.05)
+    },
+    []string{"abv", "ibu"},
+    payload,
 )
 ```
 
@@ -112,7 +112,7 @@ explicit field mapping with `"type": "datetime"` in the index definition.
 At the bleve layer, doc values are decoded based on the field's mapping type:
 
 | Mapping type | Go type in `d.Fields` | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `text` / `keyword` | `string` | Raw text bytes |
 | `number` | `float64` | IEEE 754 decoded |
 | `boolean` | `bool` | `true` / `false` |

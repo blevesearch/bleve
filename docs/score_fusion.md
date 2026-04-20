@@ -242,7 +242,7 @@ When using score fusion (`Score` set to `"rrf"` or `"rsf"`), certain features ar
 ## Choosing a Fusion Strategy
 
 | Use Case | Recommended Strategy |
-|----------|---------------------|
+| -------- | -------------------- |
 | Different score scales (e.g., TF-IDF + L2 distance) | **RRF/RSF** |
 | Minimal tuning, out-of-the-box performance | **RRF** |
 | Want to preserve score magnitude importance | **RSF** |
