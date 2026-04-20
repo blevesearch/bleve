@@ -328,12 +328,3 @@ Run the full test suite with both the `vectors` and `gpu` build tags:
 ```shell
 go test -ldflags "-r /usr/local/lib" ./... -tags=vectors,gpu
 ```
-
-### Running your application with GPU support
-
-When building or running your application, include both the `vectors` and `gpu` build tags:
-
-```shell
-go build -tags=vectors,gpu -ldflags "-r /usr/local/lib" -o myapp .
-go run -tags=vectors,gpu -ldflags "-r /usr/local/lib" main.go
-```
