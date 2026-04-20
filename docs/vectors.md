@@ -93,7 +93,7 @@ textFieldMapping := bleve.NewTextFieldMapping()
 vectorFieldMapping := bleve.NewVectorFieldMapping()
 vectorFieldMapping.Dims = 10              // Set vector dimensionality
 vectorFieldMapping.Similarity = "l2_norm" // Euclidean distance
-vectorFieldMapping.GPU = true             // Enable GPU acceleration (requires `gpu` build tag and CUDA-enabled FAISS)
+vectorFieldMapping.GPU = true             // Enable GPU acceleration
 
 // Sub-document mappings
 sectionsMapping := bleve.NewDocumentMapping()
