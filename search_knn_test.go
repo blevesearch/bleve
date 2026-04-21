@@ -2986,3 +2986,68 @@ func TestKNNNullParams(t *testing.T) {
 		}
 	}
 }
+
+func TestVectorIndexExhaustion(t *testing.T) {
+	for optimization := range index.SupportedVectorIndexOptimizations {
+		t.Run(optimization, func(t *testing.T) {
+			tmpIndexPath := createTmpIndexPath(t)
+			defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+			const dims = 8
+
+			vecFieldMapping := mapping.NewVectorFieldMapping()
+			vecFieldMapping.Dims = dims
+			vecFieldMapping.VectorIndexOptimizedFor = optimization
+
+			indexMapping := NewIndexMapping()
+			indexMapping.DefaultMapping.AddFieldMappingsAt("vec", vecFieldMapping)
+
+			idx, err := New(tmpIndexPath, indexMapping)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				err := idx.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
+			}()
+
+			docs := []struct {
+				id  string
+				vec []float32
+			}{
+				{"doc1", []float32{1, 0, 0, 0, 0, 0, 0, 0}},
+				{"doc2", []float32{0, 1, 0, 0, 0, 0, 0, 0}},
+				{"doc3", []float32{0, 0, 1, 0, 0, 0, 0, 0}},
+			}
+
+			batch := idx.NewBatch()
+			for _, doc := range docs {
+				err = batch.Index(doc.id, map[string]interface{}{
+					"vec": doc.vec,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			err = idx.Batch(batch)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			searchReq := NewSearchRequest(query.NewMatchNoneQuery())
+			searchReq.AddKNN("vec", []float32{1, 0, 0, 0, 0, 0, 0, 0}, 10, 1.0)
+			res, err := idx.Search(searchReq)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(res.Hits) != 3 {
+				t.Fatalf("expected 3 hits, got %d", len(res.Hits))
+			}
+			if res.Hits[0].ID != "doc1" {
+				t.Fatalf("expected doc1 as top hit, got %s", res.Hits[0].ID)
+			}
+		})
+	}
+}
