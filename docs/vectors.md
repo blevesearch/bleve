@@ -1,4 +1,4 @@
-# Nearest neighbor (vector) search
+# Approximate Nearest Neighbor Search (over vectors)
 
 * *v2.4.0* (and after) will come with support for **vectors' indexing and search**.
 * We've achieved this by embedding [FAISS](https://github.com/facebookresearch/faiss) indexes within our bleve (scorch) indexes.
@@ -302,7 +302,7 @@ Once the supporting library is built and made available, a sanity run is recomme
 go test -ldflags "-r /usr/local/lib" ./... -tags=vectors
 ```
 
-## GPU Setup Instructions
+## GPU Setup Instructions (v2.6.0+)
 
 GPU-accelerated vector search requires FAISS to be compiled with CUDA support and the `gpu` go tag to be set when building bleve.
 
