@@ -31,6 +31,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
@@ -39,6 +40,7 @@ import (
 	"github.com/blevesearch/bleve/v2/index/scorch/mergeplan"
 	"github.com/blevesearch/bleve/v2/mapping"
 	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
 
 func init() {
@@ -3292,5 +3294,255 @@ func TestPersistenceWithoutExclude(t *testing.T) {
 
 	if val != nil {
 		t.Fatalf("expected internal value to be nil, got %s", val)
+	}
+}
+
+// mockSegmentBase satisfies segment.Segment but does NOT implement
+// VectorFieldStatsReporter. Both mock types embed this so the stubs are
+// not duplicated, while keeping the interface sets distinct.
+type mockSegmentBase struct {
+	fields []string
+}
+
+func (m *mockSegmentBase) Dictionary(_ string) (segment.TermDictionary, error) { return nil, nil }
+func (m *mockSegmentBase) VisitStoredFields(_ uint64, _ segment.StoredFieldValueVisitor) error {
+	return nil
+}
+func (m *mockSegmentBase) DocID(_ uint64) ([]byte, error) { return nil, nil }
+func (m *mockSegmentBase) Count() uint64                  { return 0 }
+func (m *mockSegmentBase) DocNumbers(_ []string) (*roaring.Bitmap, error) {
+	return roaring.New(), nil
+}
+func (m *mockSegmentBase) Fields() []string        { return m.fields }
+func (m *mockSegmentBase) Close() error            { return nil }
+func (m *mockSegmentBase) Size() int               { return 0 }
+func (m *mockSegmentBase) AddRef()                 {}
+func (m *mockSegmentBase) DecRef() error           { return nil }
+func (m *mockSegmentBase) BytesRead() uint64       { return 0 }
+func (m *mockSegmentBase) BytesWritten() uint64    { return 0 }
+func (m *mockSegmentBase) ResetBytesRead(_ uint64) {}
+func (m *mockSegmentBase) Ancestors(_ uint64, prealloc []index.AncestorID) []index.AncestorID {
+	return prealloc
+}
+
+// mockVectorSegment adds VectorFieldStatsReporter on top of the base.
+// inGPU controls whether the index is reported as residing in GPU or CPU memory.
+type mockVectorSegment struct {
+	mockSegmentBase
+	inGPU bool
+}
+
+func (m *mockVectorSegment) UpdateVectorFieldStats(stats segment.FieldStats) {
+	for _, f := range m.fields {
+		if m.inGPU {
+			stats.Store("num_vector_indexes_in_gpu", f, 1)
+		} else {
+			stats.Store("num_vector_indexes_in_cpu", f, 1)
+		}
+	}
+}
+
+// mockPlainSegment is a segment that does NOT implement VectorFieldStatsReporter.
+// It is used to verify that non-vector segments are silently skipped.
+type mockPlainSegment struct {
+	mockSegmentBase
+}
+
+// makeSegmentSnapshot wraps a segment in a SegmentSnapshot without any static
+// field stats (stats == nil), matching the state of a live in-memory segment
+// before it has been persisted.
+func makeSegmentSnapshot(id uint64, seg segment.Segment) *SegmentSnapshot {
+	return &SegmentSnapshot{
+		id:         id,
+		segment:    seg,
+		cachedDocs: &cachedDocs{cache: nil},
+		cachedMeta: &cachedMeta{meta: nil},
+	}
+}
+
+// TestVectorFieldStatsAggregation verifies that StatsMap correctly aggregates
+// num_vector_indexes_in_gpu and num_vector_indexes_in_cpu across multiple segments.
+//
+// Setup:
+//   - seg1: field "vec" -> index in GPU memory
+//   - seg2: field "vec" -> index in GPU memory
+//   - seg3: field "vec" -> index in CPU memory
+//   - seg4: plain segment (no VectorFieldStatsReporter) -> must be ignored
+//
+// Expected:
+//
+//	field:vec:num_vector_indexes_in_gpu = 2
+//	field:vec:num_vector_indexes_in_cpu = 1
+func TestVectorFieldStatsAggregation(t *testing.T) {
+	cfg := CreateConfig("TestVectorFieldStatsAggregation")
+	if err := InitTest(cfg); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := DestroyTest(cfg); err != nil {
+			t.Log(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := idx.(*Scorch)
+	if err = s.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Log(err)
+		}
+	}()
+
+	seg1 := &mockVectorSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}, inGPU: true}
+	seg2 := &mockVectorSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}, inGPU: true}
+	seg3 := &mockVectorSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}, inGPU: false}
+	seg4 := &mockPlainSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}}
+
+	s.rootLock.Lock()
+	s.root.segment = append(s.root.segment,
+		makeSegmentSnapshot(100, seg1),
+		makeSegmentSnapshot(101, seg2),
+		makeSegmentSnapshot(102, seg3),
+		makeSegmentSnapshot(103, seg4),
+	)
+	s.rootLock.Unlock()
+
+	m := s.StatsMap()
+	if m == nil {
+		t.Fatal("StatsMap returned nil")
+	}
+
+	checkUint64Stat(t, m, "field:vec:num_vector_indexes_in_gpu", 2)
+	checkUint64Stat(t, m, "field:vec:num_vector_indexes_in_cpu", 1)
+}
+
+// TestVectorFieldStatsMultipleFields verifies that stats are tracked independently
+// per field when a segment exposes more than one vector field.
+func TestVectorFieldStatsMultipleFields(t *testing.T) {
+	cfg := CreateConfig("TestVectorFieldStatsMultipleFields")
+	if err := InitTest(cfg); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := DestroyTest(cfg); err != nil {
+			t.Log(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := idx.(*Scorch)
+	if err = s.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Log(err)
+		}
+	}()
+
+	// seg1: fieldA in GPU, fieldB in GPU
+	// seg2: fieldA in CPU
+	// seg3: fieldB in GPU
+	seg1 := &mockVectorSegment{mockSegmentBase: mockSegmentBase{fields: []string{"fieldA", "fieldB"}}, inGPU: true}
+	seg2 := &mockVectorSegment{mockSegmentBase: mockSegmentBase{fields: []string{"fieldA"}}, inGPU: false}
+	seg3 := &mockVectorSegment{mockSegmentBase: mockSegmentBase{fields: []string{"fieldB"}}, inGPU: true}
+
+	s.rootLock.Lock()
+	s.root.segment = append(s.root.segment,
+		makeSegmentSnapshot(200, seg1),
+		makeSegmentSnapshot(201, seg2),
+		makeSegmentSnapshot(202, seg3),
+	)
+	s.rootLock.Unlock()
+
+	m := s.StatsMap()
+	if m == nil {
+		t.Fatal("StatsMap returned nil")
+	}
+
+	// fieldA: 1 in GPU (seg1), 1 in CPU (seg2)
+	checkUint64Stat(t, m, "field:fieldA:num_vector_indexes_in_gpu", 1)
+	checkUint64Stat(t, m, "field:fieldA:num_vector_indexes_in_cpu", 1)
+
+	// fieldB: 2 in GPU (seg1 + seg3), 0 in CPU
+	checkUint64Stat(t, m, "field:fieldB:num_vector_indexes_in_gpu", 2)
+	if _, ok := m["field:fieldB:num_vector_indexes_in_cpu"]; ok {
+		t.Errorf("expected no num_vector_indexes_in_cpu stat for fieldB, but got one")
+	}
+}
+
+// TestVectorFieldStatsNoVectorSegments verifies that when no segment implements
+// VectorFieldStatsReporter, the vector stat keys are absent from StatsMap.
+func TestVectorFieldStatsNoVectorSegments(t *testing.T) {
+	cfg := CreateConfig("TestVectorFieldStatsNoVectorSegments")
+	if err := InitTest(cfg); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := DestroyTest(cfg); err != nil {
+			t.Log(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := idx.(*Scorch)
+	if err = s.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := s.Close(); err != nil {
+			t.Log(err)
+		}
+	}()
+
+	s.rootLock.Lock()
+	s.root.segment = append(s.root.segment,
+		makeSegmentSnapshot(300, &mockPlainSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}}),
+	)
+	s.rootLock.Unlock()
+
+	m := s.StatsMap()
+	if m == nil {
+		t.Fatal("StatsMap returned nil")
+	}
+
+	for _, key := range []string{
+		"field:vec:num_vector_indexes_in_gpu",
+		"field:vec:num_vector_indexes_in_cpu",
+	} {
+		if _, ok := m[key]; ok {
+			t.Errorf("expected key %q to be absent for non-vector segments, but it was present", key)
+		}
+	}
+}
+
+func checkUint64Stat(t *testing.T, m map[string]interface{}, key string, want uint64) {
+	t.Helper()
+	v, ok := m[key]
+	if !ok {
+		t.Errorf("expected stat %q to be present in StatsMap, but it was missing", key)
+		return
+	}
+	got, ok := v.(uint64)
+	if !ok {
+		t.Errorf("stat %q: expected uint64, got %T (%v)", key, v, v)
+		return
+	}
+	if got != want {
+		t.Errorf("stat %q: got %d, want %d", key, got, want)
 	}
 }

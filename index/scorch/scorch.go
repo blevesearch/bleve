@@ -840,6 +840,20 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 			m["field:"+fieldName+":"+statName] = val
 		}
 	}
+
+	aggVectorStats := newFieldStats()
+	for _, segmentSnapshot := range indexSnapshot.Segments() {
+		if vsr, ok := segmentSnapshot.Segment().(segment.VectorFieldStatsReporter); ok {
+			segStats := newFieldStats()
+			vsr.UpdateVectorFieldStats(segStats)
+			aggVectorStats.Aggregate(segStats)
+		}
+	}
+	for statName, stats := range aggVectorStats.Fetch() {
+		for fieldName, val := range stats {
+			m["field:"+fieldName+":"+statName] = val
+		}
+	}
 	return m
 }
 
