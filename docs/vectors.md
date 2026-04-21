@@ -33,7 +33,7 @@
 * Vectors from documents that do not conform to the index mapping dimensionality are simply discarded at index time.
 * The dimensionality of the query vector must match the dimensionality of the indexed vectors to obtain any results.
 * Pure kNN searches can be performed, but the `query` attribute within the search request must be set - to `{"match_none": {}}` in this case. The `query` attribute is made optional when `knn` is available with v2.4.1+.
-* Hybrid searches are supported, where results from `query` are unioned (for now) with results from `knn`. The tf-idf scores from exact searches are simply summed with the similarity distances to determine the aggregate scores.
+* Hybrid searches are supported, where results from `query` are unioned with results from `knn`. The FTS scores from exact searches are simply summed with the similarity distances to determine the aggregate scores.
 
 ```text
 aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distance)
@@ -92,9 +92,10 @@ doc := struct {
 // Field mappings
 textFieldMapping := bleve.NewTextFieldMapping()
 vectorFieldMapping := bleve.NewVectorFieldMapping()
-vectorFieldMapping.Dims = 10              // Set vector dimensionality
-vectorFieldMapping.Similarity = "l2_norm" // Euclidean distance
-vectorFieldMapping.GPU = true             // Enable GPU acceleration
+vectorFieldMapping.Dims = 10                                               // Set vector dimensionality
+vectorFieldMapping.Similarity = index.CosineSimilarity                     // Set similarity metric
+vectorFieldMapping.VectorIndexOptimizedFor = index.IndexOptimizedForRecall // Set vector index optimization type
+vectorFieldMapping.GPU = true                                              // Enable GPU acceleration
 
 // Sub-document mappings
 sectionsMapping := bleve.NewDocumentMapping()
