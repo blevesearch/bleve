@@ -302,7 +302,7 @@ Once the supporting library is built and made available, a sanity run is recomme
 go test -ldflags "-r /usr/local/lib" ./... -tags=vectors
 ```
 
-## GPU Setup Instructions
+## GPU Setup Instructions (v2.6.0+)
 
 GPU-accelerated vector search requires FAISS to be compiled with CUDA support and the `gpu` go tag to be set when building bleve.
 
