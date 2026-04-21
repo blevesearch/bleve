@@ -20,7 +20,7 @@
     | `v2.5.0`, `v2.5.1` | [blevesearch/faiss@352484e](https://github.com/blevesearch/faiss/tree/352484e0fc9d1f8f46737841efe5f26e0f383f71) (modified v1.10.0) |
     | `v2.5.2`, `v2.5.3`, `v2.5.4` | [blevesearch/faiss@b3d4e00](https://github.com/blevesearch/faiss/tree/b3d4e00a69425b95e0b283da7801efc9f66b580d) (modified v1.11.0) |
     | `v2.5.5`, `v2.5.6`, `v2.5.7` | [blevesearch/faiss@8a59a0c](https://github.com/blevesearch/faiss/tree/8a59a0c552fa2d14fa871f6b6bc793de1d277f5e) (modified v1.12.0) |
-    | `v2.6.0` | [blevesearch/faiss@1f14a3e](https://github.com/blevesearch/faiss/tree/1f14a3e4ed5ec1efcb0a66055516980da5d0a453) (modified v1.13.2) |
+    | `v2.6.0` | [blevesearch/faiss@90aa571](https://github.com/blevesearch/faiss/tree/90aa57130c324751c3db1a6a7d205ae0c2932763) (modified v1.13.2) |
 
 ## Supported
 
@@ -33,7 +33,7 @@
 * Vectors from documents that do not conform to the index mapping dimensionality are simply discarded at index time.
 * The dimensionality of the query vector must match the dimensionality of the indexed vectors to obtain any results.
 * Pure kNN searches can be performed, but the `query` attribute within the search request must be set - to `{"match_none": {}}` in this case. The `query` attribute is made optional when `knn` is available with v2.4.1+.
-* Hybrid searches are supported, where results from `query` are unioned (for now) with results from `knn`. The tf-idf scores from exact searches are simply summed with the similarity distances to determine the aggregate scores.
+* Hybrid searches are supported, where results from `query` are unioned with results from `knn`. The FTS scores from exact searches are simply summed with the similarity distances to determine the aggregate scores.
 
 ```text
 aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distance)
@@ -50,6 +50,14 @@ aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distanc
   * **All vectors in the field must share the same dimensionality**.
   * For single-kNN queries, each document is scored using its single best-matching vector.
   * For multi-kNN queries, the system selects the best-matching vector for each query vector within the document.
+* GPU-Accelerated vector search (v2.6.0+):
+  * Requires FAISS built with `-DFAISS_ENABLE_GPU=ON` CMake option (needs NVIDIA CUDA toolkit).
+  * Requires the `gpu` go tag in addition to the `vectors` tag when building bleve.
+  * GPU acceleration is enabled per vector field via the field mapping's GPU option.
+  * Bleve will use any available GPUs to offload training, indexing, and kNN searches for GPU-enabled vector fields.
+  * GPUs will be used for vector fields which are optimized for `recall`, `latency`, and `memory_efficient`.
+  * Multi-GPU support: when multiple GPUs are available, a load balancer distributes vector search workloads across devices.
+  * See [GPU setup instructions](#gpu-setup-instructions) below for building FAISS with GPU support.
 
 ## Indexing
 
@@ -84,8 +92,10 @@ doc := struct {
 // Field mappings
 textFieldMapping := bleve.NewTextFieldMapping()
 vectorFieldMapping := bleve.NewVectorFieldMapping()
-vectorFieldMapping.Dims = 10              // Set vector dimensionality
-vectorFieldMapping.Similarity = "l2_norm" // Euclidean distance
+vectorFieldMapping.Dims = 10                                               // Set vector dimensionality
+vectorFieldMapping.Similarity = index.CosineSimilarity                     // Set similarity metric
+vectorFieldMapping.VectorIndexOptimizedFor = index.IndexOptimizedForRecall // Set vector index optimization type
+vectorFieldMapping.GPU = true                                              // Enable GPU acceleration
 
 // Sub-document mappings
 sectionsMapping := bleve.NewDocumentMapping()
@@ -290,4 +300,33 @@ Once the supporting library is built and made available, a sanity run is recomme
 
 ```shell
 go test -ldflags "-r /usr/local/lib" ./... -tags=vectors
+```
+
+## GPU Setup Instructions
+
+GPU-accelerated vector search requires FAISS to be compiled with CUDA support and the `gpu` go tag to be set when building bleve.
+
+### Pre-requisites
+
+* An NVIDIA GPU with CUDA support (Pascal architecture / CC 6.0+ recommended).
+* [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit) installed and available on your system.
+* The FAISS C API shared library built with GPU support.
+
+### Linux (GPU)
+
+```shell
+git clone https://github.com/blevesearch/faiss.git
+cd faiss
+cmake -B build -DFAISS_ENABLE_GPU=ON -DFAISS_ENABLE_C_API=ON -DBUILD_SHARED_LIBS=ON .
+make -C build
+sudo make -C build install
+sudo cp build/c_api/libfaiss_c.so /usr/local/lib
+```
+
+### Sanity check (GPU)
+
+Run the full test suite with both the `vectors` and `gpu` build tags:
+
+```shell
+go test -ldflags "-r /usr/local/lib" ./... -tags=vectors,gpu
 ```
