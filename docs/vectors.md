@@ -55,6 +55,7 @@ aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distanc
   * Requires the `gpu` go tag in addition to the `vectors` tag when building bleve.
   * GPU acceleration is enabled per vector field via the field mapping's GPU option.
   * Bleve will use any available GPUs to offload training, indexing, and kNN searches for GPU-enabled vector fields.
+  * GPUs will be used for vector fields which are optimized for `recall`, `latency`, and `memory_efficient`.
   * Multi-GPU support: when multiple GPUs are available, a load balancer distributes vector search workloads across devices.
   * See [GPU setup instructions](#gpu-setup-instructions) below for building FAISS with GPU support.
 
