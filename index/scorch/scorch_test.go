@@ -3298,7 +3298,7 @@ func TestPersistenceWithoutExclude(t *testing.T) {
 }
 
 // mockSegmentBase satisfies segment.Segment but does NOT implement
-// GPUFieldStatsReporter. Both mock types embed this so the stubs are
+// VectorFieldStatsReporter. Both mock types embed this so the stubs are
 // not duplicated, while keeping the interface sets distinct.
 type mockSegmentBase struct {
 	fields []string
@@ -3325,25 +3325,25 @@ func (m *mockSegmentBase) Ancestors(_ uint64, prealloc []index.AncestorID) []ind
 	return prealloc
 }
 
-// mockGPUSegment adds GPUFieldStatsReporter on top of the base.
-// inGPU controls whether the segment reports GPU or CPU memory.
-type mockGPUSegment struct {
+// mockVectorSegment adds VectorFieldStatsReporter on top of the base.
+// inGPU controls whether the index is reported as residing in GPU or CPU memory.
+type mockVectorSegment struct {
 	mockSegmentBase
 	inGPU bool
 }
 
-func (m *mockGPUSegment) UpdateGPUFieldStats(stats segment.FieldStats) {
+func (m *mockVectorSegment) UpdateVectorFieldStats(stats segment.FieldStats) {
 	for _, f := range m.fields {
 		if m.inGPU {
-			stats.Store("num_gpu_segments_in_gpu_memory", f, 1)
+			stats.Store("num_vector_indexes_in_gpu", f, 1)
 		} else {
-			stats.Store("num_gpu_segments_in_cpu_memory", f, 1)
+			stats.Store("num_vector_indexes_in_cpu", f, 1)
 		}
 	}
 }
 
-// mockPlainSegment is a segment that does NOT implement GPUFieldStatsReporter.
-// It is used to verify that non-GPU segments are silently skipped.
+// mockPlainSegment is a segment that does NOT implement VectorFieldStatsReporter.
+// It is used to verify that non-vector segments are silently skipped.
 type mockPlainSegment struct {
 	mockSegmentBase
 }
@@ -3360,22 +3360,21 @@ func makeSegmentSnapshot(id uint64, seg segment.Segment) *SegmentSnapshot {
 	}
 }
 
-// TestGPUFieldStatsAggregation verifies that StatsMap correctly aggregates
-// num_gpu_segments_in_gpu_memory and num_gpu_segments_in_cpu_memory across
-// multiple segments.
+// TestVectorFieldStatsAggregation verifies that StatsMap correctly aggregates
+// num_vector_indexes_in_gpu and num_vector_indexes_in_cpu across multiple segments.
 //
 // Setup:
-//   - seg1: field "vec" -> in GPU
-//   - seg2: field "vec" -> in GPU
-//   - seg3: field "vec" -> fell back to CPU
-//   - seg4: plain segment (no GPUFieldStatsReporter) -> must be ignored
+//   - seg1: field "vec" -> index in GPU memory
+//   - seg2: field "vec" -> index in GPU memory
+//   - seg3: field "vec" -> index in CPU memory
+//   - seg4: plain segment (no VectorFieldStatsReporter) -> must be ignored
 //
 // Expected:
 //
-//	field:vec:num_gpu_segments_in_gpu_memory  = 2
-//	field:vec:num_gpu_segments_in_cpu_memory  = 1
-func TestGPUFieldStatsAggregation(t *testing.T) {
-	cfg := CreateConfig("TestGPUFieldStatsAggregation")
+//	field:vec:num_vector_indexes_in_gpu = 2
+//	field:vec:num_vector_indexes_in_cpu = 1
+func TestVectorFieldStatsAggregation(t *testing.T) {
+	cfg := CreateConfig("TestVectorFieldStatsAggregation")
 	if err := InitTest(cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -3400,9 +3399,9 @@ func TestGPUFieldStatsAggregation(t *testing.T) {
 		}
 	}()
 
-	seg1 := &mockGPUSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}, inGPU: true}
-	seg2 := &mockGPUSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}, inGPU: true}
-	seg3 := &mockGPUSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}, inGPU: false}
+	seg1 := &mockVectorSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}, inGPU: true}
+	seg2 := &mockVectorSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}, inGPU: true}
+	seg3 := &mockVectorSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}, inGPU: false}
 	seg4 := &mockPlainSegment{mockSegmentBase: mockSegmentBase{fields: []string{"vec"}}}
 
 	s.rootLock.Lock()
@@ -3419,16 +3418,14 @@ func TestGPUFieldStatsAggregation(t *testing.T) {
 		t.Fatal("StatsMap returned nil")
 	}
 
-	checkUint64Stat(t, m, "field:vec:num_gpu_segments_in_gpu_memory", 2)
-	checkUint64Stat(t, m, "field:vec:num_gpu_segments_in_cpu_memory", 1)
-	// plain segment must not contribute — value must still be 2, not 3
-	checkUint64Stat(t, m, "field:vec:num_gpu_segments_in_gpu_memory", 2)
+	checkUint64Stat(t, m, "field:vec:num_vector_indexes_in_gpu", 2)
+	checkUint64Stat(t, m, "field:vec:num_vector_indexes_in_cpu", 1)
 }
 
-// TestGPUFieldStatsMultipleFields verifies that stats are tracked independently
-// per field when a segment exposes more than one GPU-backed vector field.
-func TestGPUFieldStatsMultipleFields(t *testing.T) {
-	cfg := CreateConfig("TestGPUFieldStatsMultipleFields")
+// TestVectorFieldStatsMultipleFields verifies that stats are tracked independently
+// per field when a segment exposes more than one vector field.
+func TestVectorFieldStatsMultipleFields(t *testing.T) {
+	cfg := CreateConfig("TestVectorFieldStatsMultipleFields")
 	if err := InitTest(cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -3454,11 +3451,11 @@ func TestGPUFieldStatsMultipleFields(t *testing.T) {
 	}()
 
 	// seg1: fieldA in GPU, fieldB in GPU
-	// seg2: fieldA fell back to CPU
+	// seg2: fieldA in CPU
 	// seg3: fieldB in GPU
-	seg1 := &mockGPUSegment{mockSegmentBase: mockSegmentBase{fields: []string{"fieldA", "fieldB"}}, inGPU: true}
-	seg2 := &mockGPUSegment{mockSegmentBase: mockSegmentBase{fields: []string{"fieldA"}}, inGPU: false}
-	seg3 := &mockGPUSegment{mockSegmentBase: mockSegmentBase{fields: []string{"fieldB"}}, inGPU: true}
+	seg1 := &mockVectorSegment{mockSegmentBase: mockSegmentBase{fields: []string{"fieldA", "fieldB"}}, inGPU: true}
+	seg2 := &mockVectorSegment{mockSegmentBase: mockSegmentBase{fields: []string{"fieldA"}}, inGPU: false}
+	seg3 := &mockVectorSegment{mockSegmentBase: mockSegmentBase{fields: []string{"fieldB"}}, inGPU: true}
 
 	s.rootLock.Lock()
 	s.root.segment = append(s.root.segment,
@@ -3473,21 +3470,21 @@ func TestGPUFieldStatsMultipleFields(t *testing.T) {
 		t.Fatal("StatsMap returned nil")
 	}
 
-	// fieldA: 1 GPU (seg1), 1 CPU (seg2)
-	checkUint64Stat(t, m, "field:fieldA:num_gpu_segments_in_gpu_memory", 1)
-	checkUint64Stat(t, m, "field:fieldA:num_gpu_segments_in_cpu_memory", 1)
+	// fieldA: 1 in GPU (seg1), 1 in CPU (seg2)
+	checkUint64Stat(t, m, "field:fieldA:num_vector_indexes_in_gpu", 1)
+	checkUint64Stat(t, m, "field:fieldA:num_vector_indexes_in_cpu", 1)
 
-	// fieldB: 2 GPU (seg1 + seg3), 0 CPU
-	checkUint64Stat(t, m, "field:fieldB:num_gpu_segments_in_gpu_memory", 2)
-	if _, ok := m["field:fieldB:num_gpu_segments_in_cpu_memory"]; ok {
-		t.Errorf("expected no cpu_memory stat for fieldB, but got one")
+	// fieldB: 2 in GPU (seg1 + seg3), 0 in CPU
+	checkUint64Stat(t, m, "field:fieldB:num_vector_indexes_in_gpu", 2)
+	if _, ok := m["field:fieldB:num_vector_indexes_in_cpu"]; ok {
+		t.Errorf("expected no num_vector_indexes_in_cpu stat for fieldB, but got one")
 	}
 }
 
-// TestGPUFieldStatsNoGPUSegments verifies that when no segment implements
-// GPUFieldStatsReporter, the GPU stat keys are absent from StatsMap.
-func TestGPUFieldStatsNoGPUSegments(t *testing.T) {
-	cfg := CreateConfig("TestGPUFieldStatsNoGPUSegments")
+// TestVectorFieldStatsNoVectorSegments verifies that when no segment implements
+// VectorFieldStatsReporter, the vector stat keys are absent from StatsMap.
+func TestVectorFieldStatsNoVectorSegments(t *testing.T) {
+	cfg := CreateConfig("TestVectorFieldStatsNoVectorSegments")
 	if err := InitTest(cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -3524,11 +3521,11 @@ func TestGPUFieldStatsNoGPUSegments(t *testing.T) {
 	}
 
 	for _, key := range []string{
-		"field:vec:num_gpu_segments_in_gpu_memory",
-		"field:vec:num_gpu_segments_in_cpu_memory",
+		"field:vec:num_vector_indexes_in_gpu",
+		"field:vec:num_vector_indexes_in_cpu",
 	} {
 		if _, ok := m[key]; ok {
-			t.Errorf("expected key %q to be absent for non-GPU segments, but it was present", key)
+			t.Errorf("expected key %q to be absent for non-vector segments, but it was present", key)
 		}
 	}
 }

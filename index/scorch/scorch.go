@@ -841,15 +841,15 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 		}
 	}
 
-	aggGPUStats := newFieldStats()
+	aggVectorStats := newFieldStats()
 	for _, segmentSnapshot := range indexSnapshot.Segments() {
-		if gsr, ok := segmentSnapshot.Segment().(segment.GPUFieldStatsReporter); ok {
+		if vsr, ok := segmentSnapshot.Segment().(segment.VectorFieldStatsReporter); ok {
 			segStats := newFieldStats()
-			gsr.UpdateGPUFieldStats(segStats)
-			aggGPUStats.Aggregate(segStats)
+			vsr.UpdateVectorFieldStats(segStats)
+			aggVectorStats.Aggregate(segStats)
 		}
 	}
-	for statName, stats := range aggGPUStats.Fetch() {
+	for statName, stats := range aggVectorStats.Fetch() {
 		for fieldName, val := range stats {
 			m["field:"+fieldName+":"+statName] = val
 		}
