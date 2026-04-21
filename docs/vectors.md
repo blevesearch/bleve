@@ -1,4 +1,4 @@
-# Nearest neighbor (vector) search
+# Approximate Nearest Neighbor Search (over vectors)
 
 * *v2.4.0* (and after) will come with support for **vectors' indexing and search**.
 * We've achieved this by embedding [FAISS](https://github.com/facebookresearch/faiss) indexes within our bleve (scorch) indexes.
