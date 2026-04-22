@@ -1375,10 +1375,13 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 		// and add them to the list of segments to compact
 		segsToCompact := make([]mergeplan.Segment, 0)
 		for _, ss := range ourSnapshot.segment {
-			if segWithCallbacks, ok := ss.segment.(segment.SegmentWithCallbacks); ok {
-				if _, ok := ids[segWithCallbacks.CallbackId()]; ok {
-					segsToCompact = append(segsToCompact, ss)
-					filePaths = append(filePaths, zapFileName(ss.id))
+			// only persisted segments needs to be checked
+			if _, ok := ss.segment.(segment.PersistedSegment); ok {
+				if segWithCallbacks, ok := ss.segment.(segment.SegmentWithCallbacks); ok {
+					if _, ok := ids[segWithCallbacks.CallbackId()]; ok {
+						segsToCompact = append(segsToCompact, ss)
+						filePaths = append(filePaths, zapFileName(ss.id))
+					}
 				}
 			}
 		}

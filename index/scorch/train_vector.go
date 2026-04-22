@@ -230,7 +230,16 @@ func (t *vectorTrainer) loadTrainedData(bucket *util.BoltBucketImpl) error {
 	if bucket == nil {
 		return nil
 	}
-	segmentSnapshot, err := t.parent.loadSegment(bucket, nil)
+	writerID, err := bucket.Get(util.BoltMetaDataFileWriterIDKey, nil)
+	if err != nil {
+		return fmt.Errorf("error getting writer id: %v", err)
+	}
+	reader, err := util.NewFileReader(string(writerID), nil)
+	if err != nil {
+		return fmt.Errorf("error creating file reader: %v", err)
+	}
+
+	segmentSnapshot, err := t.parent.loadSegment(bucket, reader)
 	if err != nil {
 		return err
 	}
@@ -374,8 +383,17 @@ func (t *vectorTrainer) updateBolt(snapshotsBucket *util.BoltBucketImpl, key []b
 			return err
 		}
 
+		writerID, err := trainerBucket.Get(util.BoltMetaDataFileWriterIDKey, nil)
+		if err != nil {
+			return fmt.Errorf("error getting writer id: %v", err)
+		}
+		reader, err := util.NewFileReader(string(writerID), nil)
+		if err != nil {
+			return fmt.Errorf("error creating file reader: %v", err)
+		}
+
 		// update the centroid index pointer
-		t.centroidIndex, err = t.parent.loadSegment(trainerBucket, nil)
+		t.centroidIndex, err = t.parent.loadSegment(trainerBucket, reader)
 		if err != nil {
 			return err
 		}
