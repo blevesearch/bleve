@@ -26,23 +26,19 @@
 
 * The `vector` field type is an array that is to hold float32 values only.
 * The `vector_base64` field type to support base64 encoded strings using little endian byte ordering (v2.4.1+)
-
 * Supported similarity metrics are: [`"cosine"` (v2.4.3+), `"dot_product"`, `"l2_norm"`].
   * `cosine` paths will additionally normalize vectors before indexing and search.
 * Supported dimensionality is between 1 and 2048 (v2.4.0), and up to **4096** (v2.4.1+).
-
 * Supported vector index optimizations:
   * `recall`, `latency` (v2.4.0+)
     * Combination of Flat and IVF indexes with SQ8 quantization
-    * For recall: `nprobe = √(nlist)`, where `nlist` is the number of centroids within that index
-    * For latency: `nprobe = √(nlist)/2`
   * `memory_efficient` (v2.4.1+)
     * Combination of Flat and IVF indexes with SQ4 quantization
-  * `bivf-flat`, `bivf-sq8`, `ivf,rabitq` (v2.6.0+)
-    * FP32 vectors will be binarized before indexing (so may not work for all data sets)
-    * BIVF indexes come with a backing flat/SQ8 index; a query vector is binarized and run against the BIVF index (`hamming` distance`) and top 4*`k` samples are re-ranked using the backing index (`cosine` distance).
+  * `bivf-flat`, `bivf-sq8` (v2.6.0+)
+    * Uses binary-based BIVF indexes with a backing Flat/SQ8 index for re-ranking.
+  * `ivf,rabitq` (v2.6.0+)
     * The ivf,rabitq index is a standalone rabitq quantized binary index which works only with `vector_index_fast_merge`. This technique will first build a centroid index trained on an already complete dataset, and replicates that template for all segments introduced after.
-
+---
 * Vectors from documents that do not conform to the index mapping dimensionality are simply discarded at index time.
 * The dimensionality of the query vector must match the dimensionality of the indexed vectors to obtain any results.
 * Pure kNN searches can be performed, but the `query` attribute within the search request must be set - to `{"match_none": {}}` in this case. The `query` attribute is made optional when `knn` is available with v2.4.1+.
@@ -56,14 +52,13 @@ aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distanc
 * Multi kNN searches are supported - the `knn` object within the search request accepts an array of requests. These sub objects are unioned by default but this behavior can be overridden by setting `knn_operator` to `"and"`.
 * Previously supported pagination settings will work as they were, with size/limit being applied over the top-K hits combined with any exact search hits.
 * Pre-filtered vector and hybrid search (v2.4.3+): Apply any Bleve filter query first to narrow down candidates before running kNN search, making vector and hybrid searches faster and more relevant.
-
 * Fields containing multiple vectors (v2.5.7+):
   * A single document may contain multiple vectors within the same field, in the form of either:
     * an array of vectors (multi-vector field)
     * an array of objects each containing a vector (nested-vector field)
   * For single-kNN queries, each document is scored using its single best-matching vector.
   * For multi-kNN queries, the system selects the best-matching vector for each query vector within the document.
-
+---
 * GPU-Accelerated vector search (v2.6.0+):
   * Requires FAISS built with `-DFAISS_ENABLE_GPU=ON` CMake option (needs NVIDIA CUDA toolkit).
   * Requires the `gpu` go tag in addition to the `vectors` tag when building bleve.
