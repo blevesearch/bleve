@@ -2,7 +2,7 @@
 
 * *v2.4.0* (and after) will come with support for **vectors' indexing and search**.
 * We've achieved this by embedding [FAISS](https://github.com/facebookresearch/faiss) indexes within our bleve (scorch) indexes.
-* Introduction of a new zap file format: [v16](https://github.com/blevesearch/zapx/blob/master/zap.md). Here we co-locate text and vector indexes as neighbors within segments, continuing to conform to the segmented architecture of *scorch*.
+* Introduction of new zap file formats: [v16](https://github.com/blevesearch/zapx/blob/v16.x/zap.md), [v17](https://github.com/blevesearch/zapx/blob/master/zap.md) .. to co-locate text and vector indexes as neighbors within segments, continuing to conform to the segmented architecture of *scorch*.
 
 ## Pre-requisite(s)
 
