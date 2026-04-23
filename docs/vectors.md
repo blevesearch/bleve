@@ -37,7 +37,7 @@
   * `bivf-flat`, `bivf-sq8` (v2.6.0+)
     * Uses binary-based BIVF indexes with a backing Flat/SQ8 index for re-ranking.
   * `ivf,rabitq` (v2.6.0+)
-    * The ivf,rabitq index is a standalone rabitq quantized binary index which works only with `vector_index_fast_merge`. This technique will first build a centroid index trained on an already complete dataset, and replicates that template for all segments introduced after.
+    * The ivf,rabitq index is a standalone rabitq quantized binary index which works only with `vector_index_fast_merge`. This technique will first build a centroid index trained on an already complete dataset, and replicates that template for all segments introduced after, see [fast-merge](https://github.com/blevesearch/bleve/blob/master/docs/fast_merge.md).
 ---
 * Vectors from documents that do not conform to the index mapping dimensionality are simply discarded at index time.
 * The dimensionality of the query vector must match the dimensionality of the indexed vectors to obtain any results.
