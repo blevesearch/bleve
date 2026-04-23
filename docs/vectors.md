@@ -1,63 +1,69 @@
 # Approximate Nearest Neighbor Search (over vectors)
 
-* *v2.4.0* (and after) will come with support for **vectors' indexing and search**.
-* We've achieved this by embedding [FAISS](https://github.com/facebookresearch/faiss) indexes within our bleve (scorch) indexes.
-* Introduction of a new zap file format: [v16](https://github.com/blevesearch/zapx/blob/master/zap.md) - which will be the default going forward. Here we co-locate text and vector indexes as neighbors within segments, continuing to conform to the segmented architecture of *scorch*.
+- _v2.4.0_ (and after) will come with support for **vectors' indexing and search**.
+- We've achieved this by embedding [FAISS](https://github.com/facebookresearch/faiss) indexes within our bleve (scorch) indexes.
+- Introduction of a new zap file format: [v16](https://github.com/blevesearch/zapx/blob/master/zap.md) - which will be the default going forward. Here we co-locate text and vector indexes as neighbors within segments, continuing to conform to the segmented architecture of _scorch_.
 
 ## Pre-requisite(s)
 
-* Induction of [FAISS](https://github.com/blevesearch/faiss) into our eco system, which is a fork of the original [facebookresearch/faiss](https://github.com/facebookresearch/faiss)
-* FAISS is a C++ library that needs to be compiled and it's shared libraries need to be situated at an accessible path for your application.
-* A `vectors` GO TAG needs to be set for bleve to access all the supporting code. This TAG must be set only after the FAISS shared library is made available. Failure to do either will inhibit you from using this feature.
-* Please follow these [instructions](#setup-instructions) below for any assistance in the area.
-* Releases of `blevesearch/bleve` work with select checkpoints of `blevesearch/faiss` owing to API changes and improvements (tracking over the `bleve` branch):
+- Induction of [FAISS](https://github.com/blevesearch/faiss) into our eco system, which is a fork of the original [facebookresearch/faiss](https://github.com/facebookresearch/faiss)
+- FAISS is a C++ library that needs to be compiled and it's shared libraries need to be situated at an accessible path for your application.
+- A `vectors` GO TAG needs to be set for bleve to access all the supporting code. This TAG must be set only after the FAISS shared library is made available. Failure to do either will inhibit you from using this feature.
+- Please follow these [instructions](#setup-instructions) below for any assistance in the area.
+- Releases of `blevesearch/bleve` work with select checkpoints of `blevesearch/faiss` owing to API changes and improvements (tracking over the `bleve` branch):
 
-    | bleve version(s) | blevesearch/faiss version |
-    | --- | --- |
-    | `v2.4.0` | [blevesearch/faiss@7b119f4](https://github.com/blevesearch/faiss/tree/7b119f4b9c408989b696b36f8cc53908e53de6db) (modified v1.7.4) |
-    | `v2.4.1`, `v2.4.2` | [blevesearch/faiss@d9db66a](https://github.com/blevesearch/faiss/tree/d9db66a38518d99eb334218697e1df0732f3fdf8) (modified v1.7.4) |
-    | `v2.4.3`, `v2.4.4` | [blevesearch/faiss@b747c55](https://github.com/blevesearch/faiss/tree/b747c55a93a9627039c34d44b081f375dca94e57) (modified v1.8.0) |
-    | `v2.5.0`, `v2.5.1` | [blevesearch/faiss@352484e](https://github.com/blevesearch/faiss/tree/352484e0fc9d1f8f46737841efe5f26e0f383f71) (modified v1.10.0) |
-    | `v2.5.2`, `v2.5.3`, `v2.5.4` | [blevesearch/faiss@b3d4e00](https://github.com/blevesearch/faiss/tree/b3d4e00a69425b95e0b283da7801efc9f66b580d) (modified v1.11.0) |
-    | `v2.5.5`, `v2.5.6`, `v2.5.7` | [blevesearch/faiss@8a59a0c](https://github.com/blevesearch/faiss/tree/8a59a0c552fa2d14fa871f6b6bc793de1d277f5e) (modified v1.12.0) |
-    | `v2.6.0` | [blevesearch/faiss@90aa571](https://github.com/blevesearch/faiss/tree/90aa57130c324751c3db1a6a7d205ae0c2932763) (modified v1.13.2) |
+  | bleve version(s)             | blevesearch/faiss version                                                                                                          |
+  | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+  | `v2.4.0`                     | [blevesearch/faiss@7b119f4](https://github.com/blevesearch/faiss/tree/7b119f4b9c408989b696b36f8cc53908e53de6db) (modified v1.7.4)  |
+  | `v2.4.1`, `v2.4.2`           | [blevesearch/faiss@d9db66a](https://github.com/blevesearch/faiss/tree/d9db66a38518d99eb334218697e1df0732f3fdf8) (modified v1.7.4)  |
+  | `v2.4.3`, `v2.4.4`           | [blevesearch/faiss@b747c55](https://github.com/blevesearch/faiss/tree/b747c55a93a9627039c34d44b081f375dca94e57) (modified v1.8.0)  |
+  | `v2.5.0`, `v2.5.1`           | [blevesearch/faiss@352484e](https://github.com/blevesearch/faiss/tree/352484e0fc9d1f8f46737841efe5f26e0f383f71) (modified v1.10.0) |
+  | `v2.5.2`, `v2.5.3`, `v2.5.4` | [blevesearch/faiss@b3d4e00](https://github.com/blevesearch/faiss/tree/b3d4e00a69425b95e0b283da7801efc9f66b580d) (modified v1.11.0) |
+  | `v2.5.5`, `v2.5.6`, `v2.5.7` | [blevesearch/faiss@8a59a0c](https://github.com/blevesearch/faiss/tree/8a59a0c552fa2d14fa871f6b6bc793de1d277f5e) (modified v1.12.0) |
+  | `v2.6.0`                     | [blevesearch/faiss@90aa571](https://github.com/blevesearch/faiss/tree/90aa57130c324751c3db1a6a7d205ae0c2932763) (modified v1.13.2) |
 
 ## Supported
 
-* The `vector` field type is an array that is to hold float32 values only.
-* The `vector_base64` field type to support base64 encoded strings using little endian byte ordering (v2.4.1+)
-* Supported similarity metrics are: [`"cosine"` (v2.4.3+), `"dot_product"`, `"l2_norm"`].
-  * `cosine` paths will additionally normalize vectors before indexing and search.
-* Supported dimensionality is between 1 and 2048 (v2.4.0), and up to **4096** (v2.4.1+).
-* Supported vector index optimizations: `latency`, `memory_efficient` (v2.4.1+), `recall`.
-* Vectors from documents that do not conform to the index mapping dimensionality are simply discarded at index time.
-* The dimensionality of the query vector must match the dimensionality of the indexed vectors to obtain any results.
-* Pure kNN searches can be performed, but the `query` attribute within the search request must be set - to `{"match_none": {}}` in this case. The `query` attribute is made optional when `knn` is available with v2.4.1+.
-* Hybrid searches are supported, where results from `query` are unioned with results from `knn`. The FTS scores from exact searches are simply summed with the similarity distances to determine the aggregate scores.
+- The `vector` field type is an array that is to hold float32 values only.
+- The `vector_base64` field type to support base64 encoded strings using little endian byte ordering (v2.4.1+)
+- Supported similarity metrics are: [`"cosine"` (v2.4.3+), `"dot_product"`, `"l2_norm"`].
+  - `cosine` paths will additionally normalize vectors before indexing and search.
+- Supported dimensionality is between 1 and 2048 (v2.4.0), and up to **4096** (v2.4.1+).
+- Supported vector index optimizations: `latency`, `memory_efficient` (v2.4.1+), `recall`, `ivf,rabitq` (v2.6.0+), `bivf-flat` (v2.6.0+) and `bivf-sq8` (v2.6.0+).
+- Vectors from documents that do not conform to the index mapping dimensionality are simply discarded at index time.
+- The dimensionality of the query vector must match the dimensionality of the indexed vectors to obtain any results.
+- Pure kNN searches can be performed, but the `query` attribute within the search request must be set - to `{"match_none": {}}` in this case. The `query` attribute is made optional when `knn` is available with v2.4.1+.
+- Hybrid searches are supported, where results from `query` are unioned with results from `knn`. The FTS scores from exact searches are simply summed with the similarity distances to determine the aggregate scores.
 
 ```text
 aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distance)
 ```
 
-* Advanced score fusion strategies (v2.5.4+) are available if requested for - see [score fusion](score_fusion.md#score-fusion-for-hybrid-search).
-* Multi kNN searches are supported - the `knn` object within the search request accepts an array of requests. These sub objects are unioned by default but this behavior can be overridden by setting `knn_operator` to `"and"`.
-* Previously supported pagination settings will work as they were, with size/limit being applied over the top-K hits combined with any exact search hits.
-* Pre-filtered vector and hybrid search (v2.4.3+): Apply any Bleve filter query first to narrow down candidates before running kNN search, making vector and hybrid searches faster and more relevant.
-* Fields containing multiple vectors (v2.5.7+):
-  * A single document may contain multiple vectors within the same field, in the form of either:
-    * an array of vectors (multi-vector field)
-    * an array of objects each containing a vector (nested-vector field)
-  * **All vectors in the field must share the same dimensionality**.
-  * For single-kNN queries, each document is scored using its single best-matching vector.
-  * For multi-kNN queries, the system selects the best-matching vector for each query vector within the document.
-* GPU-Accelerated vector search (v2.6.0+):
-  * Requires FAISS built with `-DFAISS_ENABLE_GPU=ON` CMake option (needs NVIDIA CUDA toolkit).
-  * Requires the `gpu` go tag in addition to the `vectors` tag when building bleve.
-  * GPU acceleration is enabled per vector field via the field mapping's GPU option.
-  * Bleve will use any available GPUs to offload training, indexing, and kNN searches for GPU-enabled vector fields.
-  * GPUs will be used for vector fields which are optimized for `recall`, `latency`, and `memory_efficient`.
-  * Multi-GPU support: when multiple GPUs are available, a load balancer distributes vector search workloads across devices.
-  * See [GPU setup instructions](#gpu-setup-instructions) below for building FAISS with GPU support.
+- Advanced score fusion strategies (v2.5.4+) are available if requested for - see [score fusion](score_fusion.md#score-fusion-for-hybrid-search).
+- Multi kNN searches are supported - the `knn` object within the search request accepts an array of requests. These sub objects are unioned by default but this behavior can be overridden by setting `knn_operator` to `"and"`.
+- Previously supported pagination settings will work as they were, with size/limit being applied over the top-K hits combined with any exact search hits.
+- Pre-filtered vector and hybrid search (v2.4.3+): Apply any Bleve filter query first to narrow down candidates before running kNN search, making vector and hybrid searches faster and more relevant.
+- Fields containing multiple vectors (v2.5.7+):
+  - A single document may contain multiple vectors within the same field, in the form of either:
+    - an array of vectors (multi-vector field)
+    - an array of objects each containing a vector (nested-vector field)
+  - **All vectors in the field must share the same dimensionality**.
+  - For single-kNN queries, each document is scored using its single best-matching vector.
+  - For multi-kNN queries, the system selects the best-matching vector for each query vector within the document.
+- Binary Quantized vector search (v2.6.0+):
+  - Provides faster vector search using compact binary representations.
+  - Supports three approaches:
+    - bivf-flat and bivf-sq8: Use a binary-quantized IVF index for fast candidate selection, followed by reranking with a flat or SQ8 index for better accuracy. Provides the best latency and throughput at a similar recall and memory. Disk usage is comparable with sq8 backing and 2-3x increased with flat backing.
+    - ivf,rabitq: A lightweight option that applies binary quantization without a reranking stage. Provides good latency and throughput with the best memory and disk usage. Recall will be worse than all other offerings.
+  - Vectors should contain both positive and negative values for effective binary quantization.
+- GPU-Accelerated vector search (v2.6.0+):
+  - Requires FAISS built with `-DFAISS_ENABLE_GPU=ON` CMake option (needs NVIDIA CUDA toolkit).
+  - Requires the `gpu` go tag in addition to the `vectors` tag when building bleve.
+  - GPU acceleration is enabled per vector field via the field mapping's GPU option.
+  - Bleve will use any available GPUs to offload training, indexing, and kNN searches for GPU-enabled vector fields.
+  - GPUs will be used for vector fields which are optimized for `recall`, `latency`, and `memory_efficient`.
+  - Multi-GPU support: when multiple GPUs are available, a load balancer distributes vector search workloads across devices.
+  - See [GPU setup instructions](#gpu-setup-instructions) below for building FAISS with GPU support.
 
 ## Indexing
 
@@ -262,8 +268,8 @@ fmt.Printf("Pre-filtered kNN search result:\n%s\n", searchResult)
 
 ## Setup Instructions
 
-* Using `cmake` is a recommended approach by FAISS authors.
-* More details here - [faiss/INSTALL](https://github.com/blevesearch/faiss/blob/main/INSTALL.md).
+- Using `cmake` is a recommended approach by FAISS authors.
+- More details here - [faiss/INSTALL](https://github.com/blevesearch/faiss/blob/main/INSTALL.md).
 
 ### Linux
 
@@ -308,9 +314,9 @@ GPU-accelerated vector search requires FAISS to be compiled with CUDA support an
 
 ### Pre-requisites
 
-* An NVIDIA GPU with CUDA support (Pascal architecture / CC 6.0+ recommended).
-* [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit) installed and available on your system.
-* The FAISS C API shared library built with GPU support.
+- An NVIDIA GPU with CUDA support (Pascal architecture / CC 6.0+ recommended).
+- [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit) installed and available on your system.
+- The FAISS C API shared library built with GPU support.
 
 ### Linux (GPU)
 
