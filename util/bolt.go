@@ -116,8 +116,9 @@ func (b *BoltBucketImpl) CreateBucketIfNotExists(name []byte) (*BoltBucketImpl, 
 
 // Process values during ForEach if the bucket name or key is in the boltKeysProcessed map
 func (b *BoltBucketImpl) ForEach(fn func(key []byte, value []byte) error, reader FileReader) error {
+	_, ok1 := boltKeysProcessed[b.name]
 	return b.Bucket.ForEach(func(k, v []byte) error {
-		if _, ok := boltKeysProcessed[b.name]; ok {
+		if _, ok2 := boltKeysProcessed[string(k)]; ok1 || ok2 {
 			if reader == nil {
 				return fmt.Errorf("reader callback is required for bucket %s", b.name)
 			}
