@@ -51,9 +51,9 @@ type vectorTrainer struct {
 
 	m sync.RWMutex
 	// not a searchable segment in the sense that it won't return
-	// the data vectors. can return centroid vectors
-	centroidIndex *SegmentSnapshot
-	trainCh       chan *trainRequest
+	// the data vectors, returns trained centroid layout
+	trainedIndex *SegmentSnapshot
+	trainCh      chan *trainRequest
 }
 
 const IndexTrainedWithFastMerge = "vector_index_fast_merge"
@@ -67,8 +67,8 @@ func initTrainer(s *Scorch, config map[string]interface{}) *vectorTrainer {
 				config:  maps.Clone(s.config),
 				trainCh: make(chan *trainRequest, 1),
 			}
-			// update the parent scorch config with the trainer's callback to fetch the centroid index
-			s.segmentConfig[index.TrainedIndexCallback] = index.TrainedIndexCallbackFn(trainer.getCentroidIndex)
+			// update the parent scorch config with the trainer's callback to fetch the trained index
+			s.segmentConfig[index.TrainedIndexCallback] = index.TrainedIndexCallbackFn(trainer.getTrainedIndex)
 			return &trainer
 		}
 	}
@@ -98,13 +98,13 @@ func (t *vectorTrainer) persistToBolt(trainReq *trainRequest) error {
 
 	trainerBucket, err := snapshotsBucket.CreateBucketIfNotExists(util.BoltTrainerKey)
 	if err != nil {
-		return fmt.Errorf("error creating centroid bucket: %v", err)
+		return fmt.Errorf("error creating trained index bucket: %v", err)
 	}
 	err = trainerBucket.Put(util.BoltPathKey, []byte(index.TrainedIndexFileName), nil)
 	if err != nil {
-		return fmt.Errorf("error updating centroid bucket: %v", err)
+		return fmt.Errorf("error updating trained index bucket: %v", err)
 	}
-	fmt.Println("finalSample", trainReq.finalSample)
+
 	t.trainingComplete.Store(trainReq.finalSample)
 	err = trainerBucket.Put(util.BoltTrainCompleteKey, []byte(strconv.FormatBool(trainReq.finalSample)), nil)
 	if err != nil {
@@ -146,7 +146,7 @@ func (t *vectorTrainer) trainLoop() {
 			return
 		case trainReq := <-t.trainCh:
 			sampleSeg := trainReq.sample
-			if t.centroidIndex == nil {
+			if t.trainedIndex == nil {
 				switch seg := sampleSeg.(type) {
 				case segment.UnpersistedSegment:
 					err := persistToDirectory(seg, nil, path)
@@ -159,26 +159,26 @@ func (t *vectorTrainer) trainLoop() {
 				}
 			} else {
 				// merge the new segment with the existing one, to create a new
-				// .tmp centroid index file and then move it to the actual
-				// centroid index file path (during the merge, Os.Open(centroidIndexPath)
+				// .tmp trained index file and then move it to the actual
+				// trained index file path (during the merge, Os.Open(trainedIndexPath)
 				// won't be safe since its still being used for merge)
 				if trainReq.sampleSize > 0 {
 					t.config[index.TrainingKey] = true
-					_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.centroidIndex.segment, sampleSeg},
+					_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.trainedIndex.segment, sampleSeg},
 						[]*roaring.Bitmap{nil, nil}, path+".tmp", t.parent.closeCh, nil, t.config)
 					if err != nil {
-						trainReq.ackCh <- fmt.Errorf("error merging centroid index: %v", err)
+						trainReq.ackCh <- fmt.Errorf("error merging trained index: %v", err)
 						close(trainReq.ackCh)
 						return
 					}
 					// reset the training flag once completed
 					t.config[index.TrainingKey] = false
 
-					// close the existing centroid segment - it's supposed to be gc'd at this point
-					t.centroidIndex.segment.Close()
+					// close the existing trained segment - it's supposed to be gc'd at this point
+					t.trainedIndex.segment.Close()
 					err = moveFile(path+".tmp", path)
 					if err != nil {
-						trainReq.ackCh <- fmt.Errorf("error renaming centroid index: %v", err)
+						trainReq.ackCh <- fmt.Errorf("error renaming trained index: %v", err)
 						close(trainReq.ackCh)
 						return
 					}
@@ -186,7 +186,7 @@ func (t *vectorTrainer) trainLoop() {
 			}
 
 			// a bolt transaction is necessary for failover-recovery scenario and also serves as a checkpoint
-			// where we can be sure that the centroid index is available for the indexing operations downstream
+			// where we can be sure that the trained index is available for the indexing operations downstream
 			//
 			// note: when the scale increases massively especially with real world dimensions of 1536+, this API
 			// will have to be refactored to persist in a more resource efficient way. so having this bolt related
@@ -200,17 +200,17 @@ func (t *vectorTrainer) trainLoop() {
 				return
 			}
 
-			// update the centroid index pointer
-			centroidIndex, err := t.parent.segPlugin.OpenUsing(path, t.parent.segmentConfig)
+			// update the trained index pointer
+			trainedIndex, err := t.parent.segPlugin.OpenUsing(path, t.parent.segmentConfig)
 			if err != nil {
-				trainReq.ackCh <- fmt.Errorf("error opening centroid index: %v", err)
+				trainReq.ackCh <- fmt.Errorf("error opening trained index: %v", err)
 				close(trainReq.ackCh)
 				return
 			}
 
 			t.m.Lock()
-			t.centroidIndex = &SegmentSnapshot{
-				segment: centroidIndex,
+			t.trainedIndex = &SegmentSnapshot{
+				segment: trainedIndex,
 			}
 			t.m.Unlock()
 			close(trainReq.ackCh)
@@ -218,7 +218,6 @@ func (t *vectorTrainer) trainLoop() {
 			// exit the trainer loop we've ingested the final sample set and training
 			// is assumed to be complete.
 			if t.trainingComplete.Load() {
-				fmt.Println("training complete, exiting trainer loop")
 				atomic.StoreUint64(&t.parent.stats.TotTrainedSamples, t.trainedSamples)
 				atomic.StoreUint64(&t.parent.stats.TotTrainTime, uint64(time.Since(trainLoopStartTime).Milliseconds()))
 				return
@@ -227,7 +226,7 @@ func (t *vectorTrainer) trainLoop() {
 	}
 }
 
-// loads the metadata specific to the centroid index from boltdb, happens during init
+// loads the metadata specific to the trained index from boltdb, happens during init
 // no lock needed
 func (t *vectorTrainer) loadTrainedData(bucket *util.BoltBucketImpl) error {
 	if bucket == nil {
@@ -265,7 +264,7 @@ func (t *vectorTrainer) loadTrainedData(bucket *util.BoltBucketImpl) error {
 
 	t.m.Lock()
 	defer t.m.Unlock()
-	t.centroidIndex = segmentSnapshot
+	t.trainedIndex = segmentSnapshot
 	return nil
 }
 
@@ -292,8 +291,6 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	if err != nil {
 		return fmt.Errorf("error parsing train complete: %v", err)
 	}
-
-	fmt.Println("fin", fin, "train data size", len(trainData))
 
 	// just builds a new vector index out of the train data provided
 	// this is not necessarily the final train data since this is submitted
@@ -332,15 +329,15 @@ func (t *vectorTrainer) getInternal(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (t *vectorTrainer) getCentroidIndex(field string) (interface{}, error) {
+func (t *vectorTrainer) getTrainedIndex(field string) (interface{}, error) {
 	// return the coarse quantizer of the trained faiss index belonging to the field
 	// if its not available then zap performs naive merge
 	t.m.RLock()
 	defer t.m.RUnlock()
-	if t.centroidIndex != nil {
-		trainedSegment, ok := t.centroidIndex.segment.(segment.TrainedSegment)
+	if t.trainedIndex != nil {
+		trainedSegment, ok := t.trainedIndex.segment.(segment.TrainedSegment)
 		if !ok {
-			return nil, fmt.Errorf("segment is not a centroid index segment")
+			return nil, fmt.Errorf("segment is not a trained index segment")
 		}
 
 		coarseQuantizer, err := trainedSegment.GetCoarseQuantizer(field)
@@ -354,7 +351,7 @@ func (t *vectorTrainer) getCentroidIndex(field string) (interface{}, error) {
 
 func (t *vectorTrainer) copyFileLOCKED(file string, d index.IndexDirectory) error {
 	if strings.HasSuffix(file, index.TrainedIndexFileName) {
-		// centroid index file - this is outside the snapshots domain so the bolt update is different
+		// trained index file - this is outside the snapshots domain so the bolt update is different
 		err := d.SetPathInBolt(util.BoltTrainerKey, []byte(file))
 		if err != nil {
 			return fmt.Errorf("error updating dest index bolt: %w", err)
@@ -398,7 +395,7 @@ func (t *vectorTrainer) updateBolt(snapshotsBucket *util.BoltBucketImpl, key []b
 		}
 
 		// update the centroid index pointer
-		t.centroidIndex, err = t.parent.loadSegment(trainerBucket, reader)
+		t.trainedIndex, err = t.parent.loadSegment(trainerBucket, reader)
 		if err != nil {
 			return err
 		}
