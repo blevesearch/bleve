@@ -104,7 +104,7 @@ func (t *vectorTrainer) persistToBolt(trainReq *trainRequest) error {
 	if err != nil {
 		return fmt.Errorf("error updating centroid bucket: %v", err)
 	}
-
+	fmt.Println("finalSample", trainReq.finalSample)
 	t.trainingComplete.Store(trainReq.finalSample)
 	err = trainerBucket.Put(util.BoltTrainCompleteKey, []byte(strconv.FormatBool(trainReq.finalSample)), nil)
 	if err != nil {
@@ -162,24 +162,26 @@ func (t *vectorTrainer) trainLoop() {
 				// .tmp centroid index file and then move it to the actual
 				// centroid index file path (during the merge, Os.Open(centroidIndexPath)
 				// won't be safe since its still being used for merge)
-				t.config[index.TrainingKey] = true
-				_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.centroidIndex.segment, sampleSeg},
-					[]*roaring.Bitmap{nil, nil}, path+".tmp", t.parent.closeCh, nil, t.config)
-				if err != nil {
-					trainReq.ackCh <- fmt.Errorf("error merging centroid index: %v", err)
-					close(trainReq.ackCh)
-					return
-				}
-				// reset the training flag once completed
-				t.config[index.TrainingKey] = false
+				if trainReq.sampleSize > 0 {
+					t.config[index.TrainingKey] = true
+					_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.centroidIndex.segment, sampleSeg},
+						[]*roaring.Bitmap{nil, nil}, path+".tmp", t.parent.closeCh, nil, t.config)
+					if err != nil {
+						trainReq.ackCh <- fmt.Errorf("error merging centroid index: %v", err)
+						close(trainReq.ackCh)
+						return
+					}
+					// reset the training flag once completed
+					t.config[index.TrainingKey] = false
 
-				// close the existing centroid segment - it's supposed to be gc'd at this point
-				t.centroidIndex.segment.Close()
-				err = moveFile(path+".tmp", path)
-				if err != nil {
-					trainReq.ackCh <- fmt.Errorf("error renaming centroid index: %v", err)
-					close(trainReq.ackCh)
-					return
+					// close the existing centroid segment - it's supposed to be gc'd at this point
+					t.centroidIndex.segment.Close()
+					err = moveFile(path+".tmp", path)
+					if err != nil {
+						trainReq.ackCh <- fmt.Errorf("error renaming centroid index: %v", err)
+						close(trainReq.ackCh)
+						return
+					}
 				}
 			}
 
@@ -216,6 +218,7 @@ func (t *vectorTrainer) trainLoop() {
 			// exit the trainer loop we've ingested the final sample set and training
 			// is assumed to be complete.
 			if t.trainingComplete.Load() {
+				fmt.Println("training complete, exiting trainer loop")
 				atomic.StoreUint64(&t.parent.stats.TotTrainedSamples, t.trainedSamples)
 				atomic.StoreUint64(&t.parent.stats.TotTrainTime, uint64(time.Since(trainLoopStartTime).Milliseconds()))
 				return
@@ -289,6 +292,8 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	if err != nil {
 		return fmt.Errorf("error parsing train complete: %v", err)
 	}
+
+	fmt.Println("fin", fin, "train data size", len(trainData))
 
 	// just builds a new vector index out of the train data provided
 	// this is not necessarily the final train data since this is submitted
