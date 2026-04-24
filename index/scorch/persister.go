@@ -1232,9 +1232,10 @@ func (s *Scorch) removeBoltFileWriterIDs(ids map[string]struct{}) error {
 				if err != nil {
 					return fmt.Errorf("unable to load correct reader: %v", err)
 				}
-				c := snapshots.Cursor()
-				for kk, _ := c.First(); kk != nil; kk, _ = c.Next() {
-					if k[0] == util.BoltInternalKey[0] {
+
+				cc := snapshot.Cursor()
+				for kk, _ := cc.First(); kk != nil; kk, _ = cc.Next() {
+					if kk[0] == util.BoltInternalKey[0] {
 						internalBucket := snapshot.GetBucket(kk)
 						if internalBucket == nil {
 							continue

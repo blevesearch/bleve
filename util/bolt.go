@@ -118,6 +118,7 @@ func (b *BoltBucketImpl) CreateBucketIfNotExists(name []byte) (*BoltBucketImpl, 
 func (b *BoltBucketImpl) ForEach(fn func(key []byte, value []byte) error, reader FileReader) error {
 	_, ok1 := boltKeysProcessed[b.name]
 	return b.Bucket.ForEach(func(k, v []byte) error {
+		v = append([]byte(nil), v...)
 		if _, ok2 := boltKeysProcessed[string(k)]; ok1 || ok2 {
 			if reader == nil {
 				return fmt.Errorf("reader callback is required for bucket %s", b.name)
@@ -136,6 +137,7 @@ func (b *BoltBucketImpl) ForEach(fn func(key []byte, value []byte) error, reader
 func (b *BoltBucketImpl) Put(key []byte, value []byte, writer FileWriter) error {
 	_, ok1 := boltKeysProcessed[string(key)]
 	_, ok2 := boltKeysProcessed[b.name]
+	value = append([]byte(nil), value...)
 	if ok1 || ok2 {
 		if writer == nil {
 			return fmt.Errorf("writer callback is required for key %s", string(key))
