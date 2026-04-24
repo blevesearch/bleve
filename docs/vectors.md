@@ -31,14 +31,18 @@
 * Supported dimensionality is between 1 and 2048 (v2.4.0), and up to **4096** (v2.4.1+).
 * Supported vector index optimizations:
   * `recall`, `latency` (v2.4.0+)
-    * Combination of Flat and IVF indexes with SQ8 quantization
+    * Combination of Flat and IVF indexes with SQ8 quantization.
   * `memory_efficient` (v2.4.1+)
-    * Combination of Flat and IVF indexes with SQ4 quantization
+    * Combination of Flat and IVF indexes with SQ4 quantization.
   * `bivf-flat`, `bivf-sq8` (v2.6.0+)
-    * Uses binary-based BIVF indexes with a backing Flat/SQ8 index for re-ranking.
+    * Combination of BFlat and BIVF indexes with Binary quantization.
+    * Uses an additional index which is either a Flat index (`bivf-flat`) or an SQ8 index (`bivf-sq8`) for re-ranking.
   * `ivf,rabitq` (v2.6.0+)
-    * The ivf,rabitq index is a standalone rabitq quantized binary index which works only with `vector_index_fast_merge`. This technique will first build a centroid index trained on an already complete dataset, and replicates that template for all segments introduced after, see [fast-merge](https://github.com/blevesearch/bleve/blob/master/docs/fast_merge.md).
+    * Combination of Flat and IVF indexes with RaBitQ quantization.
+    * Works with [Fast Merge](https://github.com/blevesearch/bleve/blob/master/docs/fast_merge.md) - where a centroid index needs to be built/trained on a sample dataset prior to building the index for segments that deploy IVF indexes to reflect.
+
 ---
+
 * Vectors from documents that do not conform to the index mapping dimensionality are simply discarded at index time.
 * The dimensionality of the query vector must match the dimensionality of the indexed vectors to obtain any results.
 * Pure kNN searches can be performed, but the `query` attribute within the search request must be set - to `{"match_none": {}}` in this case. The `query` attribute is made optional when `knn` is available with v2.4.1+.
@@ -58,7 +62,9 @@ aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distanc
     * an array of objects each containing a vector (nested-vector field)
   * For single-kNN queries, each document is scored using its single best-matching vector.
   * For multi-kNN queries, the system selects the best-matching vector for each query vector within the document.
+
 ---
+
 * GPU-Accelerated vector search (v2.6.0+):
   * Requires FAISS built with `-DFAISS_ENABLE_GPU=ON` CMake option (needs NVIDIA CUDA toolkit).
   * Requires the `gpu` go tag in addition to the `vectors` tag when building bleve.
