@@ -35,7 +35,7 @@
   * `memory_efficient` (v2.4.1+)
     * Combination of Flat and IVF indexes with SQ4 quantization.
   * `bivf-flat`, `bivf-sq8` (v2.6.0+)
-    * Combination of Flat and IVF indexes with Binary quantization.
+    * Combination of BFlat and BIVF indexes with Binary quantization.
     * Uses an additional index which is either a Flat index (`bivf-flat`) or an SQ8 index (`bivf-sq8`) for re-ranking.
   * `ivf,rabitq` (v2.6.0+)
     * Combination of Flat and IVF indexes with RaBitQ quantization.
