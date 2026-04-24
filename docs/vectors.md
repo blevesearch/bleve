@@ -39,7 +39,7 @@
     * Uses an additional index which is either a Flat index (`bivf-flat`) or an SQ8 index (`bivf-sq8`) for re-ranking.
   * `ivf,rabitq` (v2.6.0+)
     * Combination of Flat and IVF indexes with RaBitQ quantization.
-    * Works best when Fast Merge is enabled, see [fast-merge](https://github.com/blevesearch/bleve/blob/master/docs/fast_merge.md).
+    * Works with Fast Merge, see [fast-merge](https://github.com/blevesearch/bleve/blob/master/docs/fast_merge.md) - where a centroid index needs to be built/trained on a sample dataset prior to building the index for segments that deploy IVF indexes to reflect.
 
 ---
 
