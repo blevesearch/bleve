@@ -128,13 +128,17 @@ func (t *vectorTrainer) persistToBolt(trainReq *trainRequest) error {
 // this is not a routine that will be running throughout the lifetime of the index. It's purpose
 // is to only train the vector index before the data ingestion starts.
 func (t *vectorTrainer) trainLoop() {
-	defer func() {
-		t.parent.asyncTasks.Done()
-	}()
+	defer t.parent.asyncTasks.Done()
 
 	trainLoopStartTime := time.Now()
 	path := filepath.Join(t.parent.path, index.TrainedIndexFileName)
 	for {
+		// exit once the final sample set has been ingested and training is complete.
+		if t.trainingComplete.Load() {
+			atomic.StoreUint64(&t.parent.stats.TotTrainedSamples, t.trainedSamples)
+			atomic.StoreUint64(&t.parent.stats.TotTrainTime, uint64(time.Since(trainLoopStartTime).Milliseconds()))
+			return
+		}
 		select {
 		case <-t.parent.closeCh:
 			select {
@@ -146,61 +150,59 @@ func (t *vectorTrainer) trainLoop() {
 			return
 		case trainReq := <-t.trainCh:
 			sampleSeg := trainReq.sample
+			// no sample segment: just persist state if this is the final sample and move on.
+			if sampleSeg == nil {
+				if trainReq.finalSample {
+					if err := t.persistToBolt(trainReq); err != nil {
+						trainReq.ackCh <- fmt.Errorf("error persisting to bolt: %v", err)
+						close(trainReq.ackCh)
+						return
+					}
+				}
+				close(trainReq.ackCh)
+				continue
+			}
+
 			if t.trainedIndex == nil {
 				switch seg := sampleSeg.(type) {
 				case segment.UnpersistedSegment:
-					err := persistToDirectory(seg, nil, path)
-					if err != nil {
+					if err := persistToDirectory(seg, nil, path); err != nil {
 						trainReq.ackCh <- fmt.Errorf("error persisting segment: %v", err)
 						close(trainReq.ackCh)
 						continue
 					}
-				default:
 				}
 			} else {
-				// merge the new segment with the existing one, to create a new
-				// .tmp trained index file and then move it to the actual
-				// trained index file path (during the merge, Os.Open(trainedIndexPath)
-				// won't be safe since its still being used for merge)
-				if trainReq.sampleSize > 0 {
-					t.config[index.TrainingKey] = true
-					_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.trainedIndex.segment, sampleSeg},
-						[]*roaring.Bitmap{nil, nil}, path+".tmp", t.parent.closeCh, nil, t.config)
-					if err != nil {
-						trainReq.ackCh <- fmt.Errorf("error merging trained index: %v", err)
-						close(trainReq.ackCh)
-						return
-					}
-					// reset the training flag once completed
-					t.config[index.TrainingKey] = false
+				// merge the new segment with the existing one into a .tmp file, then
+				// atomically rename it into place (Os.Open on the live path is unsafe
+				// during the merge).
+				t.config[index.TrainingKey] = true
+				_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.trainedIndex.segment, sampleSeg},
+					[]*roaring.Bitmap{nil, nil}, path+".tmp", t.parent.closeCh, nil, t.config)
+				t.config[index.TrainingKey] = false
+				if err != nil {
+					trainReq.ackCh <- fmt.Errorf("error merging trained index: %v", err)
+					close(trainReq.ackCh)
+					return
+				}
 
-					// close the existing trained segment - it's supposed to be gc'd at this point
-					t.trainedIndex.segment.Close()
-					err = moveFile(path+".tmp", path)
-					if err != nil {
-						trainReq.ackCh <- fmt.Errorf("error renaming trained index: %v", err)
-						close(trainReq.ackCh)
-						return
-					}
+				t.trainedIndex.segment.Close()
+				if err = moveFile(path+".tmp", path); err != nil {
+					trainReq.ackCh <- fmt.Errorf("error renaming trained index: %v", err)
+					close(trainReq.ackCh)
+					return
 				}
 			}
 
-			// a bolt transaction is necessary for failover-recovery scenario and also serves as a checkpoint
-			// where we can be sure that the trained index is available for the indexing operations downstream
-			//
-			// note: when the scale increases massively especially with real world dimensions of 1536+, this API
-			// will have to be refactored to persist in a more resource efficient way. so having this bolt related
-			// code will help in tracking the progress a lot better and avoid any redudant data streaming operations.
-			//
+			// bolt write acts as a checkpoint for failover-recovery: callers downstream
+			// can rely on the trained index being available once this completes.
 			// todo: rethink the frequency of bolt writes
-			err := t.persistToBolt(trainReq)
-			if err != nil {
+			if err := t.persistToBolt(trainReq); err != nil {
 				trainReq.ackCh <- fmt.Errorf("error persisting to bolt: %v", err)
 				close(trainReq.ackCh)
 				return
 			}
 
-			// update the trained index pointer
 			trainedIndex, err := t.parent.segPlugin.OpenUsing(path, t.parent.segmentConfig)
 			if err != nil {
 				trainReq.ackCh <- fmt.Errorf("error opening trained index: %v", err)
@@ -209,19 +211,9 @@ func (t *vectorTrainer) trainLoop() {
 			}
 
 			t.m.Lock()
-			t.trainedIndex = &SegmentSnapshot{
-				segment: trainedIndex,
-			}
+			t.trainedIndex = &SegmentSnapshot{segment: trainedIndex}
 			t.m.Unlock()
 			close(trainReq.ackCh)
-
-			// exit the trainer loop we've ingested the final sample set and training
-			// is assumed to be complete.
-			if t.trainingComplete.Load() {
-				atomic.StoreUint64(&t.parent.stats.TotTrainedSamples, t.trainedSamples)
-				atomic.StoreUint64(&t.parent.stats.TotTrainTime, uint64(time.Since(trainLoopStartTime).Milliseconds()))
-				return
-			}
 		}
 	}
 }
@@ -292,6 +284,11 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 		return fmt.Errorf("error parsing train complete: %v", err)
 	}
 
+	trainReq := &trainRequest{
+		finalSample: fin,
+		sampleSize:  len(trainData),
+		ackCh:       make(chan error),
+	}
 	// just builds a new vector index out of the train data provided
 	// this is not necessarily the final train data since this is submitted
 	// as a request to the trainer component to be merged. once the training
@@ -300,16 +297,11 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	//
 	// note: this might index text data too, how to handle this? s.segmentConfig?
 	// todo: updates/deletes -> data drift detection
-	seg, _, err := t.parent.segPlugin.NewUsing(trainData, t.parent.segmentConfig)
-	if err != nil {
-		return err
-	}
-
-	trainReq := &trainRequest{
-		finalSample: fin,
-		sampleSize:  len(trainData),
-		ackCh:       make(chan error),
-		sample:      seg,
+	if len(trainData) > 0 {
+		trainReq.sample, _, err = t.parent.segPlugin.NewUsing(trainData, t.parent.segmentConfig)
+		if err != nil {
+			return err
+		}
 	}
 
 	t.trainCh <- trainReq
