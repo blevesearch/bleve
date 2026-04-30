@@ -962,7 +962,7 @@ func BenchmarkLexer_Parallel(b *testing.B) {
 			var tokens []yySymType
 			r := strings.NewReader(`+field4:"test phrase 1"`)
 			l := getQueryStringLex(r)
-			
+
 			var lval yySymType
 			rv := l.Lex(&lval)
 
