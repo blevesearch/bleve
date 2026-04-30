@@ -94,4 +94,3 @@ func resolveFieldTypes(fields []string, m mapping.IndexMapping) map[string]strin
 	}
 	return types
 }
-
