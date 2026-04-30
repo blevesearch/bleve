@@ -263,6 +263,9 @@ func (t *vectorTrainer) loadTrainedData(bucket *util.BoltBucketImpl) error {
 func (t *vectorTrainer) train(batch *index.Batch) error {
 	// regulate the Train function
 	t.parent.FireIndexEvent()
+	if t.trainingComplete.Load() {
+		return fmt.Errorf("training is already complete, cannot accept more training data")
+	}
 
 	var trainData []index.Document
 	for _, doc := range batch.IndexOps {
