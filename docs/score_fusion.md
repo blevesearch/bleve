@@ -139,7 +139,7 @@ searchRequest.AddKNN(
     0.8,                                     // kNN weight (boost)
 )
 
-// Optional: Configure RRF parameters
+// Optional: Configure RSF parameters
 params := bleve.RequestParams{
     ScoreWindowSize: 150                     // Window size (default: size)
 }
@@ -237,7 +237,7 @@ When using score fusion (`Score` set to `"rrf"` or `"rsf"`), certain features ar
 
 * **SearchAfter/SearchBefore**: Not compatible with score fusion. For pagination, use `From` and `Size` only.
 * **Sort**: Only descending score sort (`-_score`) or default sorting is allowed
-* **Faceting**: Only documents included in the FTS result list are considered. Documents that appear exclusively in the KNN result list are ignored during faceting.
+* **Faceting**: Only documents included in the FTS result list are considered. Documents that appear exclusively in the kNN result list are ignored during faceting.
 
 ## Choosing a Fusion Strategy
 

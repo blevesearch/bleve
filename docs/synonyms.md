@@ -2,7 +2,7 @@
 
 * *v2.5.0* (and after) will come with support for **synonym definition indexing and search**.
 * We've achieved this by embedding synonym indexes within our bleve (scorch) indexes.
-* Usage of zap file format: [v16](https://github.com/blevesearch/zapx/blob/master/zap.md). Here we co-locate text, vector and synonym indexes as neighbors within segments, continuing to conform to the segmented architecture of *scorch*.
+* Usage of zap file format: [v16](https://github.com/blevesearch/zapx/blob/master/zap.md). Here we co-locate text, vector, and synonym indexes as neighbors within segments, continuing to conform to the segmented architecture of *scorch*.
 
 ## Supported
 
@@ -43,7 +43,7 @@
         }
         ```
 
-* The addition of `Synonym Sources` in the index mapping enables associating a set of `synonym definitions` (called a `synonym collection`) with a specific analyzer. This allows for preprocessing of terms in both the *input* and *synonyms* lists before the synonym index is created. By using an analyzer, you can normalize or transform terms (e.g., case folding, stemming) to improve synonym matching.
+* The addition of `Synonym Sources` in the index mapping enables associating a set of `synonym definitions` (called a `synonym collection`) with a specific analyzer. This allows for preprocessing of terms in both the "input" and "synonyms" lists before the synonym index is created. By using an analyzer, you can normalize or transform terms (e.g., case folding, stemming) to improve synonym matching.
 
     ```json
     {
@@ -172,7 +172,7 @@ if err != nil {
     panic(err)
 }
 
-// The search result will contain one match: "doc1". This document includes the term "hardworking", 
+// The search result will contain one match: "doc1". This document includes the term "hardworking",
 // which is a synonym for the queried term "persistent". The synonym relationship is based on 
 // the user-defined thesaurus associated with the index.
 // Print the search results, which will include the explanation for the match.

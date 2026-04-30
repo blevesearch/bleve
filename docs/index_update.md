@@ -1,7 +1,7 @@
 # Ability to reduce downtime during index mapping updates
 
-* *v2.5.4* (and after) will come with support to delete or modify any field mapping in the index mapping without requiring a full rebuild of the index
-* We do this by storing which portions of the field has to be deleted within zap and then lazily executing the deletion during subsequent merging of the segments
+* *v2.5.4* (and after) will come with support for deleting or modifying any field mapping in the index mapping without requiring a full rebuild of the index
+* We do this by storing which portions of the field that have to be deleted within zap and then lazily executing the deletion during subsequent merging of the segments
 
 ## Usage
 
@@ -20,12 +20,12 @@ However, if any of the following conditions are met, the index is considered non
 * Any additional fields or enabled document mappings in the new index mapping
 * Any changes to IncludeInAll, type, IncludeTermVectors and SkipFreqNorm
 * Any document mapping having its enabled value changing from false to true
-* Text fields with a different analyser or date time fields with a different date time format
+* Text fields with a different analyzer or date time fields with a different date time format
 * Vector and VectorBase64 fields changing dims, similarity or vectorIndexOptimizedFor
 * Any changes when field is part of `_all`
 * Full field deletions when it is covered by any dynamic setting (Index, Store or DocValues Dynamic)
 * Any changes to dynamic settings at the top level or any enabled document mapping
-* If multiple fields sharing the same field name either from different type mappings or aliases are present, then any non compatible changes across all of these fields
+* If multiple fields sharing the same field name either from different type mappings or aliases are present, then any non-compatible changes across all of these fields
 
 ## How to enforce immediate deletion?
 

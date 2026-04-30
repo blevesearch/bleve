@@ -7,7 +7,7 @@ Bleve exposes two query nodes for embedding-defined per-hit logic:
 
 Bleve itself only executes callbacks that were already provided/attached by the
 embedding application. It does not interpret any
-embedder-specific payload such as callback source, params, or requested fields.
+embedder-specific payload such as callback source, "params", or requested fields.
 
 ## Query Objects
 
@@ -130,8 +130,8 @@ At the bleve layer, doc values are decoded based on the field's mapping type:
 ## Error Cases
 
 - missing child query:
-  - `custom filter query must have a query`
-  - `custom score query must have a query`
+  - `"custom filter query must have a query"`
+  - `"custom score query must have a query"`
 - missing bound callback:
-  - `custom filter query must have a filter callback`
-  - `custom score query must have a score callback`
+  - `"custom filter query must have a filter callback"`
+  - `"custom score query must have a score callback"`

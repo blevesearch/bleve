@@ -129,7 +129,7 @@ func (s *EdgeNgramFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
     for _, token := range input {
         runeCount := utf8.RuneCount(token.Term)
         runes := bytes.Runes(token.Term)
-        // ..builds tokens based from either end, specified in the input
+        // ..builds tokens based on either end, specified in the input
     }
     return rv
 }
@@ -204,7 +204,7 @@ if err := indexMapping.AddCustomTokenFilter("Engram", edgeGramFilter); err != ni
 - `"type": "edge_ngram"` - Tells Bleve to use the edge n-gram filter
 - `"min": 2` - Start creating tokens from 2 characters ("ja", "sc", etc.)
 - `"max": 4` - Stop at 4 characters ("java", "scri", etc.)
-- `"back": "false"` - Create tokens from the front (beginning) of words
+- `"back": false` - Create tokens from the front (beginning) of words
 
 ### Step 2: Create Custom Analyzer
 

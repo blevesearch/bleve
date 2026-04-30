@@ -110,7 +110,7 @@ err := index.Index("doc", map[string]interface{}{
 
 - Document gets a unique ID (`doc`)
 - Fields are automatically mapped based on their Go types
-- Text fields are analyzed (tokenized, lowercased, etc.) based on the mapping chosen (here, the default one)
+- Text fields are analyzed (tokenized, lowercased, etc.) based on the chosen mapping (here, the default one)
 - Document is stored in the search index
 
 ### 3. Searching
@@ -184,7 +184,7 @@ query.SetField("price")
 ### Custom Field Mapping
 
 ```go
-// We can create customised mapping as well by specifying about analyzers
+// We can create customized mappings as well with configurable analyzers
 mapping := bleve.NewIndexMapping()
 
 // Text field with custom analyzer
