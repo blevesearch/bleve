@@ -28,7 +28,7 @@ JSON example:
 }
 ```
 
-The result would be 5 hits starting from the 5th hit.
+The result would be 5 hits starting from the 11th hit.
 
 When to use:
 
@@ -49,7 +49,7 @@ Rules:
 Where do sort keys come from?
 
 - Each hit includes `Sort` (and `DecodedSort` from Bleve v2.5.2). Take the last hit's sort keys for `SearchAfter`, or the first hit's sort keys for `SearchBefore`.
-- If the field/fields to be searched over is numeric, datetime or geo, the values in the `Sort` field may have garbled values; this is because of how Bleve represents such data types internally. To use such fields as sort keys, use the `DecodedSort` field, which decodes the internal representations. This feature is available from Bleve v2.5.4.
+- If the field/fields to be searched over are numeric, datetime or geo, the values in the `Sort` field may have garbled values; this is because of how Bleve represents such data types internally. To use such fields as sort keys, use the `DecodedSort` field, which decodes the internal representations. This feature is available from Bleve v2.5.4.
 
 > When using `DecodedSort`, the `Sort` array in the search request needs to explicitly declare the type of the field for proper decoding. Hence, the `Sort` array must contain either `SortField` objects (for numeric and datetime) or `SortGeoDistance` objects (for geo) rather than just the field names. More info on `SortField` and `SortGeoDistance` can be found in [sort_facet.md](sort_facet.md).
 
@@ -75,7 +75,7 @@ Backward pagination over `_id` and `_score`:
 }
 ```
 
-Pagination using numeric, datetime and geo fields. Notice how we specify the sort objects, with the "type" field explicitly declared in case of numeric and datetime:
+Pagination using numeric, datetime, and geo fields. Notice how we specify the sort objects, with the "type" field explicitly declared in case of numeric and datetime:
 
 ```json
 {
@@ -86,7 +86,7 @@ Pagination using numeric, datetime and geo fields. Notice how we specify the sor
   "sort": [
     {"by": "field", "field": "price", "type": "number"},
     {"by": "field", "field": "created_at", "type": "date"},
-    {"by": "geo_distance", "field": "location", "location": {"lat": 40.7128,"lon": -74.0060}}
+    {"by": "geo_distance", "field": "location", "location": {"lat": 40.7128, "lon": -74.0060}}
   ],
   "search_after": ["99.99", "2023-10-15T10:30:00Z", "5.2"]
 }

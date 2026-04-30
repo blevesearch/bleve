@@ -1,6 +1,6 @@
 # Hierarchical nested search
 
-* *v2.6.0* (and after) will come with support for **Array indexing and hierarchical nested search**.
+* *v2.6.0* (and after) will come with support for **array indexing and hierarchical nested search**.
 * We've achieved this by embedding nested documents within our bleve (scorch) indexes.
 * Usage of zap file format: [v17](https://github.com/blevesearch/zapx/blob/master/zap.md). Here we preserve hierarchical document relationships within segments, continuing to conform to the segmented architecture of *scorch*.
 
@@ -29,7 +29,7 @@
 }
 ```
 
-* Multi-level arrays: Arrays can contain objects that themselves have array fields, allowing for deeply nested structures, such as a list of projects, each with its own list of tasks.
+* Multi-level arrays: arrays can contain objects that themselves have array fields, allowing for deeply nested structures, such as a list of projects, each with its own list of tasks.
 
 ```json
 {
@@ -107,7 +107,7 @@
         ],
         "locations": [
             {"city": "Athens","country": "Greece"},
-            {"city": "Berlin","country": "USA"}
+            {"city": "Berlin", "country": "USA"}
         ]
     }
 }
@@ -117,7 +117,7 @@
 
 * From v2.6.0 onwards, Bleve allows for accurate representation and querying of complex nested structures, preserving the relationships between different levels of the hierarchy, across multi-level, multiple and hybrid arrays.
 
-* The addition of `nested` document mappings enable defining fields that contain arrays of objects, giving the option to preserve the hierarchical relationships within the array during indexing. Having `nested` as false (default) will flatten the objects within the array, losing the hierarchy, which was the earlier behavior.
+* The addition of `nested` document mappings enables the definition of fields that contain arrays of objects, giving the option to preserve the hierarchical relationships within the array during indexing. Having `nested` as false (default) will flatten the objects within the array, losing the hierarchy, which was the earlier behavior.
 
 ```json
 {
@@ -146,10 +146,10 @@
 }
 ```
 
-* Any Bleve query (e.g., `match`, `phrase`, `term`, `fuzzy`, `numeric/date range` etc.) can be executed against fields within nested documents, with no special handling required. The query processor will automatically traverse the nested structures to find matches. Additional search constructs
+* Any Bleve query (e.g., `match`, `phrase`, `term`, `fuzzy`, `numeric/date range`, etc.) can be executed against fields within nested documents, with no special handling required. The query processor will automatically traverse the nested structures to find matches. Additional search constructs
 like vector search, synonym search, hybrid and pre-filtered vector search integrate seamlessly with hierarchy search.
 
-* Conjunction Queries (AND queries) and other queries that depend on term co-occurrence within the same hierarchical context will respect the boundaries of nested documents. This means that terms must appear within the same nested object to be considered a match. For example, a conjunction query searching for an employee named "Alice" with the role "Engineer" within the "Engineering" department will only return results where both name and role terms are found within the same employee object, which is itself within a "Engineering" department object.
+* Conjunction Queries (AND queries) and other queries that depend on term co-occurrence within the same hierarchical context will respect the boundaries of nested documents. This means that terms must appear within the same nested object to be considered a match. For example, a conjunction query searching for an employee named "Alice" with the role "Engineer" within the "Engineering" department will only return results where both name and role terms are found within the same employee object, which is itself within an "Engineering" department object.
 
 * Some other search constructs will have enhanced precision with hierarchy search.
   * Field-Level Highlighting: Only fields within the matched nested object are retrieved and highlighted, ensuring highlights appear in the correct hierarchical context. For example, a match in `departments[name=Engineering].employees` highlights only employees in that department.

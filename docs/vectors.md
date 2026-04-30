@@ -1,13 +1,13 @@
 # Approximate Nearest Neighbor Search (over vectors)
 
-* *v2.4.0* (and after) will come with support for **vectors' indexing and search**.
+* *v2.4.0* (and after) will come with support for **vector indexing and search**.
 * We've achieved this by embedding [FAISS](https://github.com/facebookresearch/faiss) indexes within our bleve (scorch) indexes.
 * Introduction of new zap file formats: [v16](https://github.com/blevesearch/zapx/blob/v16.x/zap.md), [v17](https://github.com/blevesearch/zapx/blob/master/zap.md) .. to co-locate text and vector indexes as neighbors within segments, continuing to conform to the segmented architecture of *scorch*.
 
 ## Pre-requisite(s)
 
-* Induction of [FAISS](https://github.com/blevesearch/faiss) into our eco system, which is a fork of the original [facebookresearch/faiss](https://github.com/facebookresearch/faiss)
-* FAISS is a C++ library that needs to be compiled and it's shared libraries need to be situated at an accessible path for your application.
+* Induction of [FAISS](https://github.com/blevesearch/faiss) into our ecosystem, which is a fork of the original [facebookresearch/faiss](https://github.com/facebookresearch/faiss)
+* FAISS is a C++ library that needs to be compiled and its shared libraries need to be situated at an accessible path for your application.
 * A `vectors` GO TAG needs to be set for bleve to access all the supporting code. This TAG must be set only after the FAISS shared library is made available. Failure to do either will inhibit you from using this feature.
 * Please follow these [instructions](#setup-instructions) below for any assistance in the area.
 * Releases of `blevesearch/bleve` work with select checkpoints of `blevesearch/faiss` owing to API changes and improvements (tracking over the `bleve` branch):
@@ -45,7 +45,7 @@
 
 * Vectors from documents that do not conform to the index mapping dimensionality are simply discarded at index time.
 * The dimensionality of the query vector must match the dimensionality of the indexed vectors to obtain any results.
-* Pure kNN searches can be performed, but the `query` attribute within the search request must be set - to `{"match_none": {}}` in this case. The `query` attribute is made optional when `knn` is available with v2.4.1+.
+* Pure kNN searches can be performed, but the `query` attribute within the search request must be set -- to `{"match_none": {}}` in this case. The `query` attribute is made optional when `knn` is available with v2.4.1+.
 * Hybrid searches are supported, where results from `query` are unioned with results from `knn`. The FTS scores from exact searches are simply summed with the similarity distances to determine the aggregate scores.
 
 ```text
@@ -300,7 +300,7 @@ sudo cp build/c_api/libfaiss_c.so /usr/local/lib
 
 ### OSX
 
-While you shouldn't need to do any different over osX x86_64, with aarch64 - some instructions need adjusting (see [facebookresearch/faiss#2111](https://github.com/facebookresearch/faiss/issues/2111)) ..
+While you shouldn't need to do anything different for macOS x86_64, with aarch64 - some instructions need adjusting (see [facebookresearch/faiss#2111](https://github.com/facebookresearch/faiss/issues/2111)) ..
 
 ```shell
 LDFLAGS="-L/opt/homebrew/opt/llvm/lib" CPPFLAGS="-I/opt/homebrew/opt/llvm/include" CXX=/opt/homebrew/opt/llvm/bin/clang++ CC=/opt/homebrew/opt/llvm/bin/clang cmake -B build -DFAISS_ENABLE_GPU=OFF -DFAISS_ENABLE_C_API=ON -DBUILD_SHARED_LIBS=ON -DFAISS_ENABLE_PYTHON=OFF .

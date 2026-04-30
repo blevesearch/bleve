@@ -172,8 +172,7 @@
 		<td>No DocValues used</td>
 		<td>No DocValues used</td>
 		<td>DocValues used for field "dolor". Field Mapping for "dolor" may enable docValues.</td>
-		<td>DocValues used, for field "sit_amet". 
-Field Mapping for "sit_amet" may enable docValues.</td>
+		<td colspan="3">DocValues used for field "dolor". Field Mapping for "dolor" may enable docValues.</td>	
 	</tr>
 </table>
 </div>
@@ -394,8 +393,8 @@ Enabling docValues for the fields associated with such facet requests might prov
 		</td>
 	</tr>
 	<tr align="center">
-		<td>DocValues used for field "dolor" and "lorem". Field Mapping for "dolor" and "lorem" may enable docValues.</td>
-		<td>DocValues used for field "dolor" and "ipsum". Field Mapping for "dolor" and "ipsum" may enable docValues.</td>
+		<td>DocValues used for fields "dolor" and "lorem". Field Mapping for "dolor" and "lorem" may enable docValues.</td>
+		<td>DocValues used for fields "dolor" and "ipsum". Field Mapping for "dolor" and "ipsum" may enable docValues.</td>
 	</tr>
 </table>
 </div>
@@ -546,8 +545,8 @@ Document Format used for the test scenario:
 			<pre>
 {
 	"dummyTerm":"Term",
-	"dummyDate":"2000-01-01T00:00:00,
-	"dummyNumber:1
+	"dummyDate":"2000-01-01T00:00:00",
+	"dummyNumber":1
 }
 			</pre>
 		</td>
@@ -555,8 +554,8 @@ Document Format used for the test scenario:
 			<pre>
 {
 	"dummyTerm":"Term",
-	"dummyDate":"2000-01-01T01:00:00,
-	"dummyNumber:2
+	"dummyDate":"2000-01-01T01:00:00",
+	"dummyNumber":2
 }
 			</pre>
 		</td>
@@ -565,7 +564,7 @@ Document Format used for the test scenario:
 {
 	"dummyTerm":"Term",
 	"dummyDate":"2000-01-01T01:00:00"+(i hours),
-	"dummyNumber:i
+	"dummyNumber":i
 }
 			</pre>
 		</td>
@@ -573,8 +572,8 @@ Document Format used for the test scenario:
 			<pre>
 {
 	"dummyTerm":"Term",
-	"dummyDate":2000-01-01T01:00:00 + (5000 hours),
-	"dummyNumber:5000
+	"dummyDate":"2000-01-01T01:00:00 + (5000 hours)",
+	"dummyNumber":5000
 }
 			</pre>
 		</td>
@@ -775,7 +774,7 @@ Document Format used for the test scenario:
 		<td align="center"><code>27.034</code></td>
 	</tr>
 </table>
-Even at this small scale, with a small document size and a very limited number of indexed documents, we still observe a noticeable tradeoff. With just a slight increase in the index size (an average of 7KB) we obtain a 20ms reduction in the total execution time, on average, for only 1000 queries.
+Even at this small scale, with a small document size and a very limited number of indexed documents, we still observe a noticeable tradeoff. With just a slight increase in the index size (an average of 7KB), we obtain a 20ms reduction in the total execution time, on average, for only 1000 queries.
 
 <h3>Technical Information</h3>
 
