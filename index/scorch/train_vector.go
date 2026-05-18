@@ -100,9 +100,13 @@ func (t *vectorTrainer) persistToBolt(trainReq *trainRequest) error {
 	if err != nil {
 		return fmt.Errorf("error creating trained index bucket: %v", err)
 	}
-	err = trainerBucket.Put(util.BoltPathKey, []byte(index.TrainedIndexFileName), nil)
-	if err != nil {
-		return fmt.Errorf("error updating trained index bucket: %v", err)
+
+	segmentPath := t.parent.path + string(os.PathSeparator) + index.TrainedIndexFileName
+	if _, err := os.Stat(segmentPath); !os.IsNotExist(err) {
+		err = trainerBucket.Put(util.BoltPathKey, []byte(index.TrainedIndexFileName), nil)
+		if err != nil {
+			return fmt.Errorf("error updating trained index bucket: %v", err)
+		}
 	}
 
 	t.trainingComplete.Store(trainReq.finalSample)
@@ -233,9 +237,16 @@ func (t *vectorTrainer) loadTrainedData(bucket *util.BoltBucketImpl) error {
 		return fmt.Errorf("error creating file reader: %v", err)
 	}
 
-	segmentSnapshot, err := t.parent.loadSegment(bucket, reader)
-	if err != nil {
-		return err
+	// segmentSnapshot is constructed only if the trained index file path exists. If
+	// application layer fails to create one and the underlying path doesn't exist, we'll
+	// just skip loading the trained index and fallback to naive merge
+	var segmentSnapshot *SegmentSnapshot
+	pathBytes, err := bucket.Get(util.BoltPathKey, nil)
+	if pathBytes != nil {
+		segmentSnapshot, err = t.parent.loadSegment(bucket, reader)
+		if err != nil {
+			return err
+		}
 	}
 
 	// get the training status out of bolt
