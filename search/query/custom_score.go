@@ -85,7 +85,7 @@ func (q *CustomScoreQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		fieldTypes = resolveFieldTypes(q.Fields, m)
 	}
 
-	return searcher.NewCustomScoreSearcher(ctx, childSearcher, q.scoreFunc, dvReader, i, fieldTypes), nil
+	return searcher.NewCustomScoreSearcher(ctx, childSearcher, q.scoreFunc, dvReader, i, fieldTypes, options.Explain), nil
 }
 
 func (q *CustomScoreQuery) Validate() error {

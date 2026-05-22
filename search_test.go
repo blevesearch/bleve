@@ -4909,6 +4909,75 @@ func TestCustomScoreQuery(t *testing.T) {
 	}
 }
 
+// TestCustomScoreQueryExplanation reproduces MB-71971: when explain=true is
+// used with a custom_score query, the explanation tree must reflect the
+// custom score, not the inner query's BM25. The inner explanation should be
+// preserved as a child so callers can still see how the candidate was
+// originally scored.
+func TestCustomScoreQueryExplanation(t *testing.T) {
+	idx := newCustomQueryTestIndex(t)
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	fictionQuery := NewTermQuery("fiction")
+	fictionQuery.SetField("genre")
+
+	// Use a per-doc score that cannot collide with any plausible BM25 value
+	// so the assertion is unambiguous.
+	customScores := map[string]float64{
+		"0": 1000.5,
+		"2": 2000.5,
+		"4": 3000.5,
+		"7": 4000.5,
+	}
+	q := query.NewCustomScoreQueryWithScorer(fictionQuery, func(d *search.DocumentMatch) float64 {
+		return customScores[d.ID]
+	}, nil, nil)
+
+	req := NewSearchRequest(q)
+	req.Explain = true
+	req.Size = 10
+
+	res, err := idx.SearchInContext(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Hits) != len(customScores) {
+		t.Fatalf("expected %d hits, got %d", len(customScores), len(res.Hits))
+	}
+
+	for _, hit := range res.Hits {
+		want, ok := customScores[hit.ID]
+		if !ok {
+			t.Fatalf("unexpected hit id %s", hit.ID)
+		}
+		if hit.Score != want {
+			t.Fatalf("hit %s: expected score %v, got %v", hit.ID, want, hit.Score)
+		}
+		if hit.Expl == nil {
+			t.Fatalf("hit %s: expected explanation, got nil", hit.ID)
+		}
+		if hit.Expl.Value != want {
+			t.Fatalf("hit %s: explanation value %v did not match custom score %v",
+				hit.ID, hit.Expl.Value, want)
+		}
+		if len(hit.Expl.Children) != 1 {
+			t.Fatalf("hit %s: expected inner BM25 explanation preserved as child, got %d children",
+				hit.ID, len(hit.Expl.Children))
+		}
+		inner := hit.Expl.Children[0]
+		if inner.Value == want {
+			t.Fatalf("hit %s: inner explanation value should be original BM25, not custom score %v",
+				hit.ID, want)
+		}
+	}
+}
+
 func TestCustomFilterQueryDocumentMatchIDWithoutFields(t *testing.T) {
 	idx := newCustomQueryTestIndex(t)
 	defer func() {
@@ -5001,7 +5070,10 @@ func newCustomQueryTestIndex(t *testing.T) Index {
 	titleMapping.Analyzer = en.AnalyzerName
 	imap.DefaultMapping.AddFieldMappingsAt("title", titleMapping)
 
-	idx, err := NewMemOnly(imap)
+	tmpIndexPath := createTmpIndexPath(t)
+	t.Cleanup(func() { cleanupTmpIndexPath(t, tmpIndexPath) })
+
+	idx, err := NewUsing(tmpIndexPath, imap, scorch.Name, Config.DefaultKVStore, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -5045,7 +5117,10 @@ func newCustomQueryDocValueTestIndex(t *testing.T) Index {
 	ratingMapping := mapping.NewNumericFieldMapping()
 	imap.DefaultMapping.AddFieldMappingsAt("rating", ratingMapping)
 
-	idx, err := NewMemOnly(imap)
+	tmpIndexPath := createTmpIndexPath(t)
+	t.Cleanup(func() { cleanupTmpIndexPath(t, tmpIndexPath) })
+
+	idx, err := NewUsing(tmpIndexPath, imap, scorch.Name, Config.DefaultKVStore, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -5081,7 +5156,10 @@ func TestCustomFilterQueryDateTimeDocValues(t *testing.T) {
 	dateMapping := mapping.NewDateTimeFieldMapping()
 	imap.DefaultMapping.AddFieldMappingsAt("published", dateMapping)
 
-	idx, err := NewMemOnly(imap)
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := NewUsing(tmpIndexPath, imap, scorch.Name, Config.DefaultKVStore, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
