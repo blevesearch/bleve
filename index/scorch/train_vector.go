@@ -185,10 +185,8 @@ func (t *vectorTrainer) trainLoop() {
 				// merge the new segment with the existing one into a .tmp file, then
 				// atomically rename it into place (Os.Open on the live path is unsafe
 				// during the merge).
-				t.config[index.TrainingKey] = true
 				_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.trainedIndex.segment, sampleSeg},
 					[]*roaring.Bitmap{nil, nil}, path+".tmp", t.parent.closeCh, nil, t.config)
-				t.config[index.TrainingKey] = false
 				if err != nil {
 					trainReq.ackCh <- fmt.Errorf("error merging trained index: %v", err)
 					close(trainReq.ackCh)
