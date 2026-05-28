@@ -767,3 +767,83 @@ func TestTrainerIndexCopy(t *testing.T) {
 	}
 
 }
+
+func TestTrainerFallbackNaiveMerge(t *testing.T) {
+	cfg := CreateConfig("TestTrainerFallbackNaiveMerge")
+	cfg[IndexTrainedWithFastMerge] = true
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg["path"] = filepath.Clean(cfg["path"].(string))
+	analysisQueue := index.NewAnalysisQueue(1)
+	s, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("failed to create Scorch: %v", err)
+	}
+
+	sc, ok := s.(*Scorch)
+	if !ok {
+		t.Fatal("expected Scorch instance")
+	}
+
+	tr, ok := sc.trainer.(*vectorTrainer)
+	if !ok {
+		t.Fatal("expected vectorTrainer instance")
+	}
+	if sc.rootBolt == nil {
+		err := sc.openBolt()
+		if err != nil {
+			t.Fatalf("opening bolt failed %v", err)
+		}
+	}
+	// spawn all the routines to check the data ingest as well
+	err = sc.Open()
+	if err != nil {
+		t.Fatalf("failed to open Scorch: %v", err)
+	}
+
+	// mocking the scenario where the application would've failed to create the trained index file
+	// due to some fail of operation but expects the underlying the indexing layer
+	// to continue ingestion and fallback to naive merge and complete the training
+	// without the trained index file.
+	batch := index.NewBatch()
+	batch.SetInternal(util.BoltTrainCompleteKey, []byte("true"))
+	err = sc.Train(batch)
+	if err != nil {
+		t.Fatalf("training failed: %v", err)
+	}
+
+	batch.Reset()
+	doc := document.NewDocument("doc-998")
+	doc.AddField(document.NewVectorField("vec", nil, []float32{998, 998, 998}, 3, "cosine", index.IndexOptimizedForRecall))
+	batch.Update(doc)
+	err = sc.Batch(batch)
+	if err != nil {
+		t.Fatalf("data ingestion expected to suceed after training is complete")
+	}
+
+	val, err := tr.getInternal(util.BoltTrainCompleteKey)
+	if err != nil {
+		t.Fatalf("failed to get internal value: %v", err)
+	}
+
+	if string(val) != "true" {
+		t.Errorf("expected 'true' for training complete key, got %q", val)
+	}
+
+	s.Close()
+
+	// Re-open the index to verify that it can be loaded without the trained index file.
+	sn, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("failed to re-open Scorch: %v", err)
+	}
+
+	err = sn.Open()
+	if err != nil {
+		t.Fatalf("failed to open Scorch after fallback: %v", err)
+	}
+	defer sn.Close()
+}
