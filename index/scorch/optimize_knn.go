@@ -92,7 +92,7 @@ func (o *OptimizeVR) searchSegment(segIdx int) error {
 				)
 			}
 			if searchErr != nil {
-				go vecIndex.Close()
+				vecIndex.Close()
 				return searchErr
 			}
 			vr.postings[segIdx] = pl
