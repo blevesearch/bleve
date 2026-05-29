@@ -92,13 +92,13 @@ func (o *OptimizeVR) searchSegment(segIdx int) error {
 				)
 			}
 			if searchErr != nil {
-				vecIndex.Close()
+				go vecIndex.Close()
 				return searchErr
 			}
 			vr.postings[segIdx] = pl
 			vr.iterators[segIdx] = pl.Iterator(vr.iterators[segIdx])
 		}
-		vecIndex.Close()
+		go vecIndex.Close()
 	}
 	return nil
 }
