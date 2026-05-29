@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"sync/atomic"
 
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
@@ -164,7 +165,7 @@ func (i *IndexSnapshotVectorReader) Count() uint64 {
 }
 
 func (i *IndexSnapshotVectorReader) Close() error {
-	// TODO Consider if any scope of recycling here.
+	atomic.AddUint64(&i.snapshot.parent.stats.TotKNNSearches, 1)
 	return nil
 }
 

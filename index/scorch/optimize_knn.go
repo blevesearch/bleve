@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
@@ -54,87 +53,81 @@ func (o *OptimizeVR) invokeSearcherEndCallback() {
 	}
 }
 
+// executeSearchOnSegment runs the configured kNN searches for every vector
+// reader against a single segment, populating the per-segment postings and
+// iterators on each reader.
+func (o *OptimizeVR) searchOnSegment(segIdx int) error {
+	seg := o.snapshot.segment[segIdx]
+	vecSeg, ok := seg.segment.(segment_api.VectorSegment)
+	if !ok {
+		return nil
+	}
+	for field, vrs := range o.vrs {
+		if info, ok := o.snapshot.updatedFields[field]; ok && (info.Deleted || info.Index) {
+			continue
+		}
+		vecIndex, err := vecSeg.InterpretVectorIndex(field, seg.deleted)
+		if err != nil {
+			return err
+		}
+		seg.cachedMeta.storeMeta(field, vecIndex.Size())
+		for _, vr := range vrs {
+			var pl segment_api.VecPostingsList
+			var searchErr error
+			if vr.eligibleSelector != nil {
+				pl, searchErr = vecIndex.SearchWithFilter(
+					vr.vector,
+					vr.k,
+					vr.eligibleSelector.SegmentEligibleDocuments(segIdx),
+					vr.searchParams,
+				)
+			} else {
+				pl, searchErr = vecIndex.Search(
+					vr.vector,
+					vr.k,
+					vr.searchParams,
+				)
+			}
+			if searchErr != nil {
+				vecIndex.Close()
+				return searchErr
+			}
+			vr.postings[segIdx] = pl
+			vr.iterators[segIdx] = pl.Iterator(vr.iterators[segIdx])
+		}
+		vecIndex.Close()
+	}
+	return nil
+}
+
 func (o *OptimizeVR) Finish() error {
 	// for each field, get the vector index --> invoke the zap func.
 	// for each VR, populate postings list and iterators
 	// by passing the obtained vector index and getting similar vectors.
-	// defer close index - just once.
-	var errorsM sync.Mutex
-	var errors []error
-
 	defer o.invokeSearcherEndCallback()
 
-	wg := sync.WaitGroup{}
-	semaphore := make(chan struct{}, BleveMaxKNNConcurrency)
-	// Launch goroutines to get vector index for each segment
+	var wg sync.WaitGroup
+	errCh := make(chan error, len(o.snapshot.segment))
+
 	for i, seg := range o.snapshot.segment {
-		if sv, ok := seg.segment.(segment_api.VectorSegment); ok {
-			wg.Add(1)
-			semaphore <- struct{}{} // Acquire a semaphore slot
-			go func(index int, segment segment_api.VectorSegment, origSeg *SegmentSnapshot) {
-				defer func() {
-					<-semaphore // Release the semaphore slot
-					wg.Done()
-				}()
-				for field, vrs := range o.vrs {
-					// Early exit if the field is supposed to be completely deleted or
-					// if it's index data has been deleted
-					if info, ok := o.snapshot.updatedFields[field]; ok && (info.Deleted || info.Index) {
-						continue
-					}
-
-					vecIndex, err := segment.InterpretVectorIndex(field, origSeg.deleted)
-					if err != nil {
-						errorsM.Lock()
-						errors = append(errors, err)
-						errorsM.Unlock()
-						return
-					}
-
-					// cache the vector index size for memory accounting
-					vectorIndexSize := vecIndex.Size()
-					origSeg.cachedMeta.storeMeta(field, vectorIndexSize)
-					for _, vr := range vrs {
-						var pl segment_api.VecPostingsList
-						var err error
-
-						// for each VR, populate postings list and iterators
-						// by passing the obtained vector index and getting similar vectors.
-
-						// check if the vector reader is configured to use a pre-filter
-						// to filter out ineligible documents before performing
-						// kNN search.
-						if vr.eligibleSelector != nil {
-							pl, err = vecIndex.SearchWithFilter(vr.vector, vr.k,
-								vr.eligibleSelector.SegmentEligibleDocuments(index), vr.searchParams)
-						} else {
-							pl, err = vecIndex.Search(vr.vector, vr.k, vr.searchParams)
-						}
-
-						if err != nil {
-							errorsM.Lock()
-							errors = append(errors, err)
-							errorsM.Unlock()
-							go vecIndex.Close()
-							return
-						}
-
-						atomic.AddUint64(&o.snapshot.parent.stats.TotKNNSearches, uint64(1))
-
-						// postings and iterators are already alloc'ed when
-						// IndexSnapshotVectorReader is created
-						vr.postings[index] = pl
-						vr.iterators[index] = pl.Iterator(vr.iterators[index])
-					}
-					go vecIndex.Close()
-				}
-			}(i, sv, seg)
+		if _, ok := seg.segment.(segment_api.VectorSegment); !ok {
+			continue
 		}
+		wg.Add(1)
+		go func(segIdx int) {
+			defer wg.Done()
+			if err := o.searchOnSegment(segIdx); err != nil {
+				errCh <- err
+			}
+		}(i)
 	}
 	wg.Wait()
-	close(semaphore)
-	if len(errors) > 0 {
-		return errors[0]
+	close(errCh)
+
+	for err := range errCh {
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
