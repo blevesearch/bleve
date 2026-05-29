@@ -53,10 +53,10 @@ func (o *OptimizeVR) invokeSearcherEndCallback() {
 	}
 }
 
-// executeSearchOnSegment runs the configured kNN searches for every vector
+// searchSegment runs the configured kNN searches for every vector
 // reader against a single segment, populating the per-segment postings and
 // iterators on each reader.
-func (o *OptimizeVR) searchOnSegment(segIdx int) error {
+func (o *OptimizeVR) searchSegment(segIdx int) error {
 	seg := o.snapshot.segment[segIdx]
 	vecSeg, ok := seg.segment.(segment_api.VectorSegment)
 	if !ok {
@@ -119,7 +119,7 @@ func (o *OptimizeVR) Finish() error {
 		wg.Add(1)
 		go func(segIdx int) {
 			defer wg.Done()
-			if err := o.searchOnSegment(segIdx); err != nil {
+			if err := o.searchSegment(segIdx); err != nil {
 				errCh <- err
 			}
 		}(i)
