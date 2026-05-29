@@ -62,6 +62,7 @@ func (o *OptimizeVR) searchOnSegment(segIdx int) error {
 	if !ok {
 		return nil
 	}
+	meta := seg.cachedMeta
 	for field, vrs := range o.vrs {
 		if info, ok := o.snapshot.updatedFields[field]; ok && (info.Deleted || info.Index) {
 			continue
@@ -70,7 +71,9 @@ func (o *OptimizeVR) searchOnSegment(segIdx int) error {
 		if err != nil {
 			return err
 		}
-		seg.cachedMeta.storeMeta(field, vecIndex.Size())
+		if !meta.contains(field) {
+			meta.store(field, vecIndex.Size())
+		}
 		for _, vr := range vrs {
 			var pl segment_api.VecPostingsList
 			var searchErr error
@@ -166,7 +169,7 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 	// Finish() logic to even occur or not.
 	var sumVectorIndexSize uint64
 	for _, seg := range o.snapshot.segment {
-		vecIndexSize := seg.cachedMeta.fetchMeta(s.field)
+		vecIndexSize := seg.cachedMeta.load(s.field)
 		if vecIndexSize != nil {
 			sumVectorIndexSize += vecIndexSize.(uint64)
 		}

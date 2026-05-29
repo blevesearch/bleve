@@ -362,17 +362,23 @@ func newCachedMeta() *cachedMeta {
 	}
 }
 
-// store the value for a field if the field is not already present in the cache.
-func (c *cachedMeta) storeMeta(field string, val interface{}) {
-	c.meta.LoadOrStore(field, val)
+// store the value for a field in the cache, overwriting any existing value.
+func (c *cachedMeta) store(field string, val interface{}) {
+	c.meta.Store(field, val)
 }
 
 // fetch the value for a field from the cache, returns nil if the field is not present in the cache.
-func (c *cachedMeta) fetchMeta(field string) (rv interface{}) {
+func (c *cachedMeta) load(field string) (rv interface{}) {
 	if val, ok := c.meta.Load(field); ok {
 		return val
 	}
 	return nil
+}
+
+// contains reports whether the cache has an entry for the given field.
+func (c *cachedMeta) contains(field string) bool {
+	_, ok := c.meta.Load(field)
+	return ok
 }
 
 func (s *SegmentSnapshot) Ancestors(docNum uint64, prealloc []index.AncestorID) []index.AncestorID {
