@@ -169,8 +169,7 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 	// Finish() logic to even occur or not.
 	var sumVectorIndexSize uint64
 	for _, seg := range o.snapshot.segment {
-		vecIndexSize := seg.cachedMeta.load(s.field)
-		if vecIndexSize != nil {
+		if vecIndexSize, ok := seg.cachedMeta.load(s.field); ok {
 			sumVectorIndexSize += vecIndexSize.(uint64)
 		}
 	}
