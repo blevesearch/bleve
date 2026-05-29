@@ -5,9 +5,9 @@ go 1.25.0
 require (
 	github.com/RoaringBitmap/roaring/v2 v2.14.5
 	github.com/bits-and-blooms/bitset v1.24.2
-	github.com/blevesearch/bleve_index_api v1.3.11
+	github.com/blevesearch/bleve_index_api v1.3.12
 	github.com/blevesearch/geo v0.2.5
-	github.com/blevesearch/go-faiss v1.1.3-0.20260520191817-63736f1417c1
+	github.com/blevesearch/go-faiss v1.1.3
 	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/blevesearch/go-porterstemmer v1.0.3
 	github.com/blevesearch/goleveldb v1.0.1
@@ -25,7 +25,7 @@ require (
 	github.com/blevesearch/zapx/v14 v14.4.3
 	github.com/blevesearch/zapx/v15 v15.4.3
 	github.com/blevesearch/zapx/v16 v16.3.4
-	github.com/blevesearch/zapx/v17 v17.1.4-0.20260521123239-ff145410dea9
+	github.com/blevesearch/zapx/v17 v17.1.5-0.20260529064718-3f7ac8a8913e
 	github.com/couchbase/moss v0.2.0
 	github.com/spf13/cobra v1.10.2
 	go.etcd.io/bbolt v1.4.0
