@@ -165,7 +165,9 @@ func (i *IndexSnapshotVectorReader) Count() uint64 {
 }
 
 func (i *IndexSnapshotVectorReader) Close() error {
-	atomic.AddUint64(&i.snapshot.parent.stats.TotKNNSearches, 1)
+	if i.snapshot != nil {
+		atomic.AddUint64(&i.snapshot.parent.stats.TotKNNSearches, 1)
+	}
 	return nil
 }
 
