@@ -202,7 +202,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			segment:    next.data, // take ownership of next.data's ref-count
 			stats:      next.stats,
 			cachedDocs: &cachedDocs{cache: nil},
-			cachedMeta: &cachedMeta{meta: nil},
+			cachedMeta: newCachedMeta(),
 			internal:   make(map[string][]byte),
 			creator:    "introduceSegment",
 		}
@@ -460,7 +460,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 				deleted:    newSegmentDeleted[i],
 				stats:      stats,
 				cachedDocs: &cachedDocs{cache: nil},
-				cachedMeta: &cachedMeta{meta: nil},
+				cachedMeta: newCachedMeta(),
 				creator:    "introduceMerge",
 				mmaped:     nextMerge.mmaped,
 			})

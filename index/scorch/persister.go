@@ -1112,7 +1112,7 @@ func (s *Scorch) loadSegment(segmentBucket *util.BoltBucketImpl, reader util.Fil
 	rv := &SegmentSnapshot{
 		segment:    seg,
 		cachedDocs: &cachedDocs{cache: nil},
-		cachedMeta: &cachedMeta{meta: nil},
+		cachedMeta: newCachedMeta(),
 	}
 	deletedBytes, err := segmentBucket.Get(util.BoltDeletedKey, reader)
 	if err != nil {

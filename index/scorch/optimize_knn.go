@@ -91,9 +91,9 @@ func (o *OptimizeVR) Finish() error {
 						return
 					}
 
-					// update the vector index size as a meta value in the segment snapshot
+					// cache the vector index size for memory accounting
 					vectorIndexSize := vecIndex.Size()
-					origSeg.cachedMeta.updateMeta(field, vectorIndexSize)
+					origSeg.cachedMeta.storeMeta(field, vectorIndexSize)
 					for _, vr := range vrs {
 						var pl segment_api.VecPostingsList
 						var err error

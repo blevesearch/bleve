@@ -350,34 +350,29 @@ func (c *cachedDocs) visitDoc(localDocNum uint64,
 	c.m.RUnlock()
 }
 
-// the purpose of the cachedMeta is to simply allow the user of this type to record
-// and cache certain meta data information (specific to the segment) that can be
-// used across calls to save compute on the same.
-// for example searcher creations on the same index snapshot can use this struct
-// to help and fetch the backing index size information which can be used in
-// memory usage calculation thereby deciding whether to allow a query or not.
+// cachedMeta is a simple wrapper around sync.Map to provide typed
+// access to cached metadata values for segments.
 type cachedMeta struct {
-	m    sync.RWMutex
-	meta map[string]interface{}
+	meta sync.Map
 }
 
-func (c *cachedMeta) updateMeta(field string, val interface{}) {
-	c.m.Lock()
-	if c.meta == nil {
-		c.meta = make(map[string]interface{})
+func newCachedMeta() *cachedMeta {
+	return &cachedMeta{
+		meta: sync.Map{},
 	}
-	c.meta[field] = val
-	c.m.Unlock()
 }
 
+// store the value for a field if the field is not already present in the cache.
+func (c *cachedMeta) storeMeta(field string, val interface{}) {
+	c.meta.LoadOrStore(field, val)
+}
+
+// fetch the value for a field from the cache, returns nil if the field is not present in the cache.
 func (c *cachedMeta) fetchMeta(field string) (rv interface{}) {
-	c.m.RLock()
-	defer c.m.RUnlock()
-	if c.meta == nil {
-		return nil
+	if val, ok := c.meta.Load(field); ok {
+		return val
 	}
-	rv = c.meta[field]
-	return rv
+	return nil
 }
 
 func (s *SegmentSnapshot) Ancestors(docNum uint64, prealloc []index.AncestorID) []index.AncestorID {
