@@ -35,9 +35,6 @@ type OptimizeVR struct {
 	vrs map[string][]*IndexSnapshotVectorReader
 }
 
-// This setting _MUST_ only be changed during init and not after.
-var BleveMaxKNNConcurrency = 10
-
 func (o *OptimizeVR) invokeSearcherEndCallback() {
 	if o.ctx != nil {
 		if cb := o.ctx.Value(search.SearcherEndCallbackKey); cb != nil {
@@ -53,21 +50,21 @@ func (o *OptimizeVR) invokeSearcherEndCallback() {
 	}
 }
 
-// searchSegment runs the configured kNN searches for every vector
+// search runs the configured kNN searches for every vector
 // reader against a single segment, populating the per-segment postings and
 // iterators on each reader.
-func (o *OptimizeVR) searchSegment(segIdx int) error {
-	seg := o.snapshot.segment[segIdx]
-	vecSeg, ok := seg.segment.(segment_api.VectorSegment)
+func (o *OptimizeVR) search(segID int) error {
+	snapshot := o.snapshot.segment[segID]
+	vecSeg, ok := snapshot.segment.(segment_api.VectorSegment)
 	if !ok {
 		return nil
 	}
-	meta := seg.cachedMeta
+	meta := snapshot.cachedMeta
 	for field, vrs := range o.vrs {
 		if info, ok := o.snapshot.updatedFields[field]; ok && (info.Deleted || info.Index) {
 			continue
 		}
-		vecIndex, err := vecSeg.InterpretVectorIndex(field, seg.deleted)
+		vecIndex, err := vecSeg.InterpretVectorIndex(field, snapshot.deleted)
 		if err != nil {
 			return err
 		}
@@ -81,7 +78,7 @@ func (o *OptimizeVR) searchSegment(segIdx int) error {
 				pl, searchErr = vecIndex.SearchWithFilter(
 					vr.vector,
 					vr.k,
-					vr.eligibleSelector.SegmentEligibleDocuments(segIdx),
+					vr.eligibleSelector.SegmentEligibleDocuments(segID),
 					vr.searchParams,
 				)
 			} else {
@@ -95,8 +92,8 @@ func (o *OptimizeVR) searchSegment(segIdx int) error {
 				vecIndex.Close()
 				return searchErr
 			}
-			vr.postings[segIdx] = pl
-			vr.iterators[segIdx] = pl.Iterator(vr.iterators[segIdx])
+			vr.postings[segID] = pl
+			vr.iterators[segID] = pl.Iterator(vr.iterators[segID])
 		}
 		go vecIndex.Close()
 	}
@@ -109,21 +106,22 @@ func (o *OptimizeVR) Finish() error {
 	// by passing the obtained vector index and getting similar vectors.
 	defer o.invokeSearcherEndCallback()
 
-	var wg sync.WaitGroup
-	errCh := make(chan error, len(o.snapshot.segment))
+	numSegments := len(o.snapshot.segment)
 
-	for i, seg := range o.snapshot.segment {
-		if _, ok := seg.segment.(segment_api.VectorSegment); !ok {
-			continue
-		}
-		wg.Add(1)
-		go func(segIdx int) {
+	var wg sync.WaitGroup
+	wg.Add(numSegments)
+
+	errCh := make(chan error, numSegments)
+
+	for i := range o.snapshot.segment {
+		go func(segID int) {
 			defer wg.Done()
-			if err := o.searchSegment(segIdx); err != nil {
+			if err := o.search(segID); err != nil {
 				errCh <- err
 			}
 		}(i)
 	}
+
 	wg.Wait()
 	close(errCh)
 
@@ -132,6 +130,7 @@ func (o *OptimizeVR) Finish() error {
 			return err
 		}
 	}
+
 	return nil
 }
 
