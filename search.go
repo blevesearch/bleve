@@ -360,7 +360,7 @@ func (r *SearchRequest) Validate() error {
 			return fmt.Errorf("cannot use search after or search before with score fusion")
 		}
 
-		if r.Sort != nil {
+		if len(r.Sort) > 0 {
 			if !reflect.DeepEqual(r.Sort, AllowedFusionSort) {
 				return fmt.Errorf("sort must be empty or descending order of score for score fusion")
 			}
