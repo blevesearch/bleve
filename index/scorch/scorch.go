@@ -1354,6 +1354,13 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 		return err
 	}
 
+	if s.trainer != nil {
+		err := s.trainer.removeFileWriterIDs(ids)
+		if err != nil {
+			return err
+		}
+	}
+
 	s.rootLock.Lock()
 	// create a done channel to ensure success of merge
 	ctx := context.Background()

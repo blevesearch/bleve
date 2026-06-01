@@ -429,3 +429,40 @@ func (t *vectorTrainer) updateBolt(snapshotsBucket *util.BoltBucketImpl, key []b
 
 	return nil
 }
+
+func (t *vectorTrainer) removeFileWriterIDs(ids map[string]struct{}) error {
+	t.m.Lock()
+	defer t.m.Unlock()
+	path := filepath.Join(t.parent.path, index.TrainedIndexFileName)
+	writer, err := util.NewFileWriter([]byte(path))
+	if err != nil {
+		return err
+	}
+
+	if encryptedIndex, ok := t.trainedIndex.segment.(segment.SegmentWithCallbacks); ok {
+		if _, ok := ids[encryptedIndex.CallbackId()]; ok {
+
+			_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.trainedIndex.segment},
+				[]*roaring.Bitmap{nil, nil}, path+".tmp", t.parent.closeCh, nil, t.config)
+			if err != nil {
+				return err
+			}
+
+			// todo: handle removeFileWriterIDs call happens during training
+			t.trainedIndex.segment.Close()
+			if err = moveFile(path+".tmp", path); err != nil {
+				return err
+			}
+
+			trainedIndex, err := t.parent.segPlugin.OpenUsing(path, t.config)
+			if err != nil {
+				return err
+			}
+
+			t.m.Lock()
+			t.trainedIndex = &SegmentSnapshot{segment: trainedIndex}
+			t.m.Unlock()
+
+		}
+	}
+}
