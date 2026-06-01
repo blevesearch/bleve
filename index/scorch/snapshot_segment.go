@@ -350,34 +350,33 @@ func (c *cachedDocs) visitDoc(localDocNum uint64,
 	c.m.RUnlock()
 }
 
-// the purpose of the cachedMeta is to simply allow the user of this type to record
-// and cache certain meta data information (specific to the segment) that can be
-// used across calls to save compute on the same.
-// for example searcher creations on the same index snapshot can use this struct
-// to help and fetch the backing index size information which can be used in
-// memory usage calculation thereby deciding whether to allow a query or not.
+// cachedMeta is a simple wrapper around sync.Map to provide typed
+// access to cached metadata values for segments.
 type cachedMeta struct {
-	m    sync.RWMutex
-	meta map[string]interface{}
+	meta sync.Map
 }
 
-func (c *cachedMeta) updateMeta(field string, val interface{}) {
-	c.m.Lock()
-	if c.meta == nil {
-		c.meta = make(map[string]interface{})
+func newCachedMeta() *cachedMeta {
+	return &cachedMeta{
+		meta: sync.Map{},
 	}
-	c.meta[field] = val
-	c.m.Unlock()
 }
 
-func (c *cachedMeta) fetchMeta(field string) (rv interface{}) {
-	c.m.RLock()
-	defer c.m.RUnlock()
-	if c.meta == nil {
-		return nil
-	}
-	rv = c.meta[field]
-	return rv
+// store the value for a field in the cache, overwriting any existing value.
+func (c *cachedMeta) store(field string, val interface{}) {
+	c.meta.Store(field, val)
+}
+
+// load the value for a field from the cache, returning the value
+// and a boolean indicating whether the value was present.
+func (c *cachedMeta) load(field string) (rv interface{}, ok bool) {
+	return c.meta.Load(field)
+}
+
+// contains reports whether the cache has an entry for the given field.
+func (c *cachedMeta) contains(field string) bool {
+	_, ok := c.meta.Load(field)
+	return ok
 }
 
 func (s *SegmentSnapshot) Ancestors(docNum uint64, prealloc []index.AncestorID) []index.AncestorID {

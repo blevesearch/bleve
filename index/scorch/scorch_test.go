@@ -3571,7 +3571,7 @@ func makeSegmentSnapshot(id uint64, seg segment.Segment) *SegmentSnapshot {
 		id:         id,
 		segment:    seg,
 		cachedDocs: &cachedDocs{cache: nil},
-		cachedMeta: &cachedMeta{meta: nil},
+		cachedMeta: newCachedMeta(),
 	}
 }
 
