@@ -367,7 +367,8 @@ func (c *cachedMeta) store(field string, val interface{}) {
 	c.meta.Store(field, val)
 }
 
-// fetch the value for a field from the cache, returns nil if the field is not present in the cache.
+// load the value for a field from the cache, returning the value
+// and a boolean indicating whether the value was present.
 func (c *cachedMeta) load(field string) (rv interface{}, ok bool) {
 	return c.meta.Load(field)
 }
