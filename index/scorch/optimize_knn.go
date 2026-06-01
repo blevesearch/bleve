@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
@@ -35,9 +34,6 @@ type OptimizeVR struct {
 	// maps field to vector readers
 	vrs map[string][]*IndexSnapshotVectorReader
 }
-
-// This setting _MUST_ only be changed during init and not after.
-var BleveMaxKNNConcurrency = 10
 
 func (o *OptimizeVR) invokeSearcherEndCallback() {
 	if o.ctx != nil {
@@ -54,89 +50,94 @@ func (o *OptimizeVR) invokeSearcherEndCallback() {
 	}
 }
 
-func (o *OptimizeVR) Finish() error {
+// search runs the configured kNN searches for every vector
+// reader against a single segment, populating the per-segment postings and
+// iterators on each reader.
+func (o *OptimizeVR) search(segID int) error {
+	snapshot := o.snapshot.segment[segID]
+	vecSeg, ok := snapshot.segment.(segment_api.VectorSegment)
+	if !ok {
+		return nil
+	}
+	meta := snapshot.cachedMeta
 	// for each field, get the vector index --> invoke the zap func.
 	// for each VR, populate postings list and iterators
 	// by passing the obtained vector index and getting similar vectors.
-	// defer close index - just once.
-	var errorsM sync.Mutex
-	var errors []error
-
-	defer o.invokeSearcherEndCallback()
-
-	wg := sync.WaitGroup{}
-	semaphore := make(chan struct{}, BleveMaxKNNConcurrency)
-	// Launch goroutines to get vector index for each segment
-	for i, seg := range o.snapshot.segment {
-		if sv, ok := seg.segment.(segment_api.VectorSegment); ok {
-			wg.Add(1)
-			semaphore <- struct{}{} // Acquire a semaphore slot
-			go func(index int, segment segment_api.VectorSegment, origSeg *SegmentSnapshot) {
-				defer func() {
-					<-semaphore // Release the semaphore slot
-					wg.Done()
-				}()
-				for field, vrs := range o.vrs {
-					// Early exit if the field is supposed to be completely deleted or
-					// if it's index data has been deleted
-					if info, ok := o.snapshot.updatedFields[field]; ok && (info.Deleted || info.Index) {
-						continue
-					}
-
-					vecIndex, err := segment.InterpretVectorIndex(field, origSeg.deleted)
-					if err != nil {
-						errorsM.Lock()
-						errors = append(errors, err)
-						errorsM.Unlock()
-						return
-					}
-
-					// update the vector index size as a meta value in the segment snapshot
-					vectorIndexSize := vecIndex.Size()
-					origSeg.cachedMeta.updateMeta(field, vectorIndexSize)
-					for _, vr := range vrs {
-						var pl segment_api.VecPostingsList
-						var err error
-
-						// for each VR, populate postings list and iterators
-						// by passing the obtained vector index and getting similar vectors.
-
-						// check if the vector reader is configured to use a pre-filter
-						// to filter out ineligible documents before performing
-						// kNN search.
-						if vr.eligibleSelector != nil {
-							pl, err = vecIndex.SearchWithFilter(vr.vector, vr.k,
-								vr.eligibleSelector.SegmentEligibleDocuments(index), vr.searchParams)
-						} else {
-							pl, err = vecIndex.Search(vr.vector, vr.k, vr.searchParams)
-						}
-
-						if err != nil {
-							errorsM.Lock()
-							errors = append(errors, err)
-							errorsM.Unlock()
-							go vecIndex.Close()
-							return
-						}
-
-						atomic.AddUint64(&o.snapshot.parent.stats.TotKNNSearches, uint64(1))
-
-						// postings and iterators are already alloc'ed when
-						// IndexSnapshotVectorReader is created
-						vr.postings[index] = pl
-						vr.iterators[index] = pl.Iterator(vr.iterators[index])
-					}
-					go vecIndex.Close()
-				}
-			}(i, sv, seg)
+	for field, vrs := range o.vrs {
+		// Early exit if the field is supposed to be completely deleted or
+		// if it's index data has been deleted
+		if info, ok := o.snapshot.updatedFields[field]; ok && (info.Deleted || info.Index) {
+			continue
 		}
-	}
-	wg.Wait()
-	close(semaphore)
-	if len(errors) > 0 {
-		return errors[0]
+		vecIndex, err := vecSeg.InterpretVectorIndex(field, snapshot.deleted)
+		if err != nil {
+			return err
+		}
+		// update the vector index size as a meta value in the segment snapshot
+		// if not already present
+		if !meta.contains(field) {
+			meta.store(field, vecIndex.Size())
+		}
+		for _, vr := range vrs {
+			var pl segment_api.VecPostingsList
+			var err error
+			// for each VR, populate postings list and iterators
+			// by passing the obtained vector index and getting similar vectors.
+
+			// check if the vector reader is configured to use a pre-filter
+			// to filter out ineligible documents before performing
+			// kNN search.
+			if vr.eligibleSelector != nil {
+				pl, err = vecIndex.SearchWithFilter(
+					vr.vector,
+					vr.k,
+					vr.eligibleSelector.SegmentEligibleDocuments(segID),
+					vr.searchParams,
+				)
+			} else {
+				pl, err = vecIndex.Search(
+					vr.vector,
+					vr.k,
+					vr.searchParams,
+				)
+			}
+			if err != nil {
+				vecIndex.Close()
+				return err
+			}
+			// postings and iterators are already alloc'ed when
+			// IndexSnapshotVectorReader is created, here we are just
+			// populating them with the obtained postings list.
+			vr.postings[segID] = pl
+			vr.iterators[segID] = pl.Iterator(vr.iterators[segID])
+		}
+		go vecIndex.Close()
 	}
 	return nil
+}
+
+func (o *OptimizeVR) Finish() error {
+	defer o.invokeSearcherEndCallback()
+	numSegments := len(o.snapshot.segment)
+
+	var wg sync.WaitGroup
+	wg.Add(numSegments)
+	var errM sync.Mutex
+	var searchErr error
+	// launch goroutines to search the vector index for each segment
+	for i := 0; i < numSegments; i++ {
+		go func(segID int) {
+			defer wg.Done()
+			if err := o.search(segID); err != nil {
+				errM.Lock()
+				searchErr = err
+				errM.Unlock()
+			}
+		}(i)
+	}
+	// wait until all the launched goroutines finish and collect errors if any
+	wg.Wait()
+	return searchErr
 }
 
 func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
@@ -173,8 +174,7 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 	// Finish() logic to even occur or not.
 	var sumVectorIndexSize uint64
 	for _, seg := range o.snapshot.segment {
-		vecIndexSize := seg.cachedMeta.fetchMeta(s.field)
-		if vecIndexSize != nil {
+		if vecIndexSize, ok := seg.cachedMeta.load(s.field); ok {
 			sumVectorIndexSize += vecIndexSize.(uint64)
 		}
 	}
