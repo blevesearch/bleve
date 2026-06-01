@@ -122,24 +122,24 @@ func (o *OptimizeVR) Finish() error {
 
 	var wg sync.WaitGroup
 	wg.Add(numSegments)
-	errCh := make(chan error, numSegments)
+	var errM sync.Mutex
+	var searchErr error
 	// launch goroutines to search the vector index for each segment
 	for i := 0; i < numSegments; i++ {
 		go func(segID int) {
 			defer wg.Done()
 			if err := o.search(segID); err != nil {
-				errCh <- err
+				errM.Lock()
+				searchErr = err
+				errM.Unlock()
 			}
 		}(i)
 	}
 	// wait until all the launched goroutines finish and collect errors if any
 	wg.Wait()
-	close(errCh)
-	// report the first error, if any
-	for err := range errCh {
-		if err != nil {
-			return err
-		}
+	// report the error, if any
+	if searchErr != nil {
+		return searchErr
 	}
 
 	return nil
