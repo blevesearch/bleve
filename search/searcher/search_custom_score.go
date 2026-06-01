@@ -42,17 +42,32 @@ type CustomScoreSearcher struct {
 	dvReader    index.DocValueReader
 	indexReader index.IndexReader
 	fieldTypes  map[string]string
+	explain     bool
 }
 
 func NewCustomScoreSearcher(ctx context.Context, s search.Searcher, mutate CustomScoreFunc,
 	dvReader index.DocValueReader, indexReader index.IndexReader,
-	fieldTypes map[string]string) *CustomScoreSearcher {
+	fieldTypes map[string]string, explain bool) *CustomScoreSearcher {
 	return &CustomScoreSearcher{
 		child:       s,
 		mutate:      mutate,
 		dvReader:    dvReader,
 		indexReader: indexReader,
 		fieldTypes:  fieldTypes,
+		explain:     explain,
+	}
+}
+
+// applyScore mutates the score on the hit and, when explain is enabled,
+// replaces the explanation with a single node describing the custom score
+// result.
+func (f *CustomScoreSearcher) applyScore(d *search.DocumentMatch) {
+	d.Score = f.mutate(d)
+	if f.explain {
+		d.Expl = &search.Explanation{
+			Value:   d.Score,
+			Message: "custom_score function result",
+		}
 	}
 }
 
@@ -70,7 +85,7 @@ func (f *CustomScoreSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 		if err = loadDocValuesOnHitWithTypes(next, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
-		next.Score = f.mutate(next)
+		f.applyScore(next)
 	}
 	return next, nil
 }
@@ -84,7 +99,7 @@ func (f *CustomScoreSearcher) Advance(ctx *search.SearchContext, ID index.IndexI
 		if err = loadDocValuesOnHitWithTypes(adv, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
-		adv.Score = f.mutate(adv)
+		f.applyScore(adv)
 	}
 	return adv, nil
 }
