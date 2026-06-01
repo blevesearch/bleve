@@ -137,12 +137,7 @@ func (o *OptimizeVR) Finish() error {
 	}
 	// wait until all the launched goroutines finish and collect errors if any
 	wg.Wait()
-	// report the error, if any
-	if searchErr != nil {
-		return searchErr
-	}
-
-	return nil
+	return searchErr
 }
 
 func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
