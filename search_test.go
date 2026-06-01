@@ -5019,8 +5019,6 @@ func TestCustomScoreQueryExplain(t *testing.T) {
 		t.Fatal("expected at least one hit")
 	}
 
-	fmt.Println(res.Hits)
-
 	for _, hit := range res.Hits {
 		if hit.Expl == nil {
 			t.Fatalf("expected explanation on hit %s but got nil", hit.ID)
