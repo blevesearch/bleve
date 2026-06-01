@@ -60,7 +60,12 @@ func (o *OptimizeVR) search(segID int) error {
 		return nil
 	}
 	meta := snapshot.cachedMeta
+	// for each field, get the vector index --> invoke the zap func.
+	// for each VR, populate postings list and iterators
+	// by passing the obtained vector index and getting similar vectors.
 	for field, vrs := range o.vrs {
+		// Early exit if the field is supposed to be completely deleted or
+		// if it's index data has been deleted
 		if info, ok := o.snapshot.updatedFields[field]; ok && (info.Deleted || info.Index) {
 			continue
 		}
@@ -68,30 +73,41 @@ func (o *OptimizeVR) search(segID int) error {
 		if err != nil {
 			return err
 		}
+		// update the vector index size as a meta value in the segment snapshot
+		// if not already present
 		if !meta.contains(field) {
 			meta.store(field, vecIndex.Size())
 		}
 		for _, vr := range vrs {
 			var pl segment_api.VecPostingsList
-			var searchErr error
+			var err error
+			// for each VR, populate postings list and iterators
+			// by passing the obtained vector index and getting similar vectors.
+
+			// check if the vector reader is configured to use a pre-filter
+			// to filter out ineligible documents before performing
+			// kNN search.
 			if vr.eligibleSelector != nil {
-				pl, searchErr = vecIndex.SearchWithFilter(
+				pl, err = vecIndex.SearchWithFilter(
 					vr.vector,
 					vr.k,
 					vr.eligibleSelector.SegmentEligibleDocuments(segID),
 					vr.searchParams,
 				)
 			} else {
-				pl, searchErr = vecIndex.Search(
+				pl, err = vecIndex.Search(
 					vr.vector,
 					vr.k,
 					vr.searchParams,
 				)
 			}
-			if searchErr != nil {
+			if err != nil {
 				vecIndex.Close()
-				return searchErr
+				return err
 			}
+			// postings and iterators are already alloc'ed when
+			// IndexSnapshotVectorReader is created, here we are just
+			// populating them with the obtained postings list.
 			vr.postings[segID] = pl
 			vr.iterators[segID] = pl.Iterator(vr.iterators[segID])
 		}
@@ -101,19 +117,14 @@ func (o *OptimizeVR) search(segID int) error {
 }
 
 func (o *OptimizeVR) Finish() error {
-	// for each field, get the vector index --> invoke the zap func.
-	// for each VR, populate postings list and iterators
-	// by passing the obtained vector index and getting similar vectors.
 	defer o.invokeSearcherEndCallback()
-
 	numSegments := len(o.snapshot.segment)
 
 	var wg sync.WaitGroup
 	wg.Add(numSegments)
-
 	errCh := make(chan error, numSegments)
-
-	for i := range o.snapshot.segment {
+	// launch goroutines to search the vector index for each segment
+	for i := 0; i < numSegments; i++ {
 		go func(segID int) {
 			defer wg.Done()
 			if err := o.search(segID); err != nil {
@@ -121,10 +132,10 @@ func (o *OptimizeVR) Finish() error {
 			}
 		}(i)
 	}
-
+	// wait until all the launched goroutines finish and collect errors if any
 	wg.Wait()
 	close(errCh)
-
+	// report the first error, if any
 	for err := range errCh {
 		if err != nil {
 			return err
