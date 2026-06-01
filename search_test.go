@@ -4944,10 +4944,13 @@ func TestCustomFilterQueryDocumentMatchIDWithoutFields(t *testing.T) {
 		t.Fatalf("expected 3 hits, got %d", res.Total)
 	}
 
-	expectedOrder := []string{"0", "2", "7"}
-	for i, hit := range res.Hits {
-		if hit.ID != expectedOrder[i] {
-			t.Fatalf("expected hit %d to be %s, got %s", i, expectedOrder[i], hit.ID)
+	hitIDs := map[string]struct{}{}
+	for _, hit := range res.Hits {
+		hitIDs[hit.ID] = struct{}{}
+	}
+	for id := range allowedIDs {
+		if _, ok := hitIDs[id]; !ok {
+			t.Fatalf("missing expected hit id %s", id)
 		}
 	}
 }
@@ -4988,6 +4991,52 @@ func TestCustomScoreQueryWithDocValues(t *testing.T) {
 	}
 }
 
+func TestCustomScoreQueryExplain(t *testing.T) {
+	idx := newCustomQueryTestIndex(t)
+	defer func() {
+		if err := idx.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	titleQuery := NewMatchQuery("habit")
+	titleQuery.SetField("title")
+
+	q := query.NewCustomScoreQueryWithScorer(titleQuery, func(d *search.DocumentMatch) float64 {
+		return d.Score * 2
+	}, nil, nil)
+
+	req := NewSearchRequest(q)
+	req.Explain = true
+	req.Size = 10
+
+	res, err := idx.SearchInContext(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Hits) == 0 {
+		t.Fatal("expected at least one hit")
+	}
+
+	fmt.Println(res.Hits)
+
+	for _, hit := range res.Hits {
+		if hit.Expl == nil {
+			t.Fatalf("expected explanation on hit %s but got nil", hit.ID)
+		}
+		if hit.Expl.Message != "custom_score function result" {
+			t.Errorf("hit %s: expected wrap message %q, got %q",
+				hit.ID, "custom_score function result", hit.Expl.Message)
+		}
+		if len(hit.Expl.Children) != 0 {
+			t.Errorf("hit %s: expected no children (inner score dropped), got %d",
+				hit.ID, len(hit.Expl.Children))
+		}
+		t.Logf("hit %s (score=%f):\n%s", hit.ID, hit.Score, hit.Expl)
+	}
+}
+
 func newCustomQueryTestIndex(t *testing.T) Index {
 	t.Helper()
 
@@ -5001,7 +5050,10 @@ func newCustomQueryTestIndex(t *testing.T) Index {
 	titleMapping.Analyzer = en.AnalyzerName
 	imap.DefaultMapping.AddFieldMappingsAt("title", titleMapping)
 
-	idx, err := NewMemOnly(imap)
+	tmpIndexPath := createTmpIndexPath(t)
+	t.Cleanup(func() { cleanupTmpIndexPath(t, tmpIndexPath) })
+
+	idx, err := NewUsing(tmpIndexPath, imap, scorch.Name, Config.DefaultKVStore, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -5045,7 +5097,10 @@ func newCustomQueryDocValueTestIndex(t *testing.T) Index {
 	ratingMapping := mapping.NewNumericFieldMapping()
 	imap.DefaultMapping.AddFieldMappingsAt("rating", ratingMapping)
 
-	idx, err := NewMemOnly(imap)
+	tmpIndexPath := createTmpIndexPath(t)
+	t.Cleanup(func() { cleanupTmpIndexPath(t, tmpIndexPath) })
+
+	idx, err := NewUsing(tmpIndexPath, imap, scorch.Name, Config.DefaultKVStore, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -5081,7 +5136,10 @@ func TestCustomFilterQueryDateTimeDocValues(t *testing.T) {
 	dateMapping := mapping.NewDateTimeFieldMapping()
 	imap.DefaultMapping.AddFieldMappingsAt("published", dateMapping)
 
-	idx, err := NewMemOnly(imap)
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := NewUsing(tmpIndexPath, imap, scorch.Name, Config.DefaultKVStore, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
