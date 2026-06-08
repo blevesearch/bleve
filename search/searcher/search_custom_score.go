@@ -30,8 +30,10 @@ func init() {
 	reflectStaticSizeCustomScoreSearcher = int(reflect.TypeOf(sfs).Size())
 }
 
-// CustomScoreFunc defines a function which can mutate document scores.
-type CustomScoreFunc func(d *search.DocumentMatch) float64
+// CustomScoreFunc defines a function which can mutate document scores. A
+// non-nil error aborts the search so the failure can be surfaced to the caller
+// rather than silently falling back to the original score.
+type CustomScoreFunc func(d *search.DocumentMatch) (float64, error)
 
 // CustomScoreSearcher wraps any other searcher, optionally loads doc values
 // into each DocumentMatch, then mutates the score using the supplied
@@ -60,15 +62,21 @@ func NewCustomScoreSearcher(ctx context.Context, s search.Searcher, mutate Custo
 
 // applyScore mutates the score on the hit and, when explain is enabled,
 // replaces the explanation with a single node describing the custom score
-// result.
-func (f *CustomScoreSearcher) applyScore(d *search.DocumentMatch) {
-	d.Score = f.mutate(d)
+// result. A non-nil error from the score function is returned so the caller
+// can abort the search.
+func (f *CustomScoreSearcher) applyScore(d *search.DocumentMatch) error {
+	score, err := f.mutate(d)
+	if err != nil {
+		return err
+	}
+	d.Score = score
 	if f.explain {
 		d.Expl = &search.Explanation{
 			Value:   d.Score,
 			Message: "custom_score function result",
 		}
 	}
+	return nil
 }
 
 func (f *CustomScoreSearcher) Size() int {
@@ -85,7 +93,9 @@ func (f *CustomScoreSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 		if err = loadDocValuesOnHitWithTypes(next, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
-		f.applyScore(next)
+		if err = f.applyScore(next); err != nil {
+			return nil, err
+		}
 	}
 	return next, nil
 }
@@ -99,7 +109,9 @@ func (f *CustomScoreSearcher) Advance(ctx *search.SearchContext, ID index.IndexI
 		if err = loadDocValuesOnHitWithTypes(adv, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
-		f.applyScore(adv)
+		if err = f.applyScore(adv); err != nil {
+			return nil, err
+		}
 	}
 	return adv, nil
 }

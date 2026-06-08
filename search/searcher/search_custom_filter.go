@@ -32,8 +32,10 @@ func init() {
 
 // CustomFilterFunc decides whether a hit (with doc-value fields populated)
 // should be kept. Unlike FilterFunc it does not receive a SearchContext since
-// custom-query callbacks only need the DocumentMatch.
-type CustomFilterFunc func(d *search.DocumentMatch) bool
+// custom-query callbacks only need the DocumentMatch. A non-nil error aborts
+// the search so the failure can be surfaced to the caller rather than silently
+// dropping the hit.
+type CustomFilterFunc func(d *search.DocumentMatch) (bool, error)
 
 // CustomFilterSearcher wraps a child searcher, optionally loads doc values
 // into each DocumentMatch, then applies a CustomFilterFunc to decide whether
@@ -71,7 +73,11 @@ func (f *CustomFilterSearcher) Next(ctx *search.SearchContext) (*search.Document
 		if err = loadDocValuesOnHitWithTypes(next, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
-		if f.accept(next) {
+		keep, ferr := f.accept(next)
+		if ferr != nil {
+			return nil, ferr
+		}
+		if keep {
 			return next, nil
 		}
 		next, err = f.child.Next(ctx)
@@ -90,7 +96,11 @@ func (f *CustomFilterSearcher) Advance(ctx *search.SearchContext, ID index.Index
 	if err = loadDocValuesOnHitWithTypes(adv, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 		return nil, err
 	}
-	if f.accept(adv) {
+	keep, ferr := f.accept(adv)
+	if ferr != nil {
+		return nil, ferr
+	}
+	if keep {
 		return adv, nil
 	}
 	return f.Next(ctx)
