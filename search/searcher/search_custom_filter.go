@@ -80,6 +80,7 @@ func (f *CustomFilterSearcher) Next(ctx *search.SearchContext) (*search.Document
 		if keep {
 			return next, nil
 		}
+		ctx.DocumentMatchPool.Put(next)
 		next, err = f.child.Next(ctx)
 	}
 	return nil, err
@@ -103,6 +104,7 @@ func (f *CustomFilterSearcher) Advance(ctx *search.SearchContext, ID index.Index
 	if keep {
 		return adv, nil
 	}
+	ctx.DocumentMatchPool.Put(adv)
 	return f.Next(ctx)
 }
 
