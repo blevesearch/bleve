@@ -284,3 +284,48 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 	}
 	return rv
 }
+
+// ScoreInto fills rv.Score (and term vectors if present) from tfd without
+// allocating from the pool or building explanations.  Used by the MAXSCORE
+// lazy-scoring path: pre-fetched docIDs are scored only after passing the WAND
+// threshold, skipping BM25 for pruned candidates.
+func (s *TermQueryScorer) ScoreInto(tfd *index.TermFieldDoc, rv *search.DocumentMatch) {
+	if s.includeScore {
+		var tf float64
+		if tfd.Freq < MaxSqrtCache {
+			tf = SqrtCache[int(tfd.Freq)]
+		} else {
+			tf = math.Sqrt(float64(tfd.Freq))
+		}
+		score, _ := s.docScore(tf, tfd.Norm)
+		if s.queryWeight != 1.0 {
+			score *= s.queryWeight
+		}
+		rv.Score = score
+	}
+	if len(tfd.Vectors) > 0 {
+		if cap(rv.FieldTermLocations) < len(tfd.Vectors) {
+			rv.FieldTermLocations = make([]search.FieldTermLocation, 0, len(tfd.Vectors))
+		}
+		for _, v := range tfd.Vectors {
+			var ap search.ArrayPositions
+			if len(v.ArrayPositions) > 0 {
+				n := len(rv.FieldTermLocations)
+				if n < cap(rv.FieldTermLocations) {
+					ap = rv.FieldTermLocations[:n+1][n].Location.ArrayPositions[:0]
+				}
+				ap = append(ap, v.ArrayPositions...)
+			}
+			rv.FieldTermLocations = append(rv.FieldTermLocations, search.FieldTermLocation{
+				Field: v.Field,
+				Term:  s.queryTerm,
+				Location: search.Location{
+					Pos:            v.Pos,
+					Start:          v.Start,
+					End:            v.End,
+					ArrayPositions: ap,
+				},
+			})
+		}
+	}
+}
