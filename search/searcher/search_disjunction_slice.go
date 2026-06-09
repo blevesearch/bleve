@@ -607,10 +607,11 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 						continue
 					}
 					if s.segSkippers[si].SegmentIndexOf(curr.IndexInternalID) < nextSeg {
-						ctx.DocumentMatchPool.Put(curr)
 						if lazy {
+							ctx.DocumentMatchPool.PutLazy(curr)
 							s.currs[si], err = s.lazySearchers[si].advanceDocIDOnly(ctx, skipTo)
 						} else {
+							ctx.DocumentMatchPool.Put(curr)
 							s.currs[si], err = s.searchers[si].Advance(ctx, skipTo)
 						}
 						if err != nil {
@@ -624,13 +625,16 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 
 		// Advance non-essential iterators to minID so they can contribute
 		// bonus score if they happen to match this candidate.
+		// In the lazy path, these docs have only IndexInternalID set (never scored),
+		// so PutLazy (zeros IndexInternalID+Score) avoids the full Reset overhead.
 		for _, si := range s.maxscoreOrder[:s.pivotIdx] {
 			curr := s.currs[si]
 			if curr != nil && len(curr.IndexInternalID) == 8 && binary.BigEndian.Uint64(curr.IndexInternalID) < minIDVal {
-				ctx.DocumentMatchPool.Put(curr)
 				if lazy {
+					ctx.DocumentMatchPool.PutLazy(curr)
 					s.currs[si], err = s.lazySearchers[si].advanceDocIDOnly(ctx, minID)
 				} else {
+					ctx.DocumentMatchPool.Put(curr)
 					s.currs[si], err = s.searchers[si].Advance(ctx, minID)
 				}
 				if err != nil {
@@ -682,10 +686,18 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 		// = constituents[0] = s.currs[si_ne] for the non-essential that matched).
 		// Put calls dm.Reset() which sets IndexInternalID = IndexInternalID[:0],
 		// zeroing the len field and corrupting the heap entry.
+		//
+		// In the lazy path, non-rv matched docs have at most IndexInternalID + Score
+		// set (Score only when scoreCurrentDoc was called, i.e. rv != nil).
+		// PutLazy (zeros both fields) is sufficient and avoids the full Reset.
 		for i, curr := range s.currs {
 			if curr != nil && len(curr.IndexInternalID) == 8 && binary.BigEndian.Uint64(curr.IndexInternalID) == minIDVal {
 				if curr != rv {
-					ctx.DocumentMatchPool.Put(curr)
+					if lazy {
+						ctx.DocumentMatchPool.PutLazy(curr)
+					} else {
+						ctx.DocumentMatchPool.Put(curr)
+					}
 				}
 				if lazy {
 					s.currs[i], err = s.lazySearchers[i].nextDocIDOnly(ctx)
