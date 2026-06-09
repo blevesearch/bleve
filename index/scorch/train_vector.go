@@ -183,8 +183,8 @@ func (t *vectorTrainer) trainLoop() {
 				}
 			} else {
 				// merge the new segment with the existing one into a .tmp file, then
-				// atomically rename it into place (Os.Open on the live path is unsafe
-				// during the merge).
+				// rename it into place (Os.Open on the live path is unsafe
+				// during the merge)
 				_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.trainedIndex.segment, sampleSeg},
 					[]*roaring.Bitmap{nil, nil}, path+".tmp", t.parent.closeCh, nil, t.config)
 				if err != nil {
@@ -329,7 +329,6 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	// is complete, the template will be used for other operations down the line
 	// like merge and search.
 	//
-	// note: this might index text data too, how to handle this? s.segmentConfig?
 	// todo: updates/deletes -> data drift detection
 	if len(trainData) > 0 {
 		trainReq.sample, _, err = t.parent.segPlugin.NewUsing(trainData, config)

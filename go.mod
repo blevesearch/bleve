@@ -44,3 +44,17 @@ require (
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 )
+
+replace github.com/blevesearch/zapx/v17 => /Users/thejas.orkombu/fts/blevesearch/zapx
+
+replace github.com/blevesearch/zapx/v16 => /Users/thejas.orkombu/fts/blevesearch/zapx16
+
+replace github.com/blevesearch/zapx/v15 => /Users/thejas.orkombu/fts/blevesearch/zapx15
+
+replace github.com/blevesearch/zapx/v14 => /Users/thejas.orkombu/fts/blevesearch/zapx14
+
+replace github.com/blevesearch/zapx/v13 => /Users/thejas.orkombu/fts/blevesearch/zapx13
+
+replace github.com/blevesearch/zapx/v12 => /Users/thejas.orkombu/fts/blevesearch/zapx12
+
+replace github.com/blevesearch/zapx/v11 => /Users/thejas.orkombu/fts/blevesearch/zapx11

@@ -850,6 +850,10 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 			m["field:"+fieldName+":"+statName] = val
 		}
 	}
+
+	// these stats are the segment level stats captured throughout the index lifecycle
+	zapStats := s.segPlugin.StatsMap()
+	m["segment_stats"] = zapStats
 	return m
 }
 
