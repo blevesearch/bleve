@@ -121,8 +121,17 @@ type DisjunctionSliceSearcher struct {
 	// value the SegmentIndexOf call (a sort.Search) is skipped entirely.
 	minSegCeiling float64
 
-	// segSkipBuf is reused storage for FirstDocIDOfSegment calls.
+	// segSkipBuf is reused storage for FirstDocIDOfSegment calls (actual skips).
 	segSkipBuf [8]byte
+
+	// §15 segment boundary cache: avoids calling SegmentIndexOf (sort.Search)
+	// on every candidate.  When minIDVal is within [cachedSegStart, cachedSegEnd)
+	// the cached segIdx is reused directly.  Invalidated (cachedSegEnd = 0) when
+	// §15 is initialized so the first call always refreshes the cache.
+	cachedSegIdx   int
+	cachedSegStart uint64
+	cachedSegEnd   uint64 // exclusive; math.MaxUint64 for the last segment
+	segCacheBuf    [8]byte
 
 	// lazySearchers is non-nil when all sub-searchers support deferred BM25
 	// scoring (§9).  When set, nextMAXSCORE pre-fetches docIDs cheaply and
@@ -367,6 +376,7 @@ func (s *DisjunctionSliceSearcher) initWANDMaxImpacts() {
 		s.segSkippers = skippers
 		s.segCeilings = ceilings
 		s.minSegCeiling = minCeil
+		s.cachedSegEnd = 0 // invalidate §15 segment cache; force refresh on first use
 	}
 
 	// §9: Populate lazySearchers if all sub-searchers support deferred BM25 scoring.
@@ -442,6 +452,7 @@ func (s *DisjunctionSliceSearcher) SetQueryNorm(qnorm float64) {
 	s.segSkippers = nil
 	s.segCeilings = nil
 	s.minSegCeiling = 0
+	s.cachedSegEnd = 0
 	for _, searcher := range s.searchers {
 		searcher.SetQueryNorm(qnorm)
 	}
@@ -586,12 +597,29 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 		// all essential iterators to the first document of the next eligible segment.
 		// Guard: only call SegmentIndexOf (a sort.Search) when the threshold is high
 		// enough that at least one segment could be skipped (threshold ≥ minSegCeiling).
-		if s.segCeilings != nil && ctx.ScoreThreshold >= s.minSegCeiling {
-			segIdx := s.segSkippers[0].SegmentIndexOf(minID)
-			if s.segCeilings[segIdx] <= ctx.ScoreThreshold {
+		// Segment cache: SegmentIndexOf is O(log numSegs) per call.  Cache the last
+		// result's bounds so we only call it when minIDVal crosses a segment boundary
+		// (~15 calls per query instead of once per candidate doc).
+		if s.segCeilings != nil && threshold >= s.minSegCeiling {
+			segIdx := s.cachedSegIdx
+			if minIDVal < s.cachedSegStart || minIDVal >= s.cachedSegEnd {
+				segIdx = s.segSkippers[0].SegmentIndexOf(minID)
+				s.cachedSegIdx = segIdx
+				segStart := s.segSkippers[0].FirstDocIDOfSegment(segIdx, s.segCacheBuf[:])
+				if len(segStart) == 8 {
+					s.cachedSegStart = binary.BigEndian.Uint64(segStart)
+				}
+				segEnd := s.segSkippers[0].FirstDocIDOfSegment(segIdx+1, s.segCacheBuf[:])
+				if len(segEnd) == 8 {
+					s.cachedSegEnd = binary.BigEndian.Uint64(segEnd)
+				} else {
+					s.cachedSegEnd = math.MaxUint64
+				}
+			}
+			if s.segCeilings[segIdx] <= threshold {
 				// Find the first segment whose ceiling exceeds the threshold.
 				nextSeg := segIdx + 1
-				for nextSeg < len(s.segCeilings) && s.segCeilings[nextSeg] <= ctx.ScoreThreshold {
+				for nextSeg < len(s.segCeilings) && s.segCeilings[nextSeg] <= threshold {
 					nextSeg++
 				}
 				if nextSeg >= len(s.segCeilings) {
