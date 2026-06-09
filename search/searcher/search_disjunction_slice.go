@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"sort"
 
+
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/scorer"
 	"github.com/blevesearch/bleve/v2/size"
@@ -47,7 +48,42 @@ type DisjunctionSliceSearcher struct {
 	matchingIdxs           []int
 	initialized            bool
 	bytesRead              uint64
+
+	// wandMaxImpacts holds the per-sub-searcher MaxImpact() value, computed
+	// once in initWANDMaxImpacts() and reused for every candidate.
+	//
+	// Without this cache wandAboveThreshold paid a Go type-assertion plus an
+	// interface dispatch per matching term per candidate (~7 ns each), even
+	// though MaxImpact() is constant for the lifetime of a query.
+	//
+	// Nil = not yet initialised.  Non-nil but zero-length
+	// (wandUnavailableImpacts) = WAND cannot be applied for this query
+	// (non-BM25 scorer, or at least one term returned math.MaxFloat64).
+	//
+	// See zapx/inverted_text_cache.go for the full cache-hierarchy diagram.
+	//
+	// FUTURE optimisations considered but not yet implemented:
+	//   1. Snapshot-level maxTFNorm cache: IndexSnapshotTermFieldReader.MaxTFNorm
+	//      currently iterates N segments per term per query.  Caching the
+	//      cross-segment max on IndexSnapshot would cut initWANDMaxImpacts from
+	//      ~900 ns to ~30 ns for a 3-term/15-segment query.
+	//   2. Block-max WAND (Lucene ImpactsDISI): store max-impact per 128-doc
+	//      block in the posting list; skip entire blocks when block_max <
+	//      threshold rather than checking every doc.  Requires format change.
+	//   3. Sort sub-searchers by MaxImpact DESC: current sort is by DF (Count)
+	//      for iterator-alignment efficiency; WAND early-exit in the hot loop
+	//      benefits from highest-impact term first.  A separate WAND-order
+	//      index over matchingIdxs could give both without changing iteration.
+	//   4. res.Total accuracy: pruned candidates are not counted in
+	//      ctx.Collector's total, mirroring Lucene's approximate-total mode.
+	//      A TotalRelation field on SearchResult should expose this
+	//      (symmetric with the existing Total field name).
+	wandMaxImpacts []float64
 }
+
+// wandUnavailableImpacts is a non-nil zero-length sentinel stored in
+// wandMaxImpacts when WAND cannot be applied for the current query.
+var wandUnavailableImpacts = make([]float64, 0)
 
 func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
@@ -194,6 +230,57 @@ func (s *DisjunctionSliceSearcher) updateMatches() error {
 	return nil
 }
 
+// wandImpacter is the optional interface implemented by TermSearcher.
+type wandImpacter interface {
+	MaxImpact() float64
+}
+
+// initWANDMaxImpacts pre-computes each searcher's MaxImpact() into the
+// wandMaxImpacts slice so the per-candidate hot path only does array reads
+// and float additions with no interface dispatch or type assertions.
+// Sets wandMaxImpacts to wandUnavailableImpacts if WAND cannot be applied.
+func (s *DisjunctionSliceSearcher) initWANDMaxImpacts() {
+	mi := make([]float64, len(s.searchers))
+	for i, searcher := range s.searchers {
+		wi, ok := searcher.(wandImpacter)
+		if !ok {
+			s.wandMaxImpacts = wandUnavailableImpacts
+			return
+		}
+		v := wi.MaxImpact()
+		if v >= math.MaxFloat64 {
+			s.wandMaxImpacts = wandUnavailableImpacts
+			return
+		}
+		mi[i] = v
+	}
+	s.wandMaxImpacts = mi
+}
+
+// wandAboveThreshold returns true if the current candidate should be scored.
+// Returns false when ctx.ScoreThreshold > 0 AND the sum of per-term
+// MaxImpact values for the matching terms is ≤ the threshold — the candidate
+// cannot improve the top-k heap regardless of its actual score.
+// Returns true whenever the bound cannot be computed (non-BM25, etc.).
+func (s *DisjunctionSliceSearcher) wandAboveThreshold(ctx *search.SearchContext) bool {
+	threshold := ctx.ScoreThreshold
+	if threshold <= 0 {
+		return true
+	}
+	if s.wandMaxImpacts == nil {
+		s.initWANDMaxImpacts()
+	}
+	mi := s.wandMaxImpacts
+	if len(mi) == 0 {
+		return true // WAND unavailable for this query
+	}
+	var upperBound float64
+	for _, i := range s.matchingIdxs {
+		upperBound += mi[i]
+	}
+	return upperBound > threshold
+}
+
 func (s *DisjunctionSliceSearcher) Weight() float64 {
 	var rv float64
 	for _, searcher := range s.searchers {
@@ -203,6 +290,7 @@ func (s *DisjunctionSliceSearcher) Weight() float64 {
 }
 
 func (s *DisjunctionSliceSearcher) SetQueryNorm(qnorm float64) {
+	s.wandMaxImpacts = nil // invalidate: MaxImpact depends on queryNorm
 	for _, searcher := range s.searchers {
 		searcher.SetQueryNorm(qnorm)
 	}
@@ -223,14 +311,20 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 	found := false
 	for !found && len(s.matching) > 0 {
 		if len(s.matching) >= s.min {
-			found = true
-			if s.retrieveScoreBreakdown {
-				// just return score and expl breakdown here, since it is a disjunction over knn searchers,
-				// and the final score and expl is calculated in the knn collector
-				rv = s.scorer.ScoreAndExplBreakdown(ctx, s.matching, s.matchingIdxs, s.originalPos, s.numSearchers)
+			// WAND / MaxScore pruning: if the sum of the per-term score
+			// upper bounds for the matching terms is ≤ the current heap
+			// threshold, this candidate cannot improve the result set.
+			// Skip it by not scoring and letting the advance loop below
+			// move the iterators to the next candidate.
+			if !s.wandAboveThreshold(ctx) {
+				// discard match objects; advance happens below
 			} else {
-				// score this match
-				rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
+				found = true
+				if s.retrieveScoreBreakdown {
+					rv = s.scorer.ScoreAndExplBreakdown(ctx, s.matching, s.matchingIdxs, s.originalPos, s.numSearchers)
+				} else {
+					rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
+				}
 			}
 		}
 
