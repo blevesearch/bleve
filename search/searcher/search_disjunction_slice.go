@@ -20,7 +20,6 @@ import (
 	"reflect"
 	"sort"
 
-
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/scorer"
 	"github.com/blevesearch/bleve/v2/size"
@@ -70,15 +69,40 @@ type DisjunctionSliceSearcher struct {
 	//   2. Block-max WAND (Lucene ImpactsDISI): store max-impact per 128-doc
 	//      block in the posting list; skip entire blocks when block_max <
 	//      threshold rather than checking every doc.  Requires format change.
-	//   3. Sort sub-searchers by MaxImpact DESC: current sort is by DF (Count)
-	//      for iterator-alignment efficiency; WAND early-exit in the hot loop
-	//      benefits from highest-impact term first.  A separate WAND-order
-	//      index over matchingIdxs could give both without changing iteration.
-	//   4. res.Total accuracy: pruned candidates are not counted in
+	//   3. res.Total accuracy: pruned candidates are not counted in
 	//      ctx.Collector's total, mirroring Lucene's approximate-total mode.
 	//      A TotalRelation field on SearchResult should expose this
 	//      (symmetric with the existing Total field name).
 	wandMaxImpacts []float64
+
+	// maxscoreOrder is an argsort of wandMaxImpacts ascending (lowest MaxImpact
+	// first).  maxscoreOrder[i] is an index into s.searchers / s.currs /
+	// s.wandMaxImpacts.
+	//
+	// Non-nil only when wandMaxImpacts is also non-nil and non-empty.
+	// Populated by initWANDMaxImpacts alongside wandMaxImpacts.
+	maxscoreOrder []int
+
+	// pivotIdx is the first index in maxscoreOrder whose suffix-sum of
+	// MaxImpact values exceeds ctx.ScoreThreshold.  Searchers at indices
+	// maxscoreOrder[pivotIdx:] are *essential* (drive candidate generation);
+	// those at maxscoreOrder[:pivotIdx] are *non-essential* (only checked for
+	// bonus score contribution).
+	//
+	//   pivotIdx == 0               → all terms essential; falls back to WAND
+	//   pivotIdx == len(searchers)  → no terms essential; nothing can beat
+	//                                  threshold; return nil immediately
+	//
+	// Recomputed by computeMAXSCOREPivot whenever ctx.ScoreThreshold changes.
+	pivotIdx      int
+	lastThreshold float64 // threshold value when pivotIdx was last computed
+
+	// minIDBuf holds the minimum essential docID for the current MAXSCORE
+	// iteration.  Kept as a struct field (not a local variable) so that
+	// minID = minIDBuf[:8] does NOT escape to the heap — a local [8]byte
+	// that's sliced and passed to an interface method triggers escape analysis
+	// and allocates once per candidate.
+	minIDBuf [8]byte
 }
 
 // wandUnavailableImpacts is a non-nil zero-length sentinel stored in
@@ -238,6 +262,7 @@ type wandImpacter interface {
 // initWANDMaxImpacts pre-computes each searcher's MaxImpact() into the
 // wandMaxImpacts slice so the per-candidate hot path only does array reads
 // and float additions with no interface dispatch or type assertions.
+// Also builds maxscoreOrder (argsort of wandMaxImpacts ascending) for MAXSCORE.
 // Sets wandMaxImpacts to wandUnavailableImpacts if WAND cannot be applied.
 func (s *DisjunctionSliceSearcher) initWANDMaxImpacts() {
 	mi := make([]float64, len(s.searchers))
@@ -255,6 +280,36 @@ func (s *DisjunctionSliceSearcher) initWANDMaxImpacts() {
 		mi[i] = v
 	}
 	s.wandMaxImpacts = mi
+
+	// Build argsort for MAXSCORE: indices sorted by MaxImpact ascending.
+	order := make([]int, len(s.searchers))
+	for i := range order {
+		order[i] = i
+	}
+	sort.Slice(order, func(a, b int) bool {
+		return mi[order[a]] < mi[order[b]]
+	})
+	s.maxscoreOrder = order
+	s.pivotIdx = 0
+	s.lastThreshold = 0
+}
+
+// computeMAXSCOREPivot sets pivotIdx to the smallest index in maxscoreOrder
+// such that the suffix sum of MaxImpact values from pivotIdx onward exceeds
+// threshold.  If even the sum of all terms doesn't exceed threshold, sets
+// pivotIdx = len(maxscoreOrder) (signal to stop iterating).
+func (s *DisjunctionSliceSearcher) computeMAXSCOREPivot(threshold float64) {
+	s.lastThreshold = threshold
+	n := len(s.maxscoreOrder)
+	var sum float64
+	for i := n - 1; i >= 0; i-- {
+		sum += s.wandMaxImpacts[s.maxscoreOrder[i]]
+		if sum > threshold {
+			s.pivotIdx = i
+			return
+		}
+	}
+	s.pivotIdx = n
 }
 
 // wandAboveThreshold returns true if the current candidate should be scored.
@@ -290,7 +345,10 @@ func (s *DisjunctionSliceSearcher) Weight() float64 {
 }
 
 func (s *DisjunctionSliceSearcher) SetQueryNorm(qnorm float64) {
-	s.wandMaxImpacts = nil // invalidate: MaxImpact depends on queryNorm
+	// Invalidate both caches: MaxImpact and the MAXSCORE sort order depend on queryNorm.
+	s.wandMaxImpacts = nil
+	s.maxscoreOrder = nil
+	s.lastThreshold = 0
 	for _, searcher := range s.searchers {
 		searcher.SetQueryNorm(qnorm)
 	}
@@ -305,19 +363,44 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 			return nil, err
 		}
 	}
+
+	// MAXSCORE: when we have a score threshold and WAND is available, check
+	// whether at least one term is non-essential.  If so, use the MAXSCORE
+	// path which skips Next() calls on non-essential iterators entirely.
+	if ctx.ScoreThreshold > 0 {
+		if s.wandMaxImpacts == nil {
+			s.initWANDMaxImpacts()
+		}
+		if len(s.wandMaxImpacts) > 0 { // WAND available
+			if ctx.ScoreThreshold != s.lastThreshold {
+				s.computeMAXSCOREPivot(ctx.ScoreThreshold)
+			}
+			if s.pivotIdx == len(s.maxscoreOrder) {
+				return nil, nil // no doc can beat threshold
+			}
+			if s.pivotIdx > 0 {
+				return s.nextMAXSCORE(ctx)
+			}
+		}
+	}
+
+	return s.nextBasic(ctx)
+}
+
+// nextBasic is the original Next() loop: advances all matching iterators on
+// every candidate, with a per-candidate WAND upper-bound check.
+func (s *DisjunctionSliceSearcher) nextBasic(ctx *search.SearchContext) (
+	*search.DocumentMatch, error,
+) {
 	var err error
 	var rv *search.DocumentMatch
 
 	found := false
 	for !found && len(s.matching) > 0 {
 		if len(s.matching) >= s.min {
-			// WAND / MaxScore pruning: if the sum of the per-term score
-			// upper bounds for the matching terms is ≤ the current heap
-			// threshold, this candidate cannot improve the result set.
-			// Skip it by not scoring and letting the advance loop below
-			// move the iterators to the next candidate.
+			// WAND pruning: skip scoring when upper bound ≤ threshold.
 			if !s.wandAboveThreshold(ctx) {
-				// discard match objects; advance happens below
+				// discard; advance happens below
 			} else {
 				found = true
 				if s.retrieveScoreBreakdown {
@@ -328,24 +411,120 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 			}
 		}
 
-		// invoke next on all the matching searchers
 		for _, i := range s.matchingIdxs {
-			searcher := s.searchers[i]
 			if s.currs[i] != rv {
 				ctx.DocumentMatchPool.Put(s.currs[i])
 			}
-			s.currs[i], err = searcher.Next(ctx)
+			s.currs[i], err = s.searchers[i].Next(ctx)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		err = s.updateMatches()
-		if err != nil {
+		if err = s.updateMatches(); err != nil {
 			return nil, err
 		}
 	}
 	return rv, nil
+}
+
+// nextMAXSCORE implements the MAXSCORE essential/non-essential partition.
+//
+// Essential terms (maxscoreOrder[pivotIdx:]) drive candidate generation —
+// only their iterators are advanced with Next().  Non-essential terms
+// (maxscoreOrder[:pivotIdx]) are only seeked forward via Advance() to check
+// whether they also match the current essential-term candidate, contributing
+// a bonus to the score.  This eliminates all Next() calls on non-essential
+// iterators between candidates, which is the bulk of the speedup for queries
+// with stopwords or highly asymmetric term weights.
+//
+// Invariant on entry: pivotIdx > 0 (caller checked).
+func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
+	*search.DocumentMatch, error,
+) {
+	var err error
+	// minID is a slice into s.minIDBuf (a struct field, already on the heap).
+	// Using a local [8]byte would escape to the heap every call because the
+	// slice is passed to Advance(), an interface method — see s.minIDBuf doc.
+	var minID index.IndexInternalID
+
+	for {
+		// Find the minimum docID among essential iterators.
+		minID = minID[:0]
+		for _, si := range s.maxscoreOrder[s.pivotIdx:] {
+			curr := s.currs[si]
+			if curr == nil {
+				continue
+			}
+			if len(minID) == 0 || curr.IndexInternalID.Compare(minID) < 0 {
+				n := copy(s.minIDBuf[:], curr.IndexInternalID)
+				minID = s.minIDBuf[:n]
+			}
+		}
+		if len(minID) == 0 {
+			return nil, nil // all essential iterators exhausted
+		}
+
+		// Advance non-essential iterators to minID so they can contribute
+		// bonus score if they happen to match this candidate.
+		for _, si := range s.maxscoreOrder[:s.pivotIdx] {
+			curr := s.currs[si]
+			if curr != nil && curr.IndexInternalID.Compare(minID) < 0 {
+				ctx.DocumentMatchPool.Put(curr)
+				s.currs[si], err = s.searchers[si].Advance(ctx, minID)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		// Collect all terms (essential and non-essential) that match minID.
+		s.matching = s.matching[:0]
+		s.matchingIdxs = s.matchingIdxs[:0]
+		for i, curr := range s.currs {
+			if curr != nil && curr.IndexInternalID.Compare(minID) == 0 {
+				s.matching = append(s.matching, curr)
+				s.matchingIdxs = append(s.matchingIdxs, i)
+			}
+		}
+
+		// Score if we have enough matching terms and the upper bound clears the threshold.
+		var rv *search.DocumentMatch
+		if len(s.matching) >= s.min && s.wandAboveThreshold(ctx) {
+			if s.retrieveScoreBreakdown {
+				rv = s.scorer.ScoreAndExplBreakdown(ctx, s.matching, s.matchingIdxs, s.originalPos, s.numSearchers)
+			} else {
+				rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
+			}
+		}
+
+		// Advance ALL iterators (essential and non-essential) that are at minID.
+		//
+		// Essential iterators at minID are always advanced so the next iteration
+		// picks up fresh candidates beyond minID.
+		//
+		// Non-essential iterators at minID MUST also be advanced here — not lazily
+		// in the next iteration.  The lazy path would call ctx.DocumentMatchPool.Put
+		// on a DocumentMatch that is already in the collector's top-k heap (since rv
+		// = constituents[0] = s.currs[si_ne] for the non-essential that matched).
+		// Put calls dm.Reset() which sets IndexInternalID = IndexInternalID[:0],
+		// zeroing the len field and corrupting the heap entry.
+		for i, curr := range s.currs {
+			if curr != nil && curr.IndexInternalID.Compare(minID) == 0 {
+				if curr != rv {
+					ctx.DocumentMatchPool.Put(curr)
+				}
+				s.currs[i], err = s.searchers[i].Next(ctx)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		if rv != nil {
+			return rv, nil
+		}
+	}
 }
 
 func (s *DisjunctionSliceSearcher) Advance(ctx *search.SearchContext,
