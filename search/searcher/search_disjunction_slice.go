@@ -547,6 +547,14 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 	// lazySearchers is pre-allocated to len(s.searchers); initWANDMaxImpacts
 	// truncates it to 0 when not all searchers support lazy scoring.
 	lazy := len(s.lazySearchers) == len(s.searchers) // hoisted: constant per query
+	// wandImpacts and threshold are both constant within a single nextMAXSCORE
+	// call (threshold only changes after we return a result to the collector).
+	// Hoist them here to avoid re-loading ctx fields and to allow the upper-bound
+	// accumulation to be folded into the matching-collection loop below (which
+	// eliminates the wandAboveThreshold function call and its second pass over
+	// matchingIdxs — wandAboveThreshold exceeds the Go inliner budget).
+	wandImpacts := s.wandMaxImpacts // non-nil, len>0 guaranteed by caller
+	threshold := ctx.ScoreThreshold
 
 	for {
 		// Find the minimum docID among essential iterators.
@@ -632,18 +640,24 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 		}
 
 		// Collect all terms (essential and non-essential) that match minID.
+		// Accumulate the WAND upper bound in the same pass to avoid a second
+		// iteration over matchingIdxs inside wandAboveThreshold (which also
+		// can't be inlined — cost 109 > budget 80).
 		s.matching = s.matching[:0]
 		s.matchingIdxs = s.matchingIdxs[:0]
+		var upperBound float64
 		for i, curr := range s.currs {
 			if curr != nil && len(curr.IndexInternalID) == 8 && binary.BigEndian.Uint64(curr.IndexInternalID) == minIDVal {
 				s.matching = append(s.matching, curr)
 				s.matchingIdxs = append(s.matchingIdxs, i)
+				upperBound += wandImpacts[i]
 			}
 		}
 
 		// Score if we have enough matching terms and the upper bound clears the threshold.
+		// threshold > 0 and len(wandImpacts) > 0 are guaranteed by the caller.
 		var rv *search.DocumentMatch
-		if len(s.matching) >= s.min && s.wandAboveThreshold(ctx) {
+		if len(s.matching) >= s.min && upperBound > threshold {
 			if lazy {
 				// §9: BM25 deferred — score only candidates that survive WAND.
 				for _, si := range s.matchingIdxs {
