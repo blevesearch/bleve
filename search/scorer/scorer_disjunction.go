@@ -44,42 +44,48 @@ func NewDisjunctionQueryScorer(options search.SearcherOptions) *DisjunctionQuery
 }
 
 func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
-	var sum float64
-	var childrenExplanations []*search.Explanation
-	if s.options.Explain {
-		childrenExplanations = make([]*search.Explanation, len(constituents))
-	}
-
-	for i, docMatch := range constituents {
-		sum += docMatch.Score
-		if s.options.Explain {
-			childrenExplanations[i] = docMatch.Expl
-		}
-	}
-
-	var rawExpl *search.Explanation
-	if s.options.Explain {
-		rawExpl = &search.Explanation{Value: sum, Message: "sum of:", Children: childrenExplanations}
-	}
-
-	coord := float64(countMatch) / float64(countTotal)
-	newScore := sum * coord
-	var newExpl *search.Explanation
-	if s.options.Explain {
-		ce := make([]*search.Explanation, 2)
-		ce[0] = rawExpl
-		ce[1] = &search.Explanation{Value: coord, Message: fmt.Sprintf("coord(%d/%d)", countMatch, countTotal)}
-		newExpl = &search.Explanation{Value: newScore, Message: "product of:", Children: ce, PartialMatch: countMatch != countTotal}
-	}
-
-	// reuse constituents[0] as the return value
 	rv := constituents[0]
-	rv.Score = newScore
-	rv.Expl = newExpl
-	rv.FieldTermLocations = search.MergeFieldTermLocations(
-		rv.FieldTermLocations, constituents[1:])
-
+	var sum float64
+	for _, docMatch := range constituents {
+		sum += docMatch.Score
+	}
+	coord := float64(countMatch) / float64(countTotal)
+	rv.Score = sum * coord
+	rv.Expl = nil
+	rv.FieldTermLocations = search.MergeFieldTermLocations(rv.FieldTermLocations, constituents[1:])
+	if s.options.Explain {
+		s.scoreExplain(rv, constituents, sum, coord, countMatch, countTotal)
+	}
 	return rv
+}
+
+// ScoreFast is a lightweight variant of Score for the MAXSCORE lazy path.
+// In that path, scoreCurrentDoc (TermQueryScorer.ScoreInto) only sets Score —
+// FieldTermLocations is never written, and s.options.Explain is always false.
+// ScoreFast skips MergeFieldTermLocations and the explain branch so it stays
+// inlinable (cost < 80), allowing the call in nextMAXSCORE to be folded in.
+func (s *DisjunctionQueryScorer) ScoreFast(constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
+	rv := constituents[0]
+	var sum float64
+	for _, docMatch := range constituents {
+		sum += docMatch.Score
+	}
+	rv.Score = sum * float64(countMatch) / float64(countTotal)
+	rv.Expl = nil
+	return rv
+}
+
+// scoreExplain populates rv.Expl; called only when s.options.Explain is set.
+func (s *DisjunctionQueryScorer) scoreExplain(rv *search.DocumentMatch, constituents []*search.DocumentMatch, sum, coord float64, countMatch, countTotal int) {
+	childrenExplanations := make([]*search.Explanation, len(constituents))
+	for i, docMatch := range constituents {
+		childrenExplanations[i] = docMatch.Expl
+	}
+	rawExpl := &search.Explanation{Value: sum, Message: "sum of:", Children: childrenExplanations}
+	ce := make([]*search.Explanation, 2)
+	ce[0] = rawExpl
+	ce[1] = &search.Explanation{Value: coord, Message: fmt.Sprintf("coord(%d/%d)", countMatch, countTotal)}
+	rv.Expl = &search.Explanation{Value: rv.Score, Message: "product of:", Children: ce, PartialMatch: countMatch != countTotal}
 }
 
 // This method is used only when disjunction searcher is used over multiple
