@@ -336,6 +336,37 @@ func (s *TermSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternal
 	return docMatch, nil
 }
 
+// nextDocIDOnly fetches the next document's ID without computing its BM25 score.
+// The freq/norm are decoded into s.tfd so that a subsequent scoreCurrentDoc call
+// can fill in the score without re-reading the posting stream.
+func (s *TermSearcher) nextDocIDOnly(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+	termMatch, err := s.reader.Next(s.tfd.Reset())
+	if err != nil || termMatch == nil {
+		return nil, err
+	}
+	rv := ctx.DocumentMatchPool.Get()
+	rv.IndexInternalID = index.NewIndexInternalIDFrom(rv.IndexInternalID, termMatch.ID)
+	return rv, nil
+}
+
+// advanceDocIDOnly seeks to the first document at or after ID, capturing
+// freq/norm into s.tfd without scoring.
+func (s *TermSearcher) advanceDocIDOnly(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
+	termMatch, err := s.reader.Advance(ID, s.tfd.Reset())
+	if err != nil || termMatch == nil {
+		return nil, err
+	}
+	rv := ctx.DocumentMatchPool.Get()
+	rv.IndexInternalID = index.NewIndexInternalIDFrom(rv.IndexInternalID, termMatch.ID)
+	return rv, nil
+}
+
+// scoreCurrentDoc fills rv.Score from the freq/norm captured by the most recent
+// nextDocIDOnly or advanceDocIDOnly call on this searcher.
+func (s *TermSearcher) scoreCurrentDoc(rv *search.DocumentMatch) {
+	s.scorer.ScoreInto(&s.tfd, rv)
+}
+
 func (s *TermSearcher) Close() error {
 	return s.reader.Close()
 }
