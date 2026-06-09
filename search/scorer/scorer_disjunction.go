@@ -70,7 +70,13 @@ func (s *DisjunctionQueryScorer) ScoreFast(constituents []*search.DocumentMatch,
 	for _, docMatch := range constituents {
 		sum += docMatch.Score
 	}
-	rv.Score = sum * float64(countMatch) / float64(countTotal)
+	// When all terms matched (coord == 1.0), skip the multiply+divide.
+	// For topical queries where all terms co-occur this is the common path.
+	if countMatch == countTotal {
+		rv.Score = sum
+	} else {
+		rv.Score = sum * float64(countMatch) / float64(countTotal)
+	}
 	rv.Expl = nil
 	return rv
 }
