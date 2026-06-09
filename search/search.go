@@ -231,7 +231,9 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 		ftls[i].Location.ArrayPositions = ftls[i].Location.ArrayPositions[:0]
 	}
 	scoreBreakdown := dm.ScoreBreakdown
-	clear(scoreBreakdown)
+	if scoreBreakdown != nil {
+		clear(scoreBreakdown)
+	}
 	descendants := dm.Descendants
 	for i := range descendants { // recycle each IndexInternalID
 		descendants[i] = descendants[i][:0]
