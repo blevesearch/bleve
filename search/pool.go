@@ -89,3 +89,18 @@ func (p *DocumentMatchPool) Put(d *DocumentMatch) {
 	d.Reset()
 	p.avail = append(p.avail, d)
 }
+
+// PutLazy returns a DocumentMatch to the pool for documents that went
+// through the lazy BM25 scoring path in nextMAXSCORE.  In that path,
+// TermQueryScorer.ScoreInto sets only Score (and IndexInternalID was set
+// by nextDocIDOnly/advanceDocIDOnly); no other fields are written.
+// PutLazy zeros just those two fields, skipping the ~22-field full Reset.
+// Callers MUST guarantee that only IndexInternalID and Score were set.
+func (p *DocumentMatchPool) PutLazy(d *DocumentMatch) {
+	if d == nil {
+		return
+	}
+	d.IndexInternalID = d.IndexInternalID[:0]
+	d.Score = 0
+	p.avail = append(p.avail, d)
+}
