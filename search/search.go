@@ -222,39 +222,38 @@ OUTER:
 
 // Reset allows an already allocated DocumentMatch to be reused
 func (dm *DocumentMatch) Reset() *DocumentMatch {
-	// remember the []byte used for the IndexInternalID
+	// Save backing arrays for reuse — these are restored below.
 	indexInternalID := dm.IndexInternalID
-	// remember the []interface{} used for sort
-	sort := dm.Sort
-	// remember the []string used for decoded sort
+	sortBuf := dm.Sort
 	decodedSort := dm.DecodedSort
-	// remember the FieldTermLocations backing array
 	ftls := dm.FieldTermLocations
 	for i := range ftls { // recycle the ArrayPositions of each location
 		ftls[i].Location.ArrayPositions = ftls[i].Location.ArrayPositions[:0]
 	}
-	// remember the score breakdown map
 	scoreBreakdown := dm.ScoreBreakdown
-	// clear out the score breakdown map
 	clear(scoreBreakdown)
-	// remember the Descendants backing array
 	descendants := dm.Descendants
 	for i := range descendants { // recycle each IndexInternalID
 		descendants[i] = descendants[i][:0]
 	}
-	// idiom to copy over from empty DocumentMatch (0 allocations)
-	*dm = DocumentMatch{}
-	// reuse the []byte already allocated (and reset len to 0)
+	// Zero only the fields that are NOT restored below.  This avoids a
+	// full-struct duffzero (~240 bytes) for the common case where most
+	// fields are already nil/zero.
+	dm.Index = ""
+	dm.ID = ""
+	dm.Score = 0
+	dm.Expl = nil
+	dm.Locations = nil
+	dm.Fragments = nil
+	dm.Fields = nil
+	dm.HitNumber = 0
+	dm.IndexNames = nil
+	// Restore reusable allocations.
 	dm.IndexInternalID = indexInternalID[:0]
-	// reuse the []interface{} already allocated (and reset len to 0)
-	dm.Sort = sort[:0]
-	// reuse the []string already allocated (and reset len to 0)
+	dm.Sort = sortBuf[:0]
 	dm.DecodedSort = decodedSort[:0]
-	// reuse the FieldTermLocations already allocated (and reset len to 0)
 	dm.FieldTermLocations = ftls[:0]
-	// reuse the Descendants already allocated (and reset len to 0)
 	dm.Descendants = descendants[:0]
-	// reuse the score breakdown map already allocated (after clearing it)
 	dm.ScoreBreakdown = scoreBreakdown
 	return dm
 }
