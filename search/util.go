@@ -54,7 +54,10 @@ func MergeFieldTermLocations(dest []FieldTermLocation, matches []*DocumentMatch)
 			n += len(dm.FieldTermLocations)
 		}
 	}
-	if cap(dest) < n {
+	if n == len(dest) {
+		return dest
+	}
+	if n > cap(dest) {
 		dest = append(make([]FieldTermLocation, 0, n), dest...)
 	}
 
