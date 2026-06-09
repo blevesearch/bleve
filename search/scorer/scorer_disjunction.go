@@ -62,8 +62,13 @@ func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 		rawExpl = &search.Explanation{Value: sum, Message: "sum of:", Children: childrenExplanations}
 	}
 
-	coord := float64(countMatch) / float64(countTotal)
-	newScore := sum * coord
+	var newScore float64
+	if countMatch == countTotal {
+		newScore = sum
+	} else {
+		coord := float64(countMatch) / float64(countTotal)
+		newScore = sum * coord
+	}
 	var newExpl *search.Explanation
 	if s.options.Explain {
 		ce := make([]*search.Explanation, 2)
