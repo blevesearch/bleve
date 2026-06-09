@@ -16,6 +16,7 @@ package searcher
 
 import (
 	"context"
+	"encoding/binary"
 	"math"
 	"reflect"
 	"sort"
@@ -549,18 +550,26 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 
 	for {
 		// Find the minimum docID among essential iterators.
-		minID = minID[:0]
+		// Scorch IDs are always 8-byte big-endian uint64; decode once and use
+		// integer comparison throughout the loop to avoid bytes.Compare overhead.
+		var minIDVal uint64 = math.MaxUint64
 		for _, si := range s.maxscoreOrder[s.pivotIdx:] {
 			curr := s.currs[si]
 			if curr == nil {
 				continue
 			}
-			if len(minID) == 0 || curr.IndexInternalID.Compare(minID) < 0 {
+			if len(curr.IndexInternalID) != 8 {
+				// ID was Reset by pool (pool aliasing); treat as exhausted this round.
+				continue
+			}
+			v := binary.BigEndian.Uint64(curr.IndexInternalID)
+			if v < minIDVal {
+				minIDVal = v
 				n := copy(s.minIDBuf[:], curr.IndexInternalID)
 				minID = s.minIDBuf[:n]
 			}
 		}
-		if len(minID) == 0 {
+		if minIDVal == math.MaxUint64 {
 			return nil, nil // all essential iterators exhausted
 		}
 
@@ -601,8 +610,7 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 						}
 					}
 				}
-				minID = minID[:0] // force re-scan for new minID
-				continue
+				continue // re-scan for new minID
 			}
 		}
 
@@ -610,7 +618,7 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 		// bonus score if they happen to match this candidate.
 		for _, si := range s.maxscoreOrder[:s.pivotIdx] {
 			curr := s.currs[si]
-			if curr != nil && curr.IndexInternalID.Compare(minID) < 0 {
+			if curr != nil && len(curr.IndexInternalID) == 8 && binary.BigEndian.Uint64(curr.IndexInternalID) < minIDVal {
 				ctx.DocumentMatchPool.Put(curr)
 				if lazy {
 					s.currs[si], err = s.lazySearchers[si].advanceDocIDOnly(ctx, minID)
@@ -627,7 +635,7 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 		s.matching = s.matching[:0]
 		s.matchingIdxs = s.matchingIdxs[:0]
 		for i, curr := range s.currs {
-			if curr != nil && curr.IndexInternalID.Compare(minID) == 0 {
+			if curr != nil && len(curr.IndexInternalID) == 8 && binary.BigEndian.Uint64(curr.IndexInternalID) == minIDVal {
 				s.matching = append(s.matching, curr)
 				s.matchingIdxs = append(s.matchingIdxs, i)
 			}
@@ -661,7 +669,7 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 		// Put calls dm.Reset() which sets IndexInternalID = IndexInternalID[:0],
 		// zeroing the len field and corrupting the heap entry.
 		for i, curr := range s.currs {
-			if curr != nil && curr.IndexInternalID.Compare(minID) == 0 {
+			if curr != nil && len(curr.IndexInternalID) == 8 && binary.BigEndian.Uint64(curr.IndexInternalID) == minIDVal {
 				if curr != rv {
 					ctx.DocumentMatchPool.Put(curr)
 				}
