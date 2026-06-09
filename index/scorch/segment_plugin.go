@@ -75,6 +75,8 @@ type SegmentPlugin interface {
 	MergeUsing(segments []segment.Segment, drops []*roaring.Bitmap, path string,
 		closeCh chan struct{}, s segment.StatsReporter, config map[string]interface{}) (
 		[][]uint64, uint64, error)
+
+	StatsMap() map[string]interface{}
 }
 
 var supportedSegmentPlugins map[string]map[uint32]SegmentPlugin
@@ -82,13 +84,13 @@ var defaultSegmentPlugin SegmentPlugin
 
 func init() {
 	ResetSegmentPlugins()
-	RegisterSegmentPlugin(&zapv17.ZapPlugin{}, true)
-	RegisterSegmentPlugin(&zapv16.ZapPlugin{}, false)
-	RegisterSegmentPlugin(&zapv15.ZapPlugin{}, false)
-	RegisterSegmentPlugin(&zapv14.ZapPlugin{}, false)
-	RegisterSegmentPlugin(&zapv13.ZapPlugin{}, false)
-	RegisterSegmentPlugin(&zapv12.ZapPlugin{}, false)
-	RegisterSegmentPlugin(&zapv11.ZapPlugin{}, false)
+	RegisterSegmentPlugin(zapv17.InitPlugin(), true)
+	RegisterSegmentPlugin(zapv16.InitPlugin(), false)
+	RegisterSegmentPlugin(zapv15.InitPlugin(), false)
+	RegisterSegmentPlugin(zapv14.InitPlugin(), false)
+	RegisterSegmentPlugin(zapv13.InitPlugin(), false)
+	RegisterSegmentPlugin(zapv12.InitPlugin(), false)
+	RegisterSegmentPlugin(zapv11.InitPlugin(), false)
 }
 
 func ResetSegmentPlugins() {

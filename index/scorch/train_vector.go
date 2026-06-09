@@ -393,7 +393,6 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	// is complete, the template will be used for other operations down the line
 	// like merge and search.
 	//
-	// note: this might index text data too, how to handle this? s.segmentConfig?
 	// todo: updates/deletes -> data drift detection
 	if len(trainData) > 0 {
 		trainReq.sample, _, err = t.parent.segPlugin.NewUsing(trainData, config)
