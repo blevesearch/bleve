@@ -103,6 +103,20 @@ type DisjunctionSliceSearcher struct {
 	// that's sliced and passed to an interface method triggers escape analysis
 	// and allocates once per candidate.
 	minIDBuf [8]byte
+
+	// segSkippers is non-nil when all sub-searchers support per-segment
+	// operations (§15: per-segment score ceiling).  Indexed by position in
+	// s.searchers (same indexing as wandMaxImpacts).
+	segSkippers []segmentSkipper
+
+	// segCeilings[i] is the sum of per-term max BM25 impacts for segment i.
+	// Any document in segment i scores at most segCeilings[i].  When
+	// segCeilings[i] ≤ ctx.ScoreThreshold the entire segment can be skipped.
+	// Computed once in initWANDMaxImpacts() alongside wandMaxImpacts.
+	segCeilings []float64
+
+	// segSkipBuf is reused storage for FirstDocIDOfSegment calls.
+	segSkipBuf [8]byte
 }
 
 // wandUnavailableImpacts is a non-nil zero-length sentinel stored in
@@ -259,6 +273,15 @@ type wandImpacter interface {
 	MaxImpact() float64
 }
 
+// segmentSkipper is the optional interface implemented by TermSearcher when
+// its underlying TFR supports per-segment operations (§15).
+type segmentSkipper interface {
+	NumSegments() int
+	MaxImpactForSegment(segIdx int) float64
+	SegmentIndexOf(id index.IndexInternalID) int
+	FirstDocIDOfSegment(segIdx int, buf []byte) index.IndexInternalID
+}
+
 // initWANDMaxImpacts pre-computes each searcher's MaxImpact() into the
 // wandMaxImpacts slice so the per-candidate hot path only does array reads
 // and float additions with no interface dispatch or type assertions.
@@ -292,6 +315,29 @@ func (s *DisjunctionSliceSearcher) initWANDMaxImpacts() {
 	s.maxscoreOrder = order
 	s.pivotIdx = 0
 	s.lastThreshold = 0
+
+	// Build per-segment ceiling array (§15) if all searchers support it.
+	skippers := make([]segmentSkipper, len(s.searchers))
+	allSupport := true
+	for i, searcher := range s.searchers {
+		sk, ok := searcher.(segmentSkipper)
+		if !ok || sk.NumSegments() == 0 {
+			allSupport = false
+			break
+		}
+		skippers[i] = sk
+	}
+	if allSupport {
+		numSegs := skippers[0].NumSegments()
+		ceilings := make([]float64, numSegs)
+		for segIdx := range ceilings {
+			for _, sk := range skippers {
+				ceilings[segIdx] += sk.MaxImpactForSegment(segIdx)
+			}
+		}
+		s.segSkippers = skippers
+		s.segCeilings = ceilings
+	}
 }
 
 // computeMAXSCOREPivot sets pivotIdx to the smallest index in maxscoreOrder
@@ -345,10 +391,13 @@ func (s *DisjunctionSliceSearcher) Weight() float64 {
 }
 
 func (s *DisjunctionSliceSearcher) SetQueryNorm(qnorm float64) {
-	// Invalidate both caches: MaxImpact and the MAXSCORE sort order depend on queryNorm.
+	// Invalidate all caches: MaxImpact, MAXSCORE sort order, and per-segment
+	// ceilings all depend on queryNorm via scorer.QueryWeight().
 	s.wandMaxImpacts = nil
 	s.maxscoreOrder = nil
 	s.lastThreshold = 0
+	s.segSkippers = nil
+	s.segCeilings = nil
 	for _, searcher := range s.searchers {
 		searcher.SetQueryNorm(qnorm)
 	}
@@ -463,6 +512,42 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 		}
 		if len(minID) == 0 {
 			return nil, nil // all essential iterators exhausted
+		}
+
+		// §15: Per-segment score ceiling check.
+		// If no document in the current segment can beat the threshold, advance
+		// all essential iterators to the first document of the next eligible segment.
+		if s.segCeilings != nil && ctx.ScoreThreshold > 0 {
+			segIdx := s.segSkippers[0].SegmentIndexOf(minID)
+			if s.segCeilings[segIdx] <= ctx.ScoreThreshold {
+				// Find the first segment whose ceiling exceeds the threshold.
+				nextSeg := segIdx + 1
+				for nextSeg < len(s.segCeilings) && s.segCeilings[nextSeg] <= ctx.ScoreThreshold {
+					nextSeg++
+				}
+				if nextSeg >= len(s.segCeilings) {
+					return nil, nil // all remaining segments are below threshold
+				}
+				skipTo := s.segSkippers[0].FirstDocIDOfSegment(nextSeg, s.segSkipBuf[:])
+				if skipTo == nil {
+					return nil, nil
+				}
+				for _, si := range s.maxscoreOrder[s.pivotIdx:] {
+					curr := s.currs[si]
+					if curr == nil {
+						continue
+					}
+					if s.segSkippers[si].SegmentIndexOf(curr.IndexInternalID) < nextSeg {
+						ctx.DocumentMatchPool.Put(curr)
+						s.currs[si], err = s.searchers[si].Advance(ctx, skipTo)
+						if err != nil {
+							return nil, err
+						}
+					}
+				}
+				minID = minID[:0] // force re-scan for new minID
+				continue
+			}
 		}
 
 		// Advance non-essential iterators to minID so they can contribute
