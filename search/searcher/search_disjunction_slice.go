@@ -558,9 +558,11 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 	// Using a local [8]byte would escape to the heap every call because the
 	// slice is passed to Advance(), an interface method — see s.minIDBuf doc.
 	var minID index.IndexInternalID
-	// lazySearchers is pre-allocated to len(s.searchers); initWANDMaxImpacts
+	// lazySearchers is pre-allocated to s.numSearchers; initWANDMaxImpacts
 	// truncates it to 0 when not all searchers support lazy scoring.
-	lazy := len(s.lazySearchers) == len(s.searchers) // hoisted: constant per query
+	// Compare against s.numSearchers (cache line 1, hot) rather than
+	// len(s.searchers) (cache line 0, cold in the inner loop).
+	lazy := len(s.lazySearchers) == s.numSearchers // hoisted: constant per query
 	// wandImpacts and threshold are both constant within a single nextMAXSCORE
 	// call (threshold only changes after we return a result to the collector).
 	// Hoist them here to avoid re-loading ctx fields and to allow the upper-bound
