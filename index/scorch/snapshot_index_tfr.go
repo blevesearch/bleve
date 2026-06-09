@@ -242,6 +242,42 @@ func (i *IndexSnapshotTermFieldReader) MaxTFNorm(avgDocLength float64) float32 {
 	return maxV
 }
 
+// NumSegments returns the number of segments in the index snapshot.
+func (i *IndexSnapshotTermFieldReader) NumSegments() int {
+	return len(i.snapshot.segment)
+}
+
+// MaxTFNormForSegment returns the max BM25 tf-norm for this term in a specific
+// segment. Returns 0 if the term is absent from that segment or avgDocLength≤0.
+func (i *IndexSnapshotTermFieldReader) MaxTFNormForSegment(segIdx int, avgDocLength float64) float32 {
+	if avgDocLength <= 0 || segIdx >= len(i.dicts) {
+		return 0
+	}
+	if p, ok := i.dicts[segIdx].(maxTFNormProvider); ok {
+		return p.MaxTFNorm(i.term, avgDocLength)
+	}
+	return 0
+}
+
+// SegmentIndexOf returns the segment index for the given global docID.
+func (i *IndexSnapshotTermFieldReader) SegmentIndexOf(id index.IndexInternalID) int {
+	num, err := id.Value()
+	if err != nil {
+		return 0
+	}
+	segIdx, _ := i.snapshot.segmentIndexAndLocalDocNumFromGlobal(num)
+	return segIdx
+}
+
+// FirstDocIDOfSegment returns the first global docID in segment segIdx, using
+// buf for the backing storage. Returns nil if segIdx >= NumSegments().
+func (i *IndexSnapshotTermFieldReader) FirstDocIDOfSegment(segIdx int, buf []byte) index.IndexInternalID {
+	if segIdx >= len(i.snapshot.offsets) {
+		return nil
+	}
+	return index.NewIndexInternalID(buf, i.snapshot.offsets[segIdx])
+}
+
 func (i *IndexSnapshotTermFieldReader) Count() uint64 {
 	var rv uint64
 	for _, posting := range i.postings {

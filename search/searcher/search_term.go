@@ -218,6 +218,15 @@ type maxTFNormReader interface {
 	MaxTFNorm(avgDocLength float64) float32
 }
 
+// perSegmentTFR is the optional interface implemented by
+// scorch.IndexSnapshotTermFieldReader for per-segment score ceiling checks.
+type perSegmentTFR interface {
+	NumSegments() int
+	MaxTFNormForSegment(segIdx int, avgDocLength float64) float32
+	SegmentIndexOf(id index.IndexInternalID) int
+	FirstDocIDOfSegment(segIdx int, buf []byte) index.IndexInternalID
+}
+
 // MaxImpact returns the maximum possible BM25 score for any document in
 // this term's posting list: idf × maxTFNorm × queryWeight.
 // Computed once (lazily) and cached in the TermSearcher so subsequent calls
@@ -245,6 +254,47 @@ func (s *TermSearcher) MaxImpact() float64 {
 	}
 	s.cachedMaxImpact = math.MaxFloat64
 	return s.cachedMaxImpact
+}
+
+// NumSegments returns the number of segments if the underlying reader supports
+// per-segment operations, otherwise returns 0.
+func (s *TermSearcher) NumSegments() int {
+	if r, ok := s.reader.(perSegmentTFR); ok {
+		return r.NumSegments()
+	}
+	return 0
+}
+
+// MaxImpactForSegment returns IDF × maxTFNorm_in_segment × queryWeight.
+// Returns math.MaxFloat64 when per-segment data is unavailable.
+func (s *TermSearcher) MaxImpactForSegment(segIdx int) float64 {
+	avgDl := s.scorer.AvgDocLength()
+	if avgDl <= 0 {
+		return math.MaxFloat64
+	}
+	if r, ok := s.reader.(perSegmentTFR); ok {
+		v := r.MaxTFNormForSegment(segIdx, avgDl)
+		return s.scorer.IDF() * float64(v) * s.scorer.QueryWeight()
+	}
+	return math.MaxFloat64
+}
+
+// SegmentIndexOf decodes the segment index for the given docID.
+// Returns 0 and is a no-op if the underlying reader does not support it.
+func (s *TermSearcher) SegmentIndexOf(id index.IndexInternalID) int {
+	if r, ok := s.reader.(perSegmentTFR); ok {
+		return r.SegmentIndexOf(id)
+	}
+	return 0
+}
+
+// FirstDocIDOfSegment returns the first global docID in segment segIdx, using
+// buf for the backing storage. Returns nil if unsupported or out of range.
+func (s *TermSearcher) FirstDocIDOfSegment(segIdx int, buf []byte) index.IndexInternalID {
+	if r, ok := s.reader.(perSegmentTFR); ok {
+		return r.FirstDocIDOfSegment(segIdx, buf)
+	}
+	return nil
 }
 
 func (s *TermSearcher) SetQueryNorm(qnorm float64) {
