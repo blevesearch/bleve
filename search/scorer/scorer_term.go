@@ -114,6 +114,16 @@ func (s *TermQueryScorer) Weight() float64 {
 	return sum * sum
 }
 
+// IDF returns the inverse document frequency component of this scorer.
+func (s *TermQueryScorer) IDF() float64 { return s.idf }
+
+// QueryWeight returns the final query weight (idf × queryNorm × queryBoost).
+func (s *TermQueryScorer) QueryWeight() float64 { return s.queryWeight }
+
+// AvgDocLength returns the average document length used for BM25 scoring
+// (0 when TF-IDF is used instead of BM25).
+func (s *TermQueryScorer) AvgDocLength() float64 { return s.avgDocLength }
+
 func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 	s.queryNorm = qnorm
 

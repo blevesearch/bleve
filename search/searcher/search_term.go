@@ -20,6 +20,7 @@ import (
 	"math"
 	"reflect"
 
+
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/scorer"
 	"github.com/blevesearch/bleve/v2/size"
@@ -34,10 +35,12 @@ func init() {
 }
 
 type TermSearcher struct {
-	indexReader index.IndexReader
-	reader      index.TermFieldReader
-	scorer      *scorer.TermQueryScorer
-	tfd         index.TermFieldDoc
+	indexReader  index.IndexReader
+	reader       index.TermFieldReader
+	scorer       *scorer.TermQueryScorer
+	tfd          index.TermFieldDoc
+	cachedMaxImpact    float64 // cached result of MaxImpact(); 0 = not yet computed
+	maxImpactComputed  bool
 }
 
 func NewTermSearcher(ctx context.Context, indexReader index.IndexReader,
@@ -210,8 +213,43 @@ func (s *TermSearcher) Weight() float64 {
 	return s.scorer.Weight()
 }
 
+// maxTFNormReader is implemented by scorch.IndexSnapshotTermFieldReader.
+type maxTFNormReader interface {
+	MaxTFNorm(avgDocLength float64) float32
+}
+
+// MaxImpact returns the maximum possible BM25 score for any document in
+// this term's posting list: idf × maxTFNorm × queryWeight.
+// Computed once (lazily) and cached in the TermSearcher so subsequent calls
+// are a single field read (~1ns) rather than 25 dict RWMutex lookups.
+// Returns math.MaxFloat64 when the bound cannot be computed (non-BM25, etc.).
+func (s *TermSearcher) MaxImpact() float64 {
+	if s.maxImpactComputed {
+		return s.cachedMaxImpact
+	}
+	s.maxImpactComputed = true
+
+	avgDl := s.scorer.AvgDocLength()
+	if avgDl <= 0 {
+		s.cachedMaxImpact = math.MaxFloat64
+		return s.cachedMaxImpact
+	}
+	if r, ok := s.reader.(maxTFNormReader); ok {
+		maxTFNorm := r.MaxTFNorm(avgDl)
+		if maxTFNorm <= 0 {
+			s.cachedMaxImpact = 0
+			return 0
+		}
+		s.cachedMaxImpact = s.scorer.IDF() * float64(maxTFNorm) * s.scorer.QueryWeight()
+		return s.cachedMaxImpact
+	}
+	s.cachedMaxImpact = math.MaxFloat64
+	return s.cachedMaxImpact
+}
+
 func (s *TermSearcher) SetQueryNorm(qnorm float64) {
 	s.scorer.SetQueryNorm(qnorm)
+	s.maxImpactComputed = false // MaxImpact uses queryNorm; invalidate on change
 }
 
 func (s *TermSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
