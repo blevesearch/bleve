@@ -211,6 +211,37 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 	return preAlloced, nil
 }
 
+// maxTFNormProvider is the optional interface implemented by zapx.Dictionary.
+type maxTFNormProvider interface {
+	MaxTFNorm(term []byte, avgDocLength float64) float32
+}
+
+// MaxTFNorm returns the max BM25 tf-norm contribution for this term across
+// all segments, using the lazy per-segment cache in zapx.  Returns 0 if
+// avgDocLength is 0 (TF-IDF mode) or the term is not found anywhere.
+//
+// Cost: O(N_segments) — each call does N RLock + map-lookup operations
+// against the per-segment invertedCacheEntry.maxTFNormCache (see
+// zapx/inverted_text_cache.go).  Those lookups are fast (warm cache ≈ 20ns
+// each), but for N=15 segments and 3 query terms that is ~900ns per query.
+//
+// FUTURE: cache the cross-segment max at IndexSnapshot level so repeated
+// queries (same or different clients) pay one lookup instead of N.
+func (i *IndexSnapshotTermFieldReader) MaxTFNorm(avgDocLength float64) float32 {
+	if avgDocLength <= 0 {
+		return 0
+	}
+	var maxV float32
+	for _, dict := range i.dicts {
+		if p, ok := dict.(maxTFNormProvider); ok {
+			if v := p.MaxTFNorm(i.term, avgDocLength); v > maxV {
+				maxV = v
+			}
+		}
+	}
+	return maxV
+}
+
 func (i *IndexSnapshotTermFieldReader) Count() uint64 {
 	var rv uint64
 	for _, posting := range i.postings {

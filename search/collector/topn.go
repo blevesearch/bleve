@@ -570,6 +570,12 @@ func MakeTopNDocumentMatchHandler(
 						ctx.DocumentMatchPool.Put(tmp)
 					}
 				}
+				// Update the WAND score threshold: the heap is full and we
+				// have a lower bound on the scores in the result set.
+				// Only meaningful when the primary sort is by score.
+				if len(hc.cachedScoring) > 0 && hc.cachedScoring[0] {
+					ctx.ScoreThreshold = hc.lowestMatchOutsideResults.Score
+				}
 			}
 			return nil
 		}, false, nil

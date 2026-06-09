@@ -412,6 +412,12 @@ type SearchContext struct {
 	DocumentMatchPool *DocumentMatchPool
 	Collector         Collector
 	IndexReader       index.IndexReader
+
+	// ScoreThreshold is the score of the worst document currently in the
+	// top-k heap; set by TopNCollector once the heap is full.
+	// DisjunctionSliceSearcher reads this for WAND/MaxScore pruning:
+	// candidates whose upper-bound score ≤ ScoreThreshold are skipped.
+	ScoreThreshold float64
 }
 
 func (sc *SearchContext) Size() int {
