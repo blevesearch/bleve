@@ -122,6 +122,12 @@ type DisjunctionSliceSearcher struct {
 
 	// segSkipBuf is reused storage for FirstDocIDOfSegment calls.
 	segSkipBuf [8]byte
+
+	// lazySearchers is non-nil when all sub-searchers support deferred BM25
+	// scoring (§9).  When set, nextMAXSCORE pre-fetches docIDs cheaply and
+	// calls scoreCurrentDoc only for candidates that survive the WAND check,
+	// skipping BM25 for all pruned candidates.
+	lazySearchers []lazyTermSearcher
 }
 
 // wandUnavailableImpacts is a non-nil zero-length sentinel stored in
@@ -173,8 +179,9 @@ func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexRea
 		min:                    int(min),
 		retrieveScoreBreakdown: retrieveScoreBreakdown,
 
-		matching:     make([]*search.DocumentMatch, len(searchers)),
-		matchingIdxs: make([]int, len(searchers)),
+		matching:      make([]*search.DocumentMatch, len(searchers)),
+		matchingIdxs:  make([]int, len(searchers)),
+		lazySearchers: make([]lazyTermSearcher, len(searchers)),
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
@@ -278,6 +285,16 @@ type wandImpacter interface {
 	MaxImpact() float64
 }
 
+// lazyTermSearcher is implemented by TermSearcher for deferred BM25 scoring in
+// the MAXSCORE hot path (§9): the disjunction searcher pre-fetches docIDs
+// cheaply and calls scoreCurrentDoc only for candidates that survive the WAND
+// threshold check, skipping BM25 computation for all pruned candidates.
+type lazyTermSearcher interface {
+	nextDocIDOnly(ctx *search.SearchContext) (*search.DocumentMatch, error)
+	advanceDocIDOnly(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error)
+	scoreCurrentDoc(rv *search.DocumentMatch)
+}
+
 // segmentSkipper is the optional interface implemented by TermSearcher when
 // its underlying TFR supports per-segment operations (§15).
 type segmentSkipper interface {
@@ -350,6 +367,19 @@ func (s *DisjunctionSliceSearcher) initWANDMaxImpacts() {
 		s.segCeilings = ceilings
 		s.minSegCeiling = minCeil
 	}
+
+	// §9: Populate lazySearchers if all sub-searchers support deferred BM25 scoring.
+	// The slice was pre-allocated in newDisjunctionSliceSearcher to avoid a
+	// per-query allocation here.
+	for i, searcher := range s.searchers {
+		ls, ok := searcher.(lazyTermSearcher)
+		if !ok {
+			s.lazySearchers = s.lazySearchers[:0] // signal: lazy path unavailable
+			return
+		}
+		s.lazySearchers[i] = ls
+	}
+	// All searchers support lazy scoring; lazySearchers is fully populated.
 }
 
 // computeMAXSCOREPivot sets pivotIdx to the smallest index in maxscoreOrder
@@ -500,6 +530,10 @@ func (s *DisjunctionSliceSearcher) nextBasic(ctx *search.SearchContext) (
 // iterators between candidates, which is the bulk of the speedup for queries
 // with stopwords or highly asymmetric term weights.
 //
+// When s.lazySearchers != nil (§9), BM25 scoring is deferred: pre-fetched
+// DocumentMatches carry only the docID (Score=0) and BM25 is computed only
+// for candidates that survive the WAND threshold check.
+//
 // Invariant on entry: pivotIdx > 0 (caller checked).
 func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 	*search.DocumentMatch, error,
@@ -509,6 +543,9 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 	// Using a local [8]byte would escape to the heap every call because the
 	// slice is passed to Advance(), an interface method — see s.minIDBuf doc.
 	var minID index.IndexInternalID
+	// lazySearchers is pre-allocated to len(s.searchers); initWANDMaxImpacts
+	// truncates it to 0 when not all searchers support lazy scoring.
+	lazy := len(s.lazySearchers) == len(s.searchers) // hoisted: constant per query
 
 	for {
 		// Find the minimum docID among essential iterators.
@@ -554,7 +591,11 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 					}
 					if s.segSkippers[si].SegmentIndexOf(curr.IndexInternalID) < nextSeg {
 						ctx.DocumentMatchPool.Put(curr)
-						s.currs[si], err = s.searchers[si].Advance(ctx, skipTo)
+						if lazy {
+							s.currs[si], err = s.lazySearchers[si].advanceDocIDOnly(ctx, skipTo)
+						} else {
+							s.currs[si], err = s.searchers[si].Advance(ctx, skipTo)
+						}
 						if err != nil {
 							return nil, err
 						}
@@ -571,7 +612,11 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 			curr := s.currs[si]
 			if curr != nil && curr.IndexInternalID.Compare(minID) < 0 {
 				ctx.DocumentMatchPool.Put(curr)
-				s.currs[si], err = s.searchers[si].Advance(ctx, minID)
+				if lazy {
+					s.currs[si], err = s.lazySearchers[si].advanceDocIDOnly(ctx, minID)
+				} else {
+					s.currs[si], err = s.searchers[si].Advance(ctx, minID)
+				}
 				if err != nil {
 					return nil, err
 				}
@@ -591,6 +636,12 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 		// Score if we have enough matching terms and the upper bound clears the threshold.
 		var rv *search.DocumentMatch
 		if len(s.matching) >= s.min && s.wandAboveThreshold(ctx) {
+			if lazy {
+				// §9: BM25 deferred — score only candidates that survive WAND.
+				for _, si := range s.matchingIdxs {
+					s.lazySearchers[si].scoreCurrentDoc(s.currs[si])
+				}
+			}
 			if s.retrieveScoreBreakdown {
 				rv = s.scorer.ScoreAndExplBreakdown(ctx, s.matching, s.matchingIdxs, s.originalPos, s.numSearchers)
 			} else {
@@ -614,7 +665,11 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 				if curr != rv {
 					ctx.DocumentMatchPool.Put(curr)
 				}
-				s.currs[i], err = s.searchers[i].Next(ctx)
+				if lazy {
+					s.currs[i], err = s.lazySearchers[i].nextDocIDOnly(ctx)
+				} else {
+					s.currs[i], err = s.searchers[i].Next(ctx)
+				}
 				if err != nil {
 					return nil, err
 				}
