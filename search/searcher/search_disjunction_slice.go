@@ -115,6 +115,11 @@ type DisjunctionSliceSearcher struct {
 	// Computed once in initWANDMaxImpacts() alongside wandMaxImpacts.
 	segCeilings []float64
 
+	// minSegCeiling is min(segCeilings).  §15 can only skip a segment when
+	// ctx.ScoreThreshold ≥ minSegCeiling; when the threshold is below this
+	// value the SegmentIndexOf call (a sort.Search) is skipped entirely.
+	minSegCeiling float64
+
 	// segSkipBuf is reused storage for FirstDocIDOfSegment calls.
 	segSkipBuf [8]byte
 }
@@ -335,8 +340,15 @@ func (s *DisjunctionSliceSearcher) initWANDMaxImpacts() {
 				ceilings[segIdx] += sk.MaxImpactForSegment(segIdx)
 			}
 		}
+		minCeil := math.MaxFloat64
+		for _, c := range ceilings {
+			if c < minCeil {
+				minCeil = c
+			}
+		}
 		s.segSkippers = skippers
 		s.segCeilings = ceilings
+		s.minSegCeiling = minCeil
 	}
 }
 
@@ -398,6 +410,7 @@ func (s *DisjunctionSliceSearcher) SetQueryNorm(qnorm float64) {
 	s.lastThreshold = 0
 	s.segSkippers = nil
 	s.segCeilings = nil
+	s.minSegCeiling = 0
 	for _, searcher := range s.searchers {
 		searcher.SetQueryNorm(qnorm)
 	}
@@ -517,7 +530,9 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 		// §15: Per-segment score ceiling check.
 		// If no document in the current segment can beat the threshold, advance
 		// all essential iterators to the first document of the next eligible segment.
-		if s.segCeilings != nil && ctx.ScoreThreshold > 0 {
+		// Guard: only call SegmentIndexOf (a sort.Search) when the threshold is high
+		// enough that at least one segment could be skipped (threshold ≥ minSegCeiling).
+		if s.segCeilings != nil && ctx.ScoreThreshold >= s.minSegCeiling {
 			segIdx := s.segSkippers[0].SegmentIndexOf(minID)
 			if s.segCeilings[segIdx] <= ctx.ScoreThreshold {
 				// Find the first segment whose ceiling exceeds the threshold.
