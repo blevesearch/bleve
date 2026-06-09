@@ -41,7 +41,14 @@ type DisjunctionSliceSearcher struct {
 	numSearchers           int
 	queryNorm              float64
 	retrieveScoreBreakdown bool
-	currs                  []*search.DocumentMatch
+	// lazyMode is true when all sub-searchers support the §9 lazy BM25 path
+	// (i.e. len(lazySearchers) == numSearchers). Stored here (offset 81, cache
+	// line 1) rather than computed from len(lazySearchers) (offset 360, cache
+	// line 5, cold) to avoid the cold-line load on every nextMAXSCORE call.
+	// One bool fits in the 7-byte padding gap between retrieveScoreBreakdown
+	// and currs — struct size stays 384 bytes.
+	lazyMode bool
+	currs    []*search.DocumentMatch
 	scorer                 *scorer.DisjunctionQueryScorer
 	min                    int
 	matching               []*search.DocumentMatch
@@ -389,11 +396,13 @@ func (s *DisjunctionSliceSearcher) initWANDMaxImpacts() {
 		ts, ok := searcher.(*TermSearcher)
 		if !ok {
 			s.lazySearchers = s.lazySearchers[:0] // signal: lazy path unavailable
+			s.lazyMode = false
 			return
 		}
 		s.lazySearchers[i] = ts
 	}
 	// All searchers are *TermSearcher; lazySearchers is fully populated.
+	s.lazyMode = true
 }
 
 // computeMAXSCOREPivot sets pivotIdx to the smallest index in maxscoreOrder
@@ -558,11 +567,11 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 	// Using a local [8]byte would escape to the heap every call because the
 	// slice is passed to Advance(), an interface method — see s.minIDBuf doc.
 	var minID index.IndexInternalID
-	// lazySearchers is pre-allocated to s.numSearchers; initWANDMaxImpacts
-	// truncates it to 0 when not all searchers support lazy scoring.
-	// Compare against s.numSearchers (cache line 1, hot) rather than
-	// len(s.searchers) (cache line 0, cold in the inner loop).
-	lazy := len(s.lazySearchers) == s.numSearchers // hoisted: constant per query
+	// s.lazyMode is pre-computed in initWANDMaxImpacts: true when all
+	// sub-searchers support the §9 lazy BM25 path. Reading it from offset 81
+	// (cache line 1, hot) avoids the cold load of len(s.lazySearchers) from
+	// offset 360 (cache line 5) that the previous check required.
+	lazy := s.lazyMode // hoisted: constant per query
 	// wandImpacts and threshold are both constant within a single nextMAXSCORE
 	// call (threshold only changes after we return a result to the collector).
 	// Hoist them here to avoid re-loading ctx fields and to allow the upper-bound
