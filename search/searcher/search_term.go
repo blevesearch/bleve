@@ -331,7 +331,6 @@ func (s *TermSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternal
 
 	// score match
 	docMatch := s.scorer.Score(ctx, termMatch)
-
 	// return doc match
 	return docMatch, nil
 }
