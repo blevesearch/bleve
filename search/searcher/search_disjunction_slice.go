@@ -133,11 +133,12 @@ type DisjunctionSliceSearcher struct {
 	cachedSegEnd   uint64 // exclusive; math.MaxUint64 for the last segment
 	segCacheBuf    [8]byte
 
-	// lazySearchers is non-nil when all sub-searchers support deferred BM25
-	// scoring (§9).  When set, nextMAXSCORE pre-fetches docIDs cheaply and
-	// calls scoreCurrentDoc only for candidates that survive the WAND check,
-	// skipping BM25 for all pruned candidates.
-	lazySearchers []lazyTermSearcher
+	// lazySearchers holds concrete *TermSearcher pointers for the §9 lazy BM25
+	// path. Using the concrete type instead of the lazyTermSearcher interface
+	// eliminates vtable dispatch for nextDocIDOnly/advanceDocIDOnly (cost 206/207,
+	// non-inlinable) and allows scoreCurrentDoc (cost 64) to be inlined by the
+	// caller. Non-nil only when all sub-searchers are *TermSearcher.
+	lazySearchers []*TermSearcher
 }
 
 // wandUnavailableImpacts is a non-nil zero-length sentinel stored in
@@ -191,7 +192,7 @@ func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexRea
 
 		matching:      make([]*search.DocumentMatch, len(searchers)),
 		matchingIdxs:  make([]int, len(searchers)),
-		lazySearchers: make([]lazyTermSearcher, len(searchers)),
+		lazySearchers: make([]*TermSearcher, len(searchers)),
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
@@ -379,18 +380,20 @@ func (s *DisjunctionSliceSearcher) initWANDMaxImpacts() {
 		s.cachedSegEnd = 0 // invalidate §15 segment cache; force refresh on first use
 	}
 
-	// §9: Populate lazySearchers if all sub-searchers support deferred BM25 scoring.
-	// The slice was pre-allocated in newDisjunctionSliceSearcher to avoid a
-	// per-query allocation here.
+	// §9: Populate lazySearchers if all sub-searchers are *TermSearcher.
+	// Using the concrete type eliminates vtable dispatch for nextDocIDOnly /
+	// advanceDocIDOnly (non-inlinable, cost 206/207) and allows scoreCurrentDoc
+	// (cost 64, inlinable) to be folded into the caller.
+	// The slice was pre-allocated in newDisjunctionSliceSearcher.
 	for i, searcher := range s.searchers {
-		ls, ok := searcher.(lazyTermSearcher)
+		ts, ok := searcher.(*TermSearcher)
 		if !ok {
 			s.lazySearchers = s.lazySearchers[:0] // signal: lazy path unavailable
 			return
 		}
-		s.lazySearchers[i] = ls
+		s.lazySearchers[i] = ts
 	}
-	// All searchers support lazy scoring; lazySearchers is fully populated.
+	// All searchers are *TermSearcher; lazySearchers is fully populated.
 }
 
 // computeMAXSCOREPivot sets pivotIdx to the smallest index in maxscoreOrder
@@ -584,13 +587,15 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 			v := binary.BigEndian.Uint64(curr.IndexInternalID)
 			if v < minIDVal {
 				minIDVal = v
-				n := copy(s.minIDBuf[:], curr.IndexInternalID)
-				minID = s.minIDBuf[:n]
 			}
 		}
 		if minIDVal == math.MaxUint64 {
 			return nil, nil // all essential iterators exhausted
 		}
+		// Encode minIDVal once. PutUint64 is a single instruction (STREV on arm64)
+		// and avoids re-loading the source bytes from curr.IndexInternalID.
+		binary.BigEndian.PutUint64(s.minIDBuf[:], minIDVal)
+		minID = s.minIDBuf[:]
 
 		// §15: Per-segment score ceiling check.
 		// If no document in the current segment can beat the threshold, advance
@@ -698,6 +703,11 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 			}
 			if s.retrieveScoreBreakdown {
 				rv = s.scorer.ScoreAndExplBreakdown(ctx, s.matching, s.matchingIdxs, s.originalPos, s.numSearchers)
+			} else if lazy {
+				// ScoreFast is inlinable (cost 37 < 80): skips MergeFieldTermLocations
+				// and the explain branch (neither ever fires in the lazy BM25 path —
+				// scoreCurrentDoc only sets Score, never FieldTermLocations or Expl).
+				rv = s.scorer.ScoreFast(s.matching, len(s.matching), s.numSearchers)
 			} else {
 				rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
 			}
