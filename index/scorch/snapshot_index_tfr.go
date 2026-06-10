@@ -136,10 +136,12 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 	return nil, nil
 }
 
-// normByteProvider is the optional interface implemented by zapx.Posting
-// to expose the raw SmallFloat norm byte from the norm column (§20/§25).
-type normByteProvider interface {
-	NormByte() uint8
+// normByteIterator is the optional interface implemented by zapx.PostingsIterator
+// to expose the raw SmallFloat norm byte for a given docNum (§20/§25).
+// Called lazily in postingToTermFieldDoc so the normColumn access only happens
+// for documents that are actually scored, not for every traversed posting.
+type normByteIterator interface {
+	NormColumnByte(docNum uint64) uint8
 }
 
 func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Posting, rv *index.TermFieldDoc) {
@@ -148,8 +150,8 @@ func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Postin
 	}
 	if i.includeNorm {
 		rv.Norm = next.Norm()
-		if nb, ok := next.(normByteProvider); ok {
-			rv.NormByte = nb.NormByte()
+		if nbi, ok := i.iterators[i.segmentOffset].(normByteIterator); ok {
+			rv.NormByte = nbi.NormColumnByte(next.Number())
 		}
 	}
 	if i.includeTermVectors {
