@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/rand"
 	"os"
 	"reflect"
@@ -309,9 +308,10 @@ func testVersusSearches(vt *VersusTest, searchTemplates []string, idxA, idxB ble
 					i, bufBytes, errA, errB)
 			}
 
-			// Scores might have float64 vs float32 wobbles, so truncate precision.
-			resA.MaxScore = math.Trunc(resA.MaxScore*1000.0) / 1000.0
-			resB.MaxScore = math.Trunc(resB.MaxScore*1000.0) / 1000.0
+			// Zero MaxScore: upsidedown uses TF-IDF, scorch uses BM25 (MB-58901),
+			// so cross-engine score values are not comparable.
+			resA.MaxScore = 0
+			resB.MaxScore = 0
 
 			// Timings may be different between A & B, so force equality.
 			resA.Took = resB.Took
@@ -386,8 +386,11 @@ func hitsById(res *bleve.SearchResult) map[string]*search.DocumentMatch {
 	for _, hit := range res.Hits {
 		// Clear out or truncate precision of hit fields that might be
 		// different across different indexer implementations.
+		// Score is zeroed because upsidedown uses TF-IDF while scorch uses
+		// BM25 (since MB-58901/cbafdca0), so cross-engine score equality no
+		// longer holds.  These tests verify document identity, not scores.
 		hit.Index = ""
-		hit.Score = math.Trunc(hit.Score*1000.0) / 1000.0
+		hit.Score = 0
 		hit.IndexInternalID = nil
 		hit.HitNumber = 0
 
