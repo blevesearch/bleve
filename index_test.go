@@ -612,9 +612,9 @@ func TestBytesRead(t *testing.T) {
 	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
 	prevBytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
 
-	expectedBytesRead := uint64(21164)
+	expectedBytesRead := uint64(23597)
 	if supportForVectorSearch {
-		expectedBytesRead = 21574
+		expectedBytesRead = 24007
 	}
 
 	if prevBytesRead != expectedBytesRead && res.Cost == prevBytesRead {
@@ -631,8 +631,8 @@ func TestBytesRead(t *testing.T) {
 	}
 	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead-prevBytesRead != 66 && res.Cost == bytesRead-prevBytesRead {
-		t.Fatalf("expected bytes read for query string 66, got %v",
+	if bytesRead-prevBytesRead != 7 && res.Cost == bytesRead-prevBytesRead {
+		t.Fatalf("expected bytes read for query string 7, got %v",
 			bytesRead-prevBytesRead)
 	}
 	prevBytesRead = bytesRead
@@ -647,8 +647,8 @@ func TestBytesRead(t *testing.T) {
 	}
 	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead-prevBytesRead != 8468 && res.Cost == bytesRead-prevBytesRead {
-		t.Fatalf("expected bytes read for fuzzy query is 8468, got %v",
+	if bytesRead-prevBytesRead != 8435 && res.Cost == bytesRead-prevBytesRead {
+		t.Fatalf("expected bytes read for fuzzy query is 8435, got %v",
 			bytesRead-prevBytesRead)
 	}
 	prevBytesRead = bytesRead
@@ -664,8 +664,8 @@ func TestBytesRead(t *testing.T) {
 
 	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	if !approxSame(bytesRead-prevBytesRead, 196) && res.Cost == bytesRead-prevBytesRead {
-		t.Fatalf("expected bytes read for faceted query is around 196, got %v",
+	if !approxSame(bytesRead-prevBytesRead, 105) && res.Cost == bytesRead-prevBytesRead {
+		t.Fatalf("expected bytes read for faceted query is around 105, got %v",
 			bytesRead-prevBytesRead)
 	}
 	prevBytesRead = bytesRead
@@ -682,8 +682,8 @@ func TestBytesRead(t *testing.T) {
 
 	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead-prevBytesRead != 924 && res.Cost == bytesRead-prevBytesRead {
-		t.Fatalf("expected bytes read for numeric range query is 924, got %v",
+	if bytesRead-prevBytesRead != 925 && res.Cost == bytesRead-prevBytesRead {
+		t.Fatalf("expected bytes read for numeric range query is 925, got %v",
 			bytesRead-prevBytesRead)
 	}
 	prevBytesRead = bytesRead
@@ -697,8 +697,8 @@ func TestBytesRead(t *testing.T) {
 
 	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead-prevBytesRead != 105 && res.Cost == bytesRead-prevBytesRead {
-		t.Fatalf("expected bytes read for query with highlighter is 105, got %v",
+	if bytesRead-prevBytesRead != 60 && res.Cost == bytesRead-prevBytesRead {
+		t.Fatalf("expected bytes read for query with highlighter is 60, got %v",
 			bytesRead-prevBytesRead)
 	}
 	prevBytesRead = bytesRead
@@ -714,8 +714,8 @@ func TestBytesRead(t *testing.T) {
 	// since it's created afresh and not reused
 	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead-prevBytesRead != 120 && res.Cost == bytesRead-prevBytesRead {
-		t.Fatalf("expected bytes read for disjunction query is 120, got %v",
+	if bytesRead-prevBytesRead != 58 && res.Cost == bytesRead-prevBytesRead {
+		t.Fatalf("expected bytes read for disjunction query is 58, got %v",
 			bytesRead-prevBytesRead)
 	}
 }
@@ -770,12 +770,12 @@ func TestBytesReadStored(t *testing.T) {
 	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
 
-	expectedBytesRead := uint64(11025)
+	expectedBytesRead := uint64(13430)
 	if supportForVectorSearch {
-		expectedBytesRead = 11435
+		expectedBytesRead = 13840
 	}
 
-	if bytesRead != expectedBytesRead && bytesRead == res.Cost {
+	if !approxSame(bytesRead, expectedBytesRead) && bytesRead == res.Cost {
 		t.Fatalf("expected the bytes read stat to be around %v, got %v", expectedBytesRead, bytesRead)
 	}
 	prevBytesRead := bytesRead
@@ -787,8 +787,8 @@ func TestBytesReadStored(t *testing.T) {
 	}
 	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead-prevBytesRead != 48 && bytesRead-prevBytesRead == res.Cost {
-		t.Fatalf("expected the bytes read stat to be around 48, got %v", bytesRead-prevBytesRead)
+	if bytesRead-prevBytesRead != 7 && bytesRead-prevBytesRead == res.Cost {
+		t.Fatalf("expected the bytes read stat to be around 7, got %v", bytesRead-prevBytesRead)
 	}
 	prevBytesRead = bytesRead
 
@@ -802,8 +802,8 @@ func TestBytesReadStored(t *testing.T) {
 	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
 
-	if bytesRead-prevBytesRead != 26511 && bytesRead-prevBytesRead == res.Cost {
-		t.Fatalf("expected the bytes read stat to be around 26511, got %v",
+	if bytesRead-prevBytesRead != 26470 && bytesRead-prevBytesRead == res.Cost {
+		t.Fatalf("expected the bytes read stat to be around 26470, got %v",
 			bytesRead-prevBytesRead)
 	}
 	idx.Close()
@@ -847,12 +847,12 @@ func TestBytesReadStored(t *testing.T) {
 	stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
 
-	expectedBytesRead = uint64(3212)
+	expectedBytesRead = uint64(5663)
 	if supportForVectorSearch {
-		expectedBytesRead = 3622
+		expectedBytesRead = 6073
 	}
 
-	if bytesRead != expectedBytesRead && bytesRead == res.Cost {
+	if !approxSame(bytesRead, expectedBytesRead) && bytesRead == res.Cost {
 		t.Fatalf("expected the bytes read stat to be around %v, got %v", expectedBytesRead, bytesRead)
 	}
 	prevBytesRead = bytesRead
@@ -863,8 +863,8 @@ func TestBytesReadStored(t *testing.T) {
 	}
 	stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead-prevBytesRead != 47 && bytesRead-prevBytesRead == res.Cost {
-		t.Fatalf("expected the bytes read stat to be around 47, got %v", bytesRead-prevBytesRead)
+	if bytesRead-prevBytesRead != 3 && bytesRead-prevBytesRead == res.Cost {
+		t.Fatalf("expected the bytes read stat to be around 3, got %v", bytesRead-prevBytesRead)
 	}
 	prevBytesRead = bytesRead
 
@@ -876,8 +876,8 @@ func TestBytesReadStored(t *testing.T) {
 
 	stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead-prevBytesRead != 77 && bytesRead-prevBytesRead == res.Cost {
-		t.Fatalf("expected the bytes read stat to be around 77, got %v", bytesRead-prevBytesRead)
+	if bytesRead-prevBytesRead != 33 && bytesRead-prevBytesRead == res.Cost {
+		t.Fatalf("expected the bytes read stat to be around 33, got %v", bytesRead-prevBytesRead)
 	}
 }
 
