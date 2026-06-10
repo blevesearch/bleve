@@ -38,10 +38,20 @@ func TestDisjunctionSearchScoreIndexWithCompositeFields(t *testing.T) {
 			upHits[0].ID, upHits[1].ID, scHits[0].ID, scHits[1].ID)
 	}
 
-	if scHits[0].Score != upHits[0].Score || scHits[1].Score != upHits[1].Score {
-		t.Errorf("upsidedown, scorch showing different scores;\n"+
-			"upsidedown: (%+v, %+v), scorch: (%+v, %+v)\n",
-			*upHits[0].Expl, *upHits[1].Expl, *scHits[0].Expl, *scHits[1].Expl)
+	// Note: upsidedown uses TF-IDF (does not implement BM25Reader) while scorch
+	// uses BM25 since MB-58901 (cbafdca0). Cross-engine score equality no longer
+	// holds.  Verify per-engine score ordering and positivity instead.
+	for name, hits := range map[string][]*search.DocumentMatch{
+		"upsidedown": upHits,
+		"scorch":     scHits,
+	} {
+		if hits[0].Score <= 0 || hits[1].Score <= 0 {
+			t.Errorf("%s: expected positive scores, got %v, %v", name, hits[0].Score, hits[1].Score)
+		}
+		if hits[0].Score < hits[1].Score {
+			t.Errorf("%s: expected hits[0] score >= hits[1] score, got %v < %v",
+				name, hits[0].Score, hits[1].Score)
+		}
 	}
 }
 

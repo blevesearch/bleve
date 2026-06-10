@@ -133,9 +133,10 @@ func TestIndexReader(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectedMatch := &index.TermFieldDoc{
-		ID:   internalID2,
-		Freq: 1,
-		Norm: 0.5773502588272095,
+		ID:       internalID2,
+		Freq:     1,
+		Norm:     0.5773502588272095,
+		NormByte: 0x5c, // SmallFloat encoding of fieldLen=3 ("eat more rice")
 		Vectors: []*index.TermFieldVector{
 			{
 				Field: "desc",

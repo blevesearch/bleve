@@ -136,12 +136,21 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 	return nil, nil
 }
 
+// normByteProvider is the optional interface implemented by zapx.Posting
+// to expose the raw SmallFloat norm byte from the norm column (§20/§25).
+type normByteProvider interface {
+	NormByte() uint8
+}
+
 func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Posting, rv *index.TermFieldDoc) {
 	if i.includeFreq {
 		rv.Freq = next.Frequency()
 	}
 	if i.includeNorm {
 		rv.Norm = next.Norm()
+		if nb, ok := next.(normByteProvider); ok {
+			rv.NormByte = nb.NormByte()
+		}
 	}
 	if i.includeTermVectors {
 		locs := next.Locations()
