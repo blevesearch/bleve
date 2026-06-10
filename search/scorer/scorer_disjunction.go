@@ -59,12 +59,12 @@ func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	return rv
 }
 
-// ScoreFast is a lightweight variant of Score for the MAXSCORE lazy path.
+// ScoreImpact is a lightweight variant of Score for the MAXSCORE lazy path.
 // In that path, scoreCurrentDoc (TermQueryScorer.ScoreInto) only sets Score —
 // FieldTermLocations is never written, and s.options.Explain is always false.
-// ScoreFast skips MergeFieldTermLocations and the explain branch so it stays
+// ScoreImpact skips MergeFieldTermLocations and the explain branch so it stays
 // inlinable (cost < 80), allowing the call in nextMAXSCORE to be folded in.
-func (s *DisjunctionQueryScorer) ScoreFast(constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
+func (s *DisjunctionQueryScorer) ScoreImpact(constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
 	rv := constituents[0]
 	var sum float64
 	for _, docMatch := range constituents {

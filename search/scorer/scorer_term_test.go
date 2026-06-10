@@ -17,6 +17,7 @@ package scorer
 import (
 	"math"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -257,4 +258,23 @@ func TestTermScorerWithQueryNorm(t *testing.T) {
 		}
 	}
 
+}
+
+func TestGetBM25ImpactTableConcurrent(t *testing.T) {
+	// Verify no data race when multiple goroutines call getBM25ImpactTable
+	// concurrently with the same avgDocLen (hot path) and different avgDocLen
+	// values (rebuild path). Run with -race to catch unsynchronized access.
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		avgDocLen := float64(100 + i%3) // 3 distinct values → mix of hits and rebuilds
+		go func(avg float64) {
+			defer wg.Done()
+			tbl := getBM25ImpactTable(avg)
+			if tbl == nil {
+				t.Errorf("getBM25ImpactTable returned nil")
+			}
+		}(avgDocLen)
+	}
+	wg.Wait()
 }

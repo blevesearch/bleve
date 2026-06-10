@@ -64,23 +64,10 @@ type DisjunctionSliceSearcher struct {
 	// though MaxImpact() is constant for the lifetime of a query.
 	//
 	// Nil = not yet initialised.  Non-nil but zero-length
-	// (wandUnavailableImpacts) = WAND cannot be applied for this query
+	// (maxImpactFallback) = WAND cannot be applied for this query
 	// (non-BM25 scorer, or at least one term returned math.MaxFloat64).
 	//
 	// See zapx/inverted_text_cache.go for the full cache-hierarchy diagram.
-	//
-	// FUTURE optimisations considered but not yet implemented:
-	//   1. Snapshot-level maxTFNorm cache: IndexSnapshotTermFieldReader.MaxTFNorm
-	//      currently iterates N segments per term per query.  Caching the
-	//      cross-segment max on IndexSnapshot would cut initWANDMaxImpacts from
-	//      ~900 ns to ~30 ns for a 3-term/15-segment query.
-	//   2. Block-max WAND (Lucene ImpactsDISI): store max-impact per 128-doc
-	//      block in the posting list; skip entire blocks when block_max <
-	//      threshold rather than checking every doc.  Requires format change.
-	//   3. res.Total accuracy: pruned candidates are not counted in
-	//      ctx.Collector's total, mirroring Lucene's approximate-total mode.
-	//      A TotalRelation field on SearchResult should expose this
-	//      (symmetric with the existing Total field name).
 	wandMaxImpacts []float64
 
 	// maxscoreOrder is an argsort of wandMaxImpacts ascending (lowest MaxImpact
@@ -157,9 +144,9 @@ type DisjunctionSliceSearcher struct {
 	parallelPos     int
 }
 
-// wandUnavailableImpacts is a non-nil zero-length sentinel stored in
+// maxImpactFallback is a non-nil zero-length sentinel stored in
 // wandMaxImpacts when WAND cannot be applied for the current query.
-var wandUnavailableImpacts = make([]float64, 0)
+var maxImpactFallback = make([]float64, 0)
 
 func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
@@ -337,18 +324,18 @@ type segmentSkipper interface {
 // wandMaxImpacts slice so the per-candidate hot path only does array reads
 // and float additions with no interface dispatch or type assertions.
 // Also builds maxscoreOrder (argsort of wandMaxImpacts ascending) for MAXSCORE.
-// Sets wandMaxImpacts to wandUnavailableImpacts if WAND cannot be applied.
+// Sets wandMaxImpacts to maxImpactFallback if WAND cannot be applied.
 func (s *DisjunctionSliceSearcher) initWANDMaxImpacts() {
 	mi := make([]float64, len(s.searchers))
 	for i, searcher := range s.searchers {
 		wi, ok := searcher.(wandImpacter)
 		if !ok {
-			s.wandMaxImpacts = wandUnavailableImpacts
+			s.wandMaxImpacts = maxImpactFallback
 			return
 		}
 		v := wi.MaxImpact()
 		if v >= math.MaxFloat64 {
-			s.wandMaxImpacts = wandUnavailableImpacts
+			s.wandMaxImpacts = maxImpactFallback
 			return
 		}
 		mi[i] = v
@@ -750,10 +737,10 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 			if s.retrieveScoreBreakdown {
 				rv = s.scorer.ScoreAndExplBreakdown(ctx, s.matching, s.matchingIdxs, s.originalPos, s.numSearchers)
 			} else if lazy {
-				// ScoreFast is inlinable (cost 37 < 80): skips MergeFieldTermLocations
+				// ScoreImpact is inlinable (cost 37 < 80): skips MergeFieldTermLocations
 				// and the explain branch (neither ever fires in the lazy BM25 path —
 				// scoreCurrentDoc only sets Score, never FieldTermLocations or Expl).
-				rv = s.scorer.ScoreFast(s.matching, len(s.matching), s.numSearchers)
+				rv = s.scorer.ScoreImpact(s.matching, len(s.matching), s.numSearchers)
 			} else {
 				rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
 			}

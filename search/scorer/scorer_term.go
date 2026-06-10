@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sync"
 
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
@@ -29,6 +30,62 @@ var reflectStaticSizeTermQueryScorer int
 func init() {
 	var tqs TermQueryScorer
 	reflectStaticSizeTermQueryScorer = int(reflect.TypeOf(tqs).Size())
+}
+
+// bm25ImpactTable stores pre-computed tfNorm(freq, normByte) values for BM25 scoring.
+// Indexed as [freq][normByte]; freq=0 is unused. Built once per avgDocLen, cached globally.
+type bm25ImpactTable [MaxSqrtCache][256]float32
+
+// bm25TableCache holds the globally-cached impact table. Rebuilt lazily when avgDocLen changes.
+var bm25TableCache struct {
+	mu        sync.Mutex
+	avgDocLen float64
+	table     *bm25ImpactTable
+}
+
+// bm25SmallFloatFieldLen decodes a SmallFloat norm byte into the field length it represents.
+// Duplicates zapx normDecodeSmallFloat (in zapx/section_norm_column.go) to avoid a circular
+// import. TODO: expose NormByteToFloat from bleve_index_api so both sides share one implementation.
+func bm25SmallFloatFieldLen(nb uint8) float64 {
+	if nb == 0 {
+		return 0
+	}
+	mantissa := float64(nb&0x7)/8.0 + 1.0
+	exp := int(nb>>3) - 10
+	v := math.Ldexp(mantissa, exp)
+	if v < 1 {
+		return 1
+	}
+	return math.Round(v)
+}
+
+// getBM25ImpactTable returns (and builds if needed) the shared BM25 impact table.
+func getBM25ImpactTable(avgDocLen float64) *bm25ImpactTable {
+	bm25TableCache.mu.Lock()
+	defer bm25TableCache.mu.Unlock()
+	if bm25TableCache.table != nil && bm25TableCache.avgDocLen == avgDocLen {
+		return bm25TableCache.table
+	}
+	t := new(bm25ImpactTable)
+	k1 := search.BM25_k1
+	b := search.BM25_b
+	for freq := 1; freq < MaxSqrtCache; freq++ {
+		tf := SqrtCache[freq]
+		for nb := 0; nb < 256; nb++ {
+			fieldLen := bm25SmallFloatFieldLen(uint8(nb))
+			var tfNorm float64
+			if fieldLen == 0 {
+				// normByte=0 sentinel: replicate docScore behaviour (norm→Inf, fieldLength→0)
+				tfNorm = tf * k1 / (tf + k1*(1-b))
+			} else {
+				tfNorm = tf * k1 / (tf + k1*(1-b+b*fieldLen/avgDocLen))
+			}
+			t[freq][uint8(nb)] = float32(tfNorm)
+		}
+	}
+	bm25TableCache.avgDocLen = avgDocLen
+	bm25TableCache.table = t
+	return t
 }
 
 type TermQueryScorer struct {
@@ -45,6 +102,8 @@ type TermQueryScorer struct {
 	queryNorm              float64
 	queryWeight            float64
 	queryWeightExplanation *search.Explanation
+	impactTable            *bm25ImpactTable // nil for TF-IDF scoring
+	idfQueryWeight         float64          // idf * queryWeight; updated in SetQueryNorm
 }
 
 func (s *TermQueryScorer) Size() int {
@@ -106,6 +165,12 @@ func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64,
 		}
 	}
 
+	// §25: build/share the BM25 impact table for fast per-posting scoring.
+	// Only for BM25 (avgDocLength > 0) and when scores are actually needed.
+	if avgDocLength > 0 && rv.includeScore && !options.Explain {
+		rv.impactTable = getBM25ImpactTable(avgDocLength)
+	}
+
 	return &rv
 }
 
@@ -129,6 +194,7 @@ func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 
 	// update the query weight
 	s.queryWeight = s.queryBoost * s.idf * s.queryNorm
+	s.idfQueryWeight = s.idf * s.queryWeight
 
 	if s.options.Explain {
 		childrenExplanations := make([]*search.Explanation, 3)
@@ -211,35 +277,43 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 	// perform any score computations only when needed
 	if s.includeScore || s.options.Explain {
 		var scoreExplanation *search.Explanation
-		var tf float64
-		if termMatch.Freq < MaxSqrtCache {
-			tf = SqrtCache[int(termMatch.Freq)]
+		var score float64
+
+		// §25 fast path: table lookup replaces float64 BM25 math.
+		// impactTable is nil when Explain=true, so Explain always takes the else path.
+		if s.impactTable != nil && termMatch.NormByte != 0 && termMatch.Freq < MaxSqrtCache {
+			score = float64(s.impactTable[termMatch.Freq][termMatch.NormByte]) * s.idfQueryWeight
 		} else {
-			tf = math.Sqrt(float64(termMatch.Freq))
-		}
-
-		score, scoringModel := s.docScore(tf, termMatch.Norm)
-		if s.options.Explain {
-			childrenExplanations := s.scoreExplanation(tf, termMatch)
-			scoreExplanation = &search.Explanation{
-				Value: score,
-				Message: fmt.Sprintf("fieldWeight(%s:%s in %s), as per %s model, "+
-					"product of:", s.queryField, s.queryTerm, termMatch.ID, scoringModel),
-				Children: childrenExplanations,
+			var tf float64
+			if termMatch.Freq < MaxSqrtCache {
+				tf = SqrtCache[int(termMatch.Freq)]
+			} else {
+				tf = math.Sqrt(float64(termMatch.Freq))
 			}
-		}
+			var scoringModel string
+			score, scoringModel = s.docScore(tf, termMatch.Norm)
 
-		// if the query weight isn't 1, multiply
-		if s.queryWeight != 1.0 {
-			score = score * s.queryWeight
 			if s.options.Explain {
-				childExplanations := make([]*search.Explanation, 2)
-				childExplanations[0] = s.queryWeightExplanation
-				childExplanations[1] = scoreExplanation
+				childrenExplanations := s.scoreExplanation(tf, termMatch)
 				scoreExplanation = &search.Explanation{
-					Value:    score,
-					Message:  fmt.Sprintf("weight(%s:%s^%f in %s), product of:", s.queryField, s.queryTerm, s.queryBoost, termMatch.ID),
-					Children: childExplanations,
+					Value: score,
+					Message: fmt.Sprintf("fieldWeight(%s:%s in %s), as per %s model, "+
+						"product of:", s.queryField, s.queryTerm, termMatch.ID, scoringModel),
+					Children: childrenExplanations,
+				}
+			}
+
+			if s.queryWeight != 1.0 {
+				score = score * s.queryWeight
+				if s.options.Explain {
+					childExplanations := make([]*search.Explanation, 2)
+					childExplanations[0] = s.queryWeightExplanation
+					childExplanations[1] = scoreExplanation
+					scoreExplanation = &search.Explanation{
+						Value:    score,
+						Message:  fmt.Sprintf("weight(%s:%s^%f in %s), product of:", s.queryField, s.queryTerm, s.queryBoost, termMatch.ID),
+						Children: childExplanations,
+					}
 				}
 			}
 		}
@@ -291,17 +365,22 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 // threshold, skipping BM25 for pruned candidates.
 func (s *TermQueryScorer) ScoreInto(tfd *index.TermFieldDoc, rv *search.DocumentMatch) {
 	if s.includeScore {
-		var tf float64
-		if tfd.Freq < MaxSqrtCache {
-			tf = SqrtCache[int(tfd.Freq)]
+		// §25 fast path: table lookup replaces float64 BM25 math.
+		if s.impactTable != nil && tfd.NormByte != 0 && tfd.Freq < MaxSqrtCache {
+			rv.Score = float64(s.impactTable[tfd.Freq][tfd.NormByte]) * s.idfQueryWeight
 		} else {
-			tf = math.Sqrt(float64(tfd.Freq))
+			var tf float64
+			if tfd.Freq < MaxSqrtCache {
+				tf = SqrtCache[int(tfd.Freq)]
+			} else {
+				tf = math.Sqrt(float64(tfd.Freq))
+			}
+			score, _ := s.docScore(tf, tfd.Norm)
+			if s.queryWeight != 1.0 {
+				score *= s.queryWeight
+			}
+			rv.Score = score
 		}
-		score, _ := s.docScore(tf, tfd.Norm)
-		if s.queryWeight != 1.0 {
-			score *= s.queryWeight
-		}
-		rv.Score = score
 	}
 	if len(tfd.Vectors) > 0 {
 		if cap(rv.FieldTermLocations) < len(tfd.Vectors) {
