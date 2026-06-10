@@ -173,9 +173,27 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 			if err != nil {
 				return nil, err
 			}
-			// close the current term field reader before replacing it with a new one
-			_ = i.Close()
-			*i = *(i2.(*IndexSnapshotTermFieldReader))
+			i2tfr := i2.(*IndexSnapshotTermFieldReader)
+			// Account for the current reader's lifecycle before we overwrite it.
+			// We cannot call i.Close() here because the caller still holds i's
+			// pointer — Close() would recycle i into the pool, making i available
+			// to another goroutine while we then write *i = *i2tfr. That is a
+			// data race (MB-64604). Instead, replicate the non-recycle parts of
+			// Close() and skip recycleTermFieldReader.
+			if i.ctx != nil {
+				if fn := i.ctx.Value(search.SearchIOStatsCallbackKey); fn != nil {
+					fn.(search.SearchIOStatsCallbackFunc)(i.bytesRead)
+				}
+				search.RecordSearchCost(i.ctx, search.AddM, i.bytesRead)
+			}
+			if i.snapshot != nil {
+				atomic.AddUint64(&i.snapshot.parent.stats.TotTermSearchersFinished, uint64(1))
+			}
+			// Overwrite i in-place so the caller's pointer remains valid.
+			// i2tfr is now an orphan; clear its recycle flag so it cannot be
+			// added to the pool a second time if Close() is called on it.
+			*i = *i2tfr
+			i2tfr.recycle = false
 		} else {
 			// unadorned composite optimization
 			// we need to reset all the iterators
