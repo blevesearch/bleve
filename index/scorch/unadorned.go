@@ -184,6 +184,28 @@ type ResetablePostingsIterator interface {
 	ResetIterator()
 }
 
+// freshIteratorForShard creates a fresh, reset-to-start iterator from an
+// existing unadorned postings iterator. The new iterator shares the same
+// read-only bitmap data as the source but has independent position state,
+// making it safe for a shard goroutine to consume concurrently.
+// Used by ShardView when the parent TFR has nil postings (unadorned path).
+func freshIteratorForShard(src segment.PostingsIterator) segment.PostingsIterator {
+	if src == nil {
+		return anEmptyPostingsIterator
+	}
+	switch it := src.(type) {
+	case *unadornedPostingsIteratorBitmap:
+		if it.actualBM != nil {
+			return newUnadornedPostingsIteratorFromBitmap(it.actualBM)
+		}
+		return anEmptyPostingsIterator
+	case *unadornedPostingsIterator1Hit:
+		return newUnadornedPostingsIteratorFrom1Hit(it.docNumOrig)
+	default:
+		return anEmptyPostingsIterator
+	}
+}
+
 type UnadornedPosting struct {
 	docNum uint64
 }
