@@ -104,7 +104,7 @@ func TestCustomFilterQueryMarshalJSONPreservesPayloadAndRewritesChild(t *testing
 	}
 
 	q := NewCustomFilterQueryWithFilter(NewMatchQuery("ipa"),
-		func(d *search.DocumentMatch) bool { return true }, []string{"abv"}, payload)
+		func(d *search.DocumentMatch) (bool, error) { return true, nil }, []string{"abv"}, payload)
 
 	out, err := q.MarshalJSON()
 	if err != nil {
@@ -154,7 +154,7 @@ func TestCustomScoreQueryMarshalJSONPreservesPayloadAndRewritesChild(t *testing.
 	}
 
 	q := NewCustomScoreQueryWithScorer(NewMatchQuery("ipa"),
-		func(d *search.DocumentMatch) float64 { return d.Score }, []string{"ibu"}, payload)
+		func(d *search.DocumentMatch) (float64, error) { return d.Score, nil }, []string{"ibu"}, payload)
 
 	out, err := q.MarshalJSON()
 	if err != nil {
