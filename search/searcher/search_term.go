@@ -39,8 +39,14 @@ type TermSearcher struct {
 	reader       index.TermFieldReader
 	scorer       *scorer.TermQueryScorer
 	tfd          index.TermFieldDoc
-	cachedMaxImpact    float64 // cached result of MaxImpact(); 0 = not yet computed
-	maxImpactComputed  bool
+	cachedMaxImpact   float64 // cached result of MaxImpact(); 0 = not yet computed
+	maxImpactComputed bool
+	// Stored for §7 parallel segment search: ForSegmentRange() needs these to
+	// re-open a shard-restricted TFR with a consistent scorer.
+	term    []byte
+	field   string
+	boost   float64
+	options search.SearcherOptions
 }
 
 func NewTermSearcher(ctx context.Context, indexReader index.IndexReader,
@@ -151,6 +157,10 @@ func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReade
 		indexReader: indexReader,
 		reader:      reader,
 		scorer:      scorer,
+		term:        term,
+		field:       field,
+		boost:       boost,
+		options:     options,
 	}, nil
 }
 
@@ -295,6 +305,57 @@ func (s *TermSearcher) FirstDocIDOfSegment(segIdx int, buf []byte) index.IndexIn
 		return r.FirstDocIDOfSegment(segIdx, buf)
 	}
 	return nil
+}
+
+// shardableReader is implemented by scorch.IndexSnapshotTermFieldReader.
+// ShardView creates a lightweight shard TFR by borrowing dicts and postings
+// from the existing TFR (read-only sub-slices) and allocating only new
+// iterators, avoiding the expensive dict/posting setup cost.
+type shardableReader interface {
+	ShardView(startSeg, endSeg int) (index.TermFieldReader, error)
+}
+
+// segmentRanger is implemented by scorch.IndexSnapshot for §7 parallel
+// segment search. Used as a fallback when shardableReader is unavailable.
+type segmentRanger interface {
+	TermFieldReaderForSegmentRange(ctx context.Context, term []byte, field string,
+		includeFreq, includeNorm, includeTermVectors bool,
+		startSeg, endSeg int) (index.TermFieldReader, error)
+}
+
+// ForSegmentRange creates a new TermSearcher restricted to segments
+// [startSeg, endSeg) of the same index snapshot. The scorer is shared with
+// the original to ensure consistent IDF and query weights across shards.
+// Used by §7 parallel segment search.
+func (s *TermSearcher) ForSegmentRange(ctx context.Context, startSeg, endSeg int) (*TermSearcher, error) {
+	var reader index.TermFieldReader
+	var err error
+	if svr, ok := s.reader.(shardableReader); ok {
+		// Fast path: borrow dicts/postings from existing TFR, only create fresh iterators.
+		reader, err = svr.ShardView(startSeg, endSeg)
+	} else {
+		// Fallback: full shard TFR creation (used for non-scorch index types).
+		ranger, ok2 := s.indexReader.(segmentRanger)
+		if !ok2 {
+			return nil, fmt.Errorf("indexReader does not support TermFieldReaderForSegmentRange")
+		}
+		needFreqNorm := s.options.Score != "none"
+		reader, err = ranger.TermFieldReaderForSegmentRange(ctx, s.term, s.field,
+			needFreqNorm, needFreqNorm, s.options.IncludeTermVectors, startSeg, endSeg)
+	}
+	if err != nil {
+		return nil, err
+	}
+	// Reuse the same scorer so IDF and query weights are identical across shards.
+	return &TermSearcher{
+		indexReader: s.indexReader,
+		reader:      reader,
+		scorer:      s.scorer,
+		term:        s.term,
+		field:       s.field,
+		boost:       s.boost,
+		options:     s.options,
+	}, nil
 }
 
 func (s *TermSearcher) SetQueryNorm(qnorm float64) {

@@ -41,6 +41,11 @@ type IndexSnapshotTermFieldReader struct {
 	postings           []segment.PostingsList
 	iterators          []segment.PostingsIterator
 	segmentOffset      int
+	// segmentBase is non-zero for shard TFRs created by TermFieldReaderForSegmentRange
+	// (§7 parallel segment search). A shard TFR covers only snapshot.segment[segmentBase:
+	// segmentBase+len(iterators)]; segmentOffset is relative to this range.
+	// For normal full-index TFRs segmentBase == 0 and len(iterators) == len(snapshot.segment).
+	segmentBase        int
 	includeFreq        bool
 	includeNorm        bool
 	includeTermVectors bool
@@ -107,7 +112,7 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 		}
 		if next != nil {
 			// make segment number into global number by adding offset
-			globalOffset := i.snapshot.offsets[i.segmentOffset]
+			globalOffset := i.snapshot.offsets[i.segmentBase+i.segmentOffset]
 			nnum := next.Number()
 			rv.ID = index.NewIndexInternalID(rv.ID, nnum+globalOffset)
 			i.postingToTermFieldDoc(next, rv)
@@ -168,8 +173,19 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 		// Such a TFR will NOT have a valid `term` or `field` set, making it
 		// impossible for the TFR to replace itself with a new one.
 		if !i.unadorned {
-			i2, err := i.snapshot.TermFieldReader(context.TODO(), i.term, i.field,
-				i.includeFreq, i.includeNorm, i.includeTermVectors)
+			// For shard TFRs (§7 parallel segment search), restart within the shard
+			// range only so we don't escape the assigned segment group.
+			isShardTFR := i.segmentBase > 0 || len(i.iterators) < len(i.snapshot.segment)
+			var i2 index.TermFieldReader
+			var err error
+			if isShardTFR {
+				endSeg := i.segmentBase + len(i.iterators)
+				i2, err = i.snapshot.TermFieldReaderForSegmentRange(context.TODO(), i.term, i.field,
+					i.includeFreq, i.includeNorm, i.includeTermVectors, i.segmentBase, endSeg)
+			} else {
+				i2, err = i.snapshot.TermFieldReader(context.TODO(), i.term, i.field,
+					i.includeFreq, i.includeNorm, i.includeTermVectors)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -212,8 +228,20 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 		return nil, fmt.Errorf("computed segment index %d out of bounds %d",
 			segIndex, len(i.snapshot.segment))
 	}
+	// For shard TFRs (§7): translate global segIndex to shard-relative offset.
+	shardSegOffset := segIndex - i.segmentBase
+	if shardSegOffset < 0 {
+		// Target is before this shard; return the first match in the shard.
+		i.segmentOffset = 0
+		return i.Next(preAlloced)
+	}
+	if shardSegOffset >= len(i.iterators) {
+		// Target is after this shard; shard is exhausted.
+		i.segmentOffset = len(i.iterators)
+		return nil, nil
+	}
 	// skip directly to the target segment
-	i.segmentOffset = segIndex
+	i.segmentOffset = shardSegOffset
 	next, err := i.iterators[i.segmentOffset].Advance(ldocNum)
 	if err != nil {
 		return nil, err
@@ -277,9 +305,11 @@ func (i *IndexSnapshotTermFieldReader) MaxTFNorm(avgDocLength float64) float32 {
 	return maxV
 }
 
-// NumSegments returns the number of segments in the index snapshot.
+// NumSegments returns the number of segments covered by this TFR.
+// For shard TFRs (§7) this is the shard's segment count; for normal TFRs it
+// equals len(snapshot.segment).
 func (i *IndexSnapshotTermFieldReader) NumSegments() int {
-	return len(i.snapshot.segment)
+	return len(i.iterators)
 }
 
 // MaxTFNormForSegment returns the max BM25 tf-norm for this term in a specific
@@ -299,23 +329,80 @@ func (i *IndexSnapshotTermFieldReader) MaxTFNormForSegment(segIdx int, avgDocLen
 	return 0
 }
 
-// SegmentIndexOf returns the segment index for the given global docID.
+// SegmentIndexOf returns the shard-relative segment index for the given global
+// docID. For normal TFRs this equals the global segment index; for shard TFRs
+// (§7) it is global_index − segmentBase.
 func (i *IndexSnapshotTermFieldReader) SegmentIndexOf(id index.IndexInternalID) int {
 	num, err := id.Value()
 	if err != nil {
 		return 0
 	}
 	segIdx, _ := i.snapshot.segmentIndexAndLocalDocNumFromGlobal(num)
-	return segIdx
+	return segIdx - i.segmentBase
 }
 
-// FirstDocIDOfSegment returns the first global docID in segment segIdx, using
-// buf for the backing storage. Returns nil if segIdx >= NumSegments().
+// FirstDocIDOfSegment returns the first global docID in the shard-relative
+// segment segIdx, using buf for the backing storage. Returns nil if segIdx is
+// out of range.
 func (i *IndexSnapshotTermFieldReader) FirstDocIDOfSegment(segIdx int, buf []byte) index.IndexInternalID {
-	if segIdx >= len(i.snapshot.offsets) {
+	globalIdx := i.segmentBase + segIdx
+	if globalIdx >= len(i.snapshot.offsets) {
 		return nil
 	}
-	return index.NewIndexInternalID(buf, i.snapshot.offsets[segIdx])
+	return index.NewIndexInternalID(buf, i.snapshot.offsets[globalIdx])
+}
+
+// ShardView creates a lightweight shard TFR covering segments [startSeg, endSeg)
+// that borrows dicts and postings (read-only sub-slices) from this TFR and
+// allocates only fresh iterators. This avoids the expensive dict/posting setup
+// cost of TermFieldReaderForSegmentRange. Used by §7 parallel search via
+// TermSearcher.ForSegmentRange. Multiple ShardViews can safely share the same
+// TFR's postings concurrently: PostingsList.Iterator() is a read-only operation
+// that creates a new independent iterator from the shared mmap'd posting data.
+//
+// Unadorned TFRs (postings == nil, produced by optimize.go bitmap push-down)
+// are handled by copying fresh independent iterators from the parent's
+// pre-computed per-segment iterator slice rather than from postings.
+func (i *IndexSnapshotTermFieldReader) ShardView(startSeg, endSeg int) (index.TermFieldReader, error) {
+	n := endSeg - startSeg
+	rv := &IndexSnapshotTermFieldReader{
+		term:               i.term,
+		field:              i.field,
+		snapshot:           i.snapshot,
+		segmentBase:        startSeg,
+		iterators:          make([]segment.PostingsIterator, n),
+		segmentOffset:      0,
+		includeFreq:        i.includeFreq,
+		includeNorm:        i.includeNorm,
+		includeTermVectors: i.includeTermVectors,
+		updateBytesRead:    i.updateBytesRead,
+		unadorned:          i.unadorned,
+		recycle:            false,
+		ctx:                i.ctx,
+	}
+	if len(i.dicts) > 0 {
+		rv.dicts = i.dicts[startSeg:endSeg]
+	}
+	if len(i.postings) > 0 {
+		rv.postings = i.postings[startSeg:endSeg]
+		for j := 0; j < n; j++ {
+			if rv.postings[j] != nil {
+				rv.iterators[j] = rv.postings[j].Iterator(i.includeFreq, i.includeNorm, i.includeTermVectors, nil)
+			}
+		}
+	} else {
+		// Unadorned path: no postings, but pre-computed bitmap/1-hit iterators
+		// per segment set by OptimizeTFRConjunctionUnadorned.Finish (etc.).
+		// Each shard goroutine needs its own independent iterator state, so we
+		// create a fresh iterator backed by the same read-only bitmap data.
+		for j := 0; j < n; j++ {
+			if startSeg+j < len(i.iterators) {
+				rv.iterators[j] = freshIteratorForShard(i.iterators[startSeg+j])
+			}
+		}
+	}
+	atomic.AddUint64(&i.snapshot.parent.stats.TotTermSearchersStarted, uint64(1))
+	return rv, nil
 }
 
 func (i *IndexSnapshotTermFieldReader) Count() uint64 {

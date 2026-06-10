@@ -701,6 +701,61 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 	return rv, nil
 }
 
+// TermFieldReaderForSegmentRange creates a non-recyclable TermFieldReader that
+// covers only segments [startSeg, endSeg) of this snapshot. It is used by §7
+// parallel segment search to assign disjoint segment groups to goroutines.
+// The returned TFR has segmentBase=startSeg so global doc IDs are preserved.
+func (is *IndexSnapshot) TermFieldReaderForSegmentRange(
+	ctx context.Context, term []byte, field string,
+	includeFreq, includeNorm, includeTermVectors bool,
+	startSeg, endSeg int,
+) (index.TermFieldReader, error) {
+	segs := is.segment[startSeg:endSeg]
+	n := len(segs)
+	rv := &IndexSnapshotTermFieldReader{
+		ctx:                ctx,
+		term:               term,
+		field:              field,
+		snapshot:           is,
+		segmentBase:        startSeg,
+		dicts:              make([]segment.TermDictionary, n),
+		postings:           make([]segment.PostingsList, n),
+		iterators:          make([]segment.PostingsIterator, n),
+		segmentOffset:      0,
+		includeFreq:        includeFreq,
+		includeNorm:        includeNorm,
+		includeTermVectors: includeTermVectors,
+		recycle: false, // sub-range TFR must not be returned to the snapshot pool
+	}
+
+	for i, s := range segs {
+		var dict segment.TermDictionary
+		var err error
+		if info, ok := is.updatedFields[field]; ok && (info.Index || info.Deleted) {
+			dict, err = s.segment.Dictionary("")
+		} else {
+			dict, err = s.segment.Dictionary(field)
+		}
+		if err != nil {
+			return nil, err
+		}
+		rv.dicts[i] = dict
+	}
+
+	for i, s := range segs {
+		pl, err := rv.dicts[i].PostingsList(term, s.deleted, nil)
+		if err != nil {
+			return nil, err
+		}
+		rv.postings[i] = pl
+		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, nil)
+	}
+
+	rv.updateBytesRead = includeFreq || includeNorm || includeTermVectors
+	atomic.AddUint64(&is.parent.stats.TotTermSearchersStarted, uint64(1))
+	return rv, nil
+}
+
 func (is *IndexSnapshot) allocTermFieldReaderDicts(field string) (tfr *IndexSnapshotTermFieldReader) {
 	is.m2.Lock()
 	if is.fieldTFRs != nil {
