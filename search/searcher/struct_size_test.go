@@ -12,16 +12,12 @@ import (
 // Size history:
 //
 //	384 bytes (6 cache lines) — original
-//	408 bytes — currIDs []uint64 cache (24 bytes: slice header); eliminates BigEndian
-//	            decode + pointer chase in nextMAXSCORE collect/advance loops
-//
-// §7 and §35 land later on this branch and grow this further (to 456, 464 and 488
-// respectively in the original ordering); their commits carry those updates.
+//	456 bytes — §7 added options/ctx/parallelResults/parallelPos (cold, end of struct)
 func TestDSSStructSize(t *testing.T) {
 	var s DisjunctionSliceSearcher
 	size := unsafe.Sizeof(s)
-	if size != 408 {
-		t.Errorf("DisjunctionSliceSearcher size = %d bytes, want 408; "+
+	if size != 480 {
+		t.Errorf("DisjunctionSliceSearcher size = %d bytes, want 480; "+
 			"update this test and the struct comment if you intentionally resized it", size)
 	}
 }
