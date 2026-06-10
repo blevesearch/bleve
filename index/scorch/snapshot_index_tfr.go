@@ -131,12 +131,21 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 	return nil, nil
 }
 
+// normColumnProvider is the optional interface implemented by zapx.Posting
+// to expose the exact analyzed field length from the norm column (§20/§25).
+type normColumnProvider interface {
+	NormColumn() uint32
+}
+
 func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Posting, rv *index.TermFieldDoc) {
 	if i.includeFreq {
 		rv.Freq = next.Frequency()
 	}
 	if i.includeNorm {
 		rv.Norm = next.Norm()
+		if ncp, ok := next.(normColumnProvider); ok {
+			rv.FieldLen = ncp.NormColumn()
+		}
 	}
 	if i.includeTermVectors {
 		locs := next.Locations()

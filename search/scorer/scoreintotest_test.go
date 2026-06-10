@@ -105,9 +105,10 @@ func TestScoreIntoNoVectors(t *testing.T) {
 	}
 }
 
-// TestScoreIntoTablePathMatchesFormula verifies the §25 impact-table fast path
-// inside ScoreInto gives the same score as the formula path.  The table path
-// is active when impactTable != nil AND NormByte != 0 AND Freq < MaxSqrtCache.
+// TestScoreIntoTablePathMatchesFormula verifies the §25 field-norm-table fast
+// path inside ScoreInto gives the same score as the formula path.  The table
+// path is active when fieldNormTable != nil AND FieldLen is in range AND
+// Freq < MaxSqrtCache.
 func TestScoreIntoTablePathMatchesFormula(t *testing.T) {
 	const avgDocLen = 50.0
 	scorer := NewTermQueryScorer(
@@ -116,28 +117,26 @@ func TestScoreIntoTablePathMatchesFormula(t *testing.T) {
 	)
 	scorer.SetQueryNorm(1.0) // required to initialize idfQueryWeight
 
-	// normByte=0x5c is a common value (corresponds to fieldLen≈3)
-	const normByte = uint8(0x5c)
+	const fieldLen = uint32(3)
 	const freq = uint64(2)
 
-	// Table path (NormByte != 0, Freq < MaxSqrtCache, impactTable != nil).
+	// Table path (FieldLen in range, Freq < MaxSqrtCache, fieldNormTable != nil).
 	tfdTable := &index.TermFieldDoc{
 		ID:       index.IndexInternalID("a"),
 		Freq:     freq,
-		NormByte: normByte,
+		FieldLen: fieldLen,
 	}
 	rvTable := &search.DocumentMatch{}
 	scorer.ScoreInto(tfdTable, rvTable)
 
-	// Formula path: set NormByte=0 to force the non-table branch.
-	// Compute expected norm from the SmallFloat byte to match what the table uses.
-	fieldLen := bm25SmallFloatFieldLen(normByte)
-	norm := float64(float32(1.0 / math.Sqrt(fieldLen)))
+	// Formula path: set FieldLen=0 to force the non-table branch, carrying the
+	// same field length through the norm zapx would have stored.
+	norm := float64(float32(1.0 / math.Sqrt(float64(fieldLen))))
 	tfdFormula := &index.TermFieldDoc{
 		ID:       index.IndexInternalID("a"),
 		Freq:     freq,
 		Norm:     norm,
-		NormByte: 0, // disable table path
+		FieldLen: 0, // disable table path
 	}
 	rvFormula := &search.DocumentMatch{}
 	scorer.ScoreInto(tfdFormula, rvFormula)

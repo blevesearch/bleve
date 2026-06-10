@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sync"
 
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
@@ -29,6 +30,67 @@ var reflectStaticSizeTermQueryScorer int
 func init() {
 	var tqs TermQueryScorer
 	reflectStaticSizeTermQueryScorer = int(reflect.TypeOf(tqs).Size())
+}
+
+// bm25FieldNormCacheSize bounds the pre-computed field-norm table.  Analyzed
+// field lengths at or above it fall back to the direct formula, so the bound
+// only trades a little speed on unusually long fields, never accuracy.
+const bm25FieldNormCacheSize = 4096
+
+// bm25FieldNormTable stores the pre-computed BM25 length-normalisation
+// denominator term, k1*(1 - b + b*fieldLength/avgDocLen), for every exact
+// analyzed field length below bm25FieldNormCacheSize.  Index 0 is the
+// "field length unavailable" sentinel and is unused.  Built once per
+// avgDocLen, cached globally.
+//
+// §20 stores the exact field length per document, so scoring indexes this
+// table directly instead of quantizing the length into a SmallFloat byte:
+// the fast path keeps its table lookup and gives bit-for-bit the same score
+// the full formula would.
+type bm25FieldNormTable [bm25FieldNormCacheSize]float64
+
+// bm25TableCache holds the globally-cached field-norm table. Rebuilt lazily when
+// avgDocLen changes.
+var bm25TableCache struct {
+	mu        sync.Mutex
+	avgDocLen float64
+	table     *bm25FieldNormTable
+}
+
+// bm25FieldNorm computes the BM25 length-normalisation denominator term for a
+// document of the given field length.
+func bm25FieldNorm(fieldLength, avgDocLen float64) float64 {
+	return search.BM25_k1 * (1 - search.BM25_b + (search.BM25_b * fieldLength / avgDocLen))
+}
+
+// fieldLengthFromNorm recovers the field length from bleve's stored norm
+// (= 1/sqrt(fieldLength)).
+func fieldLengthFromNorm(norm float64) float64 {
+	return 1 / (norm * norm)
+}
+
+// fieldLengthFromFieldLen converts an exact analyzed field length into the same
+// float64 field length the norm round-trip yields, so table-path and
+// formula-path scores agree exactly.
+func fieldLengthFromFieldLen(fieldLen uint32) float64 {
+	norm := float64(float32(1.0 / math.Sqrt(float64(fieldLen))))
+	return fieldLengthFromNorm(norm)
+}
+
+// getBM25FieldNormTable returns (and builds if needed) the shared field-norm table.
+func getBM25FieldNormTable(avgDocLen float64) *bm25FieldNormTable {
+	bm25TableCache.mu.Lock()
+	defer bm25TableCache.mu.Unlock()
+	if bm25TableCache.table != nil && bm25TableCache.avgDocLen == avgDocLen {
+		return bm25TableCache.table
+	}
+	t := new(bm25FieldNormTable)
+	for fieldLen := 1; fieldLen < bm25FieldNormCacheSize; fieldLen++ {
+		t[fieldLen] = bm25FieldNorm(fieldLengthFromFieldLen(uint32(fieldLen)), avgDocLen)
+	}
+	bm25TableCache.avgDocLen = avgDocLen
+	bm25TableCache.table = t
+	return t
 }
 
 type TermQueryScorer struct {
@@ -45,6 +107,8 @@ type TermQueryScorer struct {
 	queryNorm              float64
 	queryWeight            float64
 	queryWeightExplanation *search.Explanation
+	fieldNormTable         *bm25FieldNormTable // nil for TF-IDF scoring
+	idfQueryWeight         float64             // idf * queryWeight; updated in SetQueryNorm
 }
 
 func (s *TermQueryScorer) Size() int {
@@ -106,6 +170,12 @@ func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64,
 		}
 	}
 
+	// §25: build/share the BM25 field-norm table for fast per-posting scoring.
+	// Only for BM25 (avgDocLength > 0) and when scores are actually needed.
+	if avgDocLength > 0 && rv.includeScore && !options.Explain {
+		rv.fieldNormTable = getBM25FieldNormTable(avgDocLength)
+	}
+
 	return &rv
 }
 
@@ -129,6 +199,7 @@ func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 
 	// update the query weight
 	s.queryWeight = s.queryBoost * s.idf * s.queryNorm
+	s.idfQueryWeight = s.idf * s.queryWeight
 
 	if s.options.Explain {
 		childrenExplanations := make([]*search.Explanation, 3)
@@ -211,35 +282,47 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 	// perform any score computations only when needed
 	if s.includeScore || s.options.Explain {
 		var scoreExplanation *search.Explanation
-		var tf float64
-		if termMatch.Freq < MaxSqrtCache {
-			tf = SqrtCache[int(termMatch.Freq)]
+		var score float64
+
+		// §25 fast path: table lookup replaces the field-length round-trip and
+		// the length-normalisation math.
+		// fieldNormTable is nil when Explain=true, so Explain always takes the else path.
+		if s.fieldNormTable != nil && termMatch.FieldLen != 0 &&
+			termMatch.FieldLen < bm25FieldNormCacheSize && termMatch.Freq < MaxSqrtCache {
+			tf := SqrtCache[termMatch.Freq]
+			score = tf * search.BM25_k1 / (tf + s.fieldNormTable[termMatch.FieldLen]) *
+				s.idfQueryWeight
 		} else {
-			tf = math.Sqrt(float64(termMatch.Freq))
-		}
-
-		score, scoringModel := s.docScore(tf, termMatch.Norm)
-		if s.options.Explain {
-			childrenExplanations := s.scoreExplanation(tf, termMatch)
-			scoreExplanation = &search.Explanation{
-				Value: score,
-				Message: fmt.Sprintf("fieldWeight(%s:%s in %s), as per %s model, "+
-					"product of:", s.queryField, s.queryTerm, termMatch.ID, scoringModel),
-				Children: childrenExplanations,
+			var tf float64
+			if termMatch.Freq < MaxSqrtCache {
+				tf = SqrtCache[int(termMatch.Freq)]
+			} else {
+				tf = math.Sqrt(float64(termMatch.Freq))
 			}
-		}
+			var scoringModel string
+			score, scoringModel = s.docScore(tf, termMatch.Norm)
 
-		// if the query weight isn't 1, multiply
-		if s.queryWeight != 1.0 {
-			score = score * s.queryWeight
 			if s.options.Explain {
-				childExplanations := make([]*search.Explanation, 2)
-				childExplanations[0] = s.queryWeightExplanation
-				childExplanations[1] = scoreExplanation
+				childrenExplanations := s.scoreExplanation(tf, termMatch)
 				scoreExplanation = &search.Explanation{
-					Value:    score,
-					Message:  fmt.Sprintf("weight(%s:%s^%f in %s), product of:", s.queryField, s.queryTerm, s.queryBoost, termMatch.ID),
-					Children: childExplanations,
+					Value: score,
+					Message: fmt.Sprintf("fieldWeight(%s:%s in %s), as per %s model, "+
+						"product of:", s.queryField, s.queryTerm, termMatch.ID, scoringModel),
+					Children: childrenExplanations,
+				}
+			}
+
+			if s.queryWeight != 1.0 {
+				score = score * s.queryWeight
+				if s.options.Explain {
+					childExplanations := make([]*search.Explanation, 2)
+					childExplanations[0] = s.queryWeightExplanation
+					childExplanations[1] = scoreExplanation
+					scoreExplanation = &search.Explanation{
+						Value:    score,
+						Message:  fmt.Sprintf("weight(%s:%s^%f in %s), product of:", s.queryField, s.queryTerm, s.queryBoost, termMatch.ID),
+						Children: childExplanations,
+					}
 				}
 			}
 		}
@@ -291,17 +374,26 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 // threshold, skipping BM25 for pruned candidates.
 func (s *TermQueryScorer) ScoreInto(tfd *index.TermFieldDoc, rv *search.DocumentMatch) {
 	if s.includeScore {
-		var tf float64
-		if tfd.Freq < MaxSqrtCache {
-			tf = SqrtCache[int(tfd.Freq)]
+		// §25 fast path: table lookup replaces the field-length round-trip and
+		// the length-normalisation math.
+		if s.fieldNormTable != nil && tfd.FieldLen != 0 &&
+			tfd.FieldLen < bm25FieldNormCacheSize && tfd.Freq < MaxSqrtCache {
+			tf := SqrtCache[tfd.Freq]
+			rv.Score = tf * search.BM25_k1 / (tf + s.fieldNormTable[tfd.FieldLen]) *
+				s.idfQueryWeight
 		} else {
-			tf = math.Sqrt(float64(tfd.Freq))
+			var tf float64
+			if tfd.Freq < MaxSqrtCache {
+				tf = SqrtCache[int(tfd.Freq)]
+			} else {
+				tf = math.Sqrt(float64(tfd.Freq))
+			}
+			score, _ := s.docScore(tf, tfd.Norm)
+			if s.queryWeight != 1.0 {
+				score *= s.queryWeight
+			}
+			rv.Score = score
 		}
-		score, _ := s.docScore(tf, tfd.Norm)
-		if s.queryWeight != 1.0 {
-			score *= s.queryWeight
-		}
-		rv.Score = score
 	}
 	if len(tfd.Vectors) > 0 {
 		if cap(rv.FieldTermLocations) < len(tfd.Vectors) {
