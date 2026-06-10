@@ -146,6 +146,15 @@ type DisjunctionSliceSearcher struct {
 	// non-inlinable) and allows scoreCurrentDoc (cost 64) to be inlined by the
 	// caller. Non-nil only when all sub-searchers are *TermSearcher.
 	lazySearchers []*TermSearcher
+
+	// §7 parallel segment search. options and ctx are stored so that shard
+	// sub-searchers can be created in runParallelSegmentSearch. parallelResults
+	// is set on the first Next() call when parallel mode is active; subsequent
+	// calls drain it in score-descending order.
+	options        search.SearcherOptions
+	ctx            context.Context
+	parallelResults []*search.DocumentMatch
+	parallelPos     int
 }
 
 // wandUnavailableImpacts is a non-nil zero-length sentinel stored in
@@ -200,6 +209,8 @@ func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexRea
 		matching:      make([]*search.DocumentMatch, len(searchers)),
 		matchingIdxs:  make([]int, len(searchers)),
 		lazySearchers: make([]*TermSearcher, len(searchers)),
+		options:       options,
+		ctx:           ctx,
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
@@ -473,6 +484,28 @@ func (s *DisjunctionSliceSearcher) SetQueryNorm(qnorm float64) {
 func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 	*search.DocumentMatch, error,
 ) {
+	// §7 parallel segment search: on the first call, fan out to goroutines and
+	// cache all results. Subsequent calls drain the cache in score order.
+	if s.parallelResults == nil && shouldRunParallel(s) {
+		var err error
+		s.parallelResults, err = runParallelSegmentSearch(s.ctx, s)
+		if err != nil {
+			return nil, err
+		}
+		// Ensure non-nil sentinel so the "not yet run" check above stays false.
+		if s.parallelResults == nil {
+			s.parallelResults = []*search.DocumentMatch{}
+		}
+	}
+	if s.parallelResults != nil {
+		if s.parallelPos >= len(s.parallelResults) {
+			return nil, nil
+		}
+		rv := s.parallelResults[s.parallelPos]
+		s.parallelPos++
+		return rv, nil
+	}
+
 	if !s.initialized {
 		err := s.initSearchers(ctx)
 		if err != nil {
