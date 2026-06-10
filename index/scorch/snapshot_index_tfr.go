@@ -136,10 +136,12 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 	return nil, nil
 }
 
-// normColumnProvider is the optional interface implemented by zapx.Posting
-// to expose the exact analyzed field length from the norm column (§20/§25).
-type normColumnProvider interface {
-	NormColumn() uint32
+// normColumnIterator is the optional interface implemented by zapx.PostingsIterator
+// to expose the exact analyzed field length for a given docNum (§20/§25).
+// Called lazily in postingToTermFieldDoc so the normColumn access only happens
+// for documents that are actually scored, not for every traversed posting.
+type normColumnIterator interface {
+	NormColumn(docNum uint64) uint32
 }
 
 func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Posting, rv *index.TermFieldDoc) {
@@ -148,8 +150,8 @@ func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Postin
 	}
 	if i.includeNorm {
 		rv.Norm = next.Norm()
-		if ncp, ok := next.(normColumnProvider); ok {
-			rv.FieldLen = ncp.NormColumn()
+		if nci, ok := i.iterators[i.segmentOffset].(normColumnIterator); ok {
+			rv.FieldLen = nci.NormColumn(next.Number())
 		}
 	}
 	if i.includeTermVectors {
