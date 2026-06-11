@@ -29,6 +29,7 @@ import (
 	zapv15 "github.com/blevesearch/zapx/v15"
 	zapv16 "github.com/blevesearch/zapx/v16"
 	zapv17 "github.com/blevesearch/zapx/v17"
+	zapv18 "github.com/blevesearch/zapx/v18"
 )
 
 // SegmentPlugin represents the essential functions required by a package to plug in
@@ -82,7 +83,8 @@ var defaultSegmentPlugin SegmentPlugin
 
 func init() {
 	ResetSegmentPlugins()
-	RegisterSegmentPlugin(&zapv17.ZapPlugin{}, true)
+	RegisterSegmentPlugin(&zapv18.ZapPlugin{}, true)
+	RegisterSegmentPlugin(&zapv17.ZapPlugin{}, false)
 	RegisterSegmentPlugin(&zapv16.ZapPlugin{}, false)
 	RegisterSegmentPlugin(&zapv15.ZapPlugin{}, false)
 	RegisterSegmentPlugin(&zapv14.ZapPlugin{}, false)
