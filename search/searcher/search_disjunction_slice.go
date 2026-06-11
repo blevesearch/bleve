@@ -486,15 +486,17 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 ) {
 	// §7 parallel segment search: on the first call, fan out to goroutines and
 	// cache all results. Subsequent calls drain the cache in score order.
-	if s.parallelResults == nil && shouldRunParallel(s) {
-		var err error
-		s.parallelResults, err = runParallelSegmentSearch(s.ctx, s)
-		if err != nil {
-			return nil, err
-		}
-		// Ensure non-nil sentinel so the "not yet run" check above stays false.
-		if s.parallelResults == nil {
-			s.parallelResults = []*search.DocumentMatch{}
+	if s.parallelResults == nil {
+		if ok, shardK := shouldRunParallel(s); ok {
+			var err error
+			s.parallelResults, err = runParallelSegmentSearch(s.ctx, s, shardK)
+			if err != nil {
+				return nil, err
+			}
+			// Ensure non-nil sentinel so the "not yet run" check above stays false.
+			if s.parallelResults == nil {
+				s.parallelResults = []*search.DocumentMatch{}
+			}
 		}
 	}
 	if s.parallelResults != nil {

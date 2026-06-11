@@ -146,37 +146,52 @@ func (h *dmMinHeap) pushBounded(m *search.DocumentMatch, k int) (evicted *search
 
 func (h dmMinHeap) Len() int { return len(h) }
 
-// shouldRunParallel returns true when all conditions for parallel segment search
-// are met for this DisjunctionSliceSearcher.
-func shouldRunParallel(s *DisjunctionSliceSearcher) bool {
-	if !EnableParallelSegmentSearch {
-		return false
+// shouldRunParallel returns (true, shardK) when all conditions for parallel
+// segment search are met. The ctx value for ParallelSegmentSearchKey overrides
+// the global EnableParallelSegmentSearch and ParallelSegmentSearchShardK:
+// 0 disables, ≥2 enables with that shardK; absent means use global flags.
+// shardK is only meaningful when the bool return is true.
+func shouldRunParallel(s *DisjunctionSliceSearcher) (bool, int) {
+	shardK := ParallelSegmentSearchShardK
+
+	if v, ok := s.ctx.Value(search.ParallelSegmentSearchKey).(int); ok {
+		if v <= 0 {
+			return false, 0
+		}
+		shardK = v
+	} else if !EnableParallelSegmentSearch {
+		return false, 0
 	}
+
 	if runtime.GOMAXPROCS(0) < 2 {
-		return false
+		return false, 0
 	}
 	if len(s.searchers) == 0 {
-		return false
+		return false, 0
 	}
 	// All sub-searchers must be *TermSearcher with a stored term (set by
 	// newTermSearcherFromReader; nil for synonym/unadorned paths).
 	for _, sr := range s.searchers {
 		ts, ok := sr.(*TermSearcher)
 		if !ok || ts.term == nil {
-			return false
+			return false, 0
 		}
 	}
 	// Enough segments to justify goroutine overhead.
 	n := s.searchers[0].(*TermSearcher).NumSegments()
-	return n >= ParallelSegmentSearchMinSegs
+	if n < ParallelSegmentSearchMinSegs {
+		return false, 0
+	}
+	return true, shardK
 }
 
 // runParallelSegmentSearch fans the search across P goroutines, each handling
 // a contiguous range of segments. Returns all collected results merged and
-// sorted by score descending.
+// sorted by score descending. shardK is the per-shard top-K collector limit.
 func runParallelSegmentSearch(
 	ctx context.Context,
 	s *DisjunctionSliceSearcher,
+	shardK int,
 ) ([]*search.DocumentMatch, error) {
 	numSegs := s.searchers[0].(*TermSearcher).NumSegments()
 	p := runtime.GOMAXPROCS(0)
@@ -250,7 +265,7 @@ func runParallelSegmentSearch(
 		wg.Add(1)
 		go func(g int, dss *DisjunctionSliceSearcher) {
 			defer wg.Done()
-			matches, err := runShardSearch(ctx, dss, &shared)
+			matches, err := runShardSearch(ctx, dss, &shared, shardK)
 			_ = dss.Close()
 			results[g] = shardResult{matches: matches, err: err}
 		}(g, shards[g].dss)
@@ -273,14 +288,14 @@ func runParallelSegmentSearch(
 }
 
 // runShardSearch runs a full WAND/MAXSCORE search on shardDSS, collecting at
-// most ParallelSegmentSearchShardK results. Copies each result so the caller
-// owns memory independent of the shard's DocumentMatchPool.
+// most k results. Copies each result so the caller owns memory independent of
+// the shard's DocumentMatchPool. k=count gives the tightest per-shard WAND threshold.
 func runShardSearch(
 	ctx context.Context,
 	shardDSS *DisjunctionSliceSearcher,
 	shared *sharedThreshold,
+	k int,
 ) ([]*search.DocumentMatch, error) {
-	k := ParallelSegmentSearchShardK
 	searchCtx := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(shardDSS.DocumentMatchPoolSize()+k+2, 0),
 	}
