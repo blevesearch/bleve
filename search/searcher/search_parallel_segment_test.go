@@ -332,3 +332,43 @@ func strSlicesEqual(a, b []string) bool {
 	}
 	return true
 }
+
+// TestShouldRunParallelCtxOverride verifies the early-return behavior of the
+// per-request context key API (search.ParallelSegmentSearchKey).
+//
+// shouldRunParallel has two early-return paths that can be unit-tested without
+// a fully-initialized DSS (which requires real TermSearchers and segments):
+//   1. ctx shardK=0 + global=true  → disabled (ctx wins via early return)
+//   2. no ctx + global=false       → disabled (global wins via early return)
+//
+// Full end-to-end coverage of the ctx-enable path (ctx shardK>0 + global=false)
+// is provided by TestParallelSegmentSearchCorrectness.
+func TestShouldRunParallelCtxOverride(t *testing.T) {
+	origParallel := EnableParallelSegmentSearch
+	origShardK := ParallelSegmentSearchShardK
+	defer func() {
+		EnableParallelSegmentSearch = origParallel
+		ParallelSegmentSearchShardK = origShardK
+	}()
+
+	makeS := func(ctx context.Context) *DisjunctionSliceSearcher {
+		return &DisjunctionSliceSearcher{ctx: ctx}
+	}
+
+	// Case 1: ctx shardK=0 disables via early return before any other check,
+	// even when the global flag is on.
+	EnableParallelSegmentSearch = true
+	ParallelSegmentSearchShardK = 5
+	ctx1 := context.WithValue(context.Background(), search.ParallelSegmentSearchKey, 0)
+	ok, _ := shouldRunParallel(makeS(ctx1))
+	if ok {
+		t.Error("case 1: ctx shardK=0 should disable parallel even when global=true")
+	}
+
+	// Case 2: no ctx + global=false → disabled via global early return.
+	EnableParallelSegmentSearch = false
+	ok, _ = shouldRunParallel(makeS(context.Background()))
+	if ok {
+		t.Error("case 2: global=false with no ctx should disable parallel")
+	}
+}

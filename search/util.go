@@ -184,6 +184,12 @@ const (
 	// NestedSearchKey is used to communicate whether the search is performed
 	// in an index with nested documents
 	NestedSearchKey ContextKey = "_nested_search_key"
+
+	// ParallelSegmentSearchKey overrides the global EnableParallelSegmentSearch
+	// and ParallelSegmentSearchShardK settings for a single request.
+	// Value type: int — 0 disables parallel search; ≥2 enables it with that
+	// shardK. When absent the global flags apply unchanged.
+	ParallelSegmentSearchKey ContextKey = "_parallel_segment_search_key"
 )
 
 func RecordSearchCost(ctx context.Context,
