@@ -54,6 +54,13 @@ type IndexSnapshotTermFieldReader struct {
 	// value after creation of the TFR while iterating our postings
 	// lists
 	updateBytesRead bool
+
+	// segMaxTFNorms caches per-segment maxTFNorm values populated by MaxTFNorm().
+	// MaxTFNormForSegment() uses this to avoid redundant invIndexCache lookups
+	// when initWANDMaxImpacts calls both MaxTFNorm (once) and MaxTFNormForSegment
+	// (×numSegments) per term searcher.
+	segMaxTFNorms     []float32
+	segMaxTFNormsAvgDl float64
 }
 
 func (i *IndexSnapshotTermFieldReader) incrementBytesRead(val uint64) {
@@ -231,12 +238,22 @@ func (i *IndexSnapshotTermFieldReader) MaxTFNorm(avgDocLength float64) float32 {
 	if avgDocLength <= 0 {
 		return 0
 	}
+	// Populate per-segment cache for MaxTFNormForSegment reuse.
+	if cap(i.segMaxTFNorms) < len(i.dicts) {
+		i.segMaxTFNorms = make([]float32, len(i.dicts))
+	} else {
+		i.segMaxTFNorms = i.segMaxTFNorms[:len(i.dicts)]
+	}
+	i.segMaxTFNormsAvgDl = avgDocLength
 	var maxV float32
-	for _, dict := range i.dicts {
+	for j, dict := range i.dicts {
+		var v float32
 		if p, ok := dict.(maxTFNormProvider); ok {
-			if v := p.MaxTFNorm(i.term, avgDocLength); v > maxV {
-				maxV = v
-			}
+			v = p.MaxTFNorm(i.term, avgDocLength)
+		}
+		i.segMaxTFNorms[j] = v
+		if v > maxV {
+			maxV = v
 		}
 	}
 	return maxV
@@ -249,9 +266,14 @@ func (i *IndexSnapshotTermFieldReader) NumSegments() int {
 
 // MaxTFNormForSegment returns the max BM25 tf-norm for this term in a specific
 // segment. Returns 0 if the term is absent from that segment or avgDocLength≤0.
+// Uses the per-TFR cache populated by MaxTFNorm() to avoid redundant invIndexCache
+// lookups when initWANDMaxImpacts calls both in sequence.
 func (i *IndexSnapshotTermFieldReader) MaxTFNormForSegment(segIdx int, avgDocLength float64) float32 {
 	if avgDocLength <= 0 || segIdx >= len(i.dicts) {
 		return 0
+	}
+	if i.segMaxTFNorms != nil && i.segMaxTFNormsAvgDl == avgDocLength && segIdx < len(i.segMaxTFNorms) {
+		return i.segMaxTFNorms[segIdx]
 	}
 	if p, ok := i.dicts[segIdx].(maxTFNormProvider); ok {
 		return p.MaxTFNorm(i.term, avgDocLength)
