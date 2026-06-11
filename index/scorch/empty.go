@@ -14,7 +14,10 @@
 
 package scorch
 
-import segment "github.com/blevesearch/scorch_segment_api/v2"
+import (
+	"github.com/RoaringBitmap/roaring/v2"
+	segment "github.com/blevesearch/scorch_segment_api/v2"
+)
 
 type emptyPostingsIterator struct{}
 
@@ -37,5 +40,13 @@ func (e *emptyPostingsIterator) BytesRead() uint64 {
 func (e *emptyPostingsIterator) ResetBytesRead(uint64) {}
 
 func (e *emptyPostingsIterator) BytesWritten() uint64 { return 0 }
+
+// Implement OptimizablePostingsIterator so that anEmptyPostingsIterator can
+// participate in nested conjunction/disjunction optimizations without aborting
+// them.  ActualBitmap returning nil and DocNum1Hit returning false cause the
+// iterator to contribute nothing to any AND or OR, which is correct.
+func (e *emptyPostingsIterator) ActualBitmap() *roaring.Bitmap { return nil }
+func (e *emptyPostingsIterator) DocNum1Hit() (uint64, bool)    { return 0, false }
+func (e *emptyPostingsIterator) ReplaceActual(*roaring.Bitmap) {}
 
 var anEmptyPostingsIterator = &emptyPostingsIterator{}
