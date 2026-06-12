@@ -20,6 +20,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/util"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 func unmarshalCustomQueryPayload(data []byte, key string) (Query, []string, map[string]interface{}, error) {
@@ -93,4 +94,43 @@ func resolveFieldTypes(fields []string, m mapping.IndexMapping) map[string]strin
 		return nil
 	}
 	return types
+}
+
+// expandFieldWildcard replaces a "*" entry in the requested fields with the
+// concrete set of fields in the index, mirroring how the standard stored-field
+// loader treats "*" (see LoadAndHighlightFields). Custom-query callbacks read
+// field values via the doc-value reader, which matches field names literally
+// and has no wildcard handling of its own; without this expansion a request for
+// fields:["*"] resolves to a single field literally named "*", matches nothing,
+// and leaves d.Fields empty in the callback.
+//
+// The internal composite/identifier fields ("_all", "_id") are excluded so the
+// callback sees the same fields the stored-field "*" path would surface rather
+// than the tokenized _all blob or the document id (already available as the
+// hit's ID). When fields does not contain "*", it is returned unchanged.
+func expandFieldWildcard(fields []string, i index.IndexReader) ([]string, error) {
+	hasWildcard := false
+	for _, f := range fields {
+		if f == "*" {
+			hasWildcard = true
+			break
+		}
+	}
+	if !hasWildcard {
+		return fields, nil
+	}
+
+	allFields, err := i.Fields()
+	if err != nil {
+		return nil, err
+	}
+
+	expanded := make([]string, 0, len(allFields))
+	for _, f := range allFields {
+		if f == "_all" || f == "_id" {
+			continue
+		}
+		expanded = append(expanded, f)
+	}
+	return expanded, nil
 }
