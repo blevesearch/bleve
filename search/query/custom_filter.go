@@ -76,13 +76,20 @@ func (q *CustomFilterQuery) Searcher(ctx context.Context, i index.IndexReader, m
 	var dvReader index.DocValueReader
 	var fieldTypes map[string]string
 	if len(q.Fields) > 0 {
-		var err2 error
-		dvReader, err2 = i.DocValueReader(q.Fields)
+		// Expand a "*" wildcard to the concrete field set; the doc-value
+		// reader matches field names literally and would otherwise load
+		// nothing, leaving d.Fields empty in the callback.
+		fields, err2 := expandFieldWildcard(q.Fields, i)
 		if err2 != nil {
 			_ = childSearcher.Close()
 			return nil, err2
 		}
-		fieldTypes = resolveFieldTypes(q.Fields, m)
+		dvReader, err2 = i.DocValueReader(fields)
+		if err2 != nil {
+			_ = childSearcher.Close()
+			return nil, err2
+		}
+		fieldTypes = resolveFieldTypes(fields, m)
 	}
 
 	return searcher.NewCustomFilterSearcher(ctx, childSearcher, q.filterFunc, dvReader, i, fieldTypes), nil
