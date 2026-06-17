@@ -528,26 +528,40 @@ func (ss *SearchStatus) Merge(other *SearchStatus) {
 // A SearchResult describes the results of executing
 // a SearchRequest.
 //
+// TotalRelation constants describe the accuracy of SearchResult.Total.
+const (
+	// TotalRelationEq means Total is an exact count of all matching documents.
+	TotalRelationEq = "eq"
+	// TotalRelationGte means Total is a lower bound: WAND/MaxScore pruning
+	// skipped some matching documents whose scores could not beat the top-K
+	// heap threshold, so the true match count is ≥ Total.
+	TotalRelationGte = "gte"
+)
+
 // Status - Whether the search was executed on the underlying indexes successfully
 // or failed, and the corresponding errors.
 // Request - The SearchRequest that was executed.
 // Hits - The list of documents that matched the query and their corresponding
 // scores, score explanation, location info and so on.
-// Total - The total number of documents that matched the query.
+// Total - The total number of documents that matched the query. When
+// TotalRelation is TotalRelationGte ("gte"), this is a lower bound.
+// TotalRelation - Accuracy of Total: "eq" (exact) or "gte" (lower bound due
+// to WAND pruning).
 // Cost - indicates how expensive was the query with respect to bytes read
 // from the mapped index files.
 // MaxScore - The maximum score seen across all document hits seen for this query.
 // Took - The time taken to execute the search.
 // Facets - The facet results for the search.
 type SearchResult struct {
-	Status   *SearchStatus                  `json:"status"`
-	Request  *SearchRequest                 `json:"request,omitempty"`
-	Hits     search.DocumentMatchCollection `json:"hits"`
-	Total    uint64                         `json:"total_hits"`
-	Cost     uint64                         `json:"cost"`
-	MaxScore float64                        `json:"max_score"`
-	Took     time.Duration                  `json:"took"`
-	Facets   search.FacetResults            `json:"facets"`
+	Status        *SearchStatus                  `json:"status"`
+	Request       *SearchRequest                 `json:"request,omitempty"`
+	Hits          search.DocumentMatchCollection `json:"hits"`
+	Total         uint64                         `json:"total_hits"`
+	TotalRelation string                         `json:"total_relation"`
+	Cost          uint64                         `json:"cost"`
+	MaxScore      float64                        `json:"max_score"`
+	Took          time.Duration                  `json:"took"`
+	Facets        search.FacetResults            `json:"facets"`
 	// special fields that are applicable only for search
 	// results that are obtained from a presearch
 	SynonymResult search.FieldTermSynonymMap `json:"synonym_result,omitempty"`
@@ -675,6 +689,9 @@ func (sr *SearchResult) Merge(other *SearchResult) {
 	sr.Status.Merge(other.Status)
 	sr.Hits = append(sr.Hits, other.Hits...)
 	sr.Total += other.Total
+	if other.TotalRelation == TotalRelationGte {
+		sr.TotalRelation = TotalRelationGte
+	}
 	sr.Cost += other.Cost
 	if other.MaxScore > sr.MaxScore {
 		sr.MaxScore = other.MaxScore

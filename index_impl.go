@@ -1043,16 +1043,21 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		req.SearchAfter = nil
 	}
 
+	totalRelation := TotalRelationEq
+	if coll.WANDPruned() {
+		totalRelation = TotalRelationGte
+	}
 	rv := &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
 			Successful: 1,
 		},
-		Hits:     hits,
-		Total:    coll.Total(),
-		MaxScore: coll.MaxScore(),
-		Took:     searchDuration,
-		Facets:   coll.FacetResults(),
+		Hits:          hits,
+		Total:         coll.Total(),
+		TotalRelation: totalRelation,
+		MaxScore:      coll.MaxScore(),
+		Took:          searchDuration,
+		Facets:        coll.FacetResults(),
 	}
 
 	// rescore if fusion flag is set
