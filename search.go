@@ -537,12 +537,25 @@ const (
 // A SearchResult describes the results of executing
 // a SearchRequest.
 //
+// TotalRelation constants describe the accuracy of SearchResult.Total.
+const (
+	// TotalRelationEq means Total is an exact count of all matching documents.
+	TotalRelationEq = "eq"
+	// TotalRelationGte means Total is a lower bound: WAND/MaxScore pruning
+	// skipped some matching documents whose scores could not beat the top-K
+	// heap threshold, so the true match count is ≥ Total.
+	TotalRelationGte = "gte"
+)
+
 // Status - Whether the search was executed on the underlying indexes successfully
 // or failed, and the corresponding errors.
 // Request - The SearchRequest that was executed.
 // Hits - The list of documents that matched the query and their corresponding
 // scores, score explanation, location info and so on.
-// Total - The total number of documents that matched the query.
+// Total - The total number of documents that matched the query. When
+// TotalRelation is TotalRelationGte ("gte"), this is a lower bound.
+// TotalRelation - Accuracy of Total: "eq" (exact) or "gte" (lower bound due
+// to WAND pruning).
 // Cost - indicates how expensive was the query with respect to bytes read
 // from the mapped index files.
 // MaxScore - The maximum score seen across all document hits seen for this query.
@@ -686,7 +699,6 @@ func (sr *SearchResult) Merge(other *SearchResult) {
 	sr.Hits = append(sr.Hits, other.Hits...)
 	sr.Total += other.Total
 	if other.TotalRelation == TotalRelationGte {
-		// Any constituent whose Total is a lower bound makes the merged Total one.
 		sr.TotalRelation = TotalRelationGte
 	}
 	sr.Cost += other.Cost

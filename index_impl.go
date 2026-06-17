@@ -1061,9 +1061,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	totalRelation := TotalRelationEq
-	if coll.EarlyStopped() {
-		// Total is a lower bound: the early-stop bounded scan stopped before
-		// draining all matches.
+	if coll.WANDPruned() || coll.EarlyStopped() {
+		// Total is a lower bound: WAND skipped candidates, or the early-stop
+		// bounded scan stopped before draining all matches.
 		totalRelation = TotalRelationGte
 	}
 	rv := &SearchResult{

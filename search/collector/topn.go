@@ -77,6 +77,7 @@ type TopNCollector struct {
 	updateFieldVisitor        index.DocValueVisitor
 	dvReader                  index.DocValueReader
 	searchAfter               *search.DocumentMatch
+	wandPruned                bool
 
 	knnHits             map[string]*search.DocumentMatch
 	hybridMergeCallback search.HybridMergeCallbackFn
@@ -429,6 +430,8 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		}
 		next, err = searcher.Next(searchContext)
 	}
+	// Capture whether WAND pruning occurred so callers can set TotalRelation.
+	hc.wandPruned = searchContext.WANDPruned
 	if err != nil {
 		return err
 	}
@@ -745,6 +748,13 @@ func (hc *TopNCollector) SetEarlyStop(n int) {
 // (the caller should report TotalRelation="gte").
 func (hc *TopNCollector) EarlyStopped() bool {
 	return hc.earlyStopped
+}
+
+// WANDPruned reports whether any candidate documents were skipped during
+// collection because their MaxImpact upper-bound score ≤ ScoreThreshold.
+// When true, Total() is a lower bound on the true number of matching documents.
+func (hc *TopNCollector) WANDPruned() bool {
+	return hc.wandPruned
 }
 
 // MaxScore returns the maximum score seen across all the hits
