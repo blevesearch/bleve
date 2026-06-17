@@ -514,6 +514,9 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 				s.computeMAXSCOREPivot(ctx.ScoreThreshold)
 			}
 			if s.pivotIdx == len(s.maxscoreOrder) {
+				// All remaining candidates are WAND-pruned: no doc's MaxImpact
+				// sum can exceed the threshold. Total is now a lower bound.
+				ctx.WANDPruned = true
 				return nil, nil // no doc can beat threshold
 			}
 			if s.pivotIdx > 0 {
@@ -539,6 +542,7 @@ func (s *DisjunctionSliceSearcher) nextBasic(ctx *search.SearchContext) (
 			// WAND pruning: skip scoring when upper bound ≤ threshold.
 			if !s.wandAboveThreshold(ctx) {
 				// discard; advance happens below
+				ctx.WANDPruned = true
 			} else {
 				found = true
 				if s.retrieveScoreBreakdown {
@@ -727,22 +731,26 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 		// Score if we have enough matching terms and the upper bound clears the threshold.
 		// threshold > 0 and len(wandImpacts) > 0 are guaranteed by the caller.
 		var rv *search.DocumentMatch
-		if len(s.matching) >= s.min && upperBound > threshold {
-			if lazy {
-				// §9: BM25 deferred — score only candidates that survive WAND.
-				for _, si := range s.matchingIdxs {
-					s.lazySearchers[si].scoreCurrentDoc(s.currs[si])
+		if len(s.matching) >= s.min {
+			if upperBound > threshold {
+				if lazy {
+					// §9: BM25 deferred — score only candidates that survive WAND.
+					for _, si := range s.matchingIdxs {
+						s.lazySearchers[si].scoreCurrentDoc(s.currs[si])
+					}
 				}
-			}
-			if s.retrieveScoreBreakdown {
-				rv = s.scorer.ScoreAndExplBreakdown(ctx, s.matching, s.matchingIdxs, s.originalPos, s.numSearchers)
-			} else if lazy {
-				// ScoreImpact is inlinable (cost 37 < 80): skips MergeFieldTermLocations
-				// and the explain branch (neither ever fires in the lazy BM25 path —
-				// scoreCurrentDoc only sets Score, never FieldTermLocations or Expl).
-				rv = s.scorer.ScoreImpact(s.matching, len(s.matching), s.numSearchers)
+				if s.retrieveScoreBreakdown {
+					rv = s.scorer.ScoreAndExplBreakdown(ctx, s.matching, s.matchingIdxs, s.originalPos, s.numSearchers)
+				} else if lazy {
+					// ScoreImpact is inlinable (cost 37 < 80): skips MergeFieldTermLocations
+					// and the explain branch (neither ever fires in the lazy BM25 path —
+					// scoreCurrentDoc only sets Score, never FieldTermLocations or Expl).
+					rv = s.scorer.ScoreImpact(s.matching, len(s.matching), s.numSearchers)
+				} else {
+					rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
+				}
 			} else {
-				rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
+				ctx.WANDPruned = true
 			}
 		}
 

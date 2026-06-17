@@ -419,6 +419,12 @@ type SearchContext struct {
 	// DisjunctionSliceSearcher reads this for WAND/MaxScore pruning:
 	// candidates whose upper-bound score ≤ ScoreThreshold are skipped.
 	ScoreThreshold float64
+
+	// WANDPruned is set to true by DisjunctionSliceSearcher whenever a
+	// candidate document is skipped because its MaxImpact upper-bound score
+	// ≤ ScoreThreshold. When true, SearchResult.Total is a lower bound on
+	// the true number of matching documents (some were never scored).
+	WANDPruned bool
 }
 
 func (sc *SearchContext) Size() int {
