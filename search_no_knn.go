@@ -66,6 +66,12 @@ type SearchRequest struct {
 	SearchAfter      []string          `json:"search_after,omitempty"`
 	SearchBefore     []string          `json:"search_before,omitempty"`
 
+	// ScoreMode controls which scoring optimizations are active (follows Lucene's ScoreMode).
+	// "" or "complete" (default): exact BM25 scores, exact Total — backwards compatible.
+	// "top_scores": competitive scoring (WAND/MaxScore pruning); Total may be a lower bound
+	// (TotalRelation="gte") and scores may differ slightly due to impact-table rounding.
+	ScoreMode string `json:"score_mode,omitempty"`
+
 	// PreSearchData will be a  map that will be used
 	// in the second phase of any 2-phase search, to provide additional
 	// context to the second phase. This is useful in the case of index
@@ -99,6 +105,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Score            string             `json:"score"`
 		SearchAfter      []string           `json:"search_after"`
 		SearchBefore     []string           `json:"search_before"`
+		ScoreMode        string             `json:"score_mode"`
 		PreSearchData    OptionalRawMessage `json:"pre_search_data"`
 		Params           OptionalRawMessage `json:"params"`
 	}
@@ -130,6 +137,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.Score = temp.Score
 	r.SearchAfter = temp.SearchAfter
 	r.SearchBefore = temp.SearchBefore
+	r.ScoreMode = temp.ScoreMode
 	r.Query, err = query.ParseQuery(temp.Q)
 	if err != nil {
 		return err
@@ -185,6 +193,7 @@ func copySearchRequest(req *SearchRequest, preSearchData map[string]interface{})
 		Score:            req.Score,
 		SearchAfter:      req.SearchAfter,
 		SearchBefore:     req.SearchBefore,
+		ScoreMode:        req.ScoreMode,
 		PreSearchData:    preSearchData,
 	}
 	return &rv
