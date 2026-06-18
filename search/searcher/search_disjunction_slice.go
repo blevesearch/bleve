@@ -502,10 +502,11 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 		}
 	}
 
-	// MAXSCORE: when we have a score threshold and WAND is available, check
-	// whether at least one term is non-essential.  If so, use the MAXSCORE
-	// path which skips Next() calls on non-essential iterators entirely.
-	if ctx.ScoreThreshold > 0 {
+	// MAXSCORE: when we have a score threshold, WAND is available, and the
+	// caller has opted into speed optimizations, check whether at least one
+	// term is non-essential.  If so, use the MAXSCORE path which skips
+	// Next() calls on non-essential iterators entirely.
+	if ctx.WANDEnabled && ctx.ScoreThreshold > 0 {
 		if s.wandMaxImpacts == nil {
 			s.initWANDMaxImpacts()
 		}
@@ -539,8 +540,8 @@ func (s *DisjunctionSliceSearcher) nextBasic(ctx *search.SearchContext) (
 	found := false
 	for !found && len(s.matching) > 0 {
 		if len(s.matching) >= s.min {
-			// WAND pruning: skip scoring when upper bound ≤ threshold.
-			if !s.wandAboveThreshold(ctx) {
+			// WAND pruning: skip scoring when upper bound ≤ threshold (opt-in only).
+			if ctx.WANDEnabled && !s.wandAboveThreshold(ctx) {
 				// discard; advance happens below
 				ctx.WANDPruned = true
 			} else {

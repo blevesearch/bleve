@@ -420,6 +420,11 @@ type SearchContext struct {
 	// candidates whose upper-bound score ≤ ScoreThreshold are skipped.
 	ScoreThreshold float64
 
+	// WANDEnabled is set by the collector when ScoreMode = "top_scores".
+	// When false (default), WAND/MaxScore pruning is suppressed so
+	// SearchResult.Total is an exact count and scores are full BM25.
+	WANDEnabled bool
+
 	// WANDPruned is set to true by DisjunctionSliceSearcher whenever a
 	// candidate document is skipped because its MaxImpact upper-bound score
 	// ≤ ScoreThreshold. When true, SearchResult.Total is a lower bound on

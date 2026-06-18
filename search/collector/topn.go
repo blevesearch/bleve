@@ -76,6 +76,7 @@ type TopNCollector struct {
 	updateFieldVisitor        index.DocValueVisitor
 	dvReader                  index.DocValueReader
 	searchAfter               *search.DocumentMatch
+	wandEnabled               bool
 	wandPruned                bool
 
 	knnHits             map[string]*search.DocumentMatch
@@ -302,6 +303,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		DocumentMatchPool: search.NewDocumentMatchPool(backingSize+searcher.DocumentMatchPoolSize(), len(hc.sort)),
 		Collector:         hc,
 		IndexReader:       reader,
+		WANDEnabled:       hc.wandEnabled,
 	}
 
 	hc.dvReader, err = reader.DocValueReader(hc.neededFields)
@@ -675,6 +677,15 @@ func (hc *TopNCollector) Total() uint64 {
 // When true, Total() is a lower bound on the true number of matching documents.
 func (hc *TopNCollector) WANDPruned() bool {
 	return hc.wandPruned
+}
+
+// SetWANDEnabled opts this collection into WAND/MaxScore pruning (ScoreMode = "top_scores").
+// Must be called before Collect(). When false (default), pruning is suppressed so
+// SearchResult.Total is always exact and scores are full BM25 (backwards-compatible).
+// Has no effect when Score = "none": ScoreThreshold stays 0 and the WAND gate
+// (ctx.WANDEnabled && ctx.ScoreThreshold > 0) never passes.
+func (hc *TopNCollector) SetWANDEnabled(enabled bool) {
+	hc.wandEnabled = enabled
 }
 
 // MaxScore returns the maximum score seen across all the hits
