@@ -53,6 +53,12 @@ type SearchRequest struct {
 	SearchAfter      []string          `json:"search_after,omitempty"`
 	SearchBefore     []string          `json:"search_before,omitempty"`
 
+	// ScoreMode controls which scoring optimizations are active (follows Lucene's ScoreMode).
+	// "" or "complete" (default): exact BM25 scores, exact Total — backwards compatible.
+	// "top_scores": competitive scoring (WAND/MaxScore pruning); Total may be a lower bound
+	// (TotalRelation="gte") and scores may differ slightly due to impact-table rounding.
+	ScoreMode string `json:"score_mode,omitempty"`
+
 	KNN         []*KNNRequest `json:"knn,omitempty"`
 	KNNOperator knnOperator   `json:"knn_operator,omitempty"`
 
@@ -148,6 +154,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Score            string             `json:"score"`
 		SearchAfter      []string           `json:"search_after"`
 		SearchBefore     []string           `json:"search_before"`
+		ScoreMode        string             `json:"score_mode"`
 		KNN              []*tempKNNReq      `json:"knn"`
 		KNNOperator      knnOperator        `json:"knn_operator"`
 		PreSearchData    OptionalRawMessage `json:"pre_search_data"`
@@ -181,6 +188,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.Score = temp.Score
 	r.SearchAfter = temp.SearchAfter
 	r.SearchBefore = temp.SearchBefore
+	r.ScoreMode = temp.ScoreMode
 	r.Query, err = query.ParseQuery(temp.Q)
 	if err != nil {
 		return err
@@ -259,6 +267,7 @@ func copySearchRequest(req *SearchRequest, preSearchData map[string]interface{})
 		Score:            req.Score,
 		SearchAfter:      req.SearchAfter,
 		SearchBefore:     req.SearchBefore,
+		ScoreMode:        req.ScoreMode,
 		KNN:              req.KNN,
 		KNNOperator:      req.KNNOperator,
 		PreSearchData:    preSearchData,

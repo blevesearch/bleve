@@ -792,6 +792,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	if err != nil {
 		return nil, err
 	}
+	if req.ScoreMode == ScoreModeTopScores {
+		coll.SetWANDEnabled(true)
+	}
 
 	// Early-stop (bounded scan): for score="none" + Size, the request means
 	// "return any Size+From matching docs", so the collector can stop pulling

@@ -525,25 +525,34 @@ func (ss *SearchStatus) Merge(other *SearchStatus) {
 	}
 }
 
-// TotalRelation constants describe the accuracy of SearchResult.Total.
+// ScoreMode controls which scoring optimizations are active for a query.
+// Following Lucene's ScoreMode enum. Default ("") is identical to "complete".
 const (
-	// TotalRelationEq means Total is an exact count of all matching documents.
-	TotalRelationEq = "eq"
-	// TotalRelationGte means Total is a lower bound: collection stopped before
-	// draining every match, so the true match count is >= Total.
-	TotalRelationGte = "gte"
+	// ScoreModeComplete visits all candidates and computes exact BM25 scores.
+	// SearchResult.Total is an exact count. Backwards-compatible default.
+	ScoreModeComplete = "complete"
+
+	// ScoreModeTopScores enables competitive scoring (WAND/MaxScore pruning).
+	// Candidates whose MaxImpact upper-bound ≤ ScoreThreshold are skipped.
+	// SearchResult.Total may be a lower bound (TotalRelation = "gte"), and
+	// individual hit scores may differ slightly due to impact-table rounding.
+	// Has no effect when Score = "none" (ScoreThreshold stays 0).
+	ScoreModeTopScores = "top_scores"
 )
 
 // A SearchResult describes the results of executing
 // a SearchRequest.
 //
 // TotalRelation constants describe the accuracy of SearchResult.Total.
+// Total is exact when ScoreMode = "complete" (default); it may be a lower
+// bound when ScoreMode = "top_scores" and WAND pruning fires.
 const (
 	// TotalRelationEq means Total is an exact count of all matching documents.
 	TotalRelationEq = "eq"
 	// TotalRelationGte means Total is a lower bound: WAND/MaxScore pruning
 	// skipped some matching documents whose scores could not beat the top-K
-	// heap threshold, so the true match count is ≥ Total.
+	// heap threshold, or the early-stop bounded scan stopped before draining
+	// every match, so the true match count is ≥ Total.
 	TotalRelationGte = "gte"
 )
 
