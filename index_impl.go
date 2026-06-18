@@ -792,6 +792,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	if err != nil {
 		return nil, err
 	}
+	if req.ScoreMode == ScoreModeTopScores {
+		coll.SetWANDEnabled(true)
+	}
 
 	var knnHits []*search.DocumentMatch
 	var skipKNNCollector bool
