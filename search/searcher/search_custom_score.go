@@ -30,15 +30,18 @@ func init() {
 	reflectStaticSizeCustomScoreSearcher = int(reflect.TypeOf(sfs).Size())
 }
 
-// CustomScoreFunc defines a function which can mutate document scores. A
-// non-nil error aborts the search so the failure can be surfaced to the caller
-// rather than silently falling back to the original score.
-type CustomScoreFunc func(d *search.DocumentMatch) (float64, error)
+// CustomScoreFunc defines a function which can mutate document scores. It
+// receives the search's context so a long-running callback (e.g. a JS UDF) can
+// honor the query deadline/cancellation. A non-nil error aborts the search so
+// the failure can be surfaced to the caller rather than silently falling back
+// to the original score.
+type CustomScoreFunc func(ctx context.Context, d *search.DocumentMatch) (float64, error)
 
 // CustomScoreSearcher wraps any other searcher, optionally loads doc values
 // into each DocumentMatch, then mutates the score using the supplied
 // CustomScoreFunc.
 type CustomScoreSearcher struct {
+	ctx         context.Context
 	child       search.Searcher
 	mutate      CustomScoreFunc
 	dvReader    index.DocValueReader
@@ -51,6 +54,7 @@ func NewCustomScoreSearcher(ctx context.Context, s search.Searcher, mutate Custo
 	dvReader index.DocValueReader, indexReader index.IndexReader,
 	fieldTypes map[string]string, explain bool) *CustomScoreSearcher {
 	return &CustomScoreSearcher{
+		ctx:         ctx,
 		child:       s,
 		mutate:      mutate,
 		dvReader:    dvReader,
@@ -65,7 +69,7 @@ func NewCustomScoreSearcher(ctx context.Context, s search.Searcher, mutate Custo
 // result. A non-nil error from the score function is returned so the caller
 // can abort the search.
 func (f *CustomScoreSearcher) applyScore(d *search.DocumentMatch) error {
-	score, err := f.mutate(d)
+	score, err := f.mutate(f.ctx, d)
 	if err != nil {
 		return err
 	}
