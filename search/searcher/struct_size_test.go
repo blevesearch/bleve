@@ -13,11 +13,12 @@ import (
 //
 //	384 bytes (6 cache lines) — original
 //	456 bytes — §7 added options/ctx/parallelResults/parallelPos (cold, end of struct)
+//	464 bytes — §35 added TopK int to SearcherOptions (stored in options field)
 func TestDSSStructSize(t *testing.T) {
 	var s DisjunctionSliceSearcher
 	size := unsafe.Sizeof(s)
-	if size != 480 {
-		t.Errorf("DisjunctionSliceSearcher size = %d bytes, want 480; "+
+	if size != 488 {
+		t.Errorf("DisjunctionSliceSearcher size = %d bytes, want 488; "+
 			"update this test and the struct comment if you intentionally resized it", size)
 	}
 }
