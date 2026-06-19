@@ -44,6 +44,8 @@ import (
 // EnableParallelSegmentSearch activates parallel segment search for
 // DisjunctionSliceSearcher. Disabled by default; enable for serial
 // latency-focused workloads where per-query goroutine overhead pays off.
+// When true, §33 adaptive guards (concurrency gate + DF-based shard guard)
+// still apply unless the caller sets ParallelSegmentSearchKey explicitly.
 var EnableParallelSegmentSearch = false
 
 // ParallelSegmentSearchMinSegs is the minimum number of index segments required
@@ -59,6 +61,19 @@ var ParallelSegmentSearchMinSegs = 6
 // query count: the heap fills faster, threshold rises sooner, and WAND can
 // eliminate candidates before other goroutines see them.
 var ParallelSegmentSearchShardK = 100
+
+// ParallelSegmentSearchMinDFPerSeg is the §33 DF-based shard guard threshold.
+// Parallel search is skipped when totalDF/numSegs falls below this value,
+// indicating too few candidates per shard to amortize goroutine overhead.
+// Tune via benchmark: entity queries have ~0–10 DF/seg; text queries ~100–1000.
+var ParallelSegmentSearchMinDFPerSeg uint64 = 150
+
+// parallelSearchesActive is the §33 concurrency gate counter. It tracks how
+// many parallel segment searches are currently running across all goroutines.
+// Approximate: the Load→Add sequence is not atomic, so a 1–2 over-count is
+// possible at high QPS. This is intentional — we want soft bounding, not a
+// mutex on the hot path.
+var parallelSearchesActive atomic.Int32
 
 // sharedThreshold is a lock-free monotonically increasing float64 shared
 // across goroutines. Any shard can raise it; no shard can lower it.
@@ -146,19 +161,39 @@ func (h *dmMinHeap) pushBounded(m *search.DocumentMatch, k int) (evicted *search
 
 func (h dmMinHeap) Len() int { return len(h) }
 
+// estimateDF sums the total document frequency across all sub-searchers.
+// All sub-searchers must already be verified as *TermSearcher before calling.
+// The sum is a conservative upper bound on distinct matching documents
+// (union ≤ sum of DFs), which makes it safe to use as a candidate estimate.
+func estimateDF(s *DisjunctionSliceSearcher) uint64 {
+	var total uint64
+	for _, sr := range s.searchers {
+		total += uint64(sr.(*TermSearcher).Count())
+	}
+	return total
+}
+
 // shouldRunParallel returns (true, shardK) when all conditions for parallel
 // segment search are met. The ctx value for ParallelSegmentSearchKey overrides
 // the global EnableParallelSegmentSearch and ParallelSegmentSearchShardK:
 // 0 disables, ≥2 enables with that shardK; absent means use global flags.
 // shardK is only meaningful when the bool return is true.
-func shouldRunParallel(s *DisjunctionSliceSearcher) (bool, int) {
+//
+// When no explicit override is set, two §33 adaptive guards apply:
+//   - DF-based shard guard: skip if totalDF/numSegs < ParallelSegmentSearchMinDFPerSeg
+//     (prevents goroutine overhead from dominating on low-DF entity queries)
+//   - Concurrency gate: skip if too many parallel searches are already active
+//     (prevents goroutine oversubscription at high QPS)
+func shouldRunParallel(s *DisjunctionSliceSearcher, sctx *search.SearchContext) (bool, int) {
 	shardK := ParallelSegmentSearchShardK
+	explicitOverride := false
 
 	if v, ok := s.ctx.Value(search.ParallelSegmentSearchKey).(int); ok {
 		if v <= 0 {
 			return false, 0
 		}
 		shardK = v
+		explicitOverride = true
 	} else if !EnableParallelSegmentSearch {
 		return false, 0
 	}
@@ -178,9 +213,37 @@ func shouldRunParallel(s *DisjunctionSliceSearcher) (bool, int) {
 		}
 	}
 	// Enough segments to justify goroutine overhead.
-	n := s.searchers[0].(*TermSearcher).NumSegments()
-	if n < ParallelSegmentSearchMinSegs {
+	numSegs := s.searchers[0].(*TermSearcher).NumSegments()
+	if numSegs < ParallelSegmentSearchMinSegs {
 		return false, 0
+	}
+
+	if !explicitOverride {
+		// §33 DF-based shard guard: skip when candidates are too sparse to
+		// amortize goroutine setup cost. Checked before the atomic load.
+		totalDF := estimateDF(s)
+		if totalDF < uint64(numSegs)*ParallelSegmentSearchMinDFPerSeg {
+			return false, 0
+		}
+
+		// §33 concurrency gate: prevent oversubscription at high QPS.
+		// Compute the p that runParallelSegmentSearch would use, then allow at
+		// most GOMAXPROCS/p concurrent parallel searches.
+		gmp := runtime.GOMAXPROCS(0)
+		p := gmp
+		if p > numSegs {
+			p = numSegs
+		}
+		if p > 8 {
+			p = 8
+		}
+		maxConcurrent := int32(gmp / p)
+		if maxConcurrent < 1 {
+			maxConcurrent = 1
+		}
+		if parallelSearchesActive.Load() >= maxConcurrent {
+			return false, 0
+		}
 	}
 	return true, shardK
 }
@@ -193,6 +256,9 @@ func runParallelSegmentSearch(
 	s *DisjunctionSliceSearcher,
 	shardK int,
 ) ([]*search.DocumentMatch, error) {
+	parallelSearchesActive.Add(1)
+	defer parallelSearchesActive.Add(-1)
+
 	numSegs := s.searchers[0].(*TermSearcher).NumSegments()
 	p := runtime.GOMAXPROCS(0)
 	if p > numSegs {
