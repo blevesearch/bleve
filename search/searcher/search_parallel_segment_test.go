@@ -360,15 +360,130 @@ func TestShouldRunParallelCtxOverride(t *testing.T) {
 	EnableParallelSegmentSearch = true
 	ParallelSegmentSearchShardK = 5
 	ctx1 := context.WithValue(context.Background(), search.ParallelSegmentSearchKey, 0)
-	ok, _ := shouldRunParallel(makeS(ctx1))
+	noWAND := &search.SearchContext{}
+	ok, _ := shouldRunParallel(makeS(ctx1), noWAND)
 	if ok {
 		t.Error("case 1: ctx shardK=0 should disable parallel even when global=true")
 	}
 
 	// Case 2: no ctx + global=false → disabled via global early return.
 	EnableParallelSegmentSearch = false
-	ok, _ = shouldRunParallel(makeS(context.Background()))
+	ok, _ = shouldRunParallel(makeS(context.Background()), noWAND)
 	if ok {
 		t.Error("case 2: global=false with no ctx should disable parallel")
 	}
+}
+
+// TestParallelSegmentSearchAdaptiveGuards tests the two §33 guards:
+//  1. Concurrency gate: shouldRunParallel returns false when
+//     parallelSearchesActive is at capacity; bypassed by explicit ctx key.
+//  2. DF-based shard guard: shouldRunParallel returns false when totalDF is
+//     too sparse; bypassed by explicit ctx key.
+//
+// The test uses the real multi-segment index built by buildMultiBatchScorchIndex
+// to exercise shouldRunParallel with actual TermSearchers and real Count() values.
+func TestParallelSegmentSearchAdaptiveGuards(t *testing.T) {
+	dir := t.TempDir()
+	idx := buildMultiBatchScorchIndex(t, dir)
+	defer func() { _ = idx.Close() }()
+
+	origParallel := EnableParallelSegmentSearch
+	origMinDF := ParallelSegmentSearchMinDFPerSeg
+	origMinSegs := ParallelSegmentSearchMinSegs
+	defer func() {
+		EnableParallelSegmentSearch = origParallel
+		ParallelSegmentSearchMinDFPerSeg = origMinDF
+		ParallelSegmentSearchMinSegs = origMinSegs
+		parallelSearchesActive.Store(0)
+	}()
+
+	EnableParallelSegmentSearch = true
+	ParallelSegmentSearchMinSegs = 2 // test index has 3 segments from 3 batches
+
+	ir, err := idx.Reader()
+	if err != nil {
+		t.Fatalf("Reader: %v", err)
+	}
+	defer func() { _ = ir.Close() }()
+
+	srs, err := newDisjunctionSearcherForTest(t, ir, []string{"alpha", "beta"})
+	if err != nil {
+		t.Fatalf("newDisjunctionSearcherForTest: %v", err)
+	}
+	defer func() { _ = srs.Close() }()
+
+	ctxExplicit := context.WithValue(context.Background(), search.ParallelSegmentSearchKey, 4)
+	srsExplicit, err := newDisjunctionSearcherForTest(t, ir, []string{"alpha", "beta"})
+	if err != nil {
+		t.Fatalf("newDisjunctionSearcherForTest explicit: %v", err)
+	}
+	defer func() { _ = srsExplicit.Close() }()
+	srsExplicit.ctx = ctxExplicit
+
+	noWAND := &search.SearchContext{}
+
+	// --- Concurrency gate ---
+
+	// With the gate at capacity, auto-mode should block parallel search.
+	parallelSearchesActive.Store(100)
+	ok, _ := shouldRunParallel(srs, noWAND)
+	if ok {
+		t.Error("concurrency gate: shouldRunParallel should return false when counter is at capacity")
+	}
+
+	// Explicit ctx key bypasses the gate regardless of counter value.
+	ok, _ = shouldRunParallel(srsExplicit, noWAND)
+	if !ok {
+		t.Error("concurrency gate: explicit ctx key should bypass gate even when counter is at capacity")
+	}
+
+	parallelSearchesActive.Store(0)
+
+	// --- DF-based shard guard ---
+
+	// With a very high minDFPerSeg threshold, low-DF terms should not parallelize.
+	ParallelSegmentSearchMinDFPerSeg = 1_000_000
+	ok, _ = shouldRunParallel(srs, noWAND)
+	if ok {
+		t.Error("DF guard: shouldRunParallel should return false when totalDF < threshold")
+	}
+
+	// Explicit ctx key bypasses the DF guard.
+	ok, _ = shouldRunParallel(srsExplicit, noWAND)
+	if !ok {
+		t.Error("DF guard: explicit ctx key should bypass DF guard")
+	}
+
+	// With a very low threshold, any terms should parallelize.
+	ParallelSegmentSearchMinDFPerSeg = 0
+	ok, _ = shouldRunParallel(srs, noWAND)
+	if !ok {
+		t.Error("DF guard: shouldRunParallel should return true when threshold is 0")
+	}
+}
+
+// newDisjunctionSearcherForTest creates a DisjunctionSliceSearcher for the
+// given terms against ir using a plain background context.
+func newDisjunctionSearcherForTest(t *testing.T, ir index.IndexReader, terms []string) (*DisjunctionSliceSearcher, error) {
+	t.Helper()
+	opts := search.SearcherOptions{Score: ""}
+	ctx := context.Background()
+	var searchers []search.Searcher
+	for _, term := range terms {
+		ts, err := NewTermSearcherBytes(ctx, ir, []byte(term), "f", 1.0, opts)
+		if err != nil {
+			for _, s := range searchers {
+				_ = s.Close()
+			}
+			return nil, err
+		}
+		searchers = append(searchers, ts)
+	}
+	dss, err := newDisjunctionSliceSearcher(ctx, ir, searchers, 1, opts, false)
+	if err != nil {
+		for _, s := range searchers {
+			_ = s.Close()
+		}
+	}
+	return dss, err
 }
