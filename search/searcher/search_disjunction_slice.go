@@ -403,6 +403,30 @@ func (s *DisjunctionSliceSearcher) initWANDMaxImpacts() {
 	s.lazyMode = true
 }
 
+// injectGlobalWANDCeilings pre-initializes wandMaxImpacts from caller-supplied
+// global per-term MaxImpact values (computed from full-index TermSearchers, not
+// per-shard). Used by §34 parallel WAND: each shard DSS uses the same global
+// MAXSCORE ceilings as the serial path so that the essential/non-essential
+// partition remains effective even when the shared cross-shard threshold is high.
+// Must be called after newDisjunctionSliceSearcher and before the first Next().
+// Per-segment ceilings (§15) are left nil — shard TFRs cover a subset of
+// segments so per-segment ceiling computation is deferred to future work.
+func (s *DisjunctionSliceSearcher) injectGlobalWANDCeilings(globalMI []float64) {
+	mi := make([]float64, len(globalMI))
+	copy(mi, globalMI)
+	s.wandMaxImpacts = mi
+
+	order := make([]int, len(mi))
+	for i := range order {
+		order[i] = i
+	}
+	sort.Slice(order, func(a, b int) bool { return mi[order[a]] < mi[order[b]] })
+	s.maxscoreOrder = order
+	s.pivotIdx = 0
+	s.lastThreshold = 0
+	// segCeilings / segSkippers left nil: no §15 per-segment skip in shards.
+}
+
 // computeMAXSCOREPivot sets pivotIdx to the smallest index in maxscoreOrder
 // such that the suffix sum of MaxImpact values from pivotIdx onward exceeds
 // threshold.  If even the sum of all terms doesn't exceed threshold, sets
