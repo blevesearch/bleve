@@ -52,15 +52,23 @@ var EnableParallelSegmentSearch = false
 // to activate parallel search. Below this the goroutine overhead dominates.
 var ParallelSegmentSearchMinSegs = 6
 
-// ParallelSegmentSearchShardK is the per-shard top-K collector limit. Each
-// goroutine collects at most this many results; the shared atomic threshold
-// ensures WAND prunes aggressively once any shard's heap is full.
-//
-// For correctness, K must be ≥ the query's count (top-N limit); otherwise
-// shards may miss results. For optimal WAND pruning, set K close to the
-// query count: the heap fills faster, threshold rises sooner, and WAND can
-// eliminate candidates before other goroutines see them.
-var ParallelSegmentSearchShardK = 100
+// ParallelSegmentSearchShardK is the minimum (floor) for the per-shard top-K
+// collector limit. §35: the actual shardK is max(TopK, floor) where TopK is
+// the query's count (SearchRequest.Size+From). This makes the per-shard heap
+// fill after TopK docs so the shared WAND threshold rises as fast as it would
+// in a serial search, while the floor prevents degenerate heaps for tiny counts
+// (e.g. count=1 → shardK=floor so each shard retains enough candidates for a
+// correct final merge).
+var ParallelSegmentSearchShardK = 10
+
+// ParallelSegmentSearchMaxCount is the maximum query count (top-K limit) for
+// which parallel segment search is allowed. When SearchRequest.Size+From exceeds
+// this value, shouldRunParallel returns false and the search falls back to the
+// serial path. This prevents correctness issues (shardK < count would cause
+// shards to discard candidates the final merge needs) and avoids the goroutine
+// overhead on large-K queries where WAND pruning is inherently weaker.
+// Set to 0 to disable the cap (parallel runs for any count).
+var ParallelSegmentSearchMaxCount = 100
 
 // ParallelSegmentSearchMinDFPerSeg is the §33 DF-based shard guard threshold.
 // Parallel search is skipped when totalDF/numSegs falls below this value,
@@ -185,7 +193,14 @@ func estimateDF(s *DisjunctionSliceSearcher) uint64 {
 //   - Concurrency gate: skip if too many parallel searches are already active
 //     (prevents goroutine oversubscription at high QPS)
 func shouldRunParallel(s *DisjunctionSliceSearcher, sctx *search.SearchContext) (bool, int) {
-	shardK := ParallelSegmentSearchShardK
+	// §35: dynamic shardK = max(query.count, floor). Heap fills after TopK docs
+	// → shared threshold rises to the TopK-th best score → §34 global WAND
+	// ceilings prune as aggressively as the serial path. Floor prevents
+	// degenerate heaps for very small counts.
+	shardK := ParallelSegmentSearchShardK // floor
+	if topK := s.options.TopK; topK > shardK {
+		shardK = topK
+	}
 	explicitOverride := false
 
 	if v, ok := s.ctx.Value(search.ParallelSegmentSearchKey).(int); ok {
@@ -195,6 +210,14 @@ func shouldRunParallel(s *DisjunctionSliceSearcher, sctx *search.SearchContext) 
 		shardK = v
 		explicitOverride = true
 	} else if !EnableParallelSegmentSearch {
+		return false, 0
+	}
+
+	// §35 count cap: for large-K queries WAND pruning is weaker and goroutine
+	// overhead dominates; fall back to serial. Explicit override bypasses this
+	// so BENCH_PARALLEL_SEARCH=N can still force parallel for testing.
+	if !explicitOverride && ParallelSegmentSearchMaxCount > 0 &&
+		s.options.TopK > ParallelSegmentSearchMaxCount {
 		return false, 0
 	}
 

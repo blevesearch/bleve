@@ -888,6 +888,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		Explain:            req.Explain,
 		IncludeTermVectors: req.IncludeLocations || req.Highlight != nil,
 		Score:              req.Score,
+		TopK:               req.Size + req.From,
 	})
 	if err != nil {
 		return nil, err
