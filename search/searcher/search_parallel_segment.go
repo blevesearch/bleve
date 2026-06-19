@@ -203,6 +203,23 @@ func runParallelSegmentSearch(
 	}
 	segsPerShard := (numSegs + p - 1) / p
 
+	// §34: pre-compute global per-term MaxImpact from the original full-index
+	// TermSearchers (all segments). Shard TFRs cover only 2/15 segments so their
+	// MaxImpact() is lower, making MAXSCORE partitioning ineffective against a
+	// cross-shard threshold that the highest-scoring shard broadcast. Global
+	// ceilings are a correct upper bound on any shard doc's score and keep the
+	// essential/non-essential partition as tight as the serial WAND path.
+	globalMI := make([]float64, len(s.searchers))
+	canWAND := true
+	for i, sr := range s.searchers {
+		mi := sr.(*TermSearcher).MaxImpact()
+		if mi >= math.MaxFloat64 {
+			canWAND = false
+			break
+		}
+		globalMI[i] = mi
+	}
+
 	// Create all shard DSSes sequentially to prevent concurrent SetQueryNorm
 	// writes on shared TermQueryScorer objects.
 	type shardDSS struct {
@@ -250,6 +267,9 @@ func runParallelSegmentSearch(
 			}
 			return nil, err
 		}
+		if canWAND {
+			dss.injectGlobalWANDCeilings(globalMI)
+		}
 		shards = append(shards, shardDSS{dss: dss})
 	}
 
@@ -265,7 +285,7 @@ func runParallelSegmentSearch(
 		wg.Add(1)
 		go func(g int, dss *DisjunctionSliceSearcher) {
 			defer wg.Done()
-			matches, err := runShardSearch(ctx, dss, &shared, shardK)
+			matches, err := runShardSearch(ctx, dss, &shared, shardK, canWAND)
 			_ = dss.Close()
 			results[g] = shardResult{matches: matches, err: err}
 		}(g, shards[g].dss)
@@ -290,14 +310,18 @@ func runParallelSegmentSearch(
 // runShardSearch runs a full WAND/MAXSCORE search on shardDSS, collecting at
 // most k results. Copies each result so the caller owns memory independent of
 // the shard's DocumentMatchPool. k=count gives the tightest per-shard WAND threshold.
+// wandEnabled mirrors the caller's canWAND flag: when true the shard SearchContext
+// has WANDEnabled=true so the MAXSCORE path activates using the injected global ceilings.
 func runShardSearch(
 	ctx context.Context,
 	shardDSS *DisjunctionSliceSearcher,
 	shared *sharedThreshold,
 	k int,
+	wandEnabled bool,
 ) ([]*search.DocumentMatch, error) {
 	searchCtx := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(shardDSS.DocumentMatchPoolSize()+k+2, 0),
+		WANDEnabled:       wandEnabled,
 	}
 
 	var h dmMinHeap
