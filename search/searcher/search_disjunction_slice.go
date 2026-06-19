@@ -45,9 +45,13 @@ type DisjunctionSliceSearcher struct {
 	// (i.e. len(lazySearchers) == numSearchers). Stored here (offset 81, cache
 	// line 1) rather than computed from len(lazySearchers) (offset 360, cache
 	// line 5, cold) to avoid the cold-line load on every nextMAXSCORE call.
-	// One bool fits in the 7-byte padding gap between retrieveScoreBreakdown
-	// and currs — struct size stays 384 bytes.
-	lazyMode bool
+	// Two bools fit in the 7-byte padding gap between retrieveScoreBreakdown
+	// and currs — struct size stays 384 bytes (§7 later extends to 456).
+	lazyMode        bool
+	// parallelDecided marks that shouldRunParallel has been called once for
+	// this DSS. Without it the check would fire on every Next() call when §7
+	// is disabled (parallelResults stays nil), adding O(NumCandidates) overhead.
+	parallelDecided bool
 	currs    []*search.DocumentMatch
 	scorer                 *scorer.DisjunctionQueryScorer
 	min                    int
@@ -137,9 +141,11 @@ type DisjunctionSliceSearcher struct {
 	// §7 parallel segment search. options and ctx are stored so that shard
 	// sub-searchers can be created in runParallelSegmentSearch. parallelResults
 	// is set on the first Next() call when parallel mode is active; subsequent
-	// calls drain it in score-descending order.
-	options        search.SearcherOptions
-	ctx            context.Context
+	// calls drain it in score-descending order. parallelDecided (offset 82,
+	// packed with lazyMode in the bool-padding gap) ensures shouldRunParallel
+	// is called at most once per DSS instance.
+	options         search.SearcherOptions
+	ctx             context.Context
 	parallelResults []*search.DocumentMatch
 	parallelPos     int
 }
@@ -497,8 +503,12 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 ) {
 	// §7 parallel segment search: on the first call, fan out to goroutines and
 	// cache all results. Subsequent calls drain the cache in score order.
-	if s.parallelResults == nil {
-		if ok, shardK := shouldRunParallel(s); ok {
+	// parallelDecided ensures shouldRunParallel is called at most once per DSS:
+	// without it, shouldRunParallel would run O(NumCandidates) times when §7
+	// is disabled (parallelResults stays nil and the check fires every Next()).
+	if !s.parallelDecided {
+		s.parallelDecided = true
+		if ok, shardK := shouldRunParallel(s, ctx); ok {
 			var err error
 			s.parallelResults, err = runParallelSegmentSearch(s.ctx, s, shardK)
 			if err != nil {
