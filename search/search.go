@@ -406,6 +406,11 @@ type SearcherOptions struct {
 	Explain            bool
 	IncludeTermVectors bool
 	Score              string
+	// TopK is the query's top-K limit (SearchRequest.Size + From). §35 uses it
+	// to set the per-shard heap cap in parallel segment search so the heap fills
+	// after TopK docs and the shared WAND threshold rises early.
+	// Zero means "use the global ParallelSegmentSearchShardK floor".
+	TopK int
 }
 
 // SearchContext represents the context around a single search

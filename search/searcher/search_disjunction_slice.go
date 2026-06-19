@@ -144,6 +144,7 @@ type DisjunctionSliceSearcher struct {
 	// calls drain it in score-descending order. parallelDecided (offset 82,
 	// packed with lazyMode in the bool-padding gap) ensures shouldRunParallel
 	// is called at most once per DSS instance.
+	// Struct size: 464 bytes (§35 added TopK int to SearcherOptions; was 456).
 	options         search.SearcherOptions
 	ctx             context.Context
 	parallelResults []*search.DocumentMatch
