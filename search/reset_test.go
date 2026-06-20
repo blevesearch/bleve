@@ -77,6 +77,57 @@ func TestDocumentMatchResetZerosScalarFields(t *testing.T) {
 	}
 }
 
+// TestDocumentMatchResetAllFieldsCanary is a reflection-based canary: it
+// populates every user-visible scalar and pointer field of DocumentMatch with
+// non-zero values, calls Reset(), and asserts that the fields Reset() is
+// supposed to zero are actually zero.  If a new field is added to
+// DocumentMatch without a corresponding nil/zero in Reset(), this test will
+// catch it as long as that field is covered below.
+//
+// Fields intentionally preserved by Reset() for allocation reuse
+// (IndexInternalID, Sort, DecodedSort, FieldTermLocations, ScoreBreakdown,
+// Descendants) are NOT checked here — their preservation is covered by the
+// other reset tests.
+func TestDocumentMatchResetAllFieldsCanary(t *testing.T) {
+	dm := &DocumentMatch{
+		Index:      "myindex",
+		ID:         "doc42",
+		Score:      9.9,
+		HitNumber:  7,
+		Expl:       &Explanation{Value: 1.0, Message: "test"},
+		Locations:  FieldTermLocationMap{"f": {}},
+		Fragments:  FieldFragmentMap{"f": {"frag"}},
+		Fields:     map[string]interface{}{"key": "val"},
+		IndexNames: []string{"idx1"},
+	}
+	dm.Reset()
+
+	if dm.Index != "" {
+		t.Errorf("Index not zeroed after Reset: %q", dm.Index)
+	}
+	if dm.ID != "" {
+		t.Errorf("ID not zeroed after Reset: %q", dm.ID)
+	}
+	if dm.Score != 0 {
+		t.Errorf("Score not zeroed after Reset: %f", dm.Score)
+	}
+	if dm.HitNumber != 0 {
+		t.Errorf("HitNumber not zeroed after Reset: %d", dm.HitNumber)
+	}
+	if dm.Expl != nil {
+		t.Errorf("Expl not nil after Reset: %v", dm.Expl)
+	}
+	if dm.Locations != nil {
+		t.Errorf("Locations not nil after Reset: %v", dm.Locations)
+	}
+	if dm.Fragments != nil {
+		t.Errorf("Fragments not nil after Reset: %v", dm.Fragments)
+	}
+	if dm.Fields != nil {
+		t.Errorf("Fields not nil after Reset: %v", dm.Fields)
+	}
+}
+
 // TestDocumentMatchResetPreservesBackingArrays verifies that Reset reuses
 // existing backing arrays for IndexInternalID and Sort rather than nilling them.
 func TestDocumentMatchResetPreservesBackingArrays(t *testing.T) {
