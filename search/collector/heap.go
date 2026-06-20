@@ -15,6 +15,8 @@
 package collector
 
 import (
+	"sort"
+
 	"github.com/blevesearch/bleve/v2/search"
 )
 
@@ -111,9 +113,16 @@ func (c *collectStoreHeap) Final(skip int, fixup collectorFixup) (search.Documen
 	if size <= 0 {
 		return make(search.DocumentMatchCollection, 0), nil
 	}
+	// Sort in-place so heap[0] = best doc (compare < 0 means "better").
+	// pdqsort (sort.Slice) has much better cache behavior than repeated
+	// removeLast (heapsort) because it accesses the array sequentially,
+	// avoiding the scattered pointer dereferences heapsort pays at each level.
+	sort.Slice(c.heap, func(i, j int) bool {
+		return c.compare(c.heap[i], c.heap[j]) < 0
+	})
 	rv := make(search.DocumentMatchCollection, size)
-	for i := size - 1; i >= 0; i-- {
-		doc := c.removeLast()
+	for i := 0; i < size; i++ {
+		doc := c.heap[skip+i]
 		rv[i] = doc
 		if err := fixup(doc); err != nil {
 			return nil, err
