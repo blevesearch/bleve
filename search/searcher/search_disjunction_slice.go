@@ -53,6 +53,12 @@ type DisjunctionSliceSearcher struct {
 	// is disabled (parallelResults stays nil), adding O(NumCandidates) overhead.
 	parallelDecided bool
 	currs    []*search.DocumentMatch
+	// currIDs caches the decoded big-endian uint64 docID for each currs[i].
+	// math.MaxUint64 signals nil or exhausted (len(IndexInternalID) != 8).
+	// Updated after every s.currs[i] assignment so the hot nextMAXSCORE loops
+	// can compare uint64 values directly without pointer chasing or BigEndian
+	// decoding on every WAND iteration.
+	currIDs  []uint64
 	scorer                 *scorer.DisjunctionQueryScorer
 	min                    int
 	matching               []*search.DocumentMatch
@@ -144,7 +150,7 @@ type DisjunctionSliceSearcher struct {
 	// calls drain it in score-descending order. parallelDecided (offset 82,
 	// packed with lazyMode in the bool-padding gap) ensures shouldRunParallel
 	// is called at most once per DSS instance.
-	// Struct size: 464 bytes (§35 added TopK int to SearcherOptions; was 456).
+	// Struct size: 488 bytes (currIDs []uint64 added 24 bytes; was 464).
 	options         search.SearcherOptions
 	ctx             context.Context
 	parallelResults []*search.DocumentMatch
@@ -196,6 +202,7 @@ func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexRea
 		originalPos:            originalPos,
 		numSearchers:           len(searchers),
 		currs:                  make([]*search.DocumentMatch, len(searchers)),
+		currIDs:                make([]uint64, len(searchers)),
 		scorer:                 scorer.NewDisjunctionQueryScorer(options),
 		min:                    int(min),
 		retrieveScoreBreakdown: retrieveScoreBreakdown,
@@ -250,6 +257,16 @@ func (s *DisjunctionSliceSearcher) Size() int {
 	return sizeInBytes
 }
 
+// decodeCurrID returns the big-endian uint64 from dm.IndexInternalID, or
+// math.MaxUint64 when dm is nil or has an invalid (non-8-byte) ID.
+// Inlineable (cost ~7); called after every s.currs[i] assignment.
+func decodeCurrID(dm *search.DocumentMatch) uint64 {
+	if dm != nil && len(dm.IndexInternalID) == 8 {
+		return binary.BigEndian.Uint64(dm.IndexInternalID)
+	}
+	return math.MaxUint64
+}
+
 func (s *DisjunctionSliceSearcher) initSearchers(ctx *search.SearchContext) error {
 	var err error
 	// get all searchers pointing at their first match
@@ -261,6 +278,7 @@ func (s *DisjunctionSliceSearcher) initSearchers(ctx *search.SearchContext) erro
 		if err != nil {
 			return err
 		}
+		s.currIDs[i] = decodeCurrID(s.currs[i])
 	}
 
 	err = s.updateMatches()
@@ -597,6 +615,7 @@ func (s *DisjunctionSliceSearcher) nextBasic(ctx *search.SearchContext) (
 			if err != nil {
 				return nil, err
 			}
+			s.currIDs[i] = decodeCurrID(s.currs[i])
 		}
 
 		if err = s.updateMatches(); err != nil {
@@ -644,21 +663,13 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 	threshold := ctx.ScoreThreshold
 
 	for {
-		// Find the minimum docID among essential iterators.
-		// Scorch IDs are always 8-byte big-endian uint64; decode once and use
-		// integer comparison throughout the loop to avoid bytes.Compare overhead.
+		// Find the minimum docID among essential iterators using the pre-decoded
+		// currIDs cache — no pointer chase, no BigEndian decode per element.
+		// math.MaxUint64 signals nil or exhausted; a live essential iter is
+		// always < MaxUint64 (doc IDs are bounded by segment file size).
 		var minIDVal uint64 = math.MaxUint64
 		for _, si := range s.maxscoreOrder[s.pivotIdx:] {
-			curr := s.currs[si]
-			if curr == nil {
-				continue
-			}
-			if len(curr.IndexInternalID) != 8 {
-				// ID was Reset by pool (pool aliasing); treat as exhausted this round.
-				continue
-			}
-			v := binary.BigEndian.Uint64(curr.IndexInternalID)
-			if v < minIDVal {
+			if v := s.currIDs[si]; v < minIDVal {
 				minIDVal = v
 			}
 		}
@@ -708,10 +719,10 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 					return nil, nil
 				}
 				for _, si := range s.maxscoreOrder[s.pivotIdx:] {
-					curr := s.currs[si]
-					if curr == nil {
-						continue
+					if s.currIDs[si] == math.MaxUint64 {
+						continue // nil or exhausted
 					}
+					curr := s.currs[si]
 					if s.segSkippers[si].SegmentIndexOf(curr.IndexInternalID) < nextSeg {
 						if lazy {
 							ctx.DocumentMatchPool.PutLazy(curr)
@@ -723,6 +734,7 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 						if err != nil {
 							return nil, err
 						}
+						s.currIDs[si] = decodeCurrID(s.currs[si])
 					}
 				}
 				continue // re-scan for new minID
@@ -734,8 +746,8 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 		// In the lazy path, these docs have only IndexInternalID set (never scored),
 		// so PutLazy (zeros IndexInternalID+Score) avoids the full Reset overhead.
 		for _, si := range s.maxscoreOrder[:s.pivotIdx] {
-			curr := s.currs[si]
-			if curr != nil && len(curr.IndexInternalID) == 8 && binary.BigEndian.Uint64(curr.IndexInternalID) < minIDVal {
+			if s.currIDs[si] < minIDVal {
+				curr := s.currs[si]
 				if lazy {
 					ctx.DocumentMatchPool.PutLazy(curr)
 					s.currs[si], err = s.lazySearchers[si].advanceDocIDOnly(ctx, minID)
@@ -746,6 +758,7 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 				if err != nil {
 					return nil, err
 				}
+				s.currIDs[si] = decodeCurrID(s.currs[si])
 			}
 		}
 
@@ -753,12 +766,14 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 		// Accumulate the WAND upper bound in the same pass to avoid a second
 		// iteration over matchingIdxs inside wandAboveThreshold (which also
 		// can't be inlined — cost 109 > budget 80).
+		// Range over currIDs (plain uint64 slice) rather than s.currs to avoid
+		// pointer chasing and BigEndian decoding on every element.
 		s.matching = s.matching[:0]
 		s.matchingIdxs = s.matchingIdxs[:0]
 		var upperBound float64
-		for i, curr := range s.currs {
-			if curr != nil && len(curr.IndexInternalID) == 8 && binary.BigEndian.Uint64(curr.IndexInternalID) == minIDVal {
-				s.matching = append(s.matching, curr)
+		for i, currID := range s.currIDs {
+			if currID == minIDVal {
+				s.matching = append(s.matching, s.currs[i])
 				s.matchingIdxs = append(s.matchingIdxs, i)
 				upperBound += wandImpacts[i]
 			}
@@ -805,24 +820,28 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 		// In the lazy path, non-rv matched docs have at most IndexInternalID + Score
 		// set (Score only when scoreCurrentDoc was called, i.e. rv != nil).
 		// PutLazy (zeros both fields) is sufficient and avoids the full Reset.
-		for i, curr := range s.currs {
-			if curr != nil && len(curr.IndexInternalID) == 8 && binary.BigEndian.Uint64(curr.IndexInternalID) == minIDVal {
-				if curr != rv {
-					if lazy {
-						ctx.DocumentMatchPool.PutLazy(curr)
-					} else {
-						ctx.DocumentMatchPool.Put(curr)
-					}
-				}
+		//
+		// Use matchingIdxs rather than ranging over all s.currs: the collect loop
+		// above already identified every index where curr.ID == minIDVal, so we
+		// avoid re-scanning and re-decoding the BigEndian ID for all N terms.
+		for _, i := range s.matchingIdxs {
+			curr := s.currs[i]
+			if curr != rv {
 				if lazy {
-					s.currs[i], err = s.lazySearchers[i].nextDocIDOnly(ctx)
+					ctx.DocumentMatchPool.PutLazy(curr)
 				} else {
-					s.currs[i], err = s.searchers[i].Next(ctx)
-				}
-				if err != nil {
-					return nil, err
+					ctx.DocumentMatchPool.Put(curr)
 				}
 			}
+			if lazy {
+				s.currs[i], err = s.lazySearchers[i].nextDocIDOnly(ctx)
+			} else {
+				s.currs[i], err = s.searchers[i].Next(ctx)
+			}
+			if err != nil {
+				return nil, err
+			}
+			s.currIDs[i] = decodeCurrID(s.currs[i])
 		}
 
 		if rv != nil {
@@ -853,6 +872,7 @@ func (s *DisjunctionSliceSearcher) Advance(ctx *search.SearchContext,
 		if err != nil {
 			return nil, err
 		}
+		s.currIDs[i] = decodeCurrID(s.currs[i])
 	}
 
 	err = s.updateMatches()
