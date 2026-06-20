@@ -40,6 +40,7 @@ type IndexSnapshotTermFieldReader struct {
 	dicts              []segment.TermDictionary
 	postings           []segment.PostingsList
 	iterators          []segment.PostingsIterator
+	normByteIters      []normByteIterator // cached type assertions; parallel to iterators
 	segmentOffset      int
 	// segmentBase is non-zero for shard TFRs created by TermFieldReaderForSegmentRange
 	// (§7 parallel segment search). A shard TFR covers only snapshot.segment[segmentBase:
@@ -150,7 +151,7 @@ func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Postin
 	}
 	if i.includeNorm {
 		rv.Norm = next.Norm()
-		if nbi, ok := i.iterators[i.segmentOffset].(normByteIterator); ok {
+		if nbi := i.normByteIters[i.segmentOffset]; nbi != nil {
 			rv.NormByte = nbi.NormColumnByte(next.Number())
 		}
 	}
@@ -394,11 +395,17 @@ func (i *IndexSnapshotTermFieldReader) ShardView(startSeg, endSeg int) (index.Te
 	if len(i.dicts) > 0 {
 		rv.dicts = i.dicts[startSeg:endSeg]
 	}
+	if i.includeNorm {
+		rv.normByteIters = make([]normByteIterator, n)
+	}
 	if len(i.postings) > 0 {
 		rv.postings = i.postings[startSeg:endSeg]
 		for j := 0; j < n; j++ {
 			if rv.postings[j] != nil {
 				rv.iterators[j] = rv.postings[j].Iterator(i.includeFreq, i.includeNorm, i.includeTermVectors, nil)
+				if i.includeNorm {
+					rv.normByteIters[j], _ = rv.iterators[j].(normByteIterator)
+				}
 			}
 		}
 	} else {
