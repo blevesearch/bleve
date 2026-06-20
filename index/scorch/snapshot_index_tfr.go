@@ -34,13 +34,14 @@ func init() {
 }
 
 type IndexSnapshotTermFieldReader struct {
-	term               []byte
-	field              string
-	snapshot           *IndexSnapshot
-	dicts              []segment.TermDictionary
-	postings           []segment.PostingsList
-	iterators          []segment.PostingsIterator
-	segmentOffset      int
+	term            []byte
+	field           string
+	snapshot        *IndexSnapshot
+	dicts           []segment.TermDictionary
+	postings        []segment.PostingsList
+	iterators       []segment.PostingsIterator
+	normColumnIters []normColumnIterator // cached type assertions; parallel to iterators
+	segmentOffset   int
 	// segmentBase is non-zero for shard TFRs created by TermFieldReaderForSegmentRange
 	// (§7 parallel segment search). A shard TFR covers only snapshot.segment[segmentBase:
 	// segmentBase+len(iterators)]; segmentOffset is relative to this range.
@@ -64,7 +65,7 @@ type IndexSnapshotTermFieldReader struct {
 	// MaxTFNormForSegment() uses this to avoid redundant invIndexCache lookups
 	// when initWANDMaxImpacts calls both MaxTFNorm (once) and MaxTFNormForSegment
 	// (×numSegments) per term searcher.
-	segMaxTFNorms     []float32
+	segMaxTFNorms      []float32
 	segMaxTFNormsAvgDl float64
 }
 
@@ -150,7 +151,7 @@ func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Postin
 	}
 	if i.includeNorm {
 		rv.Norm = next.Norm()
-		if nci, ok := i.iterators[i.segmentOffset].(normColumnIterator); ok {
+		if nci := i.normColumnIters[i.segmentOffset]; nci != nil {
 			rv.FieldLen = nci.NormColumn(next.Number())
 		}
 	}
@@ -394,11 +395,17 @@ func (i *IndexSnapshotTermFieldReader) ShardView(startSeg, endSeg int) (index.Te
 	if len(i.dicts) > 0 {
 		rv.dicts = i.dicts[startSeg:endSeg]
 	}
+	if i.includeNorm {
+		rv.normColumnIters = make([]normColumnIterator, n)
+	}
 	if len(i.postings) > 0 {
 		rv.postings = i.postings[startSeg:endSeg]
 		for j := 0; j < n; j++ {
 			if rv.postings[j] != nil {
 				rv.iterators[j] = rv.postings[j].Iterator(i.includeFreq, i.includeNorm, i.includeTermVectors, nil)
+				if i.includeNorm {
+					rv.normColumnIters[j], _ = rv.iterators[j].(normColumnIterator)
+				}
 			}
 		}
 	} else {
