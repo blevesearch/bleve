@@ -670,6 +670,9 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 		}
 	}
 
+	if includeNorm && rv.normByteIters == nil {
+		rv.normByteIters = make([]normByteIterator, len(is.segment))
+	}
 	for i, s := range is.segment {
 		var prevBytesReadPL uint64
 		if rv.postings[i] != nil {
@@ -686,6 +689,9 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 			prevBytesReadItr = rv.iterators[i].BytesRead()
 		}
 		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, rv.iterators[i])
+		if includeNorm {
+			rv.normByteIters[i], _ = rv.iterators[i].(normByteIterator)
+		}
 
 		if bytesRead := rv.postings[i].BytesRead(); prevBytesReadPL < bytesRead {
 			rv.incrementBytesRead(bytesRead - prevBytesReadPL)
@@ -742,6 +748,9 @@ func (is *IndexSnapshot) TermFieldReaderForSegmentRange(
 		rv.dicts[i] = dict
 	}
 
+	if includeNorm {
+		rv.normByteIters = make([]normByteIterator, n)
+	}
 	for i, s := range segs {
 		pl, err := rv.dicts[i].PostingsList(term, s.deleted, nil)
 		if err != nil {
@@ -749,6 +758,9 @@ func (is *IndexSnapshot) TermFieldReaderForSegmentRange(
 		}
 		rv.postings[i] = pl
 		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, nil)
+		if includeNorm {
+			rv.normByteIters[i], _ = rv.iterators[i].(normByteIterator)
+		}
 	}
 
 	rv.updateBytesRead = includeFreq || includeNorm || includeTermVectors
