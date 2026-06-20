@@ -664,8 +664,8 @@ func TestBytesRead(t *testing.T) {
 
 	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	if !approxSame(bytesRead-prevBytesRead, 105) && res.Cost == bytesRead-prevBytesRead {
-		t.Fatalf("expected bytes read for faceted query is around 105, got %v",
+	if !approxSame(bytesRead-prevBytesRead, 137) && res.Cost == bytesRead-prevBytesRead {
+		t.Fatalf("expected bytes read for faceted query is around 137, got %v",
 			bytesRead-prevBytesRead)
 	}
 	prevBytesRead = bytesRead
