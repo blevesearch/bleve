@@ -238,18 +238,33 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	for i := range descendants { // recycle each IndexInternalID
 		descendants[i] = descendants[i][:0]
 	}
-	// Zero only the fields that are NOT restored below.  This avoids a
-	// full-struct duffzero (~240 bytes) for the common case where most
-	// fields are already nil/zero.
-	dm.Index = ""
-	dm.ID = ""
+	// Zero only the fields that are NOT restored below.  Nil/empty guards on
+	// pointer/string/map fields avoid triggering a GC write barrier for nil→nil
+	// stores, saving ~5 cycles per field across the many millions of Reset calls
+	// (common case: no explain, no fragments, no field highlights).
+	if dm.Index != "" {
+		dm.Index = ""
+	}
+	if dm.ID != "" {
+		dm.ID = ""
+	}
 	dm.Score = 0
-	dm.Expl = nil
-	dm.Locations = nil
-	dm.Fragments = nil
-	dm.Fields = nil
+	if dm.Expl != nil {
+		dm.Expl = nil
+	}
+	if dm.Locations != nil {
+		dm.Locations = nil
+	}
+	if dm.Fragments != nil {
+		dm.Fragments = nil
+	}
+	if dm.Fields != nil {
+		dm.Fields = nil
+	}
 	dm.HitNumber = 0
-	dm.IndexNames = nil
+	if dm.IndexNames != nil {
+		dm.IndexNames = nil
+	}
 	// Restore reusable allocations.
 	dm.IndexInternalID = indexInternalID[:0]
 	dm.Sort = sortBuf[:0]
