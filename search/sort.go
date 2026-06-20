@@ -274,6 +274,23 @@ func (so SortOrder) Compare(cachedScoring, cachedDesc []bool, i, j *DocumentMatc
 	return -1
 }
 
+// ScoreCompare will compare two document matches using the score and hit number
+func ScoreCompare(i, j *DocumentMatch) int {
+	if i.Score < j.Score {
+		return 1
+	}
+	if i.Score > j.Score {
+		return -1
+	}
+	if i.HitNumber > j.HitNumber {
+		return 1
+	}
+	if i.HitNumber < j.HitNumber {
+		return -1
+	}
+	return 0
+}
+
 func (so SortOrder) RequiresScore() bool {
 	for _, soi := range so {
 		if soi.RequiresScoring() {

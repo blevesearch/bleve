@@ -16,6 +16,7 @@ package collector
 
 import (
 	"container/heap"
+	"slices"
 
 	"github.com/blevesearch/bleve/v2/search"
 )
@@ -57,9 +58,14 @@ func (c *collectStoreHeap) Final(skip int, fixup collectorFixup) (search.Documen
 	if size <= 0 {
 		return make(search.DocumentMatchCollection, 0), nil
 	}
+	inner := c.Internal()
+	slices.SortFunc(inner, func(a, b *search.DocumentMatch) int {
+		return c.compare(a, b)
+	})
+	window := inner[skip:count]
 	rv := make(search.DocumentMatchCollection, size)
-	for i := size - 1; i >= 0; i-- {
-		doc := heap.Pop(c).(*search.DocumentMatch)
+	for i := 0; i < size; i++ {
+		doc := window[i]
 		rv[i] = doc
 		err := fixup(doc)
 		if err != nil {
