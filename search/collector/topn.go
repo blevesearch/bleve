@@ -84,6 +84,11 @@ type TopNCollector struct {
 	hybridMergeCallback search.HybridMergeCallbackFn
 
 	nestedStore *collectStoreNested
+
+	// fastPrepare is true when prepareDocumentMatch can skip KNN/neededFields/
+	// needDocIds/sort-value-compute branches — set once in Collect after loadID
+	// is known. Applies only to score-sorted queries with no field-loading needs.
+	fastPrepare bool
 }
 
 // CheckDoneEvery controls how frequently we check the context deadline
@@ -356,6 +361,8 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 
 	hc.needDocIds = hc.needDocIds || loadID
+	hc.fastPrepare = len(hc.neededFields) == 0 && !hc.needDocIds &&
+		len(hc.sort) == 1 && hc.cachedScoring[0]
 	select {
 	case <-ctx.Done():
 		search.RecordSearchCost(ctx, search.AbortM, 0)
@@ -390,9 +397,11 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			}
 		}
 		if next != nil {
-			err = hc.adjustDocumentMatch(searchContext, reader, next)
-			if err != nil {
-				break
+			if hc.knnHits != nil {
+				err = hc.adjustDocumentMatch(searchContext, reader, next)
+				if err != nil {
+					break
+				}
 			}
 			err = hc.prepareDocumentMatch(searchContext, reader, next, false)
 			if err != nil {
@@ -416,9 +425,11 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	if hc.nestedStore != nil {
 		currRoot := hc.nestedStore.Current()
 		if currRoot != nil {
-			err = hc.adjustDocumentMatch(searchContext, reader, currRoot)
-			if err != nil {
-				return err
+			if hc.knnHits != nil {
+				err = hc.adjustDocumentMatch(searchContext, reader, currRoot)
+				if err != nil {
+					return err
+				}
 			}
 			// no descendants at this point
 			err = hc.prepareDocumentMatch(searchContext, reader, currRoot, false)
@@ -498,6 +509,18 @@ func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 
 func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
 	reader index.IndexReader, d *search.DocumentMatch, isKnnDoc bool) (err error) {
+
+	// Fast path: score-sorted queries with no field loading, no KNN, no docID needs.
+	// Skips all conditional branches that are always false in this common case.
+	if hc.fastPrepare && !isKnnDoc {
+		hc.total++
+		d.HitNumber = hc.total
+		if d.Score > hc.maxScore {
+			hc.maxScore = d.Score
+		}
+		d.Sort = sortByScoreOpt
+		return nil
+	}
 
 	// visit field terms for features that require it (sort, facets)
 	if !isKnnDoc && len(hc.neededFields) > 0 {
