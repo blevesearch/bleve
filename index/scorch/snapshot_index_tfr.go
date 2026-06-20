@@ -40,6 +40,7 @@ type IndexSnapshotTermFieldReader struct {
 	dicts              []segment.TermDictionary
 	postings           []segment.PostingsList
 	iterators          []segment.PostingsIterator
+	normColumnIters    []normColumnIterator // cached type assertions; parallel to iterators
 	segmentOffset      int
 	includeFreq        bool
 	includeNorm        bool
@@ -59,7 +60,7 @@ type IndexSnapshotTermFieldReader struct {
 	// MaxTFNormForSegment() uses this to avoid redundant invIndexCache lookups
 	// when initWANDMaxImpacts calls both MaxTFNorm (once) and MaxTFNormForSegment
 	// (×numSegments) per term searcher.
-	segMaxTFNorms     []float32
+	segMaxTFNorms      []float32
 	segMaxTFNormsAvgDl float64
 }
 
@@ -145,7 +146,7 @@ func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Postin
 	}
 	if i.includeNorm {
 		rv.Norm = next.Norm()
-		if nci, ok := i.iterators[i.segmentOffset].(normColumnIterator); ok {
+		if nci := i.normColumnIters[i.segmentOffset]; nci != nil {
 			rv.FieldLen = nci.NormColumn(next.Number())
 		}
 	}

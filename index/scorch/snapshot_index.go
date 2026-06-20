@@ -670,6 +670,9 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 		}
 	}
 
+	if includeNorm && rv.normColumnIters == nil {
+		rv.normColumnIters = make([]normColumnIterator, len(is.segment))
+	}
 	for i, s := range is.segment {
 		var prevBytesReadPL uint64
 		if rv.postings[i] != nil {
@@ -686,6 +689,9 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 			prevBytesReadItr = rv.iterators[i].BytesRead()
 		}
 		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, rv.iterators[i])
+		if includeNorm {
+			rv.normColumnIters[i], _ = rv.iterators[i].(normColumnIterator)
+		}
 
 		if bytesRead := rv.postings[i].BytesRead(); prevBytesReadPL < bytesRead {
 			rv.incrementBytesRead(bytesRead - prevBytesReadPL)
