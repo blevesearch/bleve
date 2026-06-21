@@ -169,16 +169,64 @@ func (h *dmMinHeap) pushBounded(m *search.DocumentMatch, k int) (evicted *search
 
 func (h dmMinHeap) Len() int { return len(h) }
 
-// estimateDF sums the total document frequency across all sub-searchers.
+// estimateDF estimates the effective candidate count for the DF guard.
 // All sub-searchers must already be verified as *TermSearcher before calling.
-// The sum is a conservative upper bound on distinct matching documents
-// (union ≤ sum of DFs), which makes it safe to use as a candidate estimate.
+//
+// For plain disjunctions (min ≤ 1), sum of all term DFs is a correct
+// conservative upper bound (union ≤ sum).
+//
+// For MSM queries (min > 1), the raw sum massively over-estimates because a
+// matching doc must appear in at least min distinct postings. Under an
+// independence model the expected count is:
+//
+//	E ≈ C(N, min) × (avgDF / N_docs)^(min-1) × avgDF
+//
+// This shrinks rapidly with min and accurately reflects the real candidate
+// density, so the DF guard correctly rejects parallel for sparse MSM queries
+// where goroutine overhead would dominate over any parallel speedup.
 func estimateDF(s *DisjunctionSliceSearcher) uint64 {
+	n := len(s.searchers)
 	var total uint64
 	for _, sr := range s.searchers {
 		total += uint64(sr.(*TermSearcher).Count())
 	}
-	return total
+
+	if s.min <= 1 {
+		return total
+	}
+
+	// MSM path: apply the independence-model correction.
+	nDocs, err := s.indexReader.DocCount()
+	if err != nil || nDocs == 0 {
+		return total // fall back to the plain-disjunction bound
+	}
+
+	avgD := float64(total) / float64(n)
+	p := avgD / float64(nDocs)
+	est := msmBinomCoeff(n, s.min) * math.Pow(p, float64(s.min-1)) * avgD
+	if est < 1 {
+		return 1
+	}
+	if uint64(est) > total {
+		return total
+	}
+	return uint64(est)
+}
+
+// msmBinomCoeff returns C(n, k) as float64. Only used for MSM term counts
+// (small n and k), so there is no overflow risk within float64 precision.
+func msmBinomCoeff(n, k int) float64 {
+	if k > n || k < 0 {
+		return 0
+	}
+	if k > n-k {
+		k = n - k
+	}
+	b := 1.0
+	for i := 0; i < k; i++ {
+		b *= float64(n-i) / float64(i+1)
+	}
+	return b
 }
 
 // shouldRunParallel returns (true, shardK) when all conditions for parallel
