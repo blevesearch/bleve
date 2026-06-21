@@ -278,6 +278,7 @@ func runParallelSegmentSearch(
 	ctx context.Context,
 	s *DisjunctionSliceSearcher,
 	shardK int,
+	requestWAND bool,
 ) ([]*search.DocumentMatch, error) {
 	parallelSearchesActive.Add(1)
 	defer parallelSearchesActive.Add(-1)
@@ -298,15 +299,24 @@ func runParallelSegmentSearch(
 	// cross-shard threshold that the highest-scoring shard broadcast. Global
 	// ceilings are a correct upper bound on any shard doc's score and keep the
 	// essential/non-essential partition as tight as the serial WAND path.
-	globalMI := make([]float64, len(s.searchers))
-	canWAND := true
-	for i, sr := range s.searchers {
-		mi := sr.(*TermSearcher).MaxImpact()
-		if mi >= math.MaxFloat64 {
-			canWAND = false
-			break
+	//
+	// Only enable WAND when the request allows it (requestWAND mirrors
+	// SearchContext.WANDEnabled which is false for ScoreModeComplete).
+	// With ScoreModeComplete the caller wants exact scores; skip the MaxImpact
+	// reads and globalMI allocation entirely.
+	var globalMI []float64
+	canWAND := false
+	if requestWAND {
+		globalMI = make([]float64, len(s.searchers))
+		canWAND = true
+		for i, sr := range s.searchers {
+			mi := sr.(*TermSearcher).MaxImpact()
+			if mi >= math.MaxFloat64 {
+				canWAND = false
+				break
+			}
+			globalMI[i] = mi
 		}
-		globalMI[i] = mi
 	}
 
 	// Create all shard DSSes sequentially to prevent concurrent SetQueryNorm
