@@ -529,7 +529,7 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 		s.parallelDecided = true
 		if ok, shardK := shouldRunParallel(s, ctx); ok {
 			var err error
-			s.parallelResults, err = runParallelSegmentSearch(s.ctx, s, shardK)
+			s.parallelResults, err = runParallelSegmentSearch(s.ctx, s, shardK, ctx.WANDEnabled)
 			if err != nil {
 				return nil, err
 			}
