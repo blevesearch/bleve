@@ -48,6 +48,11 @@ type SegmentSnapshot struct {
 	cachedMeta *cachedMeta
 
 	cachedDocs *cachedDocs
+
+	// cache the root count of the segment,
+	// since this is an expensive operation to compute
+	rootCountOnce sync.Once
+	rootCount     uint64
 }
 
 func (s *SegmentSnapshot) Segment() segment.Segment {
@@ -119,13 +124,14 @@ func (s *SegmentSnapshot) Count() uint64 {
 // Count() counts all live documents including nested children, whereas this method
 // counts only root live documents
 func (s *SegmentSnapshot) CountRoot() uint64 {
-	var rv uint64
-	if nsb, ok := s.segment.(segment.NestedSegment); ok {
-		rv = nsb.CountRoot(s.deleted)
-	} else {
-		rv = s.Count()
-	}
-	return rv
+	s.rootCountOnce.Do(func() {
+		if nsb, ok := s.segment.(segment.NestedSegment); ok {
+			s.rootCount = nsb.CountRoot(s.deleted)
+		} else {
+			s.rootCount = s.Count()
+		}
+	})
+	return s.rootCount
 }
 
 func (s *SegmentSnapshot) DocNumbers(docIDs []string) (*roaring.Bitmap, error) {
