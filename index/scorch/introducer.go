@@ -231,6 +231,13 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	}
 
 	newSnapshot.updateSize()
+	// record the docID-level diff under root lock while both snapshots are valid
+	oldLive, cerr := collectLiveDocIDs(root)
+	if cerr != nil {
+		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
+			newSnapshot.epoch, cerr))
+	}
+	inserted, updated, deleted := classifyBatchIDs(next.ids, oldLive, next.data)
 	s.rootLock.Lock()
 	if next.persisted != nil {
 		s.rootPersisted = append(s.rootPersisted, next.persisted)
@@ -244,6 +251,8 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	rootPrev := s.root
 	s.root = newSnapshot
 	atomic.StoreUint64(&s.stats.CurRootEpoch, s.root.epoch)
+	s.recordSnapshotDiffWithBatch(oldLive, newSnapshot.epoch,
+		inserted, updated, deleted)
 	// release lock
 	s.rootLock.Unlock()
 
@@ -332,6 +341,7 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 	rootPrev := s.root
 	s.root = newIndexSnapshot
 	atomic.StoreUint64(&s.stats.CurRootEpoch, s.root.epoch)
+	s.recordSnapshotDiff(rootPrev, newIndexSnapshot)
 	s.rootLock.Unlock()
 
 	if rootPrev != nil {
@@ -495,6 +505,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	rootPrev := s.root
 	s.root = newSnapshot
 	atomic.StoreUint64(&s.stats.CurRootEpoch, s.root.epoch)
+	s.recordSnapshotDiff(rootPrev, newSnapshot)
 	// release lock
 	s.rootLock.Unlock()
 
