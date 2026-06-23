@@ -31,17 +31,18 @@ func init() {
 }
 
 // CustomFilterFunc decides whether a hit (with doc-value fields populated)
-// should be kept. Unlike FilterFunc it does not receive a SearchContext since
-// custom-query callbacks only need the DocumentMatch. A non-nil error aborts
-// the search so the failure can be surfaced to the caller rather than silently
-// dropping the hit.
-type CustomFilterFunc func(d *search.DocumentMatch) (bool, error)
+// should be kept. It receives the search's context so a long-running callback
+// (e.g. a JS UDF) can honor the query deadline/cancellation. A non-nil error
+// aborts the search so the failure can be surfaced to the caller rather than
+// silently dropping the hit.
+type CustomFilterFunc func(ctx context.Context, d *search.DocumentMatch) (bool, error)
 
 // CustomFilterSearcher wraps a child searcher, optionally loads doc values
 // into each DocumentMatch, then applies a CustomFilterFunc to decide whether
 // to keep the hit. Unlike FilteringSearcher this variant is purpose-built for
 // custom queries that need field values at callback time.
 type CustomFilterSearcher struct {
+	ctx         context.Context
 	child       search.Searcher
 	accept      CustomFilterFunc
 	dvReader    index.DocValueReader
@@ -54,6 +55,7 @@ func NewCustomFilterSearcher(ctx context.Context, child search.Searcher,
 	indexReader index.IndexReader,
 	fieldTypes map[string]string) *CustomFilterSearcher {
 	return &CustomFilterSearcher{
+		ctx:         ctx,
 		child:       child,
 		accept:      filter,
 		dvReader:    dvReader,
@@ -73,7 +75,7 @@ func (f *CustomFilterSearcher) Next(ctx *search.SearchContext) (*search.Document
 		if err = loadDocValuesOnHitWithTypes(next, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
-		keep, ferr := f.accept(next)
+		keep, ferr := f.accept(f.ctx, next)
 		if ferr != nil {
 			return nil, ferr
 		}
@@ -97,7 +99,7 @@ func (f *CustomFilterSearcher) Advance(ctx *search.SearchContext, ID index.Index
 	if err = loadDocValuesOnHitWithTypes(adv, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 		return nil, err
 	}
-	keep, ferr := f.accept(adv)
+	keep, ferr := f.accept(f.ctx, adv)
 	if ferr != nil {
 		return nil, ferr
 	}

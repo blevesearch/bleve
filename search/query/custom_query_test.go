@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -104,7 +105,7 @@ func TestCustomFilterQueryMarshalJSONPreservesPayloadAndRewritesChild(t *testing
 	}
 
 	q := NewCustomFilterQueryWithFilter(NewMatchQuery("ipa"),
-		func(d *search.DocumentMatch) (bool, error) { return true, nil }, []string{"abv"}, payload)
+		func(ctx context.Context, d *search.DocumentMatch) (bool, error) { return true, nil }, []string{"abv"}, payload)
 
 	out, err := q.MarshalJSON()
 	if err != nil {
@@ -154,7 +155,7 @@ func TestCustomScoreQueryMarshalJSONPreservesPayloadAndRewritesChild(t *testing.
 	}
 
 	q := NewCustomScoreQueryWithScorer(NewMatchQuery("ipa"),
-		func(d *search.DocumentMatch) (float64, error) { return d.Score, nil }, []string{"ibu"}, payload)
+		func(ctx context.Context, d *search.DocumentMatch) (float64, error) { return d.Score, nil }, []string{"ibu"}, payload)
 
 	out, err := q.MarshalJSON()
 	if err != nil {
