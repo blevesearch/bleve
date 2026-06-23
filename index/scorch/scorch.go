@@ -1357,6 +1357,12 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	// data with writer ids that have been removed
 	prevNumSnapshotsToKeep := s.numSnapshotsToKeep
 	s.numSnapshotsToKeep = 1
+	defer func() {
+		// reset rollback snapshot retention
+		s.rootLock.Lock()
+		s.numSnapshotsToKeep = prevNumSnapshotsToKeep
+		s.rootLock.Unlock()
+	}()
 
 	// track the zapx files that are expected to be removed after
 	// the merge so that we can block until they are removed by the persister
@@ -1449,11 +1455,6 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	if err != nil {
 		return err
 	}
-
-	// reset rollback snapshot retention
-	s.rootLock.Lock()
-	s.numSnapshotsToKeep = prevNumSnapshotsToKeep
-	s.rootLock.Unlock()
 
 	return nil
 }

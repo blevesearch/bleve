@@ -800,8 +800,8 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	}
 
 	// Filter out fields that have been completely deleted or had their
-	// docvalues data deleted from both visitable fields and required fields
-	filterUpdatedFields := func(fields []string) []string {
+	// docvalues data deleted from the visitable fields
+	filterUpdatedDVFields := func(fields []string) []string {
 		filteredFields := make([]string, 0, len(fields))
 		for _, field := range fields {
 			if info, ok := is.updatedFields[field]; ok &&
@@ -813,9 +813,22 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 		return filteredFields
 	}
 
+	// Filter out fields that have been completely deleted or had their
+	// index data deleted from the cached fields
+	filterUpdatedIndexFields := func(fields []string) []string {
+		filteredFields := make([]string, 0, len(fields))
+		for _, field := range fields {
+			if info, ok := is.updatedFields[field]; ok &&
+				(info.Index || info.Deleted) {
+				continue
+			}
+			filteredFields = append(filteredFields, field)
+		}
+		return filteredFields
+	}
+
 	if len(is.updatedFields) > 0 {
-		fields = filterUpdatedFields(fields)
-		vFields = filterUpdatedFields(vFields)
+		vFields = filterUpdatedDVFields(vFields)
 	}
 
 	var errCh chan error
@@ -826,18 +839,21 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	// from a previous invocation
 	if cFields == nil {
 		cFields = subtractStrings(fields, vFields)
+	}
+	if len(is.updatedFields) > 0 {
+		cFields = filterUpdatedIndexFields(cFields)
+	}
 
-		if len(cFields) > 0 && !ss.cachedDocs.hasFields(cFields) {
-			errCh = make(chan error, 1)
+	if len(cFields) > 0 && !ss.cachedDocs.hasFields(cFields) {
+		errCh = make(chan error, 1)
 
-			go func() {
-				err := ss.cachedDocs.prepareFields(cFields, ss)
-				if err != nil {
-					errCh <- err
-				}
-				close(errCh)
-			}()
-		}
+		go func() {
+			err := ss.cachedDocs.prepareFields(cFields, ss)
+			if err != nil {
+				errCh <- err
+			}
+			close(errCh)
+		}()
 	}
 
 	if ssvOk && ssv != nil && len(vFields) > 0 {

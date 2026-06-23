@@ -5197,6 +5197,88 @@ func TestCustomFilterQueryDateTimeDocValues(t *testing.T) {
 	}
 }
 
+// TestCustomFilterQueryWildcardFields verifies that fields:["*"] inside a
+// custom_filter query exposes all doc-value fields to the callback. The
+// doc-value reader matches field names literally, so before the wildcard was
+// expanded "*" matched nothing, d.Fields stayed empty, and every candidate was
+// filtered out (total_hits == 0).
+func TestCustomFilterQueryWildcardFields(t *testing.T) {
+	idx := newCustomQueryDocValueTestIndex(t)
+	defer func() {
+		if err := idx.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	fictionQuery := NewTermQuery("fiction")
+	fictionQuery.SetField("genre")
+
+	// The callback inspects multiple fields and keeps the hit only if all are
+	// present, so with "*" the reader must surface both the numeric "rating"
+	// and the keyword "genre" (and resolve their types correctly).
+	q := query.NewCustomFilterQueryWithFilter(fictionQuery, func(ctx context.Context, d *search.DocumentMatch) (bool, error) {
+		rating, hasRating := d.Fields["rating"].(float64)
+		genre, hasGenre := d.Fields["genre"].(string)
+		return hasRating && hasGenre && genre == "fiction" && rating > 0, nil
+	}, []string{"*"}, nil)
+
+	req := NewSearchRequest(q)
+	req.Size = 10
+
+	res, err := idx.SearchInContext(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Both fiction docs carry rating + genre, so both must pass the filter.
+	if res.Total != 2 {
+		t.Fatalf("expected 2 hits with fields:[\"*\"], got %d (doc.Fields likely empty)", res.Total)
+	}
+}
+
+// TestCustomScoreQueryWildcardFields is the custom_score counterpart: fields:["*"]
+// must expose doc-value fields to the scorer just like an explicit field list.
+func TestCustomScoreQueryWildcardFields(t *testing.T) {
+	idx := newCustomQueryDocValueTestIndex(t)
+	defer func() {
+		if err := idx.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	fictionQuery := NewTermQuery("fiction")
+	fictionQuery.SetField("genre")
+
+	q := query.NewCustomScoreQueryWithScorer(fictionQuery, func(ctx context.Context, d *search.DocumentMatch) (float64, error) {
+		if rating, ok := d.Fields["rating"].(float64); ok && rating >= 9 {
+			return d.Score + 100, nil
+		}
+		return d.Score, nil
+	}, []string{"*"}, nil)
+
+	req := NewSearchRequest(q)
+	req.Size = 4
+
+	res, err := idx.SearchInContext(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Hits) != 2 {
+		t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+	}
+	// Doc "1" (rating 9) is boosted by +100; the top hit must be doc "1" AND
+	// carry that boost in its score. Without "*" expansion d.Fields["rating"]
+	// is absent, the boost never applies, and the score stays below 1 — so the
+	// magnitude check (not just ordering) is what proves the field was read.
+	if res.Hits[0].ID != "1" {
+		t.Fatalf("expected boosted hit 1 first, got %s", res.Hits[0].ID)
+	}
+	if res.Hits[0].Score < 100 {
+		t.Fatalf("expected top hit score >= 100 from boost, got %f (doc.Fields likely empty)", res.Hits[0].Score)
+	}
+}
+
 func TestGeoDistanceInSortAlias(t *testing.T) {
 	tmpIndexPath1 := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath1)
