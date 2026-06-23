@@ -212,50 +212,52 @@ func (s *Scorch) recordSnapshotDiff(prevSnapshot, newSnapshot *IndexSnapshot) {
 			newSnapshot.epoch, err))
 		return
 	}
-	s.persistDiff(diff)
+	s.diffLock.Lock()
+	s.pendingDiffs = append(s.pendingDiffs, diff)
+	s.diffLock.Unlock()
 }
 
-// recordSnapshotDiffWithBatch is used by introduceSegment.  The oldLive set
-// plus batch classification avoid a second full enumeration of either
-// snapshot.
+// recordSnapshotDiffWithBatch is used by introduceSegment.
 func (s *Scorch) recordSnapshotDiffWithBatch(oldLive []string, newEpoch uint64,
 	inserted, updated, deleted []string,
 ) {
 	diff := buildDiffFromBatch(oldLive, newEpoch, inserted, updated, deleted)
-	s.persistDiff(diff)
+	s.diffLock.Lock()
+	s.pendingDiffs = append(s.pendingDiffs, diff)
+	s.diffLock.Unlock()
 }
 
-// persistDiff writes a SnapshotDiff to root.bolt asynchronously to avoid
-// deadlocking with the persister which may hold a concurrent bolt write tx.
-func (s *Scorch) persistDiff(diff *SnapshotDiff) {
-	if s.rootBolt == nil {
-		return
+// flushPendingDiffs writes all pending snapshot diffs into the given bolt
+// transaction.  Called by the persister inside its bolt write tx.
+func (s *Scorch) flushPendingDiffs(tx *bolt.Tx) error {
+	s.diffLock.Lock()
+	defer s.diffLock.Unlock()
+
+	if len(s.pendingDiffs) == 0 {
+		return nil
 	}
 
-	rb := s.rootBolt
-	data, err := json.Marshal(diff)
-	if err != nil {
-		s.fireAsyncError(fmt.Errorf("snapshot diff marshal error for epoch %d: %v",
-			diff.Epoch, err))
-		return
+	diffBucket, cerr := tx.CreateBucketIfNotExists(boltSnapshotDiffBucket)
+	if cerr != nil {
+		return cerr
 	}
 
-	// Write async: the introducer may hold rootLock while the persister
-	// holds a bolt write tx.  A synchronous bolt write here would deadlock.
-	go func() {
-		err := rb.Update(func(tx *bolt.Tx) error {
-			diffBucket, cerr := tx.CreateBucketIfNotExists(boltSnapshotDiffBucket)
-			if cerr != nil {
-				return cerr
-			}
-			key := encodeUvarintAscending(nil, diff.Epoch)
-			return diffBucket.Put(key, data)
-		})
+	for _, diff := range s.pendingDiffs {
+		data, err := json.Marshal(diff)
 		if err != nil {
-			s.fireAsyncError(fmt.Errorf("snapshot diff persist error for epoch %d: %v",
-				diff.Epoch, err))
+			return fmt.Errorf("snapshot diff marshal error for epoch %d: %v",
+				diff.Epoch, err)
 		}
-	}()
+		key := encodeUvarintAscending(nil, diff.Epoch)
+		if err := diffBucket.Put(key, data); err != nil {
+			return err
+		}
+	}
+
+	// Clear the slice in-place so the persister doesn't grab heap.
+	clear(s.pendingDiffs)
+	s.pendingDiffs = s.pendingDiffs[:0]
+	return nil
 }
 
 // GetSnapshotDiff retrieves the diff for a specific epoch from rootBolt.
