@@ -39,7 +39,7 @@ type SnapshotDiff struct {
 
 // collectLiveDocIDs returns the sorted set of all live (non-deleted) docIDs
 // in the given IndexSnapshot.
-func collectLiveDocIDs(snapshot *IndexSnapshot) ([]string, error) {
+func collectLiveDocIDs(snapshot *IndexSnapshot) (map[string]struct{}, error) {
 	if snapshot == nil {
 		return nil, nil
 	}
@@ -58,39 +58,27 @@ func collectLiveDocIDs(snapshot *IndexSnapshot) ([]string, error) {
 			set[string(docIDBytes)] = struct{}{}
 		}
 	}
-
-	result := make([]string, 0, len(set))
-	for id := range set {
-		result = append(result, id)
-	}
-	sort.Strings(result)
-	return result, nil
+	return set, nil
 }
 
 // classifyBatchIDs classifies each batch docID as inserted, updated, or
 // deleted.  oldLive is the previous snapshot's live docIDs.  newData is
 // the new segment (nil means pure deletes).  Uses simple nested loops.
-func classifyBatchIDs(ids []string, oldLive []string, newData segment.Segment) (
+func classifyBatchIDs(ids []string, oldLive map[string]struct{}, newData segment.Segment) (
 	inserted, updated, deleted []string,
 ) {
 	for _, id := range ids {
-		if newData == nil {
-			deleted = append(deleted, id)
-			continue
-		}
-
 		inNew := false
-		bm, err := newData.DocNumbers([]string{id})
-		if err == nil && !bm.IsEmpty() {
-			inNew = true
+		if newData != nil {
+			bm, err := newData.DocNumbers([]string{id})
+			if err == nil && !bm.IsEmpty() {
+				inNew = true
+			}
 		}
 
 		inOld := false
-		for _, oid := range oldLive {
-			if oid == id {
-				inOld = true
-				break
-			}
+		if _, ok := oldLive[id]; ok {
+			inOld = true
 		}
 
 		switch {
@@ -98,8 +86,10 @@ func classifyBatchIDs(ids []string, oldLive []string, newData segment.Segment) (
 			updated = append(updated, id)
 		case inNew && !inOld:
 			inserted = append(inserted, id)
-		default:
+		case !inNew && inOld:
 			deleted = append(deleted, id)
+		default:
+			// This should never happen, but we ignore it if it does.
 		}
 	}
 	return inserted, updated, deleted
@@ -142,80 +132,80 @@ func buildDiffFromBatch(oldLive []string, newEpoch uint64,
 
 // computeSnapshotDiff compares the docID sets of two snapshots and returns
 // the diff.  Used for merge/persist introductions which have no batch IDs.
-func computeSnapshotDiff(prevSnapshot, newSnapshot *IndexSnapshot) (*SnapshotDiff, error) {
-	newLive, err := collectLiveDocIDs(newSnapshot)
-	if err != nil {
-		return nil, err
-	}
+// func computeSnapshotDiff(prevSnapshot, newSnapshot *IndexSnapshot) (*SnapshotDiff, error) {
+// 	newLive, err := collectLiveDocIDs(newSnapshot)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	diff := &SnapshotDiff{
-		Epoch:    newSnapshot.epoch,
-		Live:     newLive,
-		Deleted:  []string{},
-		Updated:  []string{},
-		Inserted: []string{},
-	}
+// 	diff := &SnapshotDiff{
+// 		Epoch:    newSnapshot.epoch,
+// 		Live:     newLive,
+// 		Deleted:  []string{},
+// 		Updated:  []string{},
+// 		Inserted: []string{},
+// 	}
 
-	if prevSnapshot == nil {
-		diff.Inserted = newLive
-		return diff, nil
-	}
+// 	if prevSnapshot == nil {
+// 		diff.Inserted = newLive
+// 		return diff, nil
+// 	}
 
-	oldLive, err := collectLiveDocIDs(prevSnapshot)
-	if err != nil {
-		return nil, err
-	}
+// 	oldLive, err := collectLiveDocIDs(prevSnapshot)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	oldSet := make(map[string]bool, len(oldLive))
-	for _, id := range oldLive {
-		oldSet[id] = true
-	}
+// 	oldSet := make(map[string]bool, len(oldLive))
+// 	for id := range oldLive {
+// 		oldSet[id] = true
+// 	}
 
-	newSet := make(map[string]bool, len(newLive))
-	for _, id := range newLive {
-		newSet[id] = true
-	}
+// 	newSet := make(map[string]bool, len(newLive))
+// 	for id := range newLive {
+// 		newSet[id] = true
+// 	}
 
-	var deleted, inserted, updated []string
-	for _, id := range oldLive {
-		if !newSet[id] {
-			deleted = append(deleted, id)
-		}
-	}
-	for _, id := range newLive {
-		if !oldSet[id] {
-			inserted = append(inserted, id)
-		}
-	}
+// 	var deleted, inserted, updated []string
+// 	for id := range oldLive {
+// 		if !newSet[id] {
+// 			deleted = append(deleted, id)
+// 		}
+// 	}
+// 	for id := range newLive {
+// 		if !oldSet[id] {
+// 			inserted = append(inserted, id)
+// 		}
+// 	}
 
-	// Update detection is handled by classifyBatchIDs at batch time.
-	// Merge/persist introductions are internal reorgs with no semantic
-	// doc updates, so we leave updated empty here.
+// 	// Update detection is handled by classifyBatchIDs at batch time.
+// 	// Merge/persist introductions are internal reorgs with no semantic
+// 	// doc updates, so we leave updated empty here.
 
-	sort.Strings(deleted)
-	sort.Strings(inserted)
-	sort.Strings(updated)
+// 	sort.Strings(deleted)
+// 	sort.Strings(inserted)
+// 	sort.Strings(updated)
 
-	diff.Deleted = deleted
-	diff.Inserted = inserted
-	diff.Updated = updated
+// 	diff.Deleted = deleted
+// 	diff.Inserted = inserted
+// 	diff.Updated = updated
 
-	return diff, nil
-}
+// 	return diff, nil
+// }
 
 // recordSnapshotDiff is used for merge/persist introductions which have no
 // batch IDs.  It falls back to full snapshot set-comparison.
-func (s *Scorch) recordSnapshotDiff(prevSnapshot, newSnapshot *IndexSnapshot) {
-	diff, err := computeSnapshotDiff(prevSnapshot, newSnapshot)
-	if err != nil {
-		s.fireAsyncError(fmt.Errorf("snapshot diff compute error for epoch %d: %v",
-			newSnapshot.epoch, err))
-		return
-	}
-	s.diffLock.Lock()
-	s.pendingDiffs = append(s.pendingDiffs, diff)
-	s.diffLock.Unlock()
-}
+// func (s *Scorch) recordSnapshotDiff(prevSnapshot, newSnapshot *IndexSnapshot) {
+// 	diff, err := computeSnapshotDiff(prevSnapshot, newSnapshot)
+// 	if err != nil {
+// 		s.fireAsyncError(fmt.Errorf("snapshot diff compute error for epoch %d: %v",
+// 			newSnapshot.epoch, err))
+// 		return
+// 	}
+// 	s.diffLock.Lock()
+// 	s.pendingDiffs = append(s.pendingDiffs, diff)
+// 	s.diffLock.Unlock()
+// }
 
 // recordSnapshotDiffWithBatch is used by introduceSegment.
 func (s *Scorch) recordSnapshotDiffWithBatch(oldLive []string, newEpoch uint64,
@@ -230,6 +220,7 @@ func (s *Scorch) recordSnapshotDiffWithBatch(oldLive []string, newEpoch uint64,
 // flushPendingDiffs writes all pending snapshot diffs into the given bolt
 // transaction.  Called by the persister inside its bolt write tx.
 func (s *Scorch) flushPendingDiffs(tx *bolt.Tx) error {
+	return nil
 	s.diffLock.Lock()
 	defer s.diffLock.Unlock()
 

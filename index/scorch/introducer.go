@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"fmt"
+	"maps"
 	"path/filepath"
 	"sync/atomic"
 
@@ -237,7 +238,29 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
 			newSnapshot.epoch, cerr))
 	}
+	newLive, cerr := collectLiveDocIDs(newSnapshot)
+	if cerr != nil {
+		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
+			newSnapshot.epoch, cerr))
+	}
+	_ = newLive
+	oldRootCount, err := root.DocCount()
+	if err != nil {
+		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
+			newSnapshot.epoch, err))
+	}
+	newRootCount, err := newSnapshot.DocCount()
+	if err != nil {
+		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
+			newSnapshot.epoch, err))
+	}
 	inserted, updated, deleted := classifyBatchIDs(next.ids, oldLive, next.data)
+	// assert that newRootCount = oldRootCount + len(inserted) - len(deleted)
+	if newRootCount != oldRootCount+uint64(len(inserted))-uint64(len(deleted)) {
+		s.fireAsyncError(fmt.Errorf("snapshot diff count mismatch for epoch %d: oldRootCount=%d, newRootCount=%d, inserted=%v, updated=%v, deleted=%v, ids=%v",
+			newSnapshot.epoch, oldRootCount, newRootCount, inserted, updated, deleted, next.ids))
+	}
+	// assert that the set of oldDocIDs - deleted + inserted = newDocIDs
 	s.rootLock.Lock()
 	if next.persisted != nil {
 		s.rootPersisted = append(s.rootPersisted, next.persisted)
@@ -251,8 +274,6 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	rootPrev := s.root
 	s.root = newSnapshot
 	atomic.StoreUint64(&s.stats.CurRootEpoch, s.root.epoch)
-	s.recordSnapshotDiffWithBatch(oldLive, newSnapshot.epoch,
-		inserted, updated, deleted)
 	// release lock
 	s.rootLock.Unlock()
 
@@ -337,11 +358,40 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 	atomic.StoreUint64(&s.stats.TotMemorySegmentsAtRoot, memSegments)
 	atomic.StoreUint64(&s.stats.TotFileSegmentsAtRoot, fileSegments)
 	newIndexSnapshot.updateSize()
+	// Assert that the docCount before and after the persist introduction is the same, since we are not changing any docIDs.
+	oldRootCount, err := root.DocCount()
+	if err != nil {
+		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
+			newIndexSnapshot.epoch, err))
+	}
+	newRootCount, err := newIndexSnapshot.DocCount()
+	if err != nil {
+		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
+			newIndexSnapshot.epoch, err))
+	}
+	if newRootCount != oldRootCount {
+		s.fireAsyncError(fmt.Errorf("snapshot diff count mismatch for epoch %d: oldRootCount=%d, newRootCount=%d",
+			newIndexSnapshot.epoch, oldRootCount, newRootCount))
+	}
+	// also assert that the total live Size is the same across all segments before and after the persist introduction, since we are not changing any docIDs.
+	oldLive, cerr := collectLiveDocIDs(root)
+	if cerr != nil {
+		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
+			newIndexSnapshot.epoch, cerr))
+	}
+	newLive, cerr := collectLiveDocIDs(newIndexSnapshot)
+	if cerr != nil {
+		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
+			newIndexSnapshot.epoch, cerr))
+	}
+	if !maps.Equal(oldLive, newLive) {
+		s.fireAsyncError(fmt.Errorf("snapshot diff mismatch for epoch %d: oldLive=%v, newLive=%v",
+			newIndexSnapshot.epoch, oldLive, newLive))
+	}
 	s.rootLock.Lock()
 	rootPrev := s.root
 	s.root = newIndexSnapshot
 	atomic.StoreUint64(&s.stats.CurRootEpoch, s.root.epoch)
-	s.recordSnapshotDiff(rootPrev, newIndexSnapshot)
 	s.rootLock.Unlock()
 
 	if rootPrev != nil {
@@ -496,6 +546,36 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	atomic.StoreUint64(&s.stats.TotFileSegmentsAtRoot, fileSegments)
 
 	newSnapshot.AddRef() // 1 ref for the nextMerge.notify response
+	// Assert that the docCount before and after the persist introduction is the same, since we are not changing any docIDs.
+	oldRootCount, err := root.DocCount()
+	if err != nil {
+		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
+			newSnapshot.epoch, err))
+	}
+	newRootCount, err := newSnapshot.DocCount()
+	if err != nil {
+		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
+			newSnapshot.epoch, err))
+	}
+	if newRootCount != oldRootCount {
+		s.fireAsyncError(fmt.Errorf("snapshot diff count mismatch for epoch %d: oldRootCount=%d, newRootCount=%d",
+			newSnapshot.epoch, oldRootCount, newRootCount))
+	}
+	// also assert that the total live Size is the same across all segments before and after the persist introduction, since we are not changing any docIDs.
+	oldLive, cerr := collectLiveDocIDs(root)
+	if cerr != nil {
+		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
+			newSnapshot.epoch, cerr))
+	}
+	newLive, cerr := collectLiveDocIDs(newSnapshot)
+	if cerr != nil {
+		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
+			newSnapshot.epoch, cerr))
+	}
+	if !maps.Equal(oldLive, newLive) {
+		s.fireAsyncError(fmt.Errorf("snapshot diff mismatch for epoch %d: oldLive=%v, newLive=%v",
+			newSnapshot.epoch, oldLive, newLive))
+	}
 
 	newSnapshot.updateSize()
 	s.rootLock.Lock()
@@ -505,7 +585,6 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	rootPrev := s.root
 	s.root = newSnapshot
 	atomic.StoreUint64(&s.stats.CurRootEpoch, s.root.epoch)
-	s.recordSnapshotDiff(rootPrev, newSnapshot)
 	// release lock
 	s.rootLock.Unlock()
 
