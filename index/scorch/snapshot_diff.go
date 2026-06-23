@@ -188,22 +188,9 @@ func computeSnapshotDiff(prevSnapshot, newSnapshot *IndexSnapshot) (*SnapshotDif
 		}
 	}
 
-	// Detect updates via InternalID shift for docs that exist in both.
-	for _, id := range newLive {
-		if oldSet[id] {
-			oldIID, err := prevSnapshot.InternalID(id)
-			if err != nil || oldIID == nil {
-				continue
-			}
-			newIID, err := newSnapshot.InternalID(id)
-			if err != nil || newIID == nil {
-				continue
-			}
-			if !oldIID.Equals(newIID) {
-				updated = append(updated, id)
-			}
-		}
-	}
+	// Update detection is handled by classifyBatchIDs at batch time.
+	// Merge/persist introductions are internal reorgs with no semantic
+	// doc updates, so we leave updated empty here.
 
 	sort.Strings(deleted)
 	sort.Strings(inserted)
@@ -253,18 +240,22 @@ func (s *Scorch) persistDiff(diff *SnapshotDiff) {
 		return
 	}
 
-	err = rb.Update(func(tx *bolt.Tx) error {
-		diffBucket, cerr := tx.CreateBucketIfNotExists(boltSnapshotDiffBucket)
-		if cerr != nil {
-			return cerr
+	// Write async: the introducer may hold rootLock while the persister
+	// holds a bolt write tx.  A synchronous bolt write here would deadlock.
+	go func() {
+		err := rb.Update(func(tx *bolt.Tx) error {
+			diffBucket, cerr := tx.CreateBucketIfNotExists(boltSnapshotDiffBucket)
+			if cerr != nil {
+				return cerr
+			}
+			key := encodeUvarintAscending(nil, diff.Epoch)
+			return diffBucket.Put(key, data)
+		})
+		if err != nil {
+			s.fireAsyncError(fmt.Errorf("snapshot diff persist error for epoch %d: %v",
+				diff.Epoch, err))
 		}
-		key := encodeUvarintAscending(nil, diff.Epoch)
-		return diffBucket.Put(key, data)
-	})
-	if err != nil {
-		s.fireAsyncError(fmt.Errorf("snapshot diff persist error for epoch %d: %v",
-			diff.Epoch, err))
-	}
+	}()
 }
 
 // GetSnapshotDiff retrieves the diff for a specific epoch from rootBolt.
