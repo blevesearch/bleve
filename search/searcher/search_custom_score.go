@@ -94,10 +94,16 @@ func (f *CustomScoreSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 		return nil, err
 	}
 	if next != nil {
+		// The fields loaded below are UDF input only; restore the hit's prior
+		// fields after scoring so the UDF's internal fields don't override
+		// SearchRequest.Fields in the response.
+		priorFields := next.Fields
 		if err = loadDocValuesOnHitWithTypes(next, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
-		if err = f.applyScore(next); err != nil {
+		err = f.applyScore(next)
+		next.Fields = priorFields
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -110,10 +116,15 @@ func (f *CustomScoreSearcher) Advance(ctx *search.SearchContext, ID index.IndexI
 		return nil, err
 	}
 	if adv != nil {
+		// See Next: restore the hit's fields after scoring so UDF-input fields
+		// don't override SearchRequest.Fields in the response.
+		priorFields := adv.Fields
 		if err = loadDocValuesOnHitWithTypes(adv, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
-		if err = f.applyScore(adv); err != nil {
+		err = f.applyScore(adv)
+		adv.Fields = priorFields
+		if err != nil {
 			return nil, err
 		}
 	}

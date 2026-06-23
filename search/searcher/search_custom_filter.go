@@ -72,10 +72,15 @@ func (f *CustomFilterSearcher) Size() int {
 func (f *CustomFilterSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	next, err := f.child.Next(ctx)
 	for next != nil && err == nil {
+		// The fields loaded below are UDF input only; remember the hit's prior
+		// fields so we can restore them and avoid leaking the UDF's internal
+		// fields into (or overriding) SearchRequest.Fields in the response.
+		priorFields := next.Fields
 		if err = loadDocValuesOnHitWithTypes(next, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 			return nil, err
 		}
 		keep, ferr := f.accept(f.ctx, next)
+		next.Fields = priorFields
 		if ferr != nil {
 			return nil, ferr
 		}
@@ -96,10 +101,14 @@ func (f *CustomFilterSearcher) Advance(ctx *search.SearchContext, ID index.Index
 	if adv == nil {
 		return nil, nil
 	}
+	// See Next: restore the hit's fields after the callback so UDF-input
+	// fields don't override SearchRequest.Fields in the response.
+	priorFields := adv.Fields
 	if err = loadDocValuesOnHitWithTypes(adv, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
 		return nil, err
 	}
 	keep, ferr := f.accept(f.ctx, adv)
+	adv.Fields = priorFields
 	if ferr != nil {
 		return nil, ferr
 	}
