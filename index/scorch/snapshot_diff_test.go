@@ -69,9 +69,9 @@ func TestBuildDiffFromBatch_InsertsOnly(t *testing.T) {
 		[]string{"c", "d"}, nil, nil)
 	assertDiff(t, diff, 1,
 		[]string{"a", "b", "c", "d"}, // live: old + inserted
-		nil, // deleted
-		nil, // updated
-		[]string{"c", "d"}, // inserted
+		nil,                          // deleted
+		nil,                          // updated
+		[]string{"c", "d"},           // inserted
 	)
 }
 
@@ -321,10 +321,10 @@ func TestComputeSnapshotDiff_DocDeleted(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertDiff(t, diff, 2,
-		[]string{"b"},   // live
-		[]string{"a"},   // deleted
-		nil,             // updated
-		nil,             // inserted
+		[]string{"b"}, // live
+		[]string{"a"}, // deleted
+		nil,           // updated
+		nil,           // inserted
 	)
 }
 
