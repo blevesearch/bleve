@@ -49,8 +49,6 @@ type SegmentSnapshot struct {
 
 	cachedDocs *cachedDocs
 
-	// cache the root count of the segment,
-	// since this is an expensive operation to compute
 	rootCountOnce sync.Once
 	rootCount     uint64
 }
