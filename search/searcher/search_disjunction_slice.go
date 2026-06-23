@@ -528,10 +528,14 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 	if !s.parallelDecided {
 		s.parallelDecided = true
 		if ok, shardK := shouldRunParallel(s, ctx); ok {
+			var wandPruned2 bool
 			var err error
-			s.parallelResults, err = runParallelSegmentSearch(s.ctx, s, shardK, ctx.WANDEnabled)
+			s.parallelResults, wandPruned2, err = runParallelSegmentSearch(s.ctx, s, shardK, ctx.WANDEnabled)
 			if err != nil {
 				return nil, err
+			}
+			if wandPruned2 {
+				ctx.WANDPruned = true
 			}
 			// Ensure non-nil sentinel so the "not yet run" check above stays false.
 			if s.parallelResults == nil {
@@ -574,6 +578,8 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 				return nil, nil // no doc can beat threshold
 			}
 			if s.pivotIdx > 0 {
+				// MAXSCORE skips docs matching only non-essential terms: Total is a lower bound.
+				ctx.WANDPruned = true
 				return s.nextMAXSCORE(ctx)
 			}
 		}
@@ -711,6 +717,7 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 				for nextSeg < len(s.segCeilings) && s.segCeilings[nextSeg] <= threshold {
 					nextSeg++
 				}
+				ctx.WANDPruned = true // skipping at least one segment's worth of candidates
 				if nextSeg >= len(s.segCeilings) {
 					return nil, nil // all remaining segments are below threshold
 				}
