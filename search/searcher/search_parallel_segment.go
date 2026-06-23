@@ -327,7 +327,7 @@ func runParallelSegmentSearch(
 	s *DisjunctionSliceSearcher,
 	shardK int,
 	requestWAND bool,
-) ([]*search.DocumentMatch, error) {
+) ([]*search.DocumentMatch, bool, error) {
 	parallelSearchesActive.Add(1)
 	defer parallelSearchesActive.Add(-1)
 
@@ -401,7 +401,7 @@ func runParallelSegmentSearch(
 			for _, sw := range shards {
 				_ = sw.dss.Close()
 			}
-			return nil, createErr
+			return nil, false, createErr
 		}
 		dss, err := newDisjunctionSliceSearcher(ctx, s.indexReader, shardSrs,
 			float64(s.min), s.options, false)
@@ -412,7 +412,7 @@ func runParallelSegmentSearch(
 			for _, sw := range shards {
 				_ = sw.dss.Close()
 			}
-			return nil, err
+			return nil, false, err
 		}
 		if canWAND {
 			dss.injectGlobalWANDCeilings(globalMI)
@@ -421,8 +421,9 @@ func runParallelSegmentSearch(
 	}
 
 	type shardResult struct {
-		matches []*search.DocumentMatch
-		err     error
+		matches    []*search.DocumentMatch
+		wandPruned bool
+		err        error
 	}
 	results := make([]shardResult, len(shards))
 	var shared sharedThreshold
@@ -432,26 +433,28 @@ func runParallelSegmentSearch(
 		wg.Add(1)
 		go func(g int, dss *DisjunctionSliceSearcher) {
 			defer wg.Done()
-			matches, err := runShardSearch(ctx, dss, &shared, shardK, canWAND)
+			matches, wandPruned, err := runShardSearch(ctx, dss, &shared, shardK, canWAND)
 			_ = dss.Close()
-			results[g] = shardResult{matches: matches, err: err}
+			results[g] = shardResult{matches: matches, wandPruned: wandPruned, err: err}
 		}(g, shards[g].dss)
 	}
 	wg.Wait()
 
 	var total int
+	var wandPruned bool
 	for _, r := range results {
 		if r.err != nil {
-			return nil, r.err
+			return nil, false, r.err
 		}
 		total += len(r.matches)
+		wandPruned = wandPruned || r.wandPruned
 	}
 	all := make([]*search.DocumentMatch, 0, total)
 	for _, r := range results {
 		all = append(all, r.matches...)
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].Score > all[j].Score })
-	return all, nil
+	return all, wandPruned, nil
 }
 
 // runShardSearch runs a full WAND/MAXSCORE search on shardDSS, collecting at
@@ -465,7 +468,7 @@ func runShardSearch(
 	shared *sharedThreshold,
 	k int,
 	wandEnabled bool,
-) ([]*search.DocumentMatch, error) {
+) ([]*search.DocumentMatch, bool, error) {
 	searchCtx := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(shardDSS.DocumentMatchPoolSize()+k+2, 0),
 		WANDEnabled:       wandEnabled,
@@ -481,7 +484,7 @@ func runShardSearch(
 
 		m, err := shardDSS.Next(searchCtx)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if m == nil {
 			break
@@ -507,5 +510,5 @@ func runShardSearch(
 		searchCtx.DocumentMatchPool.Put(dm)
 	}
 	sort.Slice(results, func(i, j int) bool { return results[i].Score > results[j].Score })
-	return results, nil
+	return results, searchCtx.WANDPruned, nil
 }
