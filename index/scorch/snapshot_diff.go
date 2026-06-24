@@ -15,56 +15,13 @@
 package scorch
 
 import (
-	"encoding/json"
-	"fmt"
-	"sort"
-
 	segment "github.com/blevesearch/scorch_segment_api/v2"
-	bolt "go.etcd.io/bbolt"
 )
 
-// boltSnapshotDiffBucket is the top-level bucket in root.bolt that stores
-// per-epoch diffs showing what changed between consecutive index snapshots.
-var boltSnapshotDiffBucket = []byte{'x'}
-
-// SnapshotDiff captures the docID-level changes between two consecutive
-// IndexSnapshots. All fields are sorted docID slices.
-type SnapshotDiff struct {
-	Epoch    uint64   `json:"epoch"`
-	Live     []string `json:"live"`
-	Deleted  []string `json:"deleted"`
-	Updated  []string `json:"updated"`
-	Inserted []string `json:"inserted"`
-}
-
-// collectLiveDocIDs returns the sorted set of all live (non-deleted) docIDs
-// in the given IndexSnapshot.
-func collectLiveDocIDs(snapshot *IndexSnapshot) (map[string]struct{}, error) {
-	if snapshot == nil {
-		return nil, nil
-	}
-
-	set := make(map[string]struct{})
-	for _, seg := range snapshot.segment {
-		liveDocs := seg.DocNumbersLive()
-		iter := liveDocs.Iterator()
-		for iter.HasNext() {
-			localDocNum := iter.Next()
-			docIDBytes, err := seg.DocID(uint64(localDocNum))
-			if err != nil {
-				return nil, fmt.Errorf("error reading docID from segment %d: %v",
-					seg.id, err)
-			}
-			set[string(docIDBytes)] = struct{}{}
-		}
-	}
-	return set, nil
-}
-
 // classifyBatchIDs classifies each batch docID as inserted, updated, or
-// deleted.  oldLive is the previous snapshot's live docIDs.  newData is
+// deleted.  oldSnapshot is the previous snapshot's live docIDs.  newData is
 // the new segment (nil means pure deletes).  Uses simple nested loops.
-func classifyBatchIDs(ids []string, oldLive map[string]struct{}, newData segment.Segment) (
+func classifyBatchIDs(ids []string, oldSnapshot *IndexSnapshot, newData segment.Segment) (
 	inserted, updated, deleted []string,
 ) {
 	for _, id := range ids {
@@ -75,10 +32,12 @@ func classifyBatchIDs(ids []string, oldLive map[string]struct{}, newData segment
 				inNew = true
 			}
 		}
-
 		inOld := false
-		if _, ok := oldLive[id]; ok {
-			inOld = true
+		if oldSnapshot != nil {
+			doc, err := oldSnapshot.Document(id)
+			if err == nil && doc != nil {
+				inOld = true
+			}
 		}
 
 		switch {
@@ -88,224 +47,7 @@ func classifyBatchIDs(ids []string, oldLive map[string]struct{}, newData segment
 			inserted = append(inserted, id)
 		case !inNew && inOld:
 			deleted = append(deleted, id)
-		default:
-			// This should never happen, but we ignore it if it does.
 		}
 	}
 	return inserted, updated, deleted
-}
-
-// buildDiffFromBatch constructs a SnapshotDiff using the per-batch
-// classification and the previous snapshot's live set.
-func buildDiffFromBatch(oldLive []string, newEpoch uint64,
-	inserted, updated, deleted []string,
-) *SnapshotDiff {
-	newLiveSet := make(map[string]bool, len(oldLive)+len(inserted))
-	for _, id := range oldLive {
-		newLiveSet[id] = true
-	}
-	for _, id := range deleted {
-		delete(newLiveSet, id)
-	}
-	for _, id := range inserted {
-		newLiveSet[id] = true
-	}
-
-	live := make([]string, 0, len(newLiveSet))
-	for id := range newLiveSet {
-		live = append(live, id)
-	}
-	sort.Strings(live)
-
-	sort.Strings(inserted)
-	sort.Strings(updated)
-	sort.Strings(deleted)
-
-	return &SnapshotDiff{
-		Epoch:    newEpoch,
-		Live:     live,
-		Deleted:  deleted,
-		Updated:  updated,
-		Inserted: inserted,
-	}
-}
-
-// computeSnapshotDiff compares the docID sets of two snapshots and returns
-// the diff.  Used for merge/persist introductions which have no batch IDs.
-// func computeSnapshotDiff(prevSnapshot, newSnapshot *IndexSnapshot) (*SnapshotDiff, error) {
-// 	newLive, err := collectLiveDocIDs(newSnapshot)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	diff := &SnapshotDiff{
-// 		Epoch:    newSnapshot.epoch,
-// 		Live:     newLive,
-// 		Deleted:  []string{},
-// 		Updated:  []string{},
-// 		Inserted: []string{},
-// 	}
-
-// 	if prevSnapshot == nil {
-// 		diff.Inserted = newLive
-// 		return diff, nil
-// 	}
-
-// 	oldLive, err := collectLiveDocIDs(prevSnapshot)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	oldSet := make(map[string]bool, len(oldLive))
-// 	for id := range oldLive {
-// 		oldSet[id] = true
-// 	}
-
-// 	newSet := make(map[string]bool, len(newLive))
-// 	for id := range newLive {
-// 		newSet[id] = true
-// 	}
-
-// 	var deleted, inserted, updated []string
-// 	for id := range oldLive {
-// 		if !newSet[id] {
-// 			deleted = append(deleted, id)
-// 		}
-// 	}
-// 	for id := range newLive {
-// 		if !oldSet[id] {
-// 			inserted = append(inserted, id)
-// 		}
-// 	}
-
-// 	// Update detection is handled by classifyBatchIDs at batch time.
-// 	// Merge/persist introductions are internal reorgs with no semantic
-// 	// doc updates, so we leave updated empty here.
-
-// 	sort.Strings(deleted)
-// 	sort.Strings(inserted)
-// 	sort.Strings(updated)
-
-// 	diff.Deleted = deleted
-// 	diff.Inserted = inserted
-// 	diff.Updated = updated
-
-// 	return diff, nil
-// }
-
-// recordSnapshotDiff is used for merge/persist introductions which have no
-// batch IDs.  It falls back to full snapshot set-comparison.
-// func (s *Scorch) recordSnapshotDiff(prevSnapshot, newSnapshot *IndexSnapshot) {
-// 	diff, err := computeSnapshotDiff(prevSnapshot, newSnapshot)
-// 	if err != nil {
-// 		s.fireAsyncError(fmt.Errorf("snapshot diff compute error for epoch %d: %v",
-// 			newSnapshot.epoch, err))
-// 		return
-// 	}
-// 	s.diffLock.Lock()
-// 	s.pendingDiffs = append(s.pendingDiffs, diff)
-// 	s.diffLock.Unlock()
-// }
-
-// recordSnapshotDiffWithBatch is used by introduceSegment.
-func (s *Scorch) recordSnapshotDiffWithBatch(oldLive []string, newEpoch uint64,
-	inserted, updated, deleted []string,
-) {
-	diff := buildDiffFromBatch(oldLive, newEpoch, inserted, updated, deleted)
-	s.diffLock.Lock()
-	s.pendingDiffs = append(s.pendingDiffs, diff)
-	s.diffLock.Unlock()
-}
-
-// flushPendingDiffs writes all pending snapshot diffs into the given bolt
-// transaction.  Called by the persister inside its bolt write tx.
-func (s *Scorch) flushPendingDiffs(tx *bolt.Tx) error {
-	return nil
-	s.diffLock.Lock()
-	defer s.diffLock.Unlock()
-
-	if len(s.pendingDiffs) == 0 {
-		return nil
-	}
-
-	diffBucket, cerr := tx.CreateBucketIfNotExists(boltSnapshotDiffBucket)
-	if cerr != nil {
-		return cerr
-	}
-
-	for _, diff := range s.pendingDiffs {
-		data, err := json.Marshal(diff)
-		if err != nil {
-			return fmt.Errorf("snapshot diff marshal error for epoch %d: %v",
-				diff.Epoch, err)
-		}
-		key := encodeUvarintAscending(nil, diff.Epoch)
-		if err := diffBucket.Put(key, data); err != nil {
-			return err
-		}
-	}
-
-	// Clear the slice in-place so the persister doesn't grab heap.
-	clear(s.pendingDiffs)
-	s.pendingDiffs = s.pendingDiffs[:0]
-	return nil
-}
-
-// GetSnapshotDiff retrieves the diff for a specific epoch from rootBolt.
-func (s *Scorch) GetSnapshotDiff(epoch uint64) (*SnapshotDiff, error) {
-	if s.rootBolt == nil {
-		return nil, fmt.Errorf("rootBolt is nil")
-	}
-
-	var diff SnapshotDiff
-	err := s.rootBolt.View(func(tx *bolt.Tx) error {
-		diffBucket := tx.Bucket(boltSnapshotDiffBucket)
-		if diffBucket == nil {
-			return fmt.Errorf("snapshot diff bucket not found")
-		}
-		key := encodeUvarintAscending(nil, epoch)
-		data := diffBucket.Get(key)
-		if data == nil {
-			return fmt.Errorf("snapshot diff for epoch %d not found", epoch)
-		}
-		return json.Unmarshal(data, &diff)
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &diff, nil
-}
-
-// GetAllSnapshotDiffs returns all snapshot diffs from rootBolt, sorted by
-// epoch ascending.
-func (s *Scorch) GetAllSnapshotDiffs() ([]*SnapshotDiff, error) {
-	if s.rootBolt == nil {
-		return nil, fmt.Errorf("rootBolt is nil")
-	}
-
-	var diffs []*SnapshotDiff
-	err := s.rootBolt.View(func(tx *bolt.Tx) error {
-		diffBucket := tx.Bucket(boltSnapshotDiffBucket)
-		if diffBucket == nil {
-			return nil
-		}
-		c := diffBucket.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			_, epoch, derr := decodeUvarintAscending(k)
-			if derr != nil {
-				continue
-			}
-			var diff SnapshotDiff
-			if jerr := json.Unmarshal(v, &diff); jerr != nil {
-				continue
-			}
-			diff.Epoch = epoch
-			diffs = append(diffs, &diff)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return diffs, nil
 }

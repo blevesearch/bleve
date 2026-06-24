@@ -51,12 +51,10 @@ type Scorch struct {
 
 	rootLock sync.RWMutex
 
-	root                 *IndexSnapshot // holds 1 ref-count on the root
-	rootPersisted        []chan error   // closed when root is persisted
-	persistedCallbacks   []index.BatchCallback
+	root               *IndexSnapshot // holds 1 ref-count on the root
+	rootPersisted      []chan error   // closed when root is persisted
+	persistedCallbacks []index.BatchCallback
 
-	diffLock     sync.Mutex
-	pendingDiffs []*SnapshotDiff // flushed to rootBolt by persister
 	nextSnapshotEpoch    uint64
 	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
 	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.

@@ -799,11 +799,6 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot, exclude map[uint
 		return err
 	}
 
-	// flush any pending snapshot diffs accumulated since last persist
-	if err = s.flushPendingDiffs(tx); err != nil {
-		return err
-	}
-
 	// we need to swap in a new root only when we've persisted 1 or
 	// more segments -- whereby the new root would have 1-for-1
 	// replacements of in-memory segments with file-based segments
