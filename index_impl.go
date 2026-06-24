@@ -796,6 +796,23 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		coll.SetWANDEnabled(true)
 	}
 
+	// Early-stop (bounded scan): for score="none" + Size, the request means
+	// "return any Size+From matching docs", so the collector can stop pulling
+	// from the searcher once that many hits are in hand instead of draining the
+	// full result set. Valid only when result identity does not depend on unseen
+	// docs: no facets (need every match counted), no KNN (separate hit set), no
+	// pagination cursor, no nested rollup, and sort-by-score only (degrades to
+	// insertion order under score="none"; a field sort would need all docs).
+	if req.Score == ScoreNone && req.Size > 0 &&
+		len(req.Facets) == 0 &&
+		!requestHasKNN(req) &&
+		req.SearchAfter == nil && !reverseQueryExecution &&
+		len(req.Sort) == 1 && req.Sort[0].RequiresScoring() {
+		if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); !ok || !nestedMode {
+			coll.SetEarlyStop(req.Size + req.From)
+		}
+	}
+
 	var knnHits []*search.DocumentMatch
 	var skipKNNCollector bool
 
@@ -1048,7 +1065,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	totalRelation := TotalRelationEq
-	if coll.WANDPruned() {
+	if coll.WANDPruned() || coll.EarlyStopped() {
+		// Total is a lower bound: WAND skipped candidates, or the early-stop
+		// bounded scan stopped before draining all matches.
 		totalRelation = TotalRelationGte
 	}
 	rv := &SearchResult{
