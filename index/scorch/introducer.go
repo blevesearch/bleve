@@ -233,19 +233,19 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	newSnapshot.updateSize()
 	oldRootCount, err := root.DocCount()
 	if err != nil {
-		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
-			newSnapshot.epoch, err))
+		s.fireAsyncError(fmt.Errorf("introducer oldRootCount error for epoch %d: %v",
+			root.epoch, err))
 	}
 	newRootCount, err := newSnapshot.DocCount()
 	if err != nil {
-		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
-			newSnapshot.epoch, err))
+		s.fireAsyncError(fmt.Errorf("introducer newRootCount error for epoch %d: %v",
+			root.epoch, err))
 	}
 	inserted, updated, deleted := classifyBatchIDs(next.ids, root, next.data)
 	// assert that newRootCount = oldRootCount + len(inserted) - len(deleted)
 	if newRootCount != oldRootCount+uint64(len(inserted))-uint64(len(deleted)) {
-		s.fireAsyncError(fmt.Errorf("snapshot diff count mismatch for epoch %d: oldRootCount=%d, newRootCount=%d, inserted=%v, updated=%v, deleted=%v, ids=%v",
-			newSnapshot.epoch, oldRootCount, newRootCount, inserted, updated, deleted, next.ids))
+		s.fireAsyncError(fmt.Errorf("introducer count mismatch for epoch %d: oldRootCount=%d, newRootCount=%d, inserted=%v, updated=%v, deleted=%v, ids=%v",
+			root.epoch, oldRootCount, newRootCount, inserted, updated, deleted, next.ids))
 	}
 	// assert that the set of oldDocIDs - deleted + inserted = newDocIDs
 	s.rootLock.Lock()
@@ -348,17 +348,17 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 	// Assert that the docCount before and after the persist introduction is the same, since we are not changing any docIDs.
 	oldRootCount, err := root.DocCount()
 	if err != nil {
-		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
-			newIndexSnapshot.epoch, err))
+		s.fireAsyncError(fmt.Errorf("persister oldRootCount  error for epoch %d: %v",
+			root.epoch, err))
 	}
 	newRootCount, err := newIndexSnapshot.DocCount()
 	if err != nil {
-		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
-			newIndexSnapshot.epoch, err))
+		s.fireAsyncError(fmt.Errorf("persister newRootCount  error for epoch %d: %v",
+			root.epoch, err))
 	}
 	if newRootCount != oldRootCount {
-		s.fireAsyncError(fmt.Errorf("snapshot diff count mismatch for epoch %d: oldRootCount=%d, newRootCount=%d",
-			newIndexSnapshot.epoch, oldRootCount, newRootCount))
+		s.fireAsyncError(fmt.Errorf("persister count mismatch for epoch %d: oldRootCount=%d, newRootCount=%d",
+			root.epoch, oldRootCount, newRootCount))
 	}
 	s.rootLock.Lock()
 	rootPrev := s.root
@@ -521,17 +521,17 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	// Assert that the docCount before and after the persist introduction is the same, since we are not changing any docIDs.
 	oldRootCount, err := root.DocCount()
 	if err != nil {
-		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
-			newSnapshot.epoch, err))
+		s.fireAsyncError(fmt.Errorf("merger oldRootCount error for epoch %d: %v",
+			root.epoch, err))
 	}
 	newRootCount, err := newSnapshot.DocCount()
 	if err != nil {
-		s.fireAsyncError(fmt.Errorf("snapshot diff collect error for epoch %d: %v",
-			newSnapshot.epoch, err))
+		s.fireAsyncError(fmt.Errorf("merger newRootCount error for epoch %d: %v",
+			root.epoch, err))
 	}
 	if newRootCount != oldRootCount {
-		s.fireAsyncError(fmt.Errorf("snapshot diff count mismatch for epoch %d: oldRootCount=%d, newRootCount=%d",
-			newSnapshot.epoch, oldRootCount, newRootCount))
+		s.fireAsyncError(fmt.Errorf("merger count mismatch for epoch %d: oldRootCount=%d, newRootCount=%d",
+			root.epoch, oldRootCount, newRootCount))
 	}
 
 	newSnapshot.updateSize()
