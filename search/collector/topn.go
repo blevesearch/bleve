@@ -89,6 +89,15 @@ type TopNCollector struct {
 	// needDocIds/sort-value-compute branches — set once in Collect after loadID
 	// is known. Applies only to score-sorted queries with no field-loading needs.
 	fastPrepare bool
+
+	// earlyStopN, when > 0, bounds the scan: once this many root hits have been
+	// collected, Collect() stops pulling from the searcher. Valid only when result
+	// identity does not depend on unseen docs (score="none", no facets, no field
+	// sort, no KNN, no nested, no SearchAfter). Set via SetEarlyStop before Collect.
+	earlyStopN int
+	// earlyStopped is set when Collect() actually broke out via earlyStopN, so the
+	// caller can report TotalRelation="gte" (Total is then a lower bound).
+	earlyStopped bool
 }
 
 // CheckDoneEvery controls how frequently we check the context deadline
@@ -409,6 +418,15 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			}
 			err = dmHandler(next)
 			if err != nil {
+				break
+			}
+			// Early-stop (bounded scan): once earlyStopN root hits are collected,
+			// stop pulling. Valid because the store keeps the earliest size+skip
+			// hits (insertion order) and, with all scores equal, no later doc can
+			// displace them — so unseen docs cannot change the result. Breaking the
+			// pull loop is the entire early exit; the searcher stack is lazy.
+			if hc.earlyStopN > 0 && hc.total >= uint64(hc.earlyStopN) {
+				hc.earlyStopped = true
 				break
 			}
 		}
@@ -732,6 +750,22 @@ func (hc *TopNCollector) WANDPruned() bool {
 // (ctx.WANDEnabled && ctx.ScoreThreshold > 0) never passes.
 func (hc *TopNCollector) SetWANDEnabled(enabled bool) {
 	hc.wandEnabled = enabled
+}
+
+// SetEarlyStop bounds the scan: Collect() stops pulling from the searcher once n
+// root hits have been collected (n is typically Size+From). Must be called before
+// Collect(), and only when the result is order-independent of unseen docs —
+// score="none", no facets, no field sort, no KNN, no nested, no SearchAfter.
+// n <= 0 disables (the default), preserving the full-scan behavior.
+func (hc *TopNCollector) SetEarlyStop(n int) {
+	hc.earlyStopN = n
+}
+
+// EarlyStopped reports whether Collect() stopped before draining the searcher
+// because the early-stop bound was reached. When true, Total() is a lower bound
+// (the caller should report TotalRelation="gte").
+func (hc *TopNCollector) EarlyStopped() bool {
+	return hc.earlyStopped
 }
 
 // MaxScore returns the maximum score seen across all the hits
