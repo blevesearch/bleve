@@ -22,43 +22,66 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-// loadDocValuesOnHit uses the supplied DocValueReader to visit doc values
-// for the given hit and populate hit.Fields. It also resolves hit.ID if empty.
-// It is a no-op when dvReader is nil.
-//
-// fieldTypes maps field name → mapping type (e.g. "datetime", "number").
-// When provided, datetime fields are decoded from their stored nanosecond
-// int64 into an RFC3339Nano string, while numeric fields use IEEE 754 bit
-// reinterpretation to recover the original float64. When nil, all prefix-coded
-// values use the numeric (float64) path.
+// loadDocValuesOnHit resolves hit.ID and returns the hit's doc-value fields in a
+// new map the caller owns. See loadDocValuesOnHitWithTypes.
 func loadDocValuesOnHit(hit *search.DocumentMatch, dvReader index.DocValueReader,
-	r index.IndexReader) error {
+	r index.IndexReader) (map[string]interface{}, error) {
 	return loadDocValuesOnHitWithTypes(hit, dvReader, r, nil)
 }
 
+// loadDocValuesOnHitWithTypes resolves hit.ID and returns the hit's doc-value
+// fields in a new map. It does not touch hit.Fields, so these UDF-input fields
+// can't leak into SearchRequest.Fields; the caller owns the map. Returns nil
+// when dvReader is nil.
+//
+// fieldTypes maps a field name to its type: datetime fields decode to an
+// RFC3339Nano string, numeric fields to float64. nil treats all prefix-coded
+// values as numeric.
 func loadDocValuesOnHitWithTypes(hit *search.DocumentMatch, dvReader index.DocValueReader,
-	r index.IndexReader, fieldTypes map[string]string) error {
+	r index.IndexReader, fieldTypes map[string]string) (map[string]interface{}, error) {
 	// Always resolve external ID so the callback can read hit.ID.
 	if hit.ID == "" && r != nil {
 		extID, err := r.ExternalID(hit.IndexInternalID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		hit.ID = extID
 	}
 
 	if dvReader == nil {
-		return nil
+		return nil, nil
 	}
 
+	fields := make(map[string]interface{})
 	err := dvReader.VisitDocValues(hit.IndexInternalID, func(field string, term []byte) {
 		value := decodeDocValueTerm(term, fieldTypes[field])
 		if value != nil {
-			hit.AddFieldValue(field, value)
+			addFieldValueToMap(fields, field, value)
 		}
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return err
+	return fields, nil
+}
+
+// addFieldValueToMap adds value under name, mirroring DocumentMatch.AddFieldValue:
+// a repeated field name accumulates into a []interface{} slice.
+func addFieldValueToMap(fields map[string]interface{}, name string, value interface{}) {
+	existingVal, ok := fields[name]
+	if !ok {
+		fields[name] = value
+		return
+	}
+
+	valSlice, ok := existingVal.([]interface{})
+	if ok {
+		valSlice = append(valSlice, value)
+	} else {
+		valSlice = []interface{}{existingVal, value}
+	}
+	fields[name] = valSlice
 }
 
 // decodeDocValueTerm converts raw doc value bytes into a typed Go value.

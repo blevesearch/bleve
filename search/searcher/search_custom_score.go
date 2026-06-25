@@ -94,17 +94,18 @@ func (f *CustomScoreSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 		return nil, err
 	}
 	if next != nil {
-		// The fields loaded below are UDF input only; restore the hit's prior
-		// fields after scoring so the UDF's internal fields don't override
-		// SearchRequest.Fields in the response.
+		// Put the loaded fields on the hit only for scoring, so UDF-input fields
+		// don't override SearchRequest.Fields in the response.
 		priorFields := next.Fields
-		if err = loadDocValuesOnHitWithTypes(next, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
-			return nil, err
+		udfFields, lerr := loadDocValuesOnHitWithTypes(next, f.dvReader, f.indexReader, f.fieldTypes)
+		if lerr != nil {
+			return nil, lerr
 		}
-		err = f.applyScore(next)
+		next.Fields = udfFields
+		serr := f.applyScore(next)
 		next.Fields = priorFields
-		if err != nil {
-			return nil, err
+		if serr != nil {
+			return nil, serr
 		}
 	}
 	return next, nil
@@ -116,16 +117,17 @@ func (f *CustomScoreSearcher) Advance(ctx *search.SearchContext, ID index.IndexI
 		return nil, err
 	}
 	if adv != nil {
-		// See Next: restore the hit's fields after scoring so UDF-input fields
-		// don't override SearchRequest.Fields in the response.
+		// See Next: put the loaded fields on the hit only for scoring.
 		priorFields := adv.Fields
-		if err = loadDocValuesOnHitWithTypes(adv, f.dvReader, f.indexReader, f.fieldTypes); err != nil {
-			return nil, err
+		udfFields, lerr := loadDocValuesOnHitWithTypes(adv, f.dvReader, f.indexReader, f.fieldTypes)
+		if lerr != nil {
+			return nil, lerr
 		}
-		err = f.applyScore(adv)
+		adv.Fields = udfFields
+		serr := f.applyScore(adv)
 		adv.Fields = priorFields
-		if err != nil {
-			return nil, err
+		if serr != nil {
+			return nil, serr
 		}
 	}
 	return adv, nil
