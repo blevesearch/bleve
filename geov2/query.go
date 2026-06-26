@@ -34,6 +34,8 @@ func NewQuery(shape index.GeoJSON, relation string) Query {
 		return NewIntersectsQuery(shape)
 	case "within":
 		return NewWithinQuery(shape)
+	case "disjoint":
+		return NewDisjointQuery(shape)
 	default:
 		return nil
 	}
