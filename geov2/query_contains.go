@@ -29,21 +29,25 @@ type containsQuery struct {
 
 	shape index.GeoJSON
 	bBox  index.GeoJSON
+
+	score uint64
 }
 
 func NewContainsQuery(shape index.GeoJSON) Query {
 	inner, cross := shape.Cells()
+
+	score := CalcCellsScore(inner) + CalcCellsScore(cross)
 
 	return &containsQuery{
 		innerCells: inner,
 		crossCells: cross,
 		shape:      shape,
 		bBox:       shape.BoundingBox(),
+		score:      score,
 	}
 }
 
 func (cq *containsQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
-	// startTime := time.Now()
 	numDocs := int(geoData.NumDocs())
 	exclude := geoData.Exclude()
 
@@ -53,27 +57,19 @@ func (cq *containsQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
 	innerScores := make([]uint64, numDocs)
 	crossScores := make([]uint64, numDocs)
 
-	docScores := geoData.DocScores()
-
 	evaluator := NewQueryEvaluator(cq, geoData)
 
 	evaluator.rangeScanInner(innerScores, crossScores)
-	for i := 0; i < numDocs; i++ {
-		if innerScores[i]+crossScores[i] == docScores[i] {
-			hits.Add(i)
-		}
-	}
-
 	evaluator.rangeScanCross(innerScores, crossScores)
+
 	for i := 0; i < numDocs; i++ {
-		if !hits.Contains(i) && innerScores[i]+crossScores[i] == docScores[i] {
+		if innerScores[i] == cq.score {
+			hits.Add(i)
+		} else if innerScores[i]+crossScores[i] == cq.score {
 			maybeHits.Add(i)
 		}
 	}
 
-	// fmt.Printf("Contains query range scan took %v\n", time.Since(startTime))
-	// fmt.Printf("After range scan: Hits count = %d, MaybeHits count = %d\n", hits.Count(), maybeHits.Count())
-	// startTime = time.Now()
 	var reader *bytes.Reader
 
 	boxFilter := func(docNum int) {
@@ -87,15 +83,12 @@ func (cq *containsQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
 			return
 		}
 
-		if ok, err := cq.bBox.Contains(docBBox); err == nil && !ok {
+		if ok, err := docBBox.Contains(cq.bBox); err == nil && !ok {
 			maybeHits.Remove(docNum)
 		}
 	}
 
 	maybeHits.Iterate(boxFilter)
-	// fmt.Printf("Box filter took %v\n", time.Since(startTime))
-	// fmt.Printf("After bounding box filter: Hits count = %d, MaybeHits count = %d\n", hits.Count(), maybeHits.Count())
-	// startTime = time.Now()
 
 	shapeFilter := func(docNum int) {
 		docShapeBytes, err := geoData.Shape(uint64(docNum))
@@ -108,14 +101,12 @@ func (cq *containsQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
 			return
 		}
 
-		if ok, err := cq.shape.Contains(docShape); err == nil && ok {
+		if ok, err := docShape.Contains(cq.shape); err == nil && ok {
 			hits.Add(docNum)
 		}
 	}
 
 	maybeHits.Iterate(shapeFilter)
-	// fmt.Printf("Shape filter took %v\n", time.Since(startTime))
-	// fmt.Printf("After shape filter: Hits count = %d, time elapsed = %v\n", hits.Count(), time.Since(startTime))
 
 	return hits
 }

@@ -24,7 +24,7 @@ import (
 )
 
 type GeoShapeV2Query struct {
-	GeometryV2 Geometry `json:"geometryV2,omitempty"`
+	GeometryV2 Geometry `json:"geometry_v2,omitempty"`
 	FieldVal   string   `json:"field,omitempty"`
 	BoostVal   *Boost   `json:"boost,omitempty"`
 }
@@ -40,4 +40,12 @@ func (q *GeoShapeV2Query) Searcher(ctx context.Context, i index.IndexReader,
 
 	return searcher.NewGeoShapeV2Searcher(ctx, i, q.GeometryV2.Shape,
 		q.GeometryV2.Relation, field, q.BoostVal.Value(), options)
+}
+
+func (q *GeoShapeV2Query) Field() string {
+	return q.FieldVal
+}
+
+func (q *GeoShapeV2Query) SetField(f string) {
+	q.FieldVal = f
 }

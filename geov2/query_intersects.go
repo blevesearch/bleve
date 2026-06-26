@@ -15,6 +15,8 @@
 package geov2
 
 import (
+	"bytes"
+
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/geojson"
@@ -72,13 +74,15 @@ func (iq *intersectsQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
 		}
 	}
 
+	var reader *bytes.Reader
+
 	boxFilter := func(docNum int) {
 		docBBoxBytes, err := geoData.BoundingBox(uint64(docNum))
 		if docBBoxBytes == nil || err != nil {
 			return
 		}
 
-		docBBox, err := geojson.ExtractShapesFromBytes(docBBoxBytes, nil, nil)
+		docBBox, err := geojson.ExtractShapesFromBytes(docBBoxBytes, &reader, nil)
 		if err != nil {
 			return
 		}
@@ -96,7 +100,7 @@ func (iq *intersectsQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
 			return
 		}
 
-		docShape, err := geojson.ExtractShapesFromBytes(docShapeBytes, nil, nil)
+		docShape, err := geojson.ExtractShapesFromBytes(docShapeBytes, &reader, nil)
 		if err != nil {
 			return
 		}

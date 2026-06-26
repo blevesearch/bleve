@@ -15,6 +15,8 @@
 package geov2
 
 import (
+	"bytes"
+
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/geojson"
@@ -27,25 +29,21 @@ type withinQuery struct {
 
 	shape index.GeoJSON
 	bBox  index.GeoJSON
-
-	score uint64
 }
 
 func NewWithinQuery(shape index.GeoJSON) Query {
 	inner, cross := shape.Cells()
-
-	score := CalcCellsScore(inner) + CalcCellsScore(cross)
 
 	return &withinQuery{
 		innerCells: inner,
 		crossCells: cross,
 		shape:      shape,
 		bBox:       shape.BoundingBox(),
-		score:      score,
 	}
 }
 
 func (wq *withinQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
+	// startTime := time.Now()
 	numDocs := int(geoData.NumDocs())
 	exclude := geoData.Exclude()
 
@@ -55,18 +53,25 @@ func (wq *withinQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
 	innerScores := make([]uint64, numDocs)
 	crossScores := make([]uint64, numDocs)
 
+	docScores := geoData.DocScores()
+
 	evaluator := NewQueryEvaluator(wq, geoData)
 
 	evaluator.rangeScanInner(innerScores, crossScores)
-	evaluator.rangeScanCross(innerScores, crossScores)
-
 	for i := 0; i < numDocs; i++ {
-		if innerScores[i] == wq.score {
+		if innerScores[i]+crossScores[i] == docScores[i] {
 			hits.Add(i)
-		} else if innerScores[i]+crossScores[i] == wq.score {
+		}
+	}
+
+	evaluator.rangeScanCross(innerScores, crossScores)
+	for i := 0; i < numDocs; i++ {
+		if !hits.Contains(i) && innerScores[i]+crossScores[i] == docScores[i] {
 			maybeHits.Add(i)
 		}
 	}
+
+	var reader *bytes.Reader
 
 	boxFilter := func(docNum int) {
 		docBBoxBytes, err := geoData.BoundingBox(uint64(docNum))
@@ -74,12 +79,12 @@ func (wq *withinQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
 			return
 		}
 
-		docBBox, err := geojson.ExtractShapesFromBytes(docBBoxBytes, nil, nil)
+		docBBox, err := geojson.ExtractShapesFromBytes(docBBoxBytes, &reader, nil)
 		if err != nil {
 			return
 		}
 
-		if ok, err := docBBox.Contains(wq.bBox); err == nil && !ok {
+		if ok, err := wq.bBox.Contains(docBBox); err == nil && !ok {
 			maybeHits.Remove(docNum)
 		}
 	}
@@ -92,12 +97,12 @@ func (wq *withinQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
 			return
 		}
 
-		docShape, err := geojson.ExtractShapesFromBytes(docShapeBytes, nil, nil)
+		docShape, err := geojson.ExtractShapesFromBytes(docShapeBytes, &reader, nil)
 		if err != nil {
 			return
 		}
 
-		if ok, err := docShape.Contains(wq.shape); err == nil && ok {
+		if ok, err := wq.shape.Contains(docShape); err == nil && ok {
 			hits.Add(docNum)
 		}
 	}
