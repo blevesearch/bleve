@@ -17,6 +17,7 @@ package scorch
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -25,6 +26,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -3043,16 +3045,48 @@ func TestPersistenceExclude(t *testing.T) {
 	}
 }
 
-// TestPersistenceExcludeSharedInternalKey verifies that when multiple in-memory
-// segments share the same internal key, and some of those segments are excluded
-// from persistence, the shared internal key survives reopen because at least
-// one persisted segment also contributed it.
-//
-// BUG: The current delete(internal, k) loop in prepareBoltSnapshot naively
-// deletes a key whenever ANY excluded segment has it, even when persisted
-// segments also contribute the same key. This test is expected to FAIL until
-// the persister logic is fixed to only delete keys that are exclusive to
-// excluded segments.
+// genDoc generates a random document with a random ID and a single field "name" with value "test".
+func genDoc(t *testing.T) index.Document {
+	t.Helper()
+	randNum := rand.Intn(1000000)
+	doc := document.NewDocument(fmt.Sprintf("test%d", randNum))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
+	doc.AddIDField()
+	doc.VisitFields(func(field index.Field) {
+		field.Analyze()
+	})
+	return doc
+}
+
+// getBatches generates a list of index.Batches.
+// 1. for each VB, create a batch with a random doc
+// 2. merge all the batches into a single batch
+// 3. repeat until numBatches is reached
+func getBatches(t *testing.T, numVB int, numBatches int) []*index.Batch {
+	t.Helper()
+	batches := make([]*index.Batch, 0, numBatches)
+	vbSeqNumbers := make([]uint64, numVB)
+	for i := 0; i < numVB; i++ {
+		vbSeqNumbers[i] = 0
+	}
+	for i := 0; i < numBatches; i++ {
+		mergedBatch := index.NewBatch()
+		for j := 0; j < numVB; j++ {
+			vbBatch := index.NewBatch()
+			doc := genDoc(t)
+			vbBatch.Update(doc)
+			vbKey := fmt.Sprintf("%d", j)
+			vbValue := make([]byte, 8)
+			binary.BigEndian.PutUint64(vbValue, vbSeqNumbers[j])
+			vbBatch.SetInternal([]byte(vbKey), vbValue)
+			vbSeqNumbers[j]++
+			mergedBatch.Merge(vbBatch)
+		}
+		batches = append(batches, mergedBatch)
+	}
+	return batches
+}
+
 func TestPersistenceExcludeSharedInternalKey(t *testing.T) {
 	cfg := CreateConfig("TestPersistenceExcludeSharedInternalKey")
 	err := InitTest(cfg)
@@ -3081,46 +3115,35 @@ func TestPersistenceExcludeSharedInternalKey(t *testing.T) {
 		t.Fatalf("failed to open bolt: %v", err)
 	}
 
-	const numSegments = 5
+	const (
+		numSegments = 5
+		numVBs      = 5
+	)
 
-	testDocs := make([][]string, numSegments)
-	for i := 0; i < numSegments; i++ {
-		testDocs[i] = []string{
-			fmt.Sprintf("doc%d_a", i),
-			fmt.Sprintf("doc%d_b", i),
-		}
-	}
-
-	// Each segment sets the same internal key "0" to a different value.
-	// Since introduceSegment overwrites the snapshot-level internal map
-	// on each call, the final snapshot.internal["0"] = []byte("5").
-	internalTestVals := make([]map[string][]byte, numSegments)
-	for i := 0; i < numSegments; i++ {
-		internalTestVals[i] = map[string][]byte{
-			"0": []byte(fmt.Sprintf("%d", i+1)),
-		}
-	}
+	batches := getBatches(t, numVBs, numSegments)
 
 	for i := 0; i < numSegments; i++ {
-		docs := make([]index.Document, 0, len(testDocs[i]))
-		for _, docID := range testDocs[i] {
-			doc := document.NewDocument(docID)
-			doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
-			doc.AddIDField()
-			doc.VisitFields(func(field index.Field) {
-				field.Analyze()
-			})
-			docs = append(docs, doc)
+		batch := batches[i]
+
+		var docs []index.Document
+		var ids []string
+		for _, doc := range batch.IndexOps {
+			if doc != nil {
+				docs = append(docs, doc)
+			}
+			ids = append(ids, doc.ID())
 		}
+
 		seg, _, err := s.segPlugin.New(docs)
 		if err != nil {
 			t.Fatalf("failed to create segment %d: %v", i, err)
 		}
+
 		intro := &segmentIntroduction{
 			id:       atomic.AddUint64(&s.nextSegmentID, 1),
 			data:     seg,
-			ids:      testDocs[i],
-			internal: internalTestVals[i],
+			ids:      ids,
+			internal: batch.InternalOps,
 			applied:  make(chan error),
 		}
 		err = s.introduceSegment(intro)
@@ -3134,10 +3157,7 @@ func TestPersistenceExcludeSharedInternalKey(t *testing.T) {
 		t.Fatalf("expected %d segments, got %d", numSegments, len(snapshot.segment))
 	}
 
-	// Persist only the first 2 segments; the remaining 3 stay in-memory.
-	// Since persisted segments 0 and 1 contributed internal key "0", it
-	// should survive in bolt. The excluded segments should not cause it
-	// to be deleted.
+	// persist only the first 2 segments, and exclude the last 3 segments from being persisted.
 	var errCh = make(chan error, 1)
 	var doneCh = make(chan struct{})
 	go func() {
@@ -3163,35 +3183,91 @@ func TestPersistenceExcludeSharedInternalKey(t *testing.T) {
 
 	<-doneCh
 
-	// Before closing, internal key "0" is still visible (carried forward
-	// by the in-memory segments still in the root).
+	// validate our snapshot's VB-seqMax mappings.
+	/*
+		Each Batch has the following VB-seqMax mappings:
+			Batch 0:
+				0 - 0
+				1 - 0
+				2 - 0
+				3 - 0
+				4 - 0
+			Batch 1:
+				0 - 1
+				1 - 1
+				2 - 1
+				3 - 1
+				4 - 1
+			Batch 2:
+				0 - 2
+				1 - 2
+				2 - 2
+				3 - 2
+				4 - 2
+			Batch 3:
+				0 - 3
+				1 - 3
+				2 - 3
+				3 - 3
+				4 - 3
+			Batch 4:
+				0 - 4
+				1 - 4
+				2 - 4
+				3 - 4
+				4 - 4
+		We have persisted only the first 2 segments, so the expected VB-seqMax mappings are:
+		1. In the Bolt Snapshot:
+				0 - 1
+				1 - 1
+				2 - 1
+				3 - 1
+				4 - 1
+		2. In the in-memory snapshot:
+				0 - 4
+				1 - 4
+				2 - 4
+				3 - 4
+				4 - 4
+		This is because bolt is representing the persisted state, while the in-memory snapshot
+		represents the current state of the index, which includes all segments, even those that
+		were excluded from persistence.
+	*/
+
+	// Verify the in-memory snapshot's VB-seqMax mappings.
+	expectedMappings := make([]uint64, numVBs)
+	for i := 0; i < numVBs; i++ {
+		expectedMappings[i] = 4
+	}
 	reader, err := idx.Reader()
 	if err != nil {
 		t.Fatalf("failed to get reader: %v", err)
 	}
-	val, err := reader.GetInternal([]byte("0"))
+	actualMappings := make([]uint64, numVBs)
+	for i := 0; i < numVBs; i++ {
+		vbKey := []byte(strconv.Itoa(i))
+		val, err := reader.GetInternal(vbKey)
+		if err != nil {
+			t.Fatalf("failed to get internal value for VB %d: %v", i, err)
+		}
+		actualMappings[i] = binary.BigEndian.Uint64(val)
+	}
+	if !slices.Equal(expectedMappings, actualMappings) {
+		t.Fatalf("expected in-memory snapshot VB-seqMax mappings %v, got %v", expectedMappings, actualMappings)
+	}
+	err = reader.Close()
 	if err != nil {
-		t.Fatalf("failed to get internal value: %v", err)
+		t.Fatalf("failed to close reader: %v", err)
 	}
-	if !bytes.Equal(val, []byte("5")) {
-		t.Fatalf("expected internal value '5' before close, got '%s'", val)
-	}
-	reader.Close()
-
 	err = idx.Close()
 	if err != nil {
 		t.Fatalf("failed to close index: %v", err)
 	}
-
-	// Reopen the index -- only the first 2 segments were persisted,
-	// and the shared internal key "0" was deleted from bolt by the
-	// excluded segments' cleanup logic.
+	// reopen the index and verify that the persisted state is correct
 	idx2, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatalf("failed to create Scorch: %v", err)
 	}
-	defer idx2.Close()
-
 	s2, ok := idx2.(*Scorch)
 	if !ok {
 		t.Fatalf("expected *Scorch, got %T", s2)
@@ -3201,29 +3277,41 @@ func TestPersistenceExcludeSharedInternalKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open bolt: %v", err)
 	}
-
 	if len(s2.root.segment) != 2 {
 		t.Fatalf("expected 2 segments in root after reopen, got %d", len(s2.root.segment))
 	}
-
 	reader2, err := idx2.Reader()
 	if err != nil {
 		t.Fatalf("failed to get reader after reopen: %v", err)
 	}
-	defer reader2.Close()
-
-	// The shared internal key "0" should survive reopen because persisted
-	// segments 0 and 1 also contributed it. The value should reflect the
-	// last persisted write (segment 1 set it to "2").
-	val, err = reader2.GetInternal([]byte("0"))
-	if err != nil {
-		t.Fatalf("failed to get internal value after reopen: %v", err)
+	// Verify the Bolt Snapshot's VB-seqMax mappings.
+	expectedMappings2 := make([]uint64, numVBs)
+	for i := 0; i < numVBs; i++ {
+		expectedMappings2[i] = 1
 	}
-	if val == nil {
-		t.Fatal("BUG: expected internal key '0' to survive reopen since " +
-			"persisted segments 0 and 1 contributed it, but the " +
-			"delete(internal, k) loop in prepareBoltSnapshot incorrectly " +
-			"removed it when excluded segments 2/3/4 were cleaned up")
+	actualMappings2 := make([]uint64, numVBs)
+	for i := 0; i < numVBs; i++ {
+		vbKey := []byte(strconv.Itoa(i))
+		val, err := reader2.GetInternal(vbKey)
+		if err != nil {
+			t.Fatalf("failed to get internal value for VB %d: %v", i, err)
+		}
+		if val == nil {
+			actualMappings2[i] = 0
+		} else {
+			actualMappings2[i] = binary.BigEndian.Uint64(val)
+		}
+	}
+	if !slices.Equal(expectedMappings2, actualMappings2) {
+		t.Fatalf("expected Bolt snapshot VB-seqMax mappings %v, got %v", expectedMappings2, actualMappings2)
+	}
+	err = reader2.Close()
+	if err != nil {
+		t.Fatalf("failed to close reader: %v", err)
+	}
+	err = idx2.Close()
+	if err != nil {
+		t.Fatalf("failed to close index: %v", err)
 	}
 }
 
