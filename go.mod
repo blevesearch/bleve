@@ -3,7 +3,7 @@ module github.com/blevesearch/bleve/v2
 go 1.25.0
 
 require (
-	github.com/RoaringBitmap/roaring/v2 v2.14.5
+	github.com/RoaringBitmap/roaring/v2 v2.18.2
 	github.com/bits-and-blooms/bitset v1.24.2
 	github.com/blevesearch/bleve_index_api v1.4.0
 	github.com/blevesearch/geo v0.2.5
@@ -25,7 +25,8 @@ require (
 	github.com/blevesearch/zapx/v14 v14.4.3
 	github.com/blevesearch/zapx/v15 v15.4.3
 	github.com/blevesearch/zapx/v16 v16.3.4
-	github.com/blevesearch/zapx/v17 v17.1.9
+	github.com/blevesearch/zapx/v17 v17.1.8
+	github.com/blevesearch/zapx/v18 v18.0.0-00010101000000-000000000000
 	github.com/couchbase/moss v0.2.0
 	github.com/spf13/cobra v1.10.2
 	go.etcd.io/bbolt v1.4.0
@@ -43,4 +44,9 @@ require (
 	github.com/spf13/pflag v1.0.9 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
+)
+
+replace (
+	github.com/blevesearch/bleve_index_api => github.com/steveyen/bleve_index_api v0.0.0-20260611191213-ecd8257d019b
+	github.com/blevesearch/zapx/v18 => github.com/steveyen/zapx/v18 v18.0.0-20260626033038-24c8e7b2333f
 )
