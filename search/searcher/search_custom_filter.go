@@ -74,11 +74,11 @@ func (f *CustomFilterSearcher) Next(ctx *search.SearchContext) (*search.Document
 	for next != nil && err == nil {
 		// Put the loaded fields on the hit only for the callback, so UDF-input
 		// fields don't override SearchRequest.Fields in the response.
-		priorFields := next.Fields
 		udfFields, lerr := loadDocValuesOnHitWithTypes(next, f.dvReader, f.indexReader, f.fieldTypes)
 		if lerr != nil {
 			return nil, lerr
 		}
+		priorFields := next.Fields
 		next.Fields = udfFields
 		keep, ferr := f.accept(f.ctx, next)
 		next.Fields = priorFields
@@ -103,11 +103,11 @@ func (f *CustomFilterSearcher) Advance(ctx *search.SearchContext, ID index.Index
 		return nil, nil
 	}
 	// See Next: put the loaded fields on the hit only for the callback.
-	priorFields := adv.Fields
 	udfFields, lerr := loadDocValuesOnHitWithTypes(adv, f.dvReader, f.indexReader, f.fieldTypes)
 	if lerr != nil {
 		return nil, lerr
 	}
+	priorFields := adv.Fields
 	adv.Fields = udfFields
 	keep, ferr := f.accept(f.ctx, adv)
 	adv.Fields = priorFields
