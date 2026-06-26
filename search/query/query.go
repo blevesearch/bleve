@@ -379,6 +379,16 @@ func ParseQuery(input []byte) (Query, error) {
 		return &rv, nil
 	}
 
+	_, hasGeo = tmp["geometryV2"]
+	if hasGeo {
+		var rv GeoShapeV2Query
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+
 	_, hasCIDR := tmp["cidr"]
 	if hasCIDR {
 		var rv IPRangeQuery

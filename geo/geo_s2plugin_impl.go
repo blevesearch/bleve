@@ -246,6 +246,16 @@ func (p *Point) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 	return nil
 }
 
+func (p *Point) Cells() ([]uint64, []uint64) {
+	// placeholder implementation
+	return nil, nil
+}
+
+func (p *Point) BoundingBox() index.GeoJSON {
+	// placeholder implementation
+	return nil
+}
+
 //----------------------------------------------------------------------------------
 
 type boundedRectangle struct {
@@ -291,6 +301,16 @@ func (br *boundedRectangle) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 	terms := s.s2GeoPointsRegionTermIndexer.GetQueryTermsForRegion(rect, "")
 
 	return geojson.StripCoveringTerms(terms)
+}
+
+func (br *boundedRectangle) Cells() ([]uint64, []uint64) {
+	// placeholder implementation
+	return nil, nil
+}
+
+func (br *boundedRectangle) BoundingBox() index.GeoJSON {
+	// placeholder implementation
+	return nil
 }
 
 //----------------------------------------------------------------------------------
@@ -341,6 +361,16 @@ func (bp *boundedPolygon) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 	return geojson.StripCoveringTerms(terms)
 }
 
+func (bp *boundedPolygon) Cells() ([]uint64, []uint64) {
+	// placeholder implementation
+	return nil, nil
+}
+
+func (bp *boundedPolygon) BoundingBox() index.GeoJSON {
+	// placeholder implementation
+	return nil
+}
+
 //----------------------------------------------------------------------------------
 
 type pointDistance struct {
@@ -387,6 +417,16 @@ func (pd *pointDistance) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 	terms := s.s2GeoPointsRegionTermIndexer.GetQueryTermsForRegion(queryRegion, "")
 
 	return geojson.StripCoveringTerms(terms)
+}
+
+func (pd *pointDistance) Cells() ([]uint64, []uint64) {
+	// placeholder implementation
+	return nil, nil
+}
+
+func (pd *pointDistance) BoundingBox() index.GeoJSON {
+	// placeholder implementation
+	return nil
 }
 
 // ------------------------------------------------------------------------

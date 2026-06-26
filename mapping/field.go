@@ -201,6 +201,16 @@ func NewGeoShapeFieldMapping() *FieldMapping {
 	}
 }
 
+func NewGeoShapeV2FieldMapping() *FieldMapping {
+	return &FieldMapping{
+		Type:         "geoshape_v2",
+		Store:        false,
+		Index:        true,
+		IncludeInAll: false,
+		DocValues:    false,
+	}
+}
+
 // NewIPFieldMapping returns a default field mapping for IP points
 func NewIPFieldMapping() *FieldMapping {
 	return &FieldMapping{
@@ -372,6 +382,51 @@ func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
 			options := fm.Options()
 			field := document.NewGeoShapeFieldFromShapeWithIndexingOptions(fieldName,
 				indexes, geoShape, options)
+			context.doc.AddField(field)
+
+			if !fm.IncludeInAll {
+				context.excludedFromAll = append(context.excludedFromAll, fieldName)
+			}
+		}
+	}
+}
+
+func (fm *FieldMapping) processGeoShapeV2(propertyMightBeGeoShape interface{},
+	pathString string, path []string, context *walkContext,
+) {
+	coordValue, shape, err := geo.ParseGeoShapeField(propertyMightBeGeoShape)
+	if err != nil {
+		return
+	}
+
+	if shape == geo.GeometryCollectionType {
+		geoShapes, found := geo.ExtractGeometryCollection(propertyMightBeGeoShape)
+		if found {
+			fieldName := getFieldName(pathString, path, fm)
+			options := fm.Options()
+			field := document.NewGeometryCollectionV2FieldFromShapesWithIndexingOptions(fieldName,
+				geoShapes, options)
+			context.doc.AddField(field)
+
+			if !fm.IncludeInAll {
+				context.excludedFromAll = append(context.excludedFromAll, fieldName)
+			}
+		}
+	} else {
+		var geoShape *geojson.GeoShape
+		var found bool
+
+		if shape == geo.CircleType {
+			geoShape, found = geo.ExtractCircle(propertyMightBeGeoShape)
+		} else {
+			geoShape, found = geo.ExtractGeoShapeCoordinates(coordValue, shape)
+		}
+
+		if found {
+			fieldName := getFieldName(pathString, path, fm)
+			options := fm.Options()
+			field := document.NewGeoShapeV2FieldFromShapeWithIndexingOptions(fieldName,
+				geoShape, options)
 			context.doc.AddField(field)
 
 			if !fm.IncludeInAll {

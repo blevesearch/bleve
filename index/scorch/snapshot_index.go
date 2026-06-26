@@ -27,6 +27,8 @@ import (
 
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/document"
+	geov2 "github.com/blevesearch/bleve/v2/geov2"
+	"github.com/blevesearch/bleve/v2/size"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
@@ -50,6 +52,8 @@ type asynchSegmentResult struct {
 }
 
 var reflectStaticSizeIndexSnapshot int
+var reflectStaticSizeIndexSnapshotGeoCellReader int
+var reflectStaticSizeRoaringIntPeekable int
 
 func init() {
 	var is interface{} = IndexSnapshot{}
@@ -63,6 +67,10 @@ func init() {
 	if err != nil {
 		panic(fmt.Errorf("levenshtein automaton ed2 builder err: %v", err))
 	}
+	var gcr IndexSnapshotGeoCellReader
+	reflectStaticSizeIndexSnapshotGeoCellReader = int(reflect.TypeOf(gcr).Size())
+	var rip roaring.IntIterator
+	reflectStaticSizeRoaringIntPeekable = int(reflect.TypeOf(rip).Size())
 }
 
 type IndexSnapshot struct {
@@ -1319,4 +1327,159 @@ func (i *IndexSnapshot) Ancestors(ID index.IndexInternalID, prealloc []index.Anc
 	}
 	// return adjusted ancestors
 	return prealloc, nil
+}
+
+func (i *IndexSnapshot) GeoCellReader(ctx context.Context, field string) (
+	index.GeoCellReader, error) {
+
+	rv := &IndexSnapshotGeoCellReader{
+		field:     field,
+		postings:  make([]*roaring.Bitmap, len(i.segment)),
+		iterators: make([]roaring.IntPeekable, len(i.segment)),
+		snapshot:  i,
+	}
+
+	return rv, nil
+}
+
+type IndexSnapshotGeoCellReader struct {
+	field string
+
+	postings      []*roaring.Bitmap
+	iterators     []roaring.IntPeekable
+	segmentOffset int
+
+	snapshot *IndexSnapshot
+}
+
+func (g *IndexSnapshotGeoCellReader) Search(shape index.GeoJSON,
+	relation string) error {
+
+	numSegments := len(g.snapshot.segment)
+	query := geov2.NewQuery(shape, relation)
+
+	var wg sync.WaitGroup
+	wg.Add(numSegments)
+
+	var errm sync.Mutex
+	var err error
+	for i := 0; i < numSegments; i++ {
+		go func(segID int) {
+			defer wg.Done()
+			err2 := g.searchSeg(segID, query)
+			if err2 != nil {
+				errm.Lock()
+				if err == nil {
+					err = err2
+				}
+				errm.Unlock()
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	return err
+}
+
+func (g *IndexSnapshotGeoCellReader) searchSeg(segID int,
+	query geov2.Query) error {
+
+	snapshot := g.snapshot.segment[segID]
+	geoSeg, ok := snapshot.segment.(segment.GeoCellSegment)
+	if !ok {
+		return nil
+	}
+
+	geoData, err := geoSeg.GeoCellData(g.field, snapshot.deleted)
+	if err != nil {
+		return err
+	}
+
+	hits := query.Evaluate(geoData)
+	postings := roaring.New()
+
+	addFunc := func(docNum int) {
+		postings.Add(uint32(docNum))
+	}
+
+	hits.Iterate(addFunc)
+
+	g.postings[segID] = postings
+	g.iterators[segID] = postings.Iterator()
+
+	return nil
+}
+
+func (g *IndexSnapshotGeoCellReader) Next(preAlloced *index.GeoCellFieldDoc) (*index.GeoCellFieldDoc, error) {
+	rv := preAlloced
+	if rv == nil {
+		rv = &index.GeoCellFieldDoc{}
+	}
+
+	for g.segmentOffset < len(g.iterators) {
+		if !g.iterators[g.segmentOffset].HasNext() {
+			g.segmentOffset++
+			continue
+		}
+
+		next := g.iterators[g.segmentOffset].Next()
+		globalOffset := g.snapshot.offsets[g.segmentOffset]
+		rv.ID = index.NewIndexInternalID(rv.ID, uint64(next)+globalOffset)
+		return rv, nil
+	}
+
+	return nil, nil
+}
+
+func (g *IndexSnapshotGeoCellReader) Advance(ID index.IndexInternalID, preAlloced *index.GeoCellFieldDoc) (*index.GeoCellFieldDoc, error) {
+	rv := preAlloced
+	if rv == nil {
+		rv = &index.GeoCellFieldDoc{}
+	}
+
+	num, err := ID.Value()
+	if err != nil {
+		return nil, fmt.Errorf("error converting IndexInternalID to doc number ID - %v, err: %w", ID, err)
+	}
+
+	segIdx, localDocNum := g.snapshot.segmentIndexAndLocalDocNumFromGlobal(num)
+	if segIdx >= len(g.iterators) {
+		return nil, fmt.Errorf("error advancing to doc number %d, segment index %d out of bounds", num, segIdx)
+	}
+
+	if g.segmentOffset > segIdx {
+		return nil, fmt.Errorf("error advancing to doc number %d, segment index %d is less than current segment offset %d", num, segIdx, g.segmentOffset)
+	}
+
+	g.segmentOffset = segIdx
+	g.iterators[g.segmentOffset].AdvanceIfNeeded(uint32(localDocNum))
+
+	return g.Next(rv)
+}
+
+func (g *IndexSnapshotGeoCellReader) Close() error {
+	return nil
+}
+
+func (g *IndexSnapshotGeoCellReader) Count() uint64 {
+	var rv uint64
+	for _, posting := range g.postings {
+		if posting != nil {
+			rv += uint64(posting.GetCardinality())
+		}
+	}
+	return rv
+}
+
+func (g *IndexSnapshotGeoCellReader) Size() int {
+	rv := reflectStaticSizeIndexSnapshotGeoCellReader + size.SizeOfPtr +
+		len(g.field) + size.SizeOfInt
+
+	for _, posting := range g.postings {
+		rv += int(posting.GetSizeInBytes())
+	}
+
+	rv += (reflectStaticSizeRoaringIntPeekable + size.SizeOfPtr) * len(g.iterators)
+
+	return rv
 }
