@@ -4,7 +4,6 @@ go 1.25.0
 
 require (
 	github.com/RoaringBitmap/roaring/v2 v2.14.5
-	github.com/andybalholm/brotli v1.2.1
 	github.com/bits-and-blooms/bitset v1.24.2
 	github.com/blevesearch/bleve_index_api v1.3.12
 	github.com/blevesearch/geo v0.2.5
@@ -45,11 +44,3 @@ require (
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 )
-
-replace github.com/blevesearch/zapx/v17 => ../zapx
-
-replace github.com/blevesearch/bleve_index_api => ../bleve_index_api
-
-replace github.com/blevesearch/scorch_segment_api/v2 => ../scorch_segment_api
-
-replace github.com/blevesearch/geo => ../geo
