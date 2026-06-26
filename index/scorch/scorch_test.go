@@ -3043,6 +3043,190 @@ func TestPersistenceExclude(t *testing.T) {
 	}
 }
 
+// TestPersistenceExcludeSharedInternalKey verifies that when multiple in-memory
+// segments share the same internal key, and some of those segments are excluded
+// from persistence, the shared internal key survives reopen because at least
+// one persisted segment also contributed it.
+//
+// BUG: The current delete(internal, k) loop in prepareBoltSnapshot naively
+// deletes a key whenever ANY excluded segment has it, even when persisted
+// segments also contribute the same key. This test is expected to FAIL until
+// the persister logic is fixed to only delete keys that are exclusive to
+// excluded segments.
+func TestPersistenceExcludeSharedInternalKey(t *testing.T) {
+	cfg := CreateConfig("TestPersistenceExcludeSharedInternalKey")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = DestroyTest(cfg)
+	}()
+
+	os.Mkdir(cfg["path"].(string), 0o755)
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("failed to create Scorch: %v", err)
+	}
+	s, ok := idx.(*Scorch)
+	if !ok {
+		t.Fatalf("expected *Scorch, got %T", s)
+	}
+
+	s.path = cfg["path"].(string)
+	err = s.openBolt()
+	if err != nil {
+		t.Fatalf("failed to open bolt: %v", err)
+	}
+
+	const numSegments = 5
+
+	testDocs := make([][]string, numSegments)
+	for i := 0; i < numSegments; i++ {
+		testDocs[i] = []string{
+			fmt.Sprintf("doc%d_a", i),
+			fmt.Sprintf("doc%d_b", i),
+		}
+	}
+
+	// Each segment sets the same internal key "0" to a different value.
+	// Since introduceSegment overwrites the snapshot-level internal map
+	// on each call, the final snapshot.internal["0"] = []byte("5").
+	internalTestVals := make([]map[string][]byte, numSegments)
+	for i := 0; i < numSegments; i++ {
+		internalTestVals[i] = map[string][]byte{
+			"0": []byte(fmt.Sprintf("%d", i+1)),
+		}
+	}
+
+	for i := 0; i < numSegments; i++ {
+		docs := make([]index.Document, 0, len(testDocs[i]))
+		for _, docID := range testDocs[i] {
+			doc := document.NewDocument(docID)
+			doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
+			doc.AddIDField()
+			doc.VisitFields(func(field index.Field) {
+				field.Analyze()
+			})
+			docs = append(docs, doc)
+		}
+		seg, _, err := s.segPlugin.New(docs)
+		if err != nil {
+			t.Fatalf("failed to create segment %d: %v", i, err)
+		}
+		intro := &segmentIntroduction{
+			id:       atomic.AddUint64(&s.nextSegmentID, 1),
+			data:     seg,
+			ids:      testDocs[i],
+			internal: internalTestVals[i],
+			applied:  make(chan error),
+		}
+		err = s.introduceSegment(intro)
+		if err != nil {
+			t.Fatalf("introduceSegment %d failed: %v", i, err)
+		}
+	}
+
+	snapshot := s.root
+	if len(snapshot.segment) != numSegments {
+		t.Fatalf("expected %d segments, got %d", numSegments, len(snapshot.segment))
+	}
+
+	// Persist only the first 2 segments; the remaining 3 stay in-memory.
+	// Since persisted segments 0 and 1 contributed internal key "0", it
+	// should survive in bolt. The excluded segments should not cause it
+	// to be deleted.
+	var errCh = make(chan error, 1)
+	var doneCh = make(chan struct{})
+	go func() {
+		exclude := map[uint64]struct{}{
+			snapshot.segment[2].id: {},
+			snapshot.segment[3].id: {},
+			snapshot.segment[4].id: {},
+		}
+		err := s.persistSnapshotDirect(snapshot, exclude)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		doneCh <- struct{}{}
+	}()
+
+	select {
+	case persist := <-s.persists:
+		s.introducePersist(persist)
+	case err := <-errCh:
+		t.Fatalf("unexpected error during persist: %v", err)
+	}
+
+	<-doneCh
+
+	// Before closing, internal key "0" is still visible (carried forward
+	// by the in-memory segments still in the root).
+	reader, err := idx.Reader()
+	if err != nil {
+		t.Fatalf("failed to get reader: %v", err)
+	}
+	val, err := reader.GetInternal([]byte("0"))
+	if err != nil {
+		t.Fatalf("failed to get internal value: %v", err)
+	}
+	if !bytes.Equal(val, []byte("5")) {
+		t.Fatalf("expected internal value '5' before close, got '%s'", val)
+	}
+	reader.Close()
+
+	err = idx.Close()
+	if err != nil {
+		t.Fatalf("failed to close index: %v", err)
+	}
+
+	// Reopen the index -- only the first 2 segments were persisted,
+	// and the shared internal key "0" was deleted from bolt by the
+	// excluded segments' cleanup logic.
+	idx2, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("failed to create Scorch: %v", err)
+	}
+	defer idx2.Close()
+
+	s2, ok := idx2.(*Scorch)
+	if !ok {
+		t.Fatalf("expected *Scorch, got %T", s2)
+	}
+	s2.path = cfg["path"].(string)
+	err = s2.openBolt()
+	if err != nil {
+		t.Fatalf("failed to open bolt: %v", err)
+	}
+
+	if len(s2.root.segment) != 2 {
+		t.Fatalf("expected 2 segments in root after reopen, got %d", len(s2.root.segment))
+	}
+
+	reader2, err := idx2.Reader()
+	if err != nil {
+		t.Fatalf("failed to get reader after reopen: %v", err)
+	}
+	defer reader2.Close()
+
+	// The shared internal key "0" should survive reopen because persisted
+	// segments 0 and 1 also contributed it. The value should reflect the
+	// last persisted write (segment 1 set it to "2").
+	val, err = reader2.GetInternal([]byte("0"))
+	if err != nil {
+		t.Fatalf("failed to get internal value after reopen: %v", err)
+	}
+	if val == nil {
+		t.Fatal("BUG: expected internal key '0' to survive reopen since " +
+			"persisted segments 0 and 1 contributed it, but the " +
+			"delete(internal, k) loop in prepareBoltSnapshot incorrectly " +
+			"removed it when excluded segments 2/3/4 were cleaned up")
+	}
+}
+
 // TestPersistenceWithoutExclude is homologous to TestPersistenceExclude but tests
 // persistence without excluding any segments and introducing another segment after
 // persistence works as expected, in the sense that we don't retain the volatile segment
