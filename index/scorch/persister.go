@@ -367,7 +367,26 @@ func (s *Scorch) parsePersisterOptions() (*persisterOptions, error) {
 			return &po, err
 		}
 	}
+	if err := validatePersisterOptions(&po); err != nil {
+		return nil, err
+	}
 	return &po, nil
+}
+
+// validatePersisterOptions validates the persister options
+func validatePersisterOptions(options *persisterOptions) error {
+	// P < 1 is an invalid case
+	if options.NumPersisterWorkers <= 0 {
+		return fmt.Errorf("NumPersisterWorkers must be greater than 0")
+	}
+	// P = 1 and M > 0 is a valid case where one worker will serially flush all batches
+	// P = 1 and M = 0 is a special case which preserves the legacy one-shot in-memory merge + flush behaviour
+	// P > 1 and M > 0 is a valid case where multiple workers will flush batches in parallel
+	// P > 1 and M = 0 is an invalid case
+	if options.NumPersisterWorkers > 1 && options.MaxSizeInMemoryMergePerWorker == 0 {
+		return fmt.Errorf("MaxSizeInMemoryMergePerWorker must be greater than 0 when NumPersisterWorkers > 1")
+	}
+	return nil
 }
 
 func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot,
@@ -477,7 +496,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 
 	// now merge each batch into a new segment, and persist all of them to disk,
 	// and construct a new snapshot with the merged segments
-	newSnapshot, newSegmentIDs, err := s.mergeAndPersistInMemorySegments(snapshot, flushSet)
+	newSnapshot, newSegmentIDs, err := s.mergeAndPersistInMemorySegments(snapshot, flushSet, po)
 	if err != nil {
 		return false, err
 	}
