@@ -15,8 +15,8 @@
 package scorch
 
 import (
-	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -2812,244 +2813,50 @@ func TestPersistorMergerOptions(t *testing.T) {
 	}
 }
 
-// TestPersistenceExclude tests that when we persist a snapshot, and exclude a
-// segment from being persisted, this means that any close and reopen of the index
-// will not retain the excluded segment since it was volatile and not updated in
-// the bolt storage. On reopen we check whether the addtional data associated with
-// the segment like the internal values are also not retained, since they're also
-// volatile.
-func TestPersistenceExclude(t *testing.T) {
-	// Setup config and analysis queue
-	cfg := CreateConfig("TestPersistenceExclude")
-	err := InitTest(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		_ = DestroyTest(cfg)
-	}()
-
-	os.Mkdir(cfg["path"].(string), 0o755)
-
-	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, cfg, analysisQueue)
-	if err != nil {
-		t.Fatalf("failed to create Scorch: %v", err)
-	}
-	s, ok := idx.(*Scorch)
-	if !ok {
-		t.Fatalf("expected *Scorch, got %T", s)
-	}
-
-	s.path = cfg["path"].(string)
-	err = s.openBolt()
-	if err != nil {
-		t.Fatalf("failed to open bolt: %v", err)
-	}
-
-	testDocs := [][]string{
-		{"doc1", "doc2"},
-		{"doc3", "doc4"},
-		{"doc5", "doc6"},
-	}
-
-	internalTestVals := []map[string][]byte{
-		{
-			"i1": []byte("v1"),
-			"i2": []byte("v2"),
-		},
-		{
-			"i3": []byte("v3"),
-			"i4": []byte("v4"),
-		},
-		{
-			"i5": []byte("v5"),
-			"i6": []byte("v6"),
-		},
-	}
-
-	// introduce 3 segments with 2 documents each, and no deletions
-	for i := 0; i < 3; i++ {
-		docs := make([]index.Document, 0, len(testDocs[i]))
-		for _, docID := range testDocs[i] {
-			doc := document.NewDocument(docID)
-			doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
-			doc.AddIDField()
-			// analyze the document to create a segment
-			doc.VisitFields(func(field index.Field) {
-				field.Analyze()
-			})
-			docs = append(docs, doc)
-		}
-		seg, _, err := s.segPlugin.New(docs)
-		if err != nil {
-			t.Fatalf("failed to create segment: %v", err)
-		}
-		// Prepare segmentIntroduction
-		intro := &segmentIntroduction{
-			id:       atomic.AddUint64(&s.nextSegmentID, 1),
-			data:     seg,
-			ids:      testDocs[i],
-			internal: internalTestVals[i],
-			applied:  make(chan error),
-		}
-
-		err = s.introduceSegment(intro)
-		if err != nil {
-			t.Fatalf("introduceSegment failed: %v", err)
-		}
-	}
-
-	// current snapshot should have 3 segments, each with 2 documents, and no deletions
-	snapshot := s.root
-	if len(snapshot.segment) != 3 {
-		t.Fatalf("expected 3 segments, got %d", len(snapshot.segment))
-	}
-	for i, seg := range snapshot.segment {
-		if seg.Count() != 2 {
-			t.Fatalf("expected 2 documents in segment, got %d", seg.Count())
-		}
-
-		dict, err := seg.segment.Dictionary("_id")
-		if err != nil {
-			t.Fatalf("failed to get dictionary: %v", err)
-		}
-		// verify the _id field has the correct docID
-		for _, docID := range testDocs[i] {
-			cont, err := dict.Contains([]byte(docID))
-			if err != nil {
-				t.Fatalf("failed to check dictionary for docID %s: %v", docID, err)
-			}
-			if !cont {
-				t.Fatalf("expected to find docID %s in segment, but not found", docID)
-			}
-		}
-	}
-	// persist the snapshot, which will create a new snapshot with 2 persisted segments
-	// listen to persists channel and update root with the new snapshot
-	var errCh = make(chan error, 1)
-	var doneCh = make(chan struct{})
-	go func() {
-		// avoid persisting the last segment
-		exclude := map[uint64]struct{}{
-			snapshot.segment[2].id: {},
-		}
-		err := s.persistSnapshotDirect(snapshot, exclude)
-		if err != nil {
-			errCh <- err
-			return
-		}
-		doneCh <- struct{}{}
-	}()
-
-	select {
-	case persist := <-s.persists:
-		s.introducePersist(persist)
-	case err := <-errCh:
-		t.Fatalf("unexpected error during persist: %v", err)
-	}
-
-	<-doneCh
-
-	snapshot = s.root
-	if len(snapshot.segment) != 3 {
-		t.Fatalf("expected 3 segments, got %d", len(snapshot.segment))
-	}
-
-	// doc5, doc6
-	lastSeg := snapshot.segment[2]
-	if lastSeg.Count() != 2 {
-		t.Fatalf("expected 2 documents in last segment, got %d", lastSeg.Count())
-	}
-
-	reader, err := idx.Reader()
-	if err != nil {
-		t.Fatalf("failed to get reader: %v", err)
-	}
-	defer reader.Close()
-
-	// check the first segment's internal value
-	val, err := reader.GetInternal([]byte("i1"))
-	if err != nil {
-		t.Fatalf("failed to get internal value: %v", err)
-	}
-
-	if !bytes.Equal(val, internalTestVals[0]["i1"]) {
-		t.Fatalf("expected internal value %s, got %s", internalTestVals[0]["i1"], val)
-	}
-
-	// check the last segment's internal value
-	val, err = reader.GetInternal([]byte("i5"))
-	if err != nil {
-		t.Fatalf("failed to get internal value: %v", err)
-	}
-
-	if !bytes.Equal(val, internalTestVals[2]["i5"]) {
-		t.Fatalf("expected internal value %s, got %s", internalTestVals[2]["i5"], val)
-	}
-
-	// close the index, the last segment data shouldn't be persisted
-	err = idx.Close()
-	if err != nil {
-		t.Fatalf("failed to close index: %v", err)
-	}
-
-	// open it back up, the index loaded doesn't have the last segment in it
-	idx2, err := NewScorch(Name, cfg, analysisQueue)
-	if err != nil {
-		t.Fatalf("failed to create Scorch: %v", err)
-	}
-	defer idx2.Close()
-
-	s2, ok := idx2.(*Scorch)
-	if !ok {
-		t.Fatalf("expected *Scorch, got %T", s2)
-	}
-	s2.path = cfg["path"].(string)
-	err = s2.openBolt()
-	if err != nil {
-		t.Fatalf("failed to open bolt: %v", err)
-	}
-
-	// only 2 segments were persisted
-	if len(s2.root.segment) != 2 {
-		t.Fatalf("expected 2 segments in root, got %d", len(s2.root.segment))
-	}
-
-	reader, err = idx2.Reader()
-	if err != nil {
-		t.Fatalf("failed to get reader: %v", err)
-	}
-	defer reader.Close()
-
-	// check the first segment's internal value
-	val, err = reader.GetInternal([]byte("i1"))
-	if err != nil {
-		t.Fatalf("failed to get internal value: %v", err)
-	}
-
-	if !bytes.Equal(val, internalTestVals[0]["i1"]) {
-		t.Fatalf("expected internal value %s, got %s", internalTestVals[0]["i1"], val)
-	}
-
-	// last segment's internal value shouldn't be there since it was never persisted
-	val, err = reader.GetInternal([]byte("i5"))
-	if err != nil {
-		t.Fatalf("failed to get internal value: %v", err)
-	}
-
-	if val != nil {
-		t.Fatalf("expected internal value to be nil, got %s", val)
-	}
+// genDoc generates a random document with a random ID and a single field "name" with value "test".
+func genDoc(t *testing.T) index.Document {
+	t.Helper()
+	randNum := rand.Intn(1000000)
+	doc := document.NewDocument(fmt.Sprintf("test%d", randNum))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
+	doc.AddIDField()
+	doc.VisitFields(func(field index.Field) {
+		field.Analyze()
+	})
+	return doc
 }
 
-// TestPersistenceWithoutExclude is homologous to TestPersistenceExclude but tests
-// persistence without excluding any segments and introducing another segment after
-// persistence works as expected, in the sense that we don't retain the volatile segment
-// since the next persister cycle never ran
-func TestPersistenceWithoutExclude(t *testing.T) {
-	// Setup config and analysis queue
-	cfg := CreateConfig("TestPersistenceWithoutExclude")
+// getBatches generates a list of index.Batches.
+// 1. for each VB, create a batch with a random doc
+// 2. merge all the batches into a single batch
+// 3. repeat until numBatches is reached
+func getBatches(t *testing.T, numVB int, numBatches int) []*index.Batch {
+	t.Helper()
+	batches := make([]*index.Batch, 0, numBatches)
+	vbSeqNumbers := make([]uint64, numVB)
+	for i := 0; i < numVB; i++ {
+		vbSeqNumbers[i] = 0
+	}
+	for i := 0; i < numBatches; i++ {
+		mergedBatch := index.NewBatch()
+		for j := 0; j < numVB; j++ {
+			vbBatch := index.NewBatch()
+			doc := genDoc(t)
+			vbBatch.Update(doc)
+			vbKey := fmt.Sprintf("%d", j)
+			vbValue := make([]byte, 8)
+			binary.BigEndian.PutUint64(vbValue, vbSeqNumbers[j])
+			vbBatch.SetInternal([]byte(vbKey), vbValue)
+			vbSeqNumbers[j]++
+			mergedBatch.Merge(vbBatch)
+		}
+		batches = append(batches, mergedBatch)
+	}
+	return batches
+}
+
+func TestPersistenceMergedBatches(t *testing.T) {
+	cfg := CreateConfig("TestPersistenceMergedBatches")
 	err := InitTest(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -3076,90 +2883,53 @@ func TestPersistenceWithoutExclude(t *testing.T) {
 		t.Fatalf("failed to open bolt: %v", err)
 	}
 
-	testDocs := [][]string{
-		{"doc1", "doc2"},
-		{"doc3", "doc4"},
-		{"doc5", "doc6"},
-	}
+	const (
+		numSegments = 5
+		numVBs      = 5
+	)
 
-	internalTestVals := []map[string][]byte{
-		{
-			"i1": []byte("v1"),
-			"i2": []byte("v2"),
-		},
-		{
-			"i3": []byte("v3"),
-			"i4": []byte("v4"),
-		},
-		{
-			"i5": []byte("v5"),
-			"i6": []byte("v6"),
-		},
-	}
+	batches := getBatches(t, numVBs, numSegments)
 
-	// introduce 2 segments with 2 documents each, and no deletions
-	for i := 0; i < 2; i++ {
-		docs := make([]index.Document, 0, len(testDocs[i]))
-		for _, docID := range testDocs[i] {
-			doc := document.NewDocument(docID)
-			doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
-			doc.AddIDField()
-			// analyze the document to create a segment
-			doc.VisitFields(func(field index.Field) {
-				field.Analyze()
-			})
-			docs = append(docs, doc)
+	for i := 0; i < numSegments; i++ {
+		batch := batches[i]
+
+		var docs []index.Document
+		var ids []string
+		for _, doc := range batch.IndexOps {
+			if doc != nil {
+				docs = append(docs, doc)
+			}
+			ids = append(ids, doc.ID())
 		}
+
 		seg, _, err := s.segPlugin.New(docs)
 		if err != nil {
-			t.Fatalf("failed to create segment: %v", err)
+			t.Fatalf("failed to create segment %d: %v", i, err)
 		}
-		// Prepare segmentIntroduction
+
 		intro := &segmentIntroduction{
 			id:       atomic.AddUint64(&s.nextSegmentID, 1),
 			data:     seg,
-			ids:      testDocs[i],
-			internal: internalTestVals[i],
-			applied:  make(chan error, 1),
+			ids:      ids,
+			internal: batch.InternalOps,
+			applied:  make(chan error),
 		}
-
 		err = s.introduceSegment(intro)
 		if err != nil {
-			t.Fatalf("introduceSegment failed: %v", err)
+			t.Fatalf("introduceSegment %d failed: %v", i, err)
 		}
 	}
 
-	// current snapshot should have 2 segments, each with 2 documents, and no deletions
 	snapshot := s.root
-	if len(snapshot.segment) != 2 {
-		t.Fatalf("expected 2 segments, got %d", len(snapshot.segment))
+	if len(snapshot.segment) != numSegments {
+		t.Fatalf("expected %d segments, got %d", numSegments, len(snapshot.segment))
 	}
-	for i, seg := range snapshot.segment {
-		if seg.Count() != 2 {
-			t.Fatalf("expected 2 documents in segment, got %d", seg.Count())
-		}
 
-		dict, err := seg.segment.Dictionary("_id")
-		if err != nil {
-			t.Fatalf("failed to get dictionary: %v", err)
-		}
-		// verify the _id field has the correct docID
-		for _, docID := range testDocs[i] {
-			cont, err := dict.Contains([]byte(docID))
-			if err != nil {
-				t.Fatalf("failed to check dictionary for docID %s: %v", docID, err)
-			}
-			if !cont {
-				t.Fatalf("expected to find docID %s in segment, but not found", docID)
-			}
-		}
-	}
-	// persist the snapshot, which will create a new snapshot with 2 persisted segments
-	// listen to persists channel and update root with the new snapshot
+	// persist only the first 2 segments, and exclude the last 3 segments from being persisted.
 	var errCh = make(chan error, 1)
 	var doneCh = make(chan struct{})
 	go func() {
-		err := s.persistSnapshotDirect(snapshot, nil)
+		err := s.persistSnapshotDirect(snapshot)
 		if err != nil {
 			errCh <- err
 			return
@@ -3176,79 +2946,90 @@ func TestPersistenceWithoutExclude(t *testing.T) {
 
 	<-doneCh
 
-	docs := make([]index.Document, 0, 2)
-	for _, docID := range testDocs[2] {
-		doc := document.NewDocument(docID)
-		doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
-		doc.AddIDField()
-		// analyze the document to create a segment
-		doc.VisitFields(func(field index.Field) {
-			field.Analyze()
-		})
-		docs = append(docs, doc)
-	}
+	// validate our snapshot's VB-seqMax mappings.
+	/*
+		Each Merged Batch has the following VB-seqMax mappings:
+		Each VB has its own batch, and when flushed to scorch, all 5 batches are merged into a single batch.
+			Batch 0:
+				0 - 0
+				1 - 0
+				2 - 0
+				3 - 0
+				4 - 0
+			Batch 1:
+				0 - 1
+				1 - 1
+				2 - 1
+				3 - 1
+				4 - 1
+			Batch 2:
+				0 - 2
+				1 - 2
+				2 - 2
+				3 - 2
+				4 - 2
+			Batch 3:
+				0 - 3
+				1 - 3
+				2 - 3
+				3 - 3
+				4 - 3
+			Batch 4:
+				0 - 4
+				1 - 4
+				2 - 4
+				3 - 4
+				4 - 4
+		We expect that after persistance, the VB-seqMax mappings will be as follows:
+		1. In the Bolt Snapshot:
+				0 - 4
+				1 - 4
+				2 - 4
+				3 - 4
+				4 - 4
+		2. In the in-memory snapshot:
+				0 - 4
+				1 - 4
+				2 - 4
+				3 - 4
+				4 - 4
+		This is because we MUST ensure that the
+		    - In-memory snapshot and Persisted snapshot are in sync with each other.
+			- The VB-seqMax mappings always pick the highest sequence number for each VB.
+	*/
 
-	seg, _, err := s.segPlugin.New(docs)
-	if err != nil {
-		t.Fatalf("failed to create segment: %v", err)
+	// ------------------------------------------------------
+	// Verify the in-memory snapshot's VB-seqMax mappings.
+	expectedMappings := make([]uint64, numVBs)
+	for i := 0; i < numVBs; i++ {
+		expectedMappings[i] = 4
 	}
-	intro := &segmentIntroduction{
-		id:       atomic.AddUint64(&s.nextSegmentID, 1),
-		data:     seg,
-		ids:      testDocs[2],
-		internal: internalTestVals[2],
-		applied:  make(chan error, 1),
-	}
-
-	err = s.introduceSegment(intro)
-	if err != nil {
-		t.Fatalf("introduceSegment failed: %v", err)
-	}
-
-	snapshot = s.root
-	if len(snapshot.segment) != 3 {
-		t.Fatalf("expected 3 segments, got %d", len(snapshot.segment))
-	}
-
-	// doc5, doc6
-	lastSeg := snapshot.segment[2]
-	if lastSeg.Count() != 2 {
-		t.Fatalf("expected 2 documents in last segment, got %d", lastSeg.Count())
-	}
-
 	reader, err := idx.Reader()
 	if err != nil {
 		t.Fatalf("failed to get reader: %v", err)
 	}
-	defer reader.Close()
-
-	// check the first segment's internal value
-	val, err := reader.GetInternal([]byte("i1"))
+	actualMappings := make([]uint64, numVBs)
+	for i := 0; i < numVBs; i++ {
+		vbKey := []byte(strconv.Itoa(i))
+		val, err := reader.GetInternal(vbKey)
+		if err != nil {
+			t.Fatalf("failed to get internal value for VB %d: %v", i, err)
+		}
+		actualMappings[i] = binary.BigEndian.Uint64(val)
+	}
+	if !slices.Equal(expectedMappings, actualMappings) {
+		t.Fatalf("expected in-memory snapshot VB-seqMax mappings %v, got %v", expectedMappings, actualMappings)
+	}
+	err = reader.Close()
 	if err != nil {
-		t.Fatalf("failed to get internal value: %v", err)
+		t.Fatalf("failed to close reader: %v", err)
 	}
-
-	if !bytes.Equal(val, internalTestVals[0]["i1"]) {
-		t.Fatalf("expected internal value %s, got %s", internalTestVals[0]["i1"], val)
-	}
-
-	// check the last segment's internal value
-	val, err = reader.GetInternal([]byte("i5"))
-	if err != nil {
-		t.Fatalf("failed to get internal value: %v", err)
-	}
-
-	if !bytes.Equal(val, internalTestVals[2]["i5"]) {
-		t.Fatalf("expected internal value %s, got %s", internalTestVals[2]["i5"], val)
-	}
-
-	// close the index, the last segment data shouldn't be persisted
 	err = idx.Close()
 	if err != nil {
 		t.Fatalf("failed to close index: %v", err)
 	}
-
-	// open it back up, the index loaded doesn't have the last segment in it
+	// ------------------------------------------------------
+	// reopen the index and verify that the persisted state is correct
 	idx2, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatalf("failed to create Scorch: %v", err)
@@ -3262,35 +3043,42 @@ func TestPersistenceWithoutExclude(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open bolt: %v", err)
 	}
-
-	// only 2 segments were persisted
 	if len(s2.root.segment) != 2 {
-		t.Fatalf("expected 2 segments in root, got %d", len(s2.root.segment))
+		t.Fatalf("expected 2 segments in root after reopen, got %d", len(s2.root.segment))
 	}
-
-	reader, err = idx2.Reader()
+	reader2, err := idx2.Reader()
 	if err != nil {
-		t.Fatalf("failed to get reader: %v", err)
+		t.Fatalf("failed to get reader after reopen: %v", err)
 	}
-	defer reader.Close()
-
-	// check the first segment's internal value
-	val, err = reader.GetInternal([]byte("i1"))
+	// ------------------------------------------------------
+	// Verify the Bolt Snapshot's VB-seqMax mappings.
+	expectedMappings2 := make([]uint64, numVBs)
+	for i := 0; i < numVBs; i++ {
+		expectedMappings2[i] = 1
+	}
+	actualMappings2 := make([]uint64, numVBs)
+	for i := 0; i < numVBs; i++ {
+		vbKey := []byte(strconv.Itoa(i))
+		val, err := reader2.GetInternal(vbKey)
+		if err != nil {
+			t.Fatalf("failed to get internal value for VB %d: %v", i, err)
+		}
+		if val == nil {
+			actualMappings2[i] = 0
+		} else {
+			actualMappings2[i] = binary.BigEndian.Uint64(val)
+		}
+	}
+	if !slices.Equal(expectedMappings2, actualMappings2) {
+		t.Fatalf("expected Bolt snapshot VB-seqMax mappings %v, got %v", expectedMappings2, actualMappings2)
+	}
+	err = reader2.Close()
 	if err != nil {
-		t.Fatalf("failed to get internal value: %v", err)
+		t.Fatalf("failed to close reader: %v", err)
 	}
-
-	if !bytes.Equal(val, internalTestVals[0]["i1"]) {
-		t.Fatalf("expected internal value %s, got %s", internalTestVals[0]["i1"], val)
-	}
-
-	// last segment's internal value shouldn't be there since it was never persisted
-	val, err = reader.GetInternal([]byte("i5"))
+	err = idx2.Close()
 	if err != nil {
-		t.Fatalf("failed to get internal value: %v", err)
+		t.Fatalf("failed to close index: %v", err)
 	}
-
-	if val != nil {
-		t.Fatalf("expected internal value to be nil, got %s", val)
-	}
+	// ------------------------------------------------------
 }
