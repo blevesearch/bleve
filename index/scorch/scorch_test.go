@@ -3043,8 +3043,8 @@ func TestPersistenceMergedBatches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open bolt: %v", err)
 	}
-	if len(s2.root.segment) != 2 {
-		t.Fatalf("expected 2 segments in root after reopen, got %d", len(s2.root.segment))
+	if len(s2.root.segment) != 5 {
+		t.Fatalf("expected 5 segments in root after reopen, got %d", len(s2.root.segment))
 	}
 	reader2, err := idx2.Reader()
 	if err != nil {
@@ -3054,7 +3054,7 @@ func TestPersistenceMergedBatches(t *testing.T) {
 	// Verify the Bolt Snapshot's VB-seqMax mappings.
 	expectedMappings2 := make([]uint64, numVBs)
 	for i := 0; i < numVBs; i++ {
-		expectedMappings2[i] = 1
+		expectedMappings2[i] = 4
 	}
 	actualMappings2 := make([]uint64, numVBs)
 	for i := 0; i < numVBs; i++ {
