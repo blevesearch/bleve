@@ -432,7 +432,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 		}
 	}
 
-	skipped := true
+	skipped := make([]bool, len(nextMerge.new))
 	// make the newly merged segments part of the newSnapshot being constructed
 	for i, newMergedSegment := range nextMerge.new {
 		// checking if this newly merged segment is worth keeping based on
@@ -465,14 +465,12 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 				docsToPersistCount += newMergedSegment.Count() - newSegmentDeleted[i].GetCardinality()
 				memSegments++
 			}
-			skipped = false
+			atomic.AddUint64(&s.stats.TotIntroducedSegmentsMerge, 1)
+			skipped[i] = false
+		} else {
+			atomic.AddUint64(&s.stats.TotFileMergeIntroductionsObsoleted, 1)
+			skipped[i] = true
 		}
-	}
-
-	if skipped {
-		atomic.AddUint64(&s.stats.TotFileMergeIntroductionsObsoleted, 1)
-	} else {
-		atomic.AddUint64(&s.stats.TotIntroducedSegmentsMerge, uint64(len(nextMerge.new)))
 	}
 
 	atomic.StoreUint64(&s.stats.TotItemsToPersist, docsToPersistCount)

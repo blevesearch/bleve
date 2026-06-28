@@ -426,10 +426,10 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 		atomic.AddUint64(&s.stats.TotFileMergeIntroductionsDone, 1)
 		if introStatus != nil && introStatus.indexSnapshot != nil {
 			_ = introStatus.indexSnapshot.DecRef()
-			if introStatus.skipped {
+			if introStatus.skipped[0] {
 				// close the segment on skipping introduction.
-				s.unmarkIneligibleForRemoval(filename)
 				_ = seg.Close()
+				s.unmarkIneligibleForRemoval(filename)
 			}
 		}
 
@@ -450,7 +450,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 type mergeTaskIntroStatus struct {
 	indexSnapshot *IndexSnapshot
-	skipped       bool
+	skipped       []bool
 }
 
 // this is important when it comes to introducing multiple merged segments in a
@@ -481,7 +481,7 @@ func cumulateBytesRead(sbs []segment.Segment) uint64 {
 func closeNewMergedSegments(segs []segment.Segment) error {
 	for _, seg := range segs {
 		if seg != nil {
-			_ = seg.DecRef()
+			_ = seg.Close()
 		}
 	}
 	return nil
@@ -491,7 +491,7 @@ func closeNewMergedSegments(segs []segment.Segment) error {
 // which are merged and persisted to disk concurrently. These are then introduced as
 // the new root snapshot in one-shot.
 func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
-	flushes []*flushable, po *persisterOptions) (*IndexSnapshot, []uint64, error) {
+	flushes []*flushable, po *persisterOptions) (*IndexSnapshot, map[uint64]struct{}, error) {
 	atomic.AddUint64(&s.stats.TotMemMergeBeg, 1)
 
 	memMergeZapStartTime := time.Now()
@@ -565,6 +565,11 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 	if errs != nil {
 		// close the new merged segments
 		_ = closeNewMergedSegments(newMergedSegments)
+		// mark the newly merged segments as eligible
+		// for removal since they are not going to be introduced
+		for _, filename := range newMergedSegmentFileNames {
+			s.unmarkIneligibleForRemoval(filename)
+		}
 		var errf error
 		for _, err := range errs {
 			if err == segment.ErrClosed {
@@ -613,31 +618,38 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 	select { // send to introducer
 	case <-s.closeCh:
 		_ = closeNewMergedSegments(newMergedSegments)
+		for _, filename := range newMergedSegmentFileNames {
+			s.unmarkIneligibleForRemoval(filename)
+		}
 		return nil, nil, segment.ErrClosed
 	case s.merges <- sm:
 	}
 
 	// blockingly wait for the introduction to complete
-	var newSnapshot *IndexSnapshot
 	introStatus := <-sm.notifyCh
-	if introStatus != nil && introStatus.indexSnapshot != nil {
-		newSnapshot = introStatus.indexSnapshot
-		atomic.AddUint64(&s.stats.TotMemMergeSegments, uint64(numSegments))
-		atomic.AddUint64(&s.stats.TotMemMergeDone, 1)
-		if introStatus.skipped {
-			// close the segment on skipping introduction.
-			_ = newSnapshot.DecRef()
-			_ = closeNewMergedSegments(newMergedSegments)
-			// since we skipped the introduction, we need to flip the
-			// ineligibility for removal for the newly merged segments
-			for _, filename := range newMergedSegmentFileNames {
-				s.unmarkIneligibleForRemoval(filename)
-			}
-			newSnapshot = nil
+	introducedSnapshot := introStatus.indexSnapshot
+	introducedSegmentIDs := make(map[uint64]struct{}, len(newMergedSegmentIDs))
+	atomic.AddUint64(&s.stats.TotMemMergeSegments, uint64(numSegments))
+	atomic.AddUint64(&s.stats.TotMemMergeDone, 1)
+	for flushID, skipped := range introStatus.skipped {
+		seg := newMergedSegments[flushID]
+		segID := newMergedSegmentIDs[flushID]
+		segFileName := newMergedSegmentFileNames[flushID]
+		if skipped {
+			_ = seg.Close()
+			s.unmarkIneligibleForRemoval(segFileName)
+		} else {
+			introducedSegmentIDs[segID] = struct{}{}
 		}
 	}
+	if len(introducedSegmentIDs) == 0 {
+		// if all the newly merged segments were skipped
+		// do not persist the new snapshot at all
+		_ = introducedSnapshot.DecRef()
+		return nil, nil, nil
+	}
 
-	return newSnapshot, newMergedSegmentIDs, nil
+	return introducedSnapshot, introducedSegmentIDs, nil
 }
 
 func (s *Scorch) ReportBytesWritten(bytesWritten uint64) {

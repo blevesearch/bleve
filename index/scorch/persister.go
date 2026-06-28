@@ -511,12 +511,6 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 		_ = newSnapshot.DecRef()
 	}()
 
-	// create a set of the newly merged segment IDs for easy lookup
-	newSegmentIDsSet := make(map[uint64]struct{}, len(newSegmentIDs))
-	for _, id := range newSegmentIDs {
-		newSegmentIDsSet[id] = struct{}{}
-	}
-
 	// construct a snapshot that's logically equivalent to the input
 	// snapshot, but with merged segments replaced by the new segment
 	equiv := &IndexSnapshot{
@@ -536,7 +530,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	// next, add all the segments that were unpersisted and hence
 	// participated in the merge, from the merged snapshot
 	for _, segment := range newSnapshot.segment {
-		if _, ok := newSegmentIDsSet[segment.id]; ok {
+		if _, ok := newSegmentIDs[segment.id]; ok {
 			equiv.segment = append(equiv.segment, &SegmentSnapshot{
 				id:      segment.id,
 				segment: segment.segment,
