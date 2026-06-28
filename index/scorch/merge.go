@@ -491,7 +491,7 @@ func closeNewMergedSegments(segs []segment.Segment) error {
 // which are merged and persisted to disk concurrently. These are then introduced as
 // the new root snapshot in one-shot.
 func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
-	flushes []*flushable, po *persisterOptions) (*IndexSnapshot, map[uint64]struct{}, error) {
+	flushes []*flushable, po *persisterOptions) (*IndexSnapshot, []uint64, error) {
 	atomic.AddUint64(&s.stats.TotMemMergeBeg, 1)
 
 	memMergeZapStartTime := time.Now()
@@ -637,13 +637,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 		}
 	}
 
-	// create a map of the newly merged segment IDs for the caller to use for tracking
-	newMergedSegmentIDsMap := make(map[uint64]struct{}, len(newMergedSegmentIDs))
-	for _, id := range newMergedSegmentIDs {
-		newMergedSegmentIDsMap[id] = struct{}{}
-	}
-
-	return newSnapshot, newMergedSegmentIDsMap, nil
+	return newSnapshot, newMergedSegmentIDs, nil
 }
 
 func (s *Scorch) ReportBytesWritten(bytesWritten uint64) {
