@@ -377,7 +377,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 				for deletedSinceItr.HasNext() {
 					oldDocNum := deletedSinceItr.Next()
 					newDocNum := segSnapAtMerge.oldNewDocIDs[oldDocNum]
-					newSegmentDeleted[segSnapAtMerge.workerID].Add(uint32(newDocNum))
+					newSegmentDeleted[segSnapAtMerge.flushID].Add(uint32(newDocNum))
 				}
 			}
 
@@ -424,7 +424,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			for obsoletedIter.HasNext() {
 				oldDocNum := obsoletedIter.Next()
 				newDocNum := ss.oldNewDocIDs[oldDocNum]
-				newSegmentDeleted[ss.workerID].Add(uint32(newDocNum))
+				newSegmentDeleted[ss.flushID].Add(uint32(newDocNum))
 			}
 		}
 	}
