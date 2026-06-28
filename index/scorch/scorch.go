@@ -459,7 +459,6 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 
 	var newSegment segment.Segment
 	var bufBytes uint64
-	stats := newFieldStats()
 
 	if len(analysisResults) > 0 {
 		newSegment, bufBytes, err = s.segPlugin.New(analysisResults)
@@ -471,14 +470,11 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 				segB.BytesWritten())
 		}
 		atomic.AddUint64(&s.iStats.newSegBufBytesAdded, bufBytes)
-		if fsr, ok := newSegment.(segment.FieldStatsReporter); ok {
-			fsr.UpdateFieldStats(stats)
-		}
 	} else {
 		atomic.AddUint64(&s.stats.TotBatchesEmpty, 1)
 	}
 
-	err = s.prepareSegment(newSegment, ids, batch.InternalOps, batch.PersistedCallback(), stats)
+	err = s.prepareSegment(newSegment, ids, batch.InternalOps, batch.PersistedCallback())
 	if err != nil {
 		if newSegment != nil {
 			_ = newSegment.Close()
@@ -498,15 +494,13 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 }
 
 func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
-	internalOps map[string][]byte, persistedCallback index.BatchCallback, stats *fieldStats,
-) error {
+	internalOps map[string][]byte, persistedCallback index.BatchCallback) error {
 	// new introduction
 	introduction := &segmentIntroduction{
 		id:                atomic.AddUint64(&s.nextSegmentID, 1),
 		data:              newSegment,
 		ids:               ids,
 		internal:          internalOps,
-		stats:             stats,
 		applied:           make(chan error),
 		persistedCallback: persistedCallback,
 	}

@@ -504,6 +504,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 	numFlushes := len(flushes)
 	newDocIDsSet := make([][][]uint64, numFlushes)
 	newMergedSegmentIDs := make([]uint64, numFlushes)
+	newMergedSegmentFileNames := make([]string, numFlushes)
 	newMergedSegments := make([]segment.Segment, numFlushes)
 	var numSegments, newMergedCount uint64
 	var em sync.Mutex
@@ -544,6 +545,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 
 			newDocIDsSet[flushID] = newDocIDs
 			newMergedSegmentIDs[flushID] = newSegmentID
+			newMergedSegmentFileNames[flushID] = filename
 			newMergedSegments[flushID], err = s.segPlugin.Open(path)
 			if err != nil {
 				em.Lock()
@@ -626,6 +628,11 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			// close the segment on skipping introduction.
 			_ = newSnapshot.DecRef()
 			_ = closeNewMergedSegments(newMergedSegments)
+			// since we skipped the introduction, we need to flip the
+			// ineligibility for removal for the newly merged segments
+			for _, filename := range newMergedSegmentFileNames {
+				s.unmarkIneligibleForRemoval(filename)
+			}
 			newSnapshot = nil
 		}
 	}

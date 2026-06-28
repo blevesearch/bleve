@@ -27,6 +27,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -2928,7 +2929,14 @@ func TestPersistenceMergedBatches(t *testing.T) {
 	var errCh = make(chan error, 1)
 	var doneCh = make(chan struct{})
 	go func() {
-		err := s.persistSnapshotDirect(snapshot)
+		po := persisterOptions{
+			PersisterNapTimeMSec:          DefaultPersisterNapTimeMSec,
+			PersisterNapUnderNumFiles:     DefaultPersisterNapUnderNumFiles,
+			MemoryPressurePauseThreshold:  DefaultMemoryPressurePauseThreshold,
+			NumPersisterWorkers:           DefaultNumPersisterWorkers,
+			MaxSizeInMemoryMergePerWorker: DefaultMaxSizeInMemoryMergePerWorker,
+		}
+		err := s.persistSnapshot(snapshot, &po)
 		if err != nil {
 			errCh <- err
 			return
@@ -2937,6 +2945,8 @@ func TestPersistenceMergedBatches(t *testing.T) {
 	}()
 
 	select {
+	case merge := <-s.merges:
+		s.introduceMerge(merge)
 	case persist := <-s.persists:
 		s.introducePersist(persist)
 	case err := <-errCh:
@@ -3027,57 +3037,248 @@ func TestPersistenceMergedBatches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to close index: %v", err)
 	}
+
 	// ------------------------------------------------------
 	// reopen the index and verify that the persisted state is correct
-	idx2, err := NewScorch(Name, cfg, analysisQueue)
+	idx, err = NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatalf("failed to create Scorch: %v", err)
 	}
-	s2, ok := idx2.(*Scorch)
+	s, ok = idx.(*Scorch)
 	if !ok {
-		t.Fatalf("expected *Scorch, got %T", s2)
+		t.Fatalf("expected *Scorch, got %T", s)
 	}
-	s2.path = cfg["path"].(string)
-	err = s2.openBolt()
+	s.path = cfg["path"].(string)
+	err = s.openBolt()
 	if err != nil {
 		t.Fatalf("failed to open bolt: %v", err)
 	}
-	if len(s2.root.segment) != 5 {
-		t.Fatalf("expected 5 segments in root after reopen, got %d", len(s2.root.segment))
+	if len(s.root.segment) != 1 {
+		t.Fatalf("expected 1 segment in root after reopen, got %d", len(s.root.segment))
 	}
-	reader2, err := idx2.Reader()
+	reader, err = idx.Reader()
 	if err != nil {
 		t.Fatalf("failed to get reader after reopen: %v", err)
 	}
+
 	// ------------------------------------------------------
 	// Verify the Bolt Snapshot's VB-seqMax mappings.
-	expectedMappings2 := make([]uint64, numVBs)
+	expectedMappings = make([]uint64, numVBs)
 	for i := 0; i < numVBs; i++ {
-		expectedMappings2[i] = 4
+		expectedMappings[i] = 4
 	}
-	actualMappings2 := make([]uint64, numVBs)
+	actualMappings = make([]uint64, numVBs)
 	for i := 0; i < numVBs; i++ {
 		vbKey := []byte(strconv.Itoa(i))
-		val, err := reader2.GetInternal(vbKey)
+		val, err := reader.GetInternal(vbKey)
 		if err != nil {
 			t.Fatalf("failed to get internal value for VB %d: %v", i, err)
 		}
 		if val == nil {
-			actualMappings2[i] = 0
+			actualMappings[i] = 0
 		} else {
-			actualMappings2[i] = binary.BigEndian.Uint64(val)
+			actualMappings[i] = binary.BigEndian.Uint64(val)
 		}
 	}
-	if !slices.Equal(expectedMappings2, actualMappings2) {
-		t.Fatalf("expected Bolt snapshot VB-seqMax mappings %v, got %v", expectedMappings2, actualMappings2)
+	if !slices.Equal(expectedMappings, actualMappings) {
+		t.Fatalf("expected Bolt snapshot VB-seqMax mappings %v, got %v", expectedMappings, actualMappings)
 	}
-	err = reader2.Close()
+	err = reader.Close()
 	if err != nil {
 		t.Fatalf("failed to close reader: %v", err)
 	}
-	err = idx2.Close()
+	err = idx.Close()
 	if err != nil {
 		t.Fatalf("failed to close index: %v", err)
 	}
-	// ------------------------------------------------------
+}
+
+func TestIneligibleForRemovalOnSkippedMerge(t *testing.T) {
+	cfg := CreateConfig("TestIneligibleForRemovalOnSkippedMerge")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = DestroyTest(cfg) }()
+	dirPath := cfg["path"].(string)
+	if err = os.Mkdir(dirPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("failed to create Scorch: %v", err)
+	}
+	s := idx.(*Scorch)
+	s, ok := idx.(*Scorch)
+	if !ok {
+		t.Fatalf("expected *Scorch, got %T", s)
+	}
+	s.path = dirPath
+	err = s.openBolt()
+	if err != nil {
+		t.Fatalf("failed to open bolt: %v", err)
+	}
+
+	// create 2 docs
+	doc1 := genDoc(t)
+	doc2 := genDoc(t)
+	doc3 := genDoc(t)
+	docs := []index.Document{doc1, doc2, doc3}
+	ids := []string{doc1.ID(), doc2.ID(), doc3.ID()}
+
+	// introduce 3 segments with 1 doc each
+	for i := 0; i < 3; i++ {
+		doc := docs[i]
+		id := ids[i]
+		seg, _, err := s.segPlugin.New([]index.Document{doc})
+		if err != nil {
+			t.Fatalf("failed to create segment: %v", err)
+		}
+		intro := &segmentIntroduction{
+			id:      atomic.AddUint64(&s.nextSegmentID, 1),
+			data:    seg,
+			ids:     []string{id},
+			applied: make(chan error),
+		}
+		if err = s.introduceSegment(intro); err != nil {
+			t.Fatalf("introduceSegment: %v", err)
+		}
+	}
+	snapshot := s.root
+	if len(snapshot.segment) != 3 {
+		t.Fatalf("expected %d segments, got %d", 3, len(snapshot.segment))
+	}
+	for _, seg := range snapshot.segment {
+		if seg.Count() != 1 {
+			t.Fatalf("expected %d docs, got %d", 1, seg.Count())
+		}
+	}
+
+	// persist the snapshot
+	var errCh = make(chan error, 1)
+	var doneCh = make(chan struct{})
+	go func() {
+		po := persisterOptions{
+			PersisterNapTimeMSec:          DefaultPersisterNapTimeMSec,
+			PersisterNapUnderNumFiles:     DefaultPersisterNapUnderNumFiles,
+			MemoryPressurePauseThreshold:  DefaultMemoryPressurePauseThreshold,
+			NumPersisterWorkers:           DefaultNumPersisterWorkers,
+			MaxSizeInMemoryMergePerWorker: DefaultMaxSizeInMemoryMergePerWorker,
+		}
+		err := s.persistSnapshot(snapshot, &po)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		doneCh <- struct{}{}
+	}()
+
+	select {
+	case merge := <-s.merges:
+		// introduce another batch deleting the 3 docs, resulting in a skipped merge
+		intro2 := &segmentIntroduction{
+			id:      atomic.AddUint64(&s.nextSegmentID, 1),
+			data:    nil,
+			ids:     ids,
+			applied: make(chan error),
+		}
+		if err = s.introduceSegment(intro2); err != nil {
+			t.Fatalf("introduceSegment: %v", err)
+		}
+		snapshot = s.root
+		if len(snapshot.segment) != 0 {
+			t.Fatalf("expected %d segments, got %d", 0, len(snapshot.segment))
+		}
+		docCount, err := snapshot.DocCount()
+		if err != nil {
+			t.Fatalf("failed to get doc count: %v", err)
+		}
+		if docCount != 0 {
+			t.Fatalf("expected %d docs, got %d", 0, docCount)
+		}
+		// now we allow the merge to happen, which will result in a skipped merge
+		s.introduceMerge(merge)
+	case err := <-errCh:
+		t.Fatalf("unexpected error during persist: %v", err)
+	}
+
+	select {
+	case persist := <-s.persists:
+		s.introducePersist(persist)
+	case err := <-errCh:
+		t.Fatalf("unexpected error during persist: %v", err)
+	}
+	<-doneCh
+
+	// verify that the root now contains 0 segments
+	snapshot = s.root
+	if len(snapshot.segment) != 0 {
+		t.Errorf("expected %d segments, got %d", 0, len(snapshot.segment))
+	}
+	docCount, err := snapshot.DocCount()
+	if err != nil {
+		t.Errorf("failed to get doc count: %v", err)
+	}
+	if docCount != 0 {
+		t.Errorf("expected %d docs, got %d", 0, docCount)
+	}
+	s.removeOldData()
+	files, err := os.ReadDir(dirPath)
+	if err != nil {
+		t.Fatalf("failed to read dir: %v", err)
+	}
+	var numZapFiles int
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".zap") {
+			numZapFiles++
+		}
+	}
+	if numZapFiles != 3 {
+		t.Errorf("expected %d zap files, got %d", 3, numZapFiles)
+	}
+
+	// close the index now, and reopen it to verify that the persisted state is correct
+	err = idx.Close()
+	if err != nil {
+		t.Fatalf("failed to close index: %v", err)
+	}
+
+	idx, err = NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("failed to create Scorch: %v", err)
+	}
+	s, ok = idx.(*Scorch)
+	if !ok {
+		t.Fatalf("expected *Scorch, got %T", s)
+	}
+	s.path = dirPath
+	err = s.openBolt()
+	if err != nil {
+		t.Fatalf("failed to open bolt: %v", err)
+	}
+	snapshot = s.root
+	if len(snapshot.segment) != 3 {
+		t.Errorf("expected %d segments, got %d", 0, len(snapshot.segment))
+	}
+	docCount, err = snapshot.DocCount()
+	if err != nil {
+		t.Errorf("failed to get doc count: %v", err)
+	}
+	if docCount != 3 {
+		t.Errorf("expected %d docs, got %d", 0, docCount)
+	}
+	files, err = os.ReadDir(dirPath)
+	if err != nil {
+		t.Fatalf("failed to read dir: %v", err)
+	}
+	numZapFiles = 0
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".zap") {
+			numZapFiles++
+		}
+	}
+	if numZapFiles != 3 {
+		t.Errorf("expected %d zap files, got %d", 3, numZapFiles)
+	}
 }

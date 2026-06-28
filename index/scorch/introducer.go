@@ -30,7 +30,6 @@ type segmentIntroduction struct {
 	obsoletes map[uint64]*roaring.Bitmap
 	ids       []string
 	internal  map[string][]byte
-	stats     *fieldStats
 
 	applied           chan error
 	persisted         chan error
@@ -193,10 +192,14 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 
 	// append new segment, if any, to end of the new index snapshot
 	if next.data != nil {
+		stats := newFieldStats()
+		if fsr, ok := next.data.(segment.FieldStatsReporter); ok {
+			fsr.UpdateFieldStats(stats)
+		}
 		newSegmentSnapshot := &SegmentSnapshot{
 			id:         next.id,
 			segment:    next.data, // take ownership of next.data's ref-count
-			stats:      next.stats,
+			stats:      stats,
 			cachedDocs: &cachedDocs{cache: nil},
 			cachedMeta: &cachedMeta{meta: nil},
 			creator:    "introduceSegment",
