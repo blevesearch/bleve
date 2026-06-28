@@ -61,6 +61,11 @@ var (
 	// trio results in better overall performance.
 	DefaultPersisterNapUnderNumFiles int = 1000
 
+	// MemoryPressurePauseThreshold lets persister to have a better leeway
+	// for prudently performing the memory merge of segments on a memory
+	// pressure situation. Here the config value is an upper threshold
+	// for the number of paused application threads. The default value would
+	// be a very high number to always favour the merging of memory segments.
 	DefaultMemoryPressurePauseThreshold uint64 = math.MaxUint64
 
 	// DefaultMinSegmentsForInMemoryMerge represents the default number of
@@ -90,11 +95,10 @@ type persisterOptions struct {
 	// a healthier and heavier in-memory merging
 	PersisterNapUnderNumFiles int
 
-	// MemoryPressurePauseThreshold let persister to have a better leeway
+	// MemoryPressurePauseThreshold lets persister to have a better leeway
 	// for prudently performing the memory merge of segments on a memory
 	// pressure situation. Here the config value is an upper threshold
-	// for the number of paused application threads. The default value would
-	// be a very high number to always favour the merging of memory segments.
+	// for the number of paused application threads.
 	MemoryPressurePauseThreshold uint64
 
 	// NumPersisterWorkers decides the number of parallel workers that will
