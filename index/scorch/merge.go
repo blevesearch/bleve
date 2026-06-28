@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -570,7 +571,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 				// so its safe to early exit the same error.
 				return nil, nil, err
 			}
-			errf = fmt.Errorf("%w; %v", errf, err)
+			errf = errors.Join(errf, err)
 		}
 		return nil, nil, errf
 	}

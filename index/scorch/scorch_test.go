@@ -2925,7 +2925,6 @@ func TestPersistenceMergedBatches(t *testing.T) {
 		t.Fatalf("expected %d segments, got %d", numSegments, len(snapshot.segment))
 	}
 
-	// persist only the first 2 segments, and exclude the last 3 segments from being persisted.
 	var errCh = make(chan error, 1)
 	var doneCh = make(chan struct{})
 	go func() {
