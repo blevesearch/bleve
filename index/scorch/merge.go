@@ -517,6 +517,12 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			filename := zapFileName(newSegmentID)
 			path := s.path + string(os.PathSeparator) + filename
 
+			// to prevent accidental cleanup of this newly created file, mark it
+			// as ineligible for removal. this will be flipped back when the bolt
+			// is updated - which is valid, since the snapshot updated in bolt is
+			// cleaned up only if its zero ref'd (MB-66163 for more details)
+			s.markIneligibleForRemoval(filename)
+
 			// the newly merged segment is already flushed out to disk, just needs
 			// to be opened using mmap.
 			newDocIDs, _, err := s.segPlugin.Merge(flushes[flushID].sbsBatch, flushes[flushID].sbsBatchDrops, path, s.closeCh, s)
@@ -527,12 +533,6 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 				atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
 				return
 			}
-			// to prevent accidental cleanup of this newly created file, mark it
-			// as ineligible for removal. this will be flipped back when the bolt
-			// is updated - which is valid, since the snapshot updated in bolt is
-			// cleaned up only if its zero ref'd (MB-66163 for more details)
-			s.markIneligibleForRemoval(filename)
-
 			newDocIDsSet[flushID] = newDocIDs
 			newMergedSegmentIDs[flushID] = newSegmentID
 			newMergedSegmentFileNames[flushID] = filename
@@ -574,7 +574,6 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 	}
 
 	atomic.AddUint64(&s.stats.TotMemMergeZapEnd, 1)
-
 	memMergeZapTime := uint64(time.Since(memMergeZapStartTime))
 	atomic.AddUint64(&s.stats.TotMemMergeZapTime, memMergeZapTime)
 	if atomic.LoadUint64(&s.stats.MaxMemMergeZapTime) < memMergeZapTime {
@@ -635,6 +634,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			introducedSegmentIDs[segID] = struct{}{}
 		}
 	}
+
 	// if we could not introduce all of the newly merged segments,
 	// then we cannot cannot persist a snapshot with any merged segments at all
 	if len(introducedSegmentIDs) != len(newMergedSegmentIDs) {
