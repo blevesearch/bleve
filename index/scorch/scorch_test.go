@@ -2862,12 +2862,9 @@ func TestPersistenceMergedBatches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		_ = DestroyTest(cfg)
-	}()
-
-	os.Mkdir(cfg["path"].(string), 0o755)
-
+	defer func() { _ = DestroyTest(cfg) }()
+	idxPath := cfg["path"].(string)
+	os.Mkdir(idxPath, 0o755)
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
@@ -2877,37 +2874,28 @@ func TestPersistenceMergedBatches(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *Scorch, got %T", s)
 	}
-
-	s.path = cfg["path"].(string)
+	s.path = idxPath
 	err = s.openBolt()
 	if err != nil {
 		t.Fatalf("failed to open bolt: %v", err)
 	}
-
 	const (
 		numSegments = 5
 		numVBs      = 5
 	)
-
 	batches := getBatches(t, numVBs, numSegments)
-
 	for i := 0; i < numSegments; i++ {
 		batch := batches[i]
-
 		var docs []index.Document
 		var ids []string
 		for _, doc := range batch.IndexOps {
-			if doc != nil {
-				docs = append(docs, doc)
-			}
+			docs = append(docs, doc)
 			ids = append(ids, doc.ID())
 		}
-
 		seg, _, err := s.segPlugin.New(docs)
 		if err != nil {
 			t.Fatalf("failed to create segment %d: %v", i, err)
 		}
-
 		intro := &segmentIntroduction{
 			id:       atomic.AddUint64(&s.nextSegmentID, 1),
 			data:     seg,
@@ -2920,12 +2908,10 @@ func TestPersistenceMergedBatches(t *testing.T) {
 			t.Fatalf("introduceSegment %d failed: %v", i, err)
 		}
 	}
-
 	snapshot := s.root
 	if len(snapshot.segment) != numSegments {
 		t.Fatalf("expected %d segments, got %d", numSegments, len(snapshot.segment))
 	}
-
 	var errCh = make(chan error, 1)
 	var doneCh = make(chan struct{})
 	go func() {
@@ -2943,18 +2929,13 @@ func TestPersistenceMergedBatches(t *testing.T) {
 		}
 		doneCh <- struct{}{}
 	}()
-
 	select {
 	case merge := <-s.merges:
 		s.introduceMerge(merge)
-	case persist := <-s.persists:
-		s.introducePersist(persist)
 	case err := <-errCh:
 		t.Fatalf("unexpected error during persist: %v", err)
 	}
-
 	<-doneCh
-
 	// validate our snapshot's VB-seqMax mappings.
 	/*
 		Each Merged Batch has the following VB-seqMax mappings:
@@ -3006,16 +2987,13 @@ func TestPersistenceMergedBatches(t *testing.T) {
 		    - In-memory snapshot and Persisted snapshot are in sync with each other.
 			- The VB-seqMax mappings always pick the highest sequence number for each VB.
 	*/
-
-	// ------------------------------------------------------
-	// Verify the in-memory snapshot's VB-seqMax mappings.
-	expectedMappings := make([]uint64, numVBs)
-	for i := 0; i < numVBs; i++ {
-		expectedMappings[i] = 4
-	}
 	reader, err := idx.Reader()
 	if err != nil {
 		t.Fatalf("failed to get reader: %v", err)
+	}
+	expectedMappings := make([]uint64, numVBs)
+	for i := 0; i < numVBs; i++ {
+		expectedMappings[i] = 4
 	}
 	actualMappings := make([]uint64, numVBs)
 	for i := 0; i < numVBs; i++ {
@@ -3024,7 +3002,11 @@ func TestPersistenceMergedBatches(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to get internal value for VB %d: %v", i, err)
 		}
-		actualMappings[i] = binary.BigEndian.Uint64(val)
+		if val == nil {
+			actualMappings[i] = 0
+		} else {
+			actualMappings[i] = binary.BigEndian.Uint64(val)
+		}
 	}
 	if !slices.Equal(expectedMappings, actualMappings) {
 		t.Fatalf("expected in-memory snapshot VB-seqMax mappings %v, got %v", expectedMappings, actualMappings)
@@ -3037,9 +3019,6 @@ func TestPersistenceMergedBatches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to close index: %v", err)
 	}
-
-	// ------------------------------------------------------
-	// reopen the index and verify that the persisted state is correct
 	idx, err = NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatalf("failed to create Scorch: %v", err)
@@ -3048,7 +3027,7 @@ func TestPersistenceMergedBatches(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *Scorch, got %T", s)
 	}
-	s.path = cfg["path"].(string)
+	s.path = idxPath
 	err = s.openBolt()
 	if err != nil {
 		t.Fatalf("failed to open bolt: %v", err)
@@ -3060,9 +3039,6 @@ func TestPersistenceMergedBatches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get reader after reopen: %v", err)
 	}
-
-	// ------------------------------------------------------
-	// Verify the Bolt Snapshot's VB-seqMax mappings.
 	expectedMappings = make([]uint64, numVBs)
 	for i := 0; i < numVBs; i++ {
 		expectedMappings[i] = 4
@@ -3109,7 +3085,6 @@ func TestIneligibleForRemovalOnSkippedMerge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create Scorch: %v", err)
 	}
-	s := idx.(*Scorch)
 	s, ok := idx.(*Scorch)
 	if !ok {
 		t.Fatalf("expected *Scorch, got %T", s)
@@ -3119,16 +3094,17 @@ func TestIneligibleForRemovalOnSkippedMerge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open bolt: %v", err)
 	}
-
-	// create 2 docs
-	doc1 := genDoc(t)
-	doc2 := genDoc(t)
-	doc3 := genDoc(t)
-	docs := []index.Document{doc1, doc2, doc3}
-	ids := []string{doc1.ID(), doc2.ID(), doc3.ID()}
-
-	// introduce 3 segments with 1 doc each
-	for i := 0; i < 3; i++ {
+	const (
+		numDocs = 3
+	)
+	docs := make([]index.Document, numDocs)
+	ids := make([]string, numDocs)
+	for i := 0; i < numDocs; i++ {
+		doc := genDoc(t)
+		docs[i] = doc
+		ids[i] = doc.ID()
+	}
+	for i := 0; i < numDocs; i++ {
 		doc := docs[i]
 		id := ids[i]
 		seg, _, err := s.segPlugin.New([]index.Document{doc})
@@ -3146,16 +3122,14 @@ func TestIneligibleForRemovalOnSkippedMerge(t *testing.T) {
 		}
 	}
 	snapshot := s.root
-	if len(snapshot.segment) != 3 {
-		t.Fatalf("expected %d segments, got %d", 3, len(snapshot.segment))
+	if len(snapshot.segment) != numDocs {
+		t.Fatalf("expected %d segments, got %d", numDocs, len(snapshot.segment))
 	}
 	for _, seg := range snapshot.segment {
 		if seg.Count() != 1 {
 			t.Fatalf("expected %d docs, got %d", 1, seg.Count())
 		}
 	}
-
-	// persist the snapshot
 	var errCh = make(chan error, 1)
 	var doneCh = make(chan struct{})
 	go func() {
@@ -3173,17 +3147,15 @@ func TestIneligibleForRemovalOnSkippedMerge(t *testing.T) {
 		}
 		doneCh <- struct{}{}
 	}()
-
 	select {
 	case merge := <-s.merges:
-		// introduce another batch deleting the 3 docs, resulting in a skipped merge
-		intro2 := &segmentIntroduction{
+		intro := &segmentIntroduction{
 			id:      atomic.AddUint64(&s.nextSegmentID, 1),
 			data:    nil,
 			ids:     ids,
 			applied: make(chan error),
 		}
-		if err = s.introduceSegment(intro2); err != nil {
+		if err = s.introduceSegment(intro); err != nil {
 			t.Fatalf("introduceSegment: %v", err)
 		}
 		snapshot = s.root
@@ -3197,12 +3169,10 @@ func TestIneligibleForRemovalOnSkippedMerge(t *testing.T) {
 		if docCount != 0 {
 			t.Fatalf("expected %d docs, got %d", 0, docCount)
 		}
-		// now we allow the merge to happen, which will result in a skipped merge
 		s.introduceMerge(merge)
 	case err := <-errCh:
 		t.Fatalf("unexpected error during persist: %v", err)
 	}
-
 	select {
 	case persist := <-s.persists:
 		s.introducePersist(persist)
@@ -3210,18 +3180,16 @@ func TestIneligibleForRemovalOnSkippedMerge(t *testing.T) {
 		t.Fatalf("unexpected error during persist: %v", err)
 	}
 	<-doneCh
-
-	// verify that the root now contains 0 segments
 	snapshot = s.root
 	if len(snapshot.segment) != 0 {
-		t.Errorf("expected %d segments, got %d", 0, len(snapshot.segment))
+		t.Fatalf("expected %d segments, got %d", 0, len(snapshot.segment))
 	}
 	docCount, err := snapshot.DocCount()
 	if err != nil {
-		t.Errorf("failed to get doc count: %v", err)
+		t.Fatalf("failed to get doc count: %v", err)
 	}
 	if docCount != 0 {
-		t.Errorf("expected %d docs, got %d", 0, docCount)
+		t.Fatalf("expected %d docs, got %d", 0, docCount)
 	}
 	s.removeOldData()
 	files, err := os.ReadDir(dirPath)
@@ -3234,16 +3202,13 @@ func TestIneligibleForRemovalOnSkippedMerge(t *testing.T) {
 			numZapFiles++
 		}
 	}
-	if numZapFiles != 3 {
-		t.Errorf("expected %d zap files, got %d", 3, numZapFiles)
+	if numZapFiles != numDocs {
+		t.Fatalf("expected %d zap files, got %d", numDocs, numZapFiles)
 	}
-
-	// close the index now, and reopen it to verify that the persisted state is correct
 	err = idx.Close()
 	if err != nil {
 		t.Fatalf("failed to close index: %v", err)
 	}
-
 	idx, err = NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatalf("failed to create Scorch: %v", err)
@@ -3258,15 +3223,15 @@ func TestIneligibleForRemovalOnSkippedMerge(t *testing.T) {
 		t.Fatalf("failed to open bolt: %v", err)
 	}
 	snapshot = s.root
-	if len(snapshot.segment) != 3 {
-		t.Errorf("expected %d segments, got %d", 0, len(snapshot.segment))
+	if len(snapshot.segment) != numDocs {
+		t.Fatalf("expected %d segments, got %d", numDocs, len(snapshot.segment))
 	}
 	docCount, err = snapshot.DocCount()
 	if err != nil {
-		t.Errorf("failed to get doc count: %v", err)
+		t.Fatalf("failed to get doc count: %v", err)
 	}
-	if docCount != 3 {
-		t.Errorf("expected %d docs, got %d", 0, docCount)
+	if docCount != numDocs {
+		t.Fatalf("expected %d docs, got %d", numDocs, docCount)
 	}
 	files, err = os.ReadDir(dirPath)
 	if err != nil {
@@ -3278,7 +3243,11 @@ func TestIneligibleForRemovalOnSkippedMerge(t *testing.T) {
 			numZapFiles++
 		}
 	}
-	if numZapFiles != 3 {
-		t.Errorf("expected %d zap files, got %d", 3, numZapFiles)
+	if numZapFiles != numDocs {
+		t.Fatalf("expected %d zap files, got %d", numDocs, numZapFiles)
+	}
+	err = idx.Close()
+	if err != nil {
+		t.Fatalf("failed to close index: %v", err)
 	}
 }

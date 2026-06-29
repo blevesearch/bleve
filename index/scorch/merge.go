@@ -642,9 +642,9 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			introducedSegmentIDs[segID] = struct{}{}
 		}
 	}
-	if len(introducedSegmentIDs) == 0 {
-		// if all the newly merged segments were skipped
-		// do not persist the new snapshot at all
+	// if we could not introduce all of the newly merged segments,
+	// then we cannot cannot persist a snapshot with any merged segments at all
+	if len(introducedSegmentIDs) != len(newMergedSegmentIDs) {
 		_ = introducedSnapshot.DecRef()
 		return nil, nil, nil
 	}
