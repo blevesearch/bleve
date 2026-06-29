@@ -413,9 +413,9 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot,
 }
 
 type flushable struct {
-	segments []segment.Segment
-	drops    []*roaring.Bitmap
-	sbIdxs   []int
+	sbsBatch        []segment.Segment
+	sbsBatchDrops   []*roaring.Bitmap
+	sbsBatchIndexes []int
 }
 
 func legacyFlushBehaviour(maxSizeInMemoryMergePerWorker, numPersisterWorkers int) bool {
@@ -464,9 +464,9 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	var flushSet []*flushable
 	if legacyFlushBehaviour(po.MaxSizeInMemoryMergePerWorker, po.NumPersisterWorkers) {
 		val := &flushable{
-			segments: slices.Clone(sbs),
-			drops:    slices.Clone(sbsDrops),
-			sbIdxs:   slices.Clone(sbsIndexes),
+			sbsBatch:        slices.Clone(sbs),
+			sbsBatchDrops:   slices.Clone(sbsDrops),
+			sbsBatchIndexes: slices.Clone(sbsIndexes),
 		}
 		flushSet = append(flushSet, val)
 	} else {
@@ -481,9 +481,9 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 			runningSize += sbsSizes[i]
 			if runningSize >= po.MaxSizeInMemoryMergePerWorker && len(sbsBatch) >= DefaultMinSegmentsForInMemoryMerge {
 				flushSet = append(flushSet, &flushable{
-					segments: slices.Clone(sbsBatch),
-					drops:    slices.Clone(sbsBatchDrops),
-					sbIdxs:   slices.Clone(sbsBatchIndexes),
+					sbsBatch:        slices.Clone(sbsBatch),
+					sbsBatchDrops:   slices.Clone(sbsBatchDrops),
+					sbsBatchIndexes: slices.Clone(sbsBatchIndexes),
 				})
 				sbsBatch, sbsBatchDrops, sbsBatchIndexes = sbsBatch[:0], sbsBatchDrops[:0], sbsBatchIndexes[:0]
 				runningSize = 0
@@ -491,9 +491,9 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 		}
 		if len(sbsBatch) > 0 {
 			flushSet = append(flushSet, &flushable{
-				segments: slices.Clone(sbsBatch),
-				drops:    slices.Clone(sbsBatchDrops),
-				sbIdxs:   slices.Clone(sbsBatchIndexes),
+				sbsBatch:        slices.Clone(sbsBatch),
+				sbsBatchDrops:   slices.Clone(sbsBatchDrops),
+				sbsBatchIndexes: slices.Clone(sbsBatchIndexes),
 			})
 		}
 	}

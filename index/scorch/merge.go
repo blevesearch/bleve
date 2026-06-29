@@ -508,7 +508,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 	for flushID := 0; flushID < numFlushes; flushID++ {
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(segsBatch []segment.Segment, dropsBatch []*roaring.Bitmap, flushID int) {
+		go func(flushID int) {
 			defer func() {
 				<-sem
 				wg.Done()
@@ -519,8 +519,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 
 			// the newly merged segment is already flushed out to disk, just needs
 			// to be opened using mmap.
-			newDocIDs, _, err :=
-				s.segPlugin.Merge(segsBatch, dropsBatch, path, s.closeCh, s)
+			newDocIDs, _, err := s.segPlugin.Merge(flushes[flushID].sbsBatch, flushes[flushID].sbsBatchDrops, path, s.closeCh, s)
 			if err != nil {
 				em.Lock()
 				errs = append(errs, err)
@@ -546,8 +545,8 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 				return
 			}
 			atomic.AddUint64(&newMergedCount, newMergedSegments[flushID].Count())
-			atomic.AddUint64(&numSegments, uint64(len(segsBatch)))
-		}(flushes[flushID].segments, flushes[flushID].drops, flushID)
+			atomic.AddUint64(&numSegments, uint64(len(flushes[flushID].sbsBatch)))
+		}(flushID)
 	}
 	wg.Wait()
 	close(sem)
@@ -596,7 +595,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 	//  This map will be used on the introducer side to out-ref
 	// the in-memory segments and also track the new tombstones if present.
 	for flushID, flush := range flushes {
-		for j, idx := range flush.sbIdxs {
+		for j, idx := range flush.sbsBatchIndexes {
 			ss := snapshot.segment[idx]
 			sm.mergedSegHistory[ss.id] = &mergedSegmentHistory{
 				flushID:      uint64(flushID),
