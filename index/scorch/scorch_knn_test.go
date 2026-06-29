@@ -29,20 +29,20 @@ import (
 )
 
 const (
-	testVectorDims       = 3
-	testVectorSimilarity = "l2"
+	testVectorDims              = 3
+	testVectorSimilarity        = index.CosineSimilarity
+	testVectorIndexOptimizedFor = index.IndexOptimizedForRecall
 )
 
 func genVectorDoc(t *testing.T, fieldName string) index.Document {
 	t.Helper()
 	randNum := rand.Intn(1000000)
 	doc := document.NewDocument(fmt.Sprintf("vectest%d", randNum))
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
 	vector := make([]float32, testVectorDims)
 	for i := range vector {
 		vector[i] = float32(i+1) * float32(randNum+1)
 	}
-	doc.AddField(document.NewVectorField(fieldName, nil, vector, testVectorDims, testVectorSimilarity, ""))
+	doc.AddField(document.NewVectorField(fieldName, nil, vector, testVectorDims, testVectorSimilarity, testVectorIndexOptimizedFor))
 	doc.AddIDField()
 	doc.VisitFields(func(field index.Field) {
 		field.Analyze()
@@ -57,7 +57,6 @@ func TestFieldStatPersistence(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = DestroyTest(cfg) }()
-
 	dirPath := cfg["path"].(string)
 	if err = os.Mkdir(dirPath, 0o755); err != nil {
 		t.Fatal(err)
@@ -116,16 +115,13 @@ func TestFieldStatPersistence(t *testing.T) {
 		}
 		doneCh <- struct{}{}
 	}()
-
 	select {
 	case merge := <-s.merges:
 		s.introduceMerge(merge)
 	case err := <-errCh:
 		t.Fatalf("unexpected error during persist (merge phase): %v", err)
 	}
-
 	<-doneCh
-
 	snapshot := s.root
 	if len(snapshot.segment) != 1 {
 		t.Fatalf("expected 1 segment after introduce, got %d", len(snapshot.segment))
@@ -138,11 +134,9 @@ func TestFieldStatPersistence(t *testing.T) {
 	if numVecs != uint64(numSegments) {
 		t.Fatalf("expected %d vectors in stats, got %d", numSegments, numVecs)
 	}
-
 	if err = idx.Close(); err != nil {
 		t.Fatalf("failed to close index: %v", err)
 	}
-
 	idx, err = NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatalf("failed to recreate Scorch: %v", err)
@@ -155,8 +149,6 @@ func TestFieldStatPersistence(t *testing.T) {
 	if err = s.openBolt(); err != nil {
 		t.Fatalf("failed to open bolt on reopen: %v", err)
 	}
-
-	// (3) Verify HasVector on the segment loaded from bolt.
 	snapshot = s.root
 	if len(snapshot.segment) != 1 {
 		t.Fatalf("expected 1 segment after reopen, got %d", len(snapshot.segment))
@@ -168,5 +160,9 @@ func TestFieldStatPersistence(t *testing.T) {
 	numVecs = scorchStats[statName].(uint64)
 	if numVecs != uint64(numSegments) {
 		t.Fatalf("expected %d vectors in stats, got %d", numSegments, numVecs)
+	}
+	err = idx.Close()
+	if err != nil {
+		t.Fatalf("failed to close index on reopen: %v", err)
 	}
 }
