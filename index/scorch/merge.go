@@ -478,15 +478,6 @@ func cumulateBytesRead(sbs []segment.Segment) uint64 {
 	return rv
 }
 
-func closeNewMergedSegments(segs []segment.Segment) error {
-	for _, seg := range segs {
-		if seg != nil {
-			_ = seg.Close()
-		}
-	}
-	return nil
-}
-
 // mergeAndPersistInMemorySegments takes an IndexSnapshot and a list of in-memory segments,
 // which are merged and persisted to disk concurrently. These are then introduced as
 // the new root snapshot in one-shot.
@@ -563,12 +554,12 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 
 	// if any of the flushes failed, close the newly merged segments and return the error
 	if errs != nil {
-		// close the new merged segments
-		_ = closeNewMergedSegments(newMergedSegments)
-		// mark the newly merged segments as eligible
-		// for removal since they are not going to be introduced
-		for _, filename := range newMergedSegmentFileNames {
-			s.unmarkIneligibleForRemoval(filename)
+		// close all merged segments and flip their ineligible for removal flag
+		for flushID := 0; flushID < numFlushes; flushID++ {
+			if newMergedSegments[flushID] != nil {
+				_ = newMergedSegments[flushID].Close()
+			}
+			s.unmarkIneligibleForRemoval(newMergedSegmentFileNames[flushID])
 		}
 		var errf error
 		for _, err := range errs {
@@ -617,9 +608,12 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 
 	select { // send to introducer
 	case <-s.closeCh:
-		_ = closeNewMergedSegments(newMergedSegments)
-		for _, filename := range newMergedSegmentFileNames {
-			s.unmarkIneligibleForRemoval(filename)
+		// close all merged segments and flip their ineligible for removal flag
+		for flushID := 0; flushID < numFlushes; flushID++ {
+			if newMergedSegments[flushID] != nil {
+				_ = newMergedSegments[flushID].Close()
+			}
+			s.unmarkIneligibleForRemoval(newMergedSegmentFileNames[flushID])
 		}
 		return nil, nil, segment.ErrClosed
 	case s.merges <- sm:
