@@ -727,7 +727,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *util.BoltTxImpl, path stri
 				return nil, nil, fmt.Errorf("segment: %s persist err: %v", path, err)
 			}
 			newSegmentPaths[segmentSnapshot.id] = path
-			err = snapshotSegmentBucket.Put(util.BoltPathKey, []byte(filename), writer)
+			err = snapshotSegmentBucket.Put(util.BoltPathKey, []byte(filename), nil)
 			if err != nil {
 				return nil, nil, err
 			}
