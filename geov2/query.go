@@ -21,7 +21,7 @@ import (
 )
 
 type Query interface {
-	Evaluate(geoData segment.GeoCellData) *util.Bitset
+	Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset
 	InnerCells() []uint64
 	CrossCells() []uint64
 }

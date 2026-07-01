@@ -39,7 +39,8 @@ func NewDisjointQuery(shape index.GeoJSON) Query {
 	}
 }
 
-func (dq *disjointQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
+func (dq *disjointQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
+	// evaluate the disjoint query by creating an intersects query and negating the results
 	intersectsQuery := &intersectsQuery{
 		innerCells: dq.innerCells,
 		crossCells: dq.crossCells,
@@ -47,18 +48,11 @@ func (dq *disjointQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
 		bBox:       dq.bBox,
 	}
 
-	notHits := intersectsQuery.Evaluate(geoData)
+	// evaluate the intersects query to get the hits
+	hits := intersectsQuery.Evaluate(geoData)
 
-	numDocs := int(geoData.NumDocs())
-	exclude := geoData.Exclude()
-
-	hits := util.NewBitset(numDocs, exclude)
-
-	for i := 0; i < numDocs; i++ {
-		if !notHits.Contains(i) {
-			hits.Add(i)
-		}
-	}
+	// invert the hits to get the disjoint results
+	hits.Invert()
 
 	return hits
 }

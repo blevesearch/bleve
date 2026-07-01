@@ -31,39 +31,45 @@ func init() {
 }
 
 type GeoShapeV2Searcher struct {
-	geoCellReader index.GeoCellReader
-	scorer        *scorer.ConstantScorer
+	geoShapeIndexReader index.GeoShapeV2FieldReader
+	scorer              *scorer.ConstantScorer
 
-	gd index.GeoCellFieldDoc
+	gd index.GeoShapeV2FieldDoc
 }
 
-func NewGeoShapeV2Searcher(ctx context.Context, indexReader index.IndexReader, shape index.GeoJSON,
-	relation string, field string, boost float64,
+func NewGeoShapeV2Searcher(ctx context.Context, indexReader index.IndexReader,
+	shape index.GeoJSON, relation string, field string, boost float64,
 	options search.SearcherOptions,
 ) (search.Searcher, error) {
 
-	if gr, ok := indexReader.(index.GeoCellIndexReader); ok {
-		geoCellReader, err := gr.GeoCellReader(ctx, field)
+	if gr, ok := indexReader.(index.GeoShapeV2IndexReader); ok {
+		// get the GeoShapeV2FieldReader for the specified field
+		geoShapeIndexReader, err := gr.GeoShapeV2FieldReader(ctx, field)
 		if err != nil {
 			return nil, err
 		}
 
-		err = geoCellReader.Search(shape, relation)
+		// perform the search on the GeoShapeV2FieldReader with the specified
+		// shape and relation
+		err = geoShapeIndexReader.Search(shape, relation)
 		if err != nil {
 			return nil, err
 		}
 
 		return &GeoShapeV2Searcher{
-			geoCellReader: geoCellReader,
-			scorer:        scorer.NewConstantScorer(1, boost, options),
-			gd:            index.GeoCellFieldDoc{},
+			geoShapeIndexReader: geoShapeIndexReader,
+			scorer:              scorer.NewConstantScorer(1, boost, options),
+			gd:                  index.GeoShapeV2FieldDoc{},
 		}, nil
 	}
 	return nil, nil
 }
 
+// Next returns the next document match for the GeoShapeV2Searcher.
+// It retrieves the next matching document from the GeoShapeV2FieldReader
+// and scores it using the ConstantScorer.
 func (g *GeoShapeV2Searcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
-	match, err := g.geoCellReader.Next(g.gd.Reset())
+	match, err := g.geoShapeIndexReader.Next(g.gd.Reset())
 	if err != nil {
 		return nil, err
 	}
@@ -75,8 +81,10 @@ func (g *GeoShapeV2Searcher) Next(ctx *search.SearchContext) (*search.DocumentMa
 	return docMatch, nil
 }
 
+// Advance moves the searcher to the first document with an ID greater than or equal to the specified ID.
+// It retrieves the next matching document from the GeoShapeV2FieldReader and scores it using the ConstantScorer.
 func (g *GeoShapeV2Searcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
-	knnMatch, err := g.geoCellReader.Advance(ID, g.gd.Reset())
+	knnMatch, err := g.geoShapeIndexReader.Advance(ID, g.gd.Reset())
 	if err != nil {
 		return nil, err
 	}
@@ -89,11 +97,11 @@ func (g *GeoShapeV2Searcher) Advance(ctx *search.SearchContext, ID index.IndexIn
 }
 
 func (g *GeoShapeV2Searcher) Close() error {
-	return g.geoCellReader.Close()
+	return g.geoShapeIndexReader.Close()
 }
 
 func (g *GeoShapeV2Searcher) Count() uint64 {
-	return g.geoCellReader.Count()
+	return g.geoShapeIndexReader.Count()
 }
 
 func (g *GeoShapeV2Searcher) DocumentMatchPoolSize() int {
@@ -109,7 +117,7 @@ func (g *GeoShapeV2Searcher) SetQueryNorm(n float64) {
 }
 
 func (g *GeoShapeV2Searcher) Size() int {
-	return reflectStaticSizeGeoShapeV2Searcher + g.geoCellReader.Size() +
+	return reflectStaticSizeGeoShapeV2Searcher + g.geoShapeIndexReader.Size() +
 		g.scorer.Size() + g.gd.Size()
 }
 

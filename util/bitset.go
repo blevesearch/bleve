@@ -30,7 +30,8 @@ func NewBitset(maxVal int, exclude *roaring.Bitmap) *Bitset {
 	// We need (maxVal / 64) + 1 buckets to hold up to maxVal
 	size := (maxVal / 64) + 1
 	return &Bitset{
-		data: make([]uint64, size),
+		data:    make([]uint64, size),
+		exclude: exclude,
 	}
 }
 
@@ -61,6 +62,24 @@ func (b *Bitset) Contains(val int) bool {
 	bit := uint(val & 63)
 
 	return (b.data[bucket] & (1 << bit)) != 0
+}
+
+// Invert flips all bits in the bitset,
+// effectively turning all 1s to 0s and vice versa
+func (b *Bitset) Invert() {
+	for i := range b.data {
+		b.data[i] = ^b.data[i]
+	}
+	if b.exclude != nil {
+		it := b.exclude.Iterator()
+		for it.HasNext() {
+			bit := uint64(it.Next())
+			word := bit / 64
+			if word < uint64(len(b.data)) {
+				b.data[word] &^= uint64(1) << (bit % 64)
+			}
+		}
+	}
 }
 
 // Iterate calls the provided function for every integer recorded in the bitset, in ascending order

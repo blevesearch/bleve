@@ -42,20 +42,27 @@ func NewIntersectsQuery(shape index.GeoJSON) Query {
 	}
 }
 
-func (iq *intersectsQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
+func (iq *intersectsQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	numDocs := int(geoData.NumDocs())
 	exclude := geoData.Exclude()
 
+	// create bitsets for hits and maybeHits providing exclude to the bitset
+	// which will make it impossible to set those bits
 	hits := util.NewBitset(numDocs, exclude)
 	maybeHits := util.NewBitset(numDocs, exclude)
 
 	innerScores := make([]uint64, numDocs)
 	crossScores := make([]uint64, numDocs)
 
+	// create an evaluator instance to scan the query cells against the index cells
 	evaluator := NewQueryEvaluator(iq, geoData)
 
+	// scan and score the overlap of query inner cells with all index cells
 	evaluator.rangeScanInner(innerScores, crossScores)
 
+	// if there is any overlap of query inner cells with any of the index cells
+	// then we have a quaranteed hit. Reset scores to reuse score arrays for the
+	// next step
 	for i := 0; i < numDocs; i++ {
 		if innerScores[i] > 0 || crossScores[i] > 0 {
 			hits.Add(i)
@@ -64,8 +71,13 @@ func (iq *intersectsQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
 		}
 	}
 
+	// scan and score the overlap of query cross cells with all index cells
 	evaluator.rangeScanCross(innerScores, crossScores)
 
+	// if there is any overlap of query cross cells with any of the index inner
+	// cells then we have a quaranteed hit, if there is any overlap of query cross
+	// cells with any of the index cross cells then we have a maybe hit, otherwise
+	// we have no hit.
 	for i := 0; i < numDocs; i++ {
 		if innerScores[i] > 0 && !hits.Contains(i) {
 			hits.Add(i)
@@ -76,6 +88,8 @@ func (iq *intersectsQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
 
 	var reader *bytes.Reader
 
+	// filter out any maybeHits that do not have a bounding box that
+	// intersects the query bounding box
 	boxFilter := func(docNum int) {
 		docBBoxBytes, err := geoData.BoundingBox(uint64(docNum))
 		if docBBoxBytes == nil || err != nil {
@@ -94,6 +108,8 @@ func (iq *intersectsQuery) Evaluate(geoData segment.GeoCellData) *util.Bitset {
 
 	maybeHits.Iterate(boxFilter)
 
+	// filter out any maybeHits that do not have a shape that
+	// intersects the query shape
 	shapeFilter := func(docNum int) {
 		docShapeBytes, err := geoData.Shape(uint64(docNum))
 		if docShapeBytes == nil || err != nil {

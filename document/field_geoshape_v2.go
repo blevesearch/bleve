@@ -19,6 +19,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/geov2"
+	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/geojson"
 )
@@ -41,8 +42,6 @@ type GeoShapeV2Field struct {
 	shapeBytes []byte
 
 	options index.FieldIndexingOptions
-
-	numPlainTextBytes uint64
 }
 
 func (f *GeoShapeV2Field) Name() string {
@@ -58,7 +57,6 @@ func (f *GeoShapeV2Field) Options() index.FieldIndexingOptions {
 }
 
 func (f *GeoShapeV2Field) Analyze() {
-
 	f.inner, f.cross = f.shape.Cells()
 	f.score = geov2.CalcCellsScore(f.inner) + geov2.CalcCellsScore(f.cross)
 
@@ -72,15 +70,20 @@ func (f *GeoShapeV2Field) Analyze() {
 }
 
 func (f *GeoShapeV2Field) Value() []byte {
-	return nil
+	return []byte{}
 }
 
 func (f *GeoShapeV2Field) NumPlainTextBytes() uint64 {
-	return f.numPlainTextBytes
+	return 0
 }
 
 func (f *GeoShapeV2Field) Size() int {
-	return 0
+	return reflectStaticSizeGeoShapeV2Field + size.SizeOfPtr +
+		len(f.name) +
+		len(f.inner)*size.SizeOfUint64 +
+		len(f.cross)*size.SizeOfUint64 +
+		len(f.bBoxBytes) +
+		len(f.shapeBytes)
 }
 
 func (f *GeoShapeV2Field) EncodedFieldType() byte {
@@ -123,9 +126,11 @@ func NewGeoShapeV2FieldFromShapeWithIndexingOptions(name string, geoShape *geojs
 	var err error
 
 	if geoShape.Type == geo.CircleType {
-		shape, shapeBytes, err = geo.NewGeoCircleShape(geoShape.Center, geoShape.Radius)
+		shape, shapeBytes, err = geo.NewGeoCircleShape(geoShape.Center,
+			geoShape.Radius)
 	} else {
-		shape, shapeBytes, err = geo.NewGeoJsonShape(geoShape.Coordinates, geoShape.Type)
+		shape, shapeBytes, err = geo.NewGeoJsonShape(geoShape.Coordinates,
+			geoShape.Type)
 	}
 	if err != nil {
 		return nil

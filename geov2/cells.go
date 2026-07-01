@@ -19,25 +19,25 @@ import "github.com/blevesearch/geo/s2"
 // getCellSearchBounds takes a raw uint64 S2 cell ID and returns the
 // minimum and maximum uint64 values defining its absolute spatial range.
 func getCellSearchBounds(cellUint uint64) (min uint64, max uint64) {
-	// 1. Cast the raw uint64 back into a native s2.CellID object
 	cellID := s2.CellID(cellUint)
 
-	// 2. Extract the absolute minimum and maximum descendant bounds
 	rangeMin := cellID.RangeMin()
 	rangeMax := cellID.RangeMax()
 
-	// 3. Convert them back to raw uint64 integers for your database range scan
 	return uint64(rangeMin), uint64(rangeMax)
 }
 
+// Returns the level of the given S2 cell ID
 func getCellLevel(cell uint64) uint64 {
 	return uint64(s2.CellID(cell).Level())
 }
 
+// Returns the parent cell ID of the given S2 cell ID at the specified level
 func getParentCell(cell uint64, level int) uint64 {
 	return uint64(s2.CellID(cell).Parent(level))
 }
 
+// Returns the area of the given S2 cell ID in level 18 cell units
 func CalcCellsScore(cells []uint64) uint64 {
 	var score uint64
 	for _, cell := range cells {

@@ -54,12 +54,13 @@ var pow4Table = [32]uint64{
 // pow4 returns 4^exp quickly using the lookup table.
 func pow4(exp uint64) uint64 {
 	if exp >= 32 {
-		// Handle overflow safely. 4^32 and above naturally wraps to 0 in uint64 arithmetic.
+		// Handle overflow safely.
 		return 0
 	}
 	return pow4Table[exp]
 }
 
+// returns the overlap of query and index cells based on their levels
 func calcScore(queryCellLevel, indexCellLevel uint64) uint64 {
 	if indexCellLevel > queryCellLevel {
 		return pow4(18 - indexCellLevel)

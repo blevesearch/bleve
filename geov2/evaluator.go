@@ -27,7 +27,7 @@ type queryEvaluator struct {
 	crossDocIds []uint64
 }
 
-func NewQueryEvaluator(query Query, geoData segment.GeoCellData) *queryEvaluator {
+func NewQueryEvaluator(query Query, geoData segment.GeoShapeV2Data) *queryEvaluator {
 	return &queryEvaluator{
 		queryInnerCells: query.InnerCells(),
 		queryCrossCells: query.CrossCells(),
@@ -38,6 +38,8 @@ func NewQueryEvaluator(query Query, geoData segment.GeoCellData) *queryEvaluator
 	}
 }
 
+// find the leftmost index in arr where arr[i] >= target, or
+// len(arr) if no such index exists
 func binarySearchLeftmostGreaterOrEqual(arr []uint64, target uint64) int {
 	lo, hi := 0, len(arr)
 	for lo < hi {
@@ -48,30 +50,38 @@ func binarySearchLeftmostGreaterOrEqual(arr []uint64, target uint64) int {
 			hi = mid
 		}
 	}
-	return lo // first index where arr[i] >= target, or len(arr) if none
+	return lo
 }
 
+// scan and score the overlap of query inner cells with all index cells
 func (qe *queryEvaluator) rangeScanInner(innerScores []uint64, crossScores []uint64) {
 	for _, cell := range qe.queryInnerCells {
-		rangeScanOne(cell, qe.innerCells, qe.innerDocIds, innerScores)
-		rangeScanOne(cell, qe.crossCells, qe.crossDocIds, crossScores)
+		minVal, maxVal := getCellSearchBounds(cell)
+		cellLevel := getCellLevel(cell)
+		rangeScanOne(cell, minVal, maxVal, cellLevel, qe.innerCells, qe.innerDocIds, innerScores)
+		rangeScanOne(cell, minVal, maxVal, cellLevel, qe.crossCells, qe.crossDocIds, crossScores)
 	}
 }
 
+// scan and score the overlap of query cross cells with all index cells
 func (qe *queryEvaluator) rangeScanCross(innerScores, crossScores []uint64) {
 	for _, cell := range qe.queryCrossCells {
-		rangeScanOne(cell, qe.innerCells, qe.innerDocIds, innerScores)
-		rangeScanOne(cell, qe.crossCells, qe.crossDocIds, crossScores)
+		minVal, maxVal := getCellSearchBounds(cell)
+		cellLevel := getCellLevel(cell)
+		rangeScanOne(cell, minVal, maxVal, cellLevel, qe.innerCells, qe.innerDocIds, innerScores)
+		rangeScanOne(cell, minVal, maxVal, cellLevel, qe.crossCells, qe.crossDocIds, crossScores)
 	}
 }
 
-func rangeScanOne(queryCell uint64, indexCells, docIds, scores []uint64) {
-	minVal, maxVal := getCellSearchBounds(queryCell)
-	cellLevel := getCellLevel(queryCell)
-
+// scan and score the overlap of a single query cell with the given index cells
+func rangeScanOne(queryCell uint64, minVal, maxVal, cellLevel uint64,
+	indexCells, docIds, scores []uint64) {
+	// find the range of index cells within the min/max bounds of the query cell
+	// end will be < start if there are no index cells within the bounds
 	start := binarySearchLeftmostGreaterOrEqual(indexCells, minVal)
 	end := binarySearchLeftmostGreaterOrEqual(indexCells, maxVal+1) - 1
 
+	// score all index cells within the bounds of the query cell
 	for i := start; i <= end; i++ {
 		id := docIds[i]
 		val := indexCells[i]
@@ -80,10 +90,15 @@ func rangeScanOne(queryCell uint64, indexCells, docIds, scores []uint64) {
 		scores[id] += calcScore(cellLevel, valLevel)
 	}
 
+	// score all parent cells of the query cell that are present in the index
+	// since parent cells are not within the min/max bounds
 	for level := int(cellLevel) - 1; level >= 0; level-- {
+		// get the parent cell of the query cell at this level
 		parentCell := getParentCell(queryCell, level)
+		// search for the leftmost index of this parent cell in the index cells
 		parentStart := binarySearchLeftmostGreaterOrEqual(indexCells, parentCell)
 
+		// score all index cells that match this parent cell exactly
 		for i := parentStart; i < len(indexCells) && indexCells[i] == parentCell; i++ {
 			id := docIds[i]
 			scores[id] += calcScore(cellLevel, uint64(level))
