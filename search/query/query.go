@@ -371,7 +371,7 @@ func ParseQuery(input []byte) (Query, error) {
 
 	_, hasGeo := tmp["geometry"]
 	if hasGeo {
-		var rv GeoShapeQuery
+		var rv GeoShapeV2Query
 		err := util.UnmarshalJSON(input, &rv)
 		if err != nil {
 			return nil, err
