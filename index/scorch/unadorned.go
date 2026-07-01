@@ -173,6 +173,20 @@ func (i *unadornedPostingsIterator1Hit) ResetIterator() {
 	i.docNum = i.docNumOrig
 }
 
+func (i *unadornedPostingsIterator1Hit) ActualBitmap() *roaring.Bitmap {
+	return nil
+}
+
+func (i *unadornedPostingsIterator1Hit) DocNum1Hit() (uint64, bool) {
+	if i.docNum == docNum1HitFinished {
+		return 0, false
+	}
+	return i.docNumOrig, true
+}
+
+func (i *unadornedPostingsIterator1Hit) ReplaceActual(actual *roaring.Bitmap) {
+}
+
 func newUnadornedPostingsIteratorFrom1Hit(docNum1Hit uint64) segment.PostingsIterator {
 	return &unadornedPostingsIterator1Hit{
 		docNumOrig: docNum1Hit,
