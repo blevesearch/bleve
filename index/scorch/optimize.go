@@ -337,18 +337,6 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 			}
 		}
 
-		// Fast path: no hits in this segment — reuse the zero-alloc empty sentinel.
-		if len(actualBMs) == 0 && len(docNums) == 0 {
-			oTFR.iterators[i] = anEmptyPostingsIterator
-			continue
-		}
-
-		// Fast path: exactly one 1-hit doc with no bitmaps.
-		if len(actualBMs) == 0 && len(docNums) == 1 {
-			oTFR.iterators[i] = newUnadornedPostingsIteratorFrom1Hit(uint64(docNums[0]))
-			continue
-		}
-
 		var bm *roaring.Bitmap
 		if len(actualBMs) > 2 {
 			bm = roaring.HeapOr(actualBMs...)
@@ -357,6 +345,13 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 		} else if len(actualBMs) == 1 {
 			bm = actualBMs[0].Clone()
 		} else {
+			if len(docNums) == 0 {
+				oTFR.iterators[i] = anEmptyPostingsIterator
+				continue
+			} else if len(docNums) == 1 {
+				oTFR.iterators[i] = newUnadornedPostingsIteratorFrom1Hit(uint64(docNums[0]))
+				continue
+			}
 			bm = roaring.New()
 		}
 
