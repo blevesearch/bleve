@@ -69,6 +69,9 @@ func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 			rv, err := optimizeCompositeSearcher(ctx, "disjunction:unadorned",
 				indexReader, qsearchers, options)
 			if err != nil || rv != nil {
+				for _, s := range qsearchers {
+					_ = s.Close()
+				}
 				return rv, err
 			}
 		}
