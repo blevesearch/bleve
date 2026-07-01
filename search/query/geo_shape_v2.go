@@ -26,7 +26,7 @@ import (
 )
 
 type GeoShapeV2Query struct {
-	GeometryV2 Geometry `json:"geometry_v2,omitempty"`
+	GeometryV2 Geometry `json:"geometry,omitempty"`
 	FieldVal   string   `json:"field,omitempty"`
 	BoostVal   *Boost   `json:"boost,omitempty"`
 }

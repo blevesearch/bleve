@@ -552,7 +552,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			for _, fieldMapping := range subDocMapping.Fields {
 				switch fieldMapping.Type {
 				case "geoshape":
-					fieldMapping.processGeoShape(property, pathString, path, indexes, context)
+					fieldMapping.processGeoShapeV2(property, pathString, path, context)
 				case "geopoint":
 					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
 				case "vector_base64":
@@ -642,7 +642,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 					case "geopoint":
 						fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
 					case "geoshape":
-						fieldMapping.processGeoShape(property, pathString, path, indexes, context)
+						fieldMapping.processGeoShapeV2(property, pathString, path, context)
 					case "geoshape_v2":
 						fieldMapping.processGeoShapeV2(property, pathString, path, context)
 					}
@@ -668,7 +668,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 					}
 					walkDocument = true
 				case "geoshape":
-					fieldMapping.processGeoShape(property, pathString, path, indexes, context)
+					fieldMapping.processGeoShapeV2(property, pathString, path, context)
 					walkDocument = true
 				case "geoshape_v2":
 					fieldMapping.processGeoShapeV2(property, pathString, path, context)
