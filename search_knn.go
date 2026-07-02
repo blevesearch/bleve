@@ -479,8 +479,9 @@ func setKnnHitsInCollector(knnHits []*search.DocumentMatch, coll *collector.TopN
 		mergeFn := func(ftsMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) {
 			// Boost the FTS score using the KNN score
 			ftsMatch.Score += knnMatch.Score
-			// Combine the FTS explanation with the KNN explanation, if present
-			ftsMatch.Expl.MergeWith(knnMatch.Expl)
+			// Capture the merged explanation; MergeWith doesn't always mutate
+			// the receiver, so ignoring the return value drops the KNN part.
+			ftsMatch.Expl = ftsMatch.Expl.MergeWith(knnMatch.Expl)
 		}
 		coll.SetKNNHits(knnHits, search.HybridMergeCallbackFn(mergeFn))
 	}
