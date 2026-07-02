@@ -1308,20 +1308,18 @@ func (s *Scorch) removeOldData() {
 }
 
 func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
-	snapshots []*snapshotMetaData,
-) (int, map[uint64]time.Time) {
+	snapshots []*snapshotMetaData) (int, map[uint64]time.Time) {
 	if interval == 0 || len(snapshots) == 0 || maxDataPoints <= 0 {
 		return len(snapshots), map[uint64]time.Time{}
 	}
 	// the map containing the time series snapshots, i.e the timeseries of snapshots
 	// each of which is separated by rollbackSamplingInterval
-	rv := make(map[uint64]time.Time)
+	rv := make(map[uint64]time.Time, maxDataPoints)
 	// the last point in the "time series", i.e. the timeseries of snapshots
 	// each of which is separated by rollbackSamplingInterval
 	ptr := len(snapshots) - 1
 	rv[snapshots[ptr].epoch] = snapshots[ptr].timeStamp
 	numSnapshotsProtected := 1
-
 	// traverse the list in reverse order, older timestamps to newer ones.
 	for i := ptr - 1; i >= 0; i-- {
 		sinceLast := snapshots[i].timeStamp.Sub(snapshots[ptr].timeStamp)
@@ -1339,7 +1337,6 @@ func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
 				numSnapshotsProtected++
 			}
 		}
-
 		if numSnapshotsProtected >= maxDataPoints {
 			break
 		}
@@ -1363,7 +1360,6 @@ func (s *Scorch) getProtectedSnapshots(liveSnapshots []*snapshotMetaData) map[ui
 			protectedEpochs[liveSnapshots[i].epoch] = liveSnapshots[i].timeStamp
 		}
 	}
-
 	return protectedEpochs
 }
 
@@ -1416,8 +1412,8 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 		}
 	}
 	s.eligibleForRemoval = newEligible
-	s.rootLock.Unlock()
 	s.checkPoints = newCheckPoints(protectedSnapshots)
+	s.rootLock.Unlock()
 
 	if len(epochsToRemove) == 0 {
 		return 0, nil
