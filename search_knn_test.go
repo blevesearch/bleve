@@ -2290,3 +2290,92 @@ func TestHierarchicalNestedVectorSearch(t *testing.T) {
 		}
 	}
 }
+
+// TestHybridExplainNotDropped verifies that a doc matching BOTH the text query
+// and the KNN branch keeps a merged explanation (text + vector) whose value
+// equals the summed score, i.e. the KNN part isn't dropped from the explain tree.
+func TestHybridExplainNotDropped(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	// vdocBoth matches the text query (category=health) AND is the nearest
+	// vector to the query vector, so it exercises the hybrid merge path.
+	docs := map[string]map[string]interface{}{
+		"vdocBoth":     {"category": "health", "vector": []float32{0.1, 0.9, 0.2, 0.5}},
+		"vdocVecOnly":  {"vector": []float32{0.1, 0.9, 0.2, 0.5}},
+		"vdocTextOnly": {"category": "health", "vector": []float32{0.1, 0.2, 0.9, 0.1}},
+		"vdocNeither":  {"category": "finance", "vector": []float32{0.8, 0.1, 0.1, 0.9}},
+	}
+
+	indexMapping := NewIndexMapping()
+	catFM := NewTextFieldMapping()
+	catFM.Analyzer = "keyword"
+	indexMapping.DefaultMapping.AddFieldMappingsAt("category", catFM)
+
+	vecFM := mapping.NewVectorFieldMapping()
+	vecFM.Index = true
+	vecFM.Dims = 4
+	vecFM.Similarity = "l2_norm"
+	indexMapping.DefaultMapping.AddFieldMappingsAt("vector", vecFM)
+
+	idx, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := idx.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch := idx.NewBatch()
+	for id, doc := range docs {
+		if err := batch.Index(id, doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	// Root-level text query (matches vdocBoth and vdocTextOnly) + KNN branch
+	// whose nearest neighbours are vdocBoth and vdocVecOnly.
+	tq := query.NewTermQuery("health")
+	tq.SetField("category")
+	req := NewSearchRequest(tq)
+	req.AddKNN("vector", []float32{0.1, 0.9, 0.2, 0.4}, 2, 1.0)
+	req.Explain = true
+	req.Fields = []string{"category"}
+
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var checkedBoth bool
+	for _, hit := range res.Hits {
+		if hit.Expl == nil {
+			t.Fatalf("hit %s has no explanation", hit.ID)
+		}
+		// The invariant the bug violated: the explanation value must equal the
+		// score it is attached to.
+		if diff := hit.Expl.Value - hit.Score; diff > 1e-6 || diff < -1e-6 {
+			t.Errorf("hit %s: explanation.value=%v != score=%v (vector explanation dropped)",
+				hit.ID, hit.Expl.Value, hit.Score)
+		}
+
+		if hit.ID == "vdocBoth" {
+			checkedBoth = true
+			// A both-branches hit must be a merged explanation carrying both
+			// the text and the vector sub-explanations.
+			if len(hit.Expl.Children) < 2 {
+				t.Errorf("hit vdocBoth: expected merged explanation with >=2 children "+
+					"(text + vector), got message=%q value=%v children=%d",
+					hit.Expl.Message, hit.Expl.Value, len(hit.Expl.Children))
+			}
+		}
+	}
+	if !checkedBoth {
+		t.Fatal("vdocBoth was not returned by the hybrid query")
+	}
+}
