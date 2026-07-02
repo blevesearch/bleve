@@ -15,29 +15,18 @@
 package collector
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/search"
 )
 
-var (
-	errTestFixup error = errors.New("fixup error")
-	noFixup            = func(*search.DocumentMatch) error {
-		return nil
-	}
-	makeScoreDoc = func(score float64) *search.DocumentMatch {
-		return &search.DocumentMatch{Score: score}
-	}
-)
-
-func TestCollectStoreListRoundTrip(t *testing.T) {
-	l := newStoreList(20, search.ScoreCompare)
+func TestCollectStoreHeapRoundTrip(t *testing.T) {
+	l := newStoreHeap(20, search.ScoreCompare)
 	for _, s := range []float64{3, 1, 4, 1, 5, 9, 2, 6} {
 		l.add(makeScoreDoc(s))
 	}
-	if l.len() != 8 {
-		t.Fatalf("len=%d want 8", l.len())
+	if l.Len() != 8 {
+		t.Fatalf("len=%d want 8", l.Len())
 	}
 	result, err := l.Final(0, noFixup)
 	if err != nil {
@@ -54,9 +43,9 @@ func TestCollectStoreListRoundTrip(t *testing.T) {
 	}
 }
 
-func TestCollectStoreListAddNotExceedingSize(t *testing.T) {
+func TestCollectStoreHeapAddNotExceedingSize(t *testing.T) {
 	const k = 3
-	l := newStoreList(k, search.ScoreCompare)
+	l := newStoreHeap(k, search.ScoreCompare)
 	var evictedScores []float64
 	for _, s := range []float64{1, 5, 3, 7, 2} {
 		ev := l.AddNotExceedingSize(makeScoreDoc(s), k)
@@ -64,8 +53,8 @@ func TestCollectStoreListAddNotExceedingSize(t *testing.T) {
 			evictedScores = append(evictedScores, ev.Score)
 		}
 	}
-	if l.len() != k {
-		t.Fatalf("list len=%d want %d after capping at k", l.len(), k)
+	if l.Len() != k {
+		t.Fatalf("heap len=%d want %d after capping at k", l.Len(), k)
 	}
 	// Inserted {1,5,3,7,2} with k=3 → evicted the 2 worst: 1 and 2.
 	if len(evictedScores) != 2 {
@@ -84,8 +73,8 @@ func TestCollectStoreListAddNotExceedingSize(t *testing.T) {
 	}
 }
 
-func TestCollectStoreListSkip(t *testing.T) {
-	l := newStoreList(20, search.ScoreCompare)
+func TestCollectStoreHeapSkip(t *testing.T) {
+	l := newStoreHeap(20, search.ScoreCompare)
 	for _, s := range []float64{1, 2, 3, 4, 5} {
 		l.add(makeScoreDoc(s))
 	}
@@ -105,8 +94,8 @@ func TestCollectStoreListSkip(t *testing.T) {
 	}
 }
 
-func TestCollectStoreListSkipAll(t *testing.T) {
-	l := newStoreList(10, search.ScoreCompare)
+func TestCollectStoreHeapSkipAll(t *testing.T) {
+	l := newStoreHeap(10, search.ScoreCompare)
 	for _, s := range []float64{1, 2, 3} {
 		l.add(makeScoreDoc(s))
 	}
@@ -115,12 +104,12 @@ func TestCollectStoreListSkipAll(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(result) != 0 {
-		t.Errorf("Final(skip=10) on 3-elem list returned %d docs, want 0", len(result))
+		t.Errorf("Final(skip=10) on 3-elem heap returned %d docs, want 0", len(result))
 	}
 }
 
-func TestCollectStoreListInternal(t *testing.T) {
-	l := newStoreList(10, search.ScoreCompare)
+func TestCollectStoreHeapInternal(t *testing.T) {
+	l := newStoreHeap(10, search.ScoreCompare)
 	for _, s := range []float64{3, 1, 4} {
 		l.add(makeScoreDoc(s))
 	}
@@ -128,17 +117,21 @@ func TestCollectStoreListInternal(t *testing.T) {
 	if len(iv) != 3 {
 		t.Fatalf("Internal len=%d want 3", len(iv))
 	}
-	// Linked list: Front=worst→Back=best, so Internal() iterates Front→Back = ascending.
-	want := []float64{1, 3, 4}
-	for i, w := range want {
-		if iv[i].Score != w {
-			t.Errorf("Internal[%d]=%.2f want %.2f (ascending from worst)", i, iv[i].Score, w)
+	// Internal() exposes the raw heap array, whose order is not sorted,
+	// so only membership is checked here (ordering is covered by Final).
+	seen := make(map[float64]bool)
+	for _, dm := range iv {
+		seen[dm.Score] = true
+	}
+	for _, want := range []float64{3, 1, 4} {
+		if !seen[want] {
+			t.Errorf("Internal missing score %.2f: got %v", want, iv)
 		}
 	}
 }
 
-func TestCollectStoreListRemoveLast(t *testing.T) {
-	l := newStoreList(10, search.ScoreCompare)
+func TestCollectStoreHeapRemoveLast(t *testing.T) {
+	l := newStoreHeap(10, search.ScoreCompare)
 	for _, s := range []float64{3, 1, 5} {
 		l.add(makeScoreDoc(s))
 	}
@@ -146,13 +139,13 @@ func TestCollectStoreListRemoveLast(t *testing.T) {
 	if evicted.Score != 1 {
 		t.Errorf("removeLast returned score=%.2f, want 1.0 (the worst)", evicted.Score)
 	}
-	if l.len() != 2 {
-		t.Errorf("len=%d after removeLast, want 2", l.len())
+	if l.Len() != 2 {
+		t.Errorf("len=%d after removeLast, want 2", l.Len())
 	}
 }
 
-func TestCollectStoreListSingleElement(t *testing.T) {
-	l := newStoreList(5, search.ScoreCompare)
+func TestCollectStoreHeapSingleElement(t *testing.T) {
+	l := newStoreHeap(5, search.ScoreCompare)
 	l.add(makeScoreDoc(7.5))
 
 	result, err := l.Final(0, noFixup)
@@ -169,13 +162,13 @@ func TestCollectStoreListSingleElement(t *testing.T) {
 	}
 }
 
-func TestCollectStoreListEqualScores(t *testing.T) {
-	l := newStoreList(10, search.ScoreCompare)
+func TestCollectStoreHeapEqualScores(t *testing.T) {
+	l := newStoreHeap(10, search.ScoreCompare)
 	for range 5 {
 		l.add(makeScoreDoc(3.0))
 	}
-	if l.len() != 5 {
-		t.Fatalf("len=%d after 5 equal-scored adds, want 5", l.len())
+	if l.Len() != 5 {
+		t.Fatalf("len=%d after 5 equal-scored adds, want 5", l.Len())
 	}
 	result, err := l.Final(0, noFixup)
 	if err != nil {
@@ -188,8 +181,8 @@ func TestCollectStoreListEqualScores(t *testing.T) {
 	}
 }
 
-func TestCollectStoreListFixupError(t *testing.T) {
-	l := newStoreList(10, search.ScoreCompare)
+func TestCollectStoreHeapFixupError(t *testing.T) {
+	l := newStoreHeap(10, search.ScoreCompare)
 	l.add(makeScoreDoc(1.0))
 
 	errFixup := func(*search.DocumentMatch) error {

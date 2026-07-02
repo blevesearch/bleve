@@ -15,24 +15,13 @@
 package collector
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/search"
 )
 
-var (
-	errTestFixup error = errors.New("fixup error")
-	noFixup            = func(*search.DocumentMatch) error {
-		return nil
-	}
-	makeScoreDoc = func(score float64) *search.DocumentMatch {
-		return &search.DocumentMatch{Score: score}
-	}
-)
-
-func TestCollectStoreListRoundTrip(t *testing.T) {
-	l := newStoreList(20, search.ScoreCompare)
+func TestCollectStoreSliceRoundTrip(t *testing.T) {
+	l := newStoreSlice(20, search.ScoreCompare)
 	for _, s := range []float64{3, 1, 4, 1, 5, 9, 2, 6} {
 		l.add(makeScoreDoc(s))
 	}
@@ -54,9 +43,9 @@ func TestCollectStoreListRoundTrip(t *testing.T) {
 	}
 }
 
-func TestCollectStoreListAddNotExceedingSize(t *testing.T) {
+func TestCollectStoreSliceAddNotExceedingSize(t *testing.T) {
 	const k = 3
-	l := newStoreList(k, search.ScoreCompare)
+	l := newStoreSlice(k, search.ScoreCompare)
 	var evictedScores []float64
 	for _, s := range []float64{1, 5, 3, 7, 2} {
 		ev := l.AddNotExceedingSize(makeScoreDoc(s), k)
@@ -84,8 +73,8 @@ func TestCollectStoreListAddNotExceedingSize(t *testing.T) {
 	}
 }
 
-func TestCollectStoreListSkip(t *testing.T) {
-	l := newStoreList(20, search.ScoreCompare)
+func TestCollectStoreSliceSkip(t *testing.T) {
+	l := newStoreSlice(20, search.ScoreCompare)
 	for _, s := range []float64{1, 2, 3, 4, 5} {
 		l.add(makeScoreDoc(s))
 	}
@@ -105,8 +94,8 @@ func TestCollectStoreListSkip(t *testing.T) {
 	}
 }
 
-func TestCollectStoreListSkipAll(t *testing.T) {
-	l := newStoreList(10, search.ScoreCompare)
+func TestCollectStoreSliceSkipAll(t *testing.T) {
+	l := newStoreSlice(10, search.ScoreCompare)
 	for _, s := range []float64{1, 2, 3} {
 		l.add(makeScoreDoc(s))
 	}
@@ -119,8 +108,8 @@ func TestCollectStoreListSkipAll(t *testing.T) {
 	}
 }
 
-func TestCollectStoreListInternal(t *testing.T) {
-	l := newStoreList(10, search.ScoreCompare)
+func TestCollectStoreSliceInternal(t *testing.T) {
+	l := newStoreSlice(10, search.ScoreCompare)
 	for _, s := range []float64{3, 1, 4} {
 		l.add(makeScoreDoc(s))
 	}
@@ -128,17 +117,17 @@ func TestCollectStoreListInternal(t *testing.T) {
 	if len(iv) != 3 {
 		t.Fatalf("Internal len=%d want 3", len(iv))
 	}
-	// Linked list: Front=worst→Back=best, so Internal() iterates Front→Back = ascending.
-	want := []float64{1, 3, 4}
+	// Slice is kept sorted best→worst, so Internal() is descending.
+	want := []float64{4, 3, 1}
 	for i, w := range want {
 		if iv[i].Score != w {
-			t.Errorf("Internal[%d]=%.2f want %.2f (ascending from worst)", i, iv[i].Score, w)
+			t.Errorf("Internal[%d]=%.2f want %.2f (descending from best)", i, iv[i].Score, w)
 		}
 	}
 }
 
-func TestCollectStoreListRemoveLast(t *testing.T) {
-	l := newStoreList(10, search.ScoreCompare)
+func TestCollectStoreSliceRemoveLast(t *testing.T) {
+	l := newStoreSlice(10, search.ScoreCompare)
 	for _, s := range []float64{3, 1, 5} {
 		l.add(makeScoreDoc(s))
 	}
@@ -151,8 +140,8 @@ func TestCollectStoreListRemoveLast(t *testing.T) {
 	}
 }
 
-func TestCollectStoreListSingleElement(t *testing.T) {
-	l := newStoreList(5, search.ScoreCompare)
+func TestCollectStoreSliceSingleElement(t *testing.T) {
+	l := newStoreSlice(5, search.ScoreCompare)
 	l.add(makeScoreDoc(7.5))
 
 	result, err := l.Final(0, noFixup)
@@ -169,8 +158,8 @@ func TestCollectStoreListSingleElement(t *testing.T) {
 	}
 }
 
-func TestCollectStoreListEqualScores(t *testing.T) {
-	l := newStoreList(10, search.ScoreCompare)
+func TestCollectStoreSliceEqualScores(t *testing.T) {
+	l := newStoreSlice(10, search.ScoreCompare)
 	for range 5 {
 		l.add(makeScoreDoc(3.0))
 	}
@@ -188,8 +177,8 @@ func TestCollectStoreListEqualScores(t *testing.T) {
 	}
 }
 
-func TestCollectStoreListFixupError(t *testing.T) {
-	l := newStoreList(10, search.ScoreCompare)
+func TestCollectStoreSliceFixupError(t *testing.T) {
+	l := newStoreSlice(10, search.ScoreCompare)
 	l.add(makeScoreDoc(1.0))
 
 	errFixup := func(*search.DocumentMatch) error {
