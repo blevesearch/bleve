@@ -15,14 +15,13 @@
 package scorch
 
 import (
-	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -252,12 +251,73 @@ func TestIndexRollback(t *testing.T) {
 	}
 }
 
+func openTestBolt(t *testing.T, name string) *util.RootBoltImpl {
+	t.Helper()
+	cfg := CreateConfig(name)
+	if err := InitTest(cfg); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := DestroyTest(cfg); err != nil {
+			t.Log(err)
+		}
+	})
+	path := cfg["path"].(string)
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	rootBolt, err := util.OpenBolt(filepath.Join(path, "root.bolt"), 0o600, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := rootBolt.Close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+	return rootBolt
+}
+
+func seedBoltSnapshots(t *testing.T, rootBolt *util.RootBoltImpl, snapshotTimes map[uint64]time.Time) {
+	t.Helper()
+	err := rootBolt.Update(func(tx *util.BoltTxImpl) error {
+		snapshots, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
+		if err != nil {
+			return err
+		}
+		for epoch, timeStamp := range snapshotTimes {
+			snapshot, err := snapshots.CreateBucketIfNotExists(
+				encodeUvarintAscending(nil, epoch))
+			if err != nil {
+				return err
+			}
+			metaBucket, err := snapshot.CreateBucketIfNotExists(util.BoltMetaDataKey)
+			if err != nil {
+				return err
+			}
+			timeStampBinary, err := timeStamp.MarshalText()
+			if err != nil {
+				return err
+			}
+			err = metaBucket.Put(util.BoltMetaDataTimeStamp, timeStampBinary, nil)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGetProtectedSnapshots(t *testing.T) {
-	origRollbackSamplingInterval := RollbackSamplingInterval
-	defer func() {
-		RollbackSamplingInterval = origRollbackSamplingInterval
-	}()
-	RollbackSamplingInterval = 10 * time.Minute
+	rootBolt := openTestBolt(t, "TestGetProtectedSnapshots")
+	interval := 10 * time.Minute
+	s := &Scorch{
+		rootBolt:                 rootBolt,
+		rollbackSamplingInterval: interval,
+	}
 	currentTimeStamp := time.Now()
 	tests := []struct {
 		title              string
@@ -270,11 +330,11 @@ func TestGetProtectedSnapshots(t *testing.T) {
 			title: "epochs that have exact timestamps as per expectation for protecting",
 			metaData: []*snapshotMetaData{
 				{epoch: 100, timeStamp: currentTimeStamp},
-				{epoch: 99, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 12))},
-				{epoch: 88, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 6))},
-				{epoch: 50, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval))},
-				{epoch: 35, timeStamp: currentTimeStamp.Add(-(6 * RollbackSamplingInterval / 5))},
-				{epoch: 10, timeStamp: currentTimeStamp.Add(-(2 * RollbackSamplingInterval))},
+				{epoch: 99, timeStamp: currentTimeStamp.Add(-(interval / 12))},
+				{epoch: 88, timeStamp: currentTimeStamp.Add(-(interval / 6))},
+				{epoch: 50, timeStamp: currentTimeStamp.Add(-(interval))},
+				{epoch: 35, timeStamp: currentTimeStamp.Add(-(6 * interval / 5))},
+				{epoch: 10, timeStamp: currentTimeStamp.Add(-(2 * interval))},
 			},
 			numSnapshotsToKeep: 3,
 			expCount:           3,
@@ -284,9 +344,9 @@ func TestGetProtectedSnapshots(t *testing.T) {
 			title: "epochs that have exact timestamps as per expectation for protecting",
 			metaData: []*snapshotMetaData{
 				{epoch: 100, timeStamp: currentTimeStamp},
-				{epoch: 99, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 12))},
-				{epoch: 88, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 6))},
-				{epoch: 50, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval))},
+				{epoch: 99, timeStamp: currentTimeStamp.Add(-(interval / 12))},
+				{epoch: 88, timeStamp: currentTimeStamp.Add(-(interval / 6))},
+				{epoch: 50, timeStamp: currentTimeStamp.Add(-(interval))},
 			},
 			numSnapshotsToKeep: 2,
 			expCount:           2,
@@ -297,26 +357,26 @@ func TestGetProtectedSnapshots(t *testing.T) {
 				"always retain the latest one",
 			metaData: []*snapshotMetaData{
 				{epoch: 100, timeStamp: currentTimeStamp},
-				{epoch: 99, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 12))},
-				{epoch: 88, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 6))},
-				{epoch: 50, timeStamp: currentTimeStamp.Add(-(3 * RollbackSamplingInterval / 4))},
-				{epoch: 35, timeStamp: currentTimeStamp.Add(-(6 * RollbackSamplingInterval / 5))},
-				{epoch: 10, timeStamp: currentTimeStamp.Add(-(2 * RollbackSamplingInterval))},
+				{epoch: 99, timeStamp: currentTimeStamp.Add(-(interval / 12))},
+				{epoch: 88, timeStamp: currentTimeStamp.Add(-(interval / 6))},
+				{epoch: 50, timeStamp: currentTimeStamp.Add(-(3 * interval / 4))},
+				{epoch: 35, timeStamp: currentTimeStamp.Add(-(6 * interval / 5))},
+				{epoch: 10, timeStamp: currentTimeStamp.Add(-(2 * interval))},
 			},
 			numSnapshotsToKeep: 3,
 			expCount:           3,
 			expEpochs:          []uint64{100, 35, 10},
 		},
 		{
-			title: "protecting epochs when we don't have enough snapshots with RollbackSamplingInterval" +
+			title: "protecting epochs when we don't have enough snapshots with rollbackSamplingInterval" +
 				" separated timestamps",
 			metaData: []*snapshotMetaData{
 				{epoch: 100, timeStamp: currentTimeStamp},
-				{epoch: 99, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 12))},
-				{epoch: 88, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 6))},
-				{epoch: 50, timeStamp: currentTimeStamp.Add(-(3 * RollbackSamplingInterval / 4))},
-				{epoch: 35, timeStamp: currentTimeStamp.Add(-(5 * RollbackSamplingInterval / 6))},
-				{epoch: 10, timeStamp: currentTimeStamp.Add(-(7 * RollbackSamplingInterval / 8))},
+				{epoch: 99, timeStamp: currentTimeStamp.Add(-(interval / 12))},
+				{epoch: 88, timeStamp: currentTimeStamp.Add(-(interval / 6))},
+				{epoch: 50, timeStamp: currentTimeStamp.Add(-(3 * interval / 4))},
+				{epoch: 35, timeStamp: currentTimeStamp.Add(-(5 * interval / 6))},
+				{epoch: 10, timeStamp: currentTimeStamp.Add(-(7 * interval / 8))},
 			},
 			numSnapshotsToKeep: 4,
 			expCount:           4,
@@ -324,14 +384,14 @@ func TestGetProtectedSnapshots(t *testing.T) {
 		},
 		{
 			title: "epochs of which some are approximated to the expected timestamps, and" +
-				" we don't have enough snapshots with RollbackSamplingInterval separated timestamps",
+				" we don't have enough snapshots with rollbackSamplingInterval separated timestamps",
 			metaData: []*snapshotMetaData{
 				{epoch: 100, timeStamp: currentTimeStamp},
-				{epoch: 99, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 12))},
-				{epoch: 88, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 6))},
-				{epoch: 50, timeStamp: currentTimeStamp.Add(-(3 * RollbackSamplingInterval / 4))},
-				{epoch: 35, timeStamp: currentTimeStamp.Add(-(8 * RollbackSamplingInterval / 7))},
-				{epoch: 10, timeStamp: currentTimeStamp.Add(-(6 * RollbackSamplingInterval / 5))},
+				{epoch: 99, timeStamp: currentTimeStamp.Add(-(interval / 12))},
+				{epoch: 88, timeStamp: currentTimeStamp.Add(-(interval / 6))},
+				{epoch: 50, timeStamp: currentTimeStamp.Add(-(3 * interval / 4))},
+				{epoch: 35, timeStamp: currentTimeStamp.Add(-(8 * interval / 7))},
+				{epoch: 10, timeStamp: currentTimeStamp.Add(-(6 * interval / 5))},
 			},
 			numSnapshotsToKeep: 3,
 			expCount:           3,
@@ -340,8 +400,8 @@ func TestGetProtectedSnapshots(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		protectedEpochs := getProtectedSnapshots(RollbackSamplingInterval,
-			test.numSnapshotsToKeep, test.metaData)
+		s.numSnapshotsToKeep = test.numSnapshotsToKeep
+		protectedEpochs := s.getProtectedSnapshots(test.metaData)
 		if len(protectedEpochs) != test.expCount {
 			t.Errorf("%d test: %s, getProtectedSnapshots expected to return %d "+
 				"snapshots, but got: %d", i, test.title, test.expCount, len(protectedEpochs))
@@ -355,281 +415,196 @@ func TestGetProtectedSnapshots(t *testing.T) {
 	}
 }
 
-func indexDummyData(t *testing.T, scorchi *Scorch, i int) {
-	// create a batch, insert 2 new documents
-	batch := index.NewBatch()
-	doc := document.NewDocument(fmt.Sprintf("%d", i))
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
-	batch.Update(doc)
-	doc = document.NewDocument(fmt.Sprintf("%d", i+1))
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
-	batch.Update(doc)
-
-	err := scorchi.Batch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-type testFSDirector string
-
-func (f testFSDirector) GetWriter(filePath string) (io.WriteCloser,
-	error) {
-	dir, file := filepath.Split(filePath)
-	if dir != "" {
-		err := os.MkdirAll(filepath.Join(string(f), dir), os.ModePerm)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return os.OpenFile(filepath.Join(string(f), dir, file),
-		os.O_RDWR|os.O_CREATE, 0600)
-}
-
 func TestLatestSnapshotProtected(t *testing.T) {
-	cfg := CreateConfig("TestLatestSnapshotProtected")
-	numSnapshotsToKeepOrig := NumSnapshotsToKeep
-	NumSnapshotsToKeep = 3
-	rollbackSamplingIntervalOrig := RollbackSamplingInterval
-	RollbackSamplingInterval = 10 * time.Second
-
-	err := InitTest(cfg)
+	rootBolt := openTestBolt(t, "TestLatestSnapshotProtected")
+	s := &Scorch{
+		rootBolt:                 rootBolt,
+		rollbackSamplingInterval: 10 * time.Minute,
+		numSnapshotsToKeep:       3,
+	}
+	// seed snapshots with the following timestamps:
+	// 	tc, tc - d/12, tc - d/6, tc - 3d/4, tc - 5d/6, tc - 6d/5
+	// where d is the rollback sampling interval. the latest snapshot is only
+	// d/12 newer than the one before it, so it does not fit into the sampled
+	// time series anchored at the oldest snapshot, and must be retained by
+	// the fallback that always protects the latest snapshot.
+	d := s.rollbackSamplingInterval
+	tc := time.Now()
+	seedBoltSnapshots(t, rootBolt, map[uint64]time.Time{
+		100: tc,
+		99:  tc.Add(-(d / 12)),
+		88:  tc.Add(-(d / 6)),
+		50:  tc.Add(-(3 * d / 4)),
+		35:  tc.Add(-(5 * d / 6)),
+		10:  tc.Add(-(6 * d / 5)),
+	})
+	liveSnapshots, err := s.getLiveSnapshots()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		NumSnapshotsToKeep = numSnapshotsToKeepOrig
-		RollbackSamplingInterval = rollbackSamplingIntervalOrig
-		err := DestroyTest(cfg)
-		if err != nil {
-			t.Log(err)
+	if len(liveSnapshots) != 6 {
+		t.Fatalf("expected 6 live snapshots, got %d", len(liveSnapshots))
+	}
+	for i, epoch := range []uint64{100, 99, 88, 50, 35, 10} {
+		if liveSnapshots[i].epoch != epoch {
+			t.Fatalf("expected epoch %d at index %d, got %d", epoch, i,
+				liveSnapshots[i].epoch)
 		}
-	}()
-
-	// disable merger and purger
-	RegistryEventCallbacks["test"] = func(e Event) bool {
-		if e.Kind == EventKindPreMergeCheck || e.Kind == EventKindPurgerCheck {
-			return false
+	}
+	protectedSnapshots := s.getProtectedSnapshots(liveSnapshots)
+	if len(protectedSnapshots) != s.numSnapshotsToKeep {
+		t.Fatalf("expected %d protected snapshots, got %d",
+			s.numSnapshotsToKeep, len(protectedSnapshots))
+	}
+	for _, epoch := range []uint64{100, 50, 10} {
+		if _, found := protectedSnapshots[epoch]; !found {
+			t.Fatalf("expected epoch %d to be protected, got %v", epoch, protectedSnapshots)
 		}
-		return true
-	}
-	cfg["eventCallbackName"] = "test"
-	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, cfg, analysisQueue)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer func() {
-		err := idx.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	scorchi, ok := idx.(*Scorch)
-	if !ok {
-		t.Fatalf("Not a scorch index?")
-	}
-
-	err = scorchi.Open()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// replicate the following scenario of persistence of snapshots
-	// tc, tc - d/12, tc - d/6, tc - 3d/4, tc - 5d/6, tc - 6d/5
-	// approximate timestamps where there's a chance that the latest snapshot
-	// might not fit into the time-series
-	indexDummyData(t, scorchi, 1)
-	persistedSnapshots, err := scorchi.rootBoltSnapshotMetaData()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(persistedSnapshots) != 1 {
-		t.Fatalf("expected 1 persisted snapshot, got %d", len(persistedSnapshots))
-	}
-	time.Sleep(4 * RollbackSamplingInterval / 5)
-	indexDummyData(t, scorchi, 3)
-	time.Sleep(9 * RollbackSamplingInterval / 20)
-	indexDummyData(t, scorchi, 5)
-	time.Sleep(7 * RollbackSamplingInterval / 12)
-	indexDummyData(t, scorchi, 7)
-	time.Sleep(1 * RollbackSamplingInterval / 12)
-	indexDummyData(t, scorchi, 9)
-
-	persistedSnapshots, err = scorchi.rootBoltSnapshotMetaData()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	protectedSnapshots := getProtectedSnapshots(RollbackSamplingInterval, NumSnapshotsToKeep, persistedSnapshots)
-	if len(protectedSnapshots) != 3 {
-		t.Fatalf("expected %d protected snapshots, got %d", NumSnapshotsToKeep, len(protectedSnapshots))
-	}
-	if _, ok := protectedSnapshots[persistedSnapshots[0].epoch]; !ok {
-		t.Fatalf("expected %d to be protected, but not found", persistedSnapshots[0].epoch)
 	}
 }
 
 func TestBackupRacingWithPurge(t *testing.T) {
-	cfg := CreateConfig("TestBackupRacingWithPurge")
-	numSnapshotsToKeepOrig := NumSnapshotsToKeep
-	NumSnapshotsToKeep = 3
-	rollbackSamplingIntervalOrig := RollbackSamplingInterval
-	RollbackSamplingInterval = 10 * time.Second
-	err := InitTest(cfg)
-	if err != nil {
-		t.Fatal(err)
+	rootBolt := openTestBolt(t, "TestBackupRacingWithPurge")
+	s := &Scorch{
+		rootBolt:                 rootBolt,
+		rollbackSamplingInterval: 10 * time.Minute,
+		numSnapshotsToKeep:       3,
 	}
-	defer func() {
-		NumSnapshotsToKeep = numSnapshotsToKeepOrig
-		RollbackSamplingInterval = rollbackSamplingIntervalOrig
-		err := DestroyTest(cfg)
-		if err != nil {
-			t.Log(err)
-		}
-	}()
+	d := s.rollbackSamplingInterval
+	tc := time.Now()
+	seedBoltSnapshots(t, rootBolt, map[uint64]time.Time{
+		100: tc,
+		99:  tc.Add(-(d / 12)),
+		88:  tc.Add(-(d / 6)),
+		50:  tc.Add(-(3 * d / 4)),
+		35:  tc.Add(-(5 * d / 6)),
+		10:  tc.Add(-(6 * d / 5)),
+	})
 
-	// disable merger and purger
-	RegistryEventCallbacks["test"] = func(e Event) bool {
-		if e.Kind == EventKindPreMergeCheck || e.Kind == EventKindPurgerCheck {
-			return false
-		}
-		return true
-	}
-	cfg["eventCallbackName"] = "test"
-	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, cfg, analysisQueue)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := idx.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	// even if every epoch were marked eligible for removal while a backup
+	// reads from the latest snapshot, the purge must never delete the latest
+	// snapshot from bolt - else the backup's CopyTo would fail
+	s.eligibleForRemoval = []uint64{100, 99, 88, 50, 35, 10}
 
-	scorchi, ok := idx.(*Scorch)
-	if !ok {
-		t.Fatalf("Not a scorch index?")
-	}
-
-	err = scorchi.Open()
-	if err != nil {
+	if _, err := s.removeOldBoltSnapshots(); err != nil {
 		t.Fatal(err)
 	}
 
-	// replicate the following scenario of persistence of snapshots
-	// tc, tc - d/12, tc - d/6, tc - 3d/4, tc - 5d/6, tc - 6d/5
-	// approximate timestamps where there's a chance that the latest snapshot
-	// might not fit into the time-series
-	indexDummyData(t, scorchi, 1)
-	time.Sleep(4 * RollbackSamplingInterval / 5)
-	indexDummyData(t, scorchi, 3)
-	time.Sleep(9 * RollbackSamplingInterval / 20)
-	indexDummyData(t, scorchi, 5)
-	time.Sleep(7 * RollbackSamplingInterval / 12)
-	indexDummyData(t, scorchi, 7)
-	time.Sleep(1 * RollbackSamplingInterval / 12)
-	indexDummyData(t, scorchi, 9)
-
-	// now if the purge code is invoked, there's a possibility of the latest snapshot
-	// being removed from bolt and the corresponding file segment getting cleaned up.
-	scorchi.removeOldData()
-
-	copyReader := scorchi.CopyReader()
-	defer func() { copyReader.CloseCopyReader() }()
-
-	backupidxConfig := CreateConfig("backup-directory")
-	err = InitTest(backupidxConfig)
+	remaining, err := s.RootBoltSnapshotEpochs()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		err := DestroyTest(backupidxConfig)
-		if err != nil {
-			t.Log(err)
+	if len(remaining) == 0 || remaining[0] != 100 {
+		t.Fatalf("expected the latest snapshot (epoch 100) to survive the "+
+			"purge, got remaining epochs %v", remaining)
+	}
+	expected := []uint64{100, 50, 10} // newest -> oldest
+	if len(remaining) != len(expected) {
+		t.Fatalf("expected snapshot epochs %v to remain in bolt, got %v",
+			expected, remaining)
+	}
+	for i, epoch := range expected {
+		if remaining[i] != epoch {
+			t.Fatalf("expected snapshot epochs %v to remain in bolt, got %v",
+				expected, remaining)
 		}
-	}()
-
-	// if the latest snapshot was purged, the following will return error
-	err = copyReader.CopyTo(testFSDirector(backupidxConfig["path"].(string)))
-	if err != nil {
-		t.Fatalf("error copying the index: %v", err)
 	}
 }
 
 func TestSparseMutationCheckpointing(t *testing.T) {
-	cfg := CreateConfig("TestSparseMutationCheckpointing")
-	numSnapshotsToKeepOrig := NumSnapshotsToKeep
-	NumSnapshotsToKeep = 3
-	rollbackSamplingIntervalOrig := RollbackSamplingInterval
-	RollbackSamplingInterval = 2 * time.Second
-
-	err := InitTest(cfg)
+	rootBolt := openTestBolt(t, "TestSparseMutationCheckpointing")
+	s := &Scorch{
+		rootBolt:                 rootBolt,
+		rollbackSamplingInterval: 10 * time.Minute,
+		numSnapshotsToKeep:       3,
+		rollbackRetentionFactor:  0.5,
+	}
+	// snapshots persisted at rollbackSamplingInterval (d) intervals, followed
+	// by a single new snapshot after a long (3d) mutation gap - so every
+	// older snapshot now falls outside the (numSnapshotsToKeep-1) * d
+	// expiration window
+	d := s.rollbackSamplingInterval
+	tc := time.Now()
+	seedBoltSnapshots(t, rootBolt, map[uint64]time.Time{
+		9: tc,
+		7: tc.Add(-(3 * d)),
+		5: tc.Add(-(4 * d)),
+		3: tc.Add(-(5 * d)),
+		1: tc.Add(-(6 * d)),
+	})
+	// checkpoints computed while epochs 7, 5 and 3 were still protected; the
+	// retention factor extends the expiration boundary to the middle
+	// checkpoint (epoch 5), so checkpoints newer than it survive the gap
+	s.checkPoints = []*snapshotMetaData{
+		{epoch: 7, timeStamp: tc.Add(-(3 * d))},
+		{epoch: 5, timeStamp: tc.Add(-(4 * d))},
+		{epoch: 3, timeStamp: tc.Add(-(5 * d))},
+	}
+	liveSnapshots, err := s.getLiveSnapshots()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		NumSnapshotsToKeep = numSnapshotsToKeepOrig
-		RollbackSamplingInterval = rollbackSamplingIntervalOrig
-		err := DestroyTest(cfg)
-		if err != nil {
-			t.Log(err)
+	expectedLiveEpochs := []uint64{9, 7}
+	if len(liveSnapshots) != len(expectedLiveEpochs) {
+		t.Fatalf("expected %d live snapshots, got %d", len(expectedLiveEpochs),
+			len(liveSnapshots))
+	}
+	for i, epoch := range expectedLiveEpochs {
+		if liveSnapshots[i].epoch != epoch {
+			t.Fatalf("expected epoch %d at index %d, got %d", epoch, i,
+				liveSnapshots[i].epoch)
 		}
-	}()
-
-	// disable merger and purger
-	RegistryEventCallbacks["test"] = func(e Event) bool {
-		if e.Kind == EventKindPreMergeCheck {
-			return false
-		}
-		return true
 	}
-	cfg["eventCallbackName"] = "test"
-	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, cfg, analysisQueue)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	scorchi, ok := idx.(*Scorch)
-	if !ok {
-		t.Fatalf("Not a scorch index?")
-	}
-
-	err = scorchi.Open()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// create 4 snapshots every 2 seconds
-	indexDummyData(t, scorchi, 1)
-	time.Sleep(RollbackSamplingInterval)
-	indexDummyData(t, scorchi, 3)
-	time.Sleep(RollbackSamplingInterval)
-	indexDummyData(t, scorchi, 5)
-	time.Sleep(RollbackSamplingInterval)
-	indexDummyData(t, scorchi, 7)
-
-	// now the another snapshot is persisted outside of the window of checkpointing
-	// and we should be able to retain some older checkpoints as well along with
-	// the latest one
-	time.Sleep(time.Duration(NumSnapshotsToKeep) * RollbackSamplingInterval)
-	indexDummyData(t, scorchi, 9)
-
-	persistedSnapshots, err := scorchi.rootBoltSnapshotMetaData()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// should have more than 1 snapshots
-	protectedSnapshots := getProtectedSnapshots(RollbackSamplingInterval, NumSnapshotsToKeep, persistedSnapshots)
+	// the latest snapshot (epoch 9) is always live and the cutoff time
+	// based on the retention factor is epoch 5, so epochs 7 and 9 are protected
+	protectedSnapshots := s.getProtectedSnapshots(liveSnapshots)
 	if len(protectedSnapshots) <= 1 {
-		t.Fatalf("expected %d protected snapshots, got %d", NumSnapshotsToKeep, len(protectedSnapshots))
+		t.Fatalf("expected more than 1 protected snapshot, got %d",
+			len(protectedSnapshots))
+	}
+	for _, epoch := range []uint64{9, 7} {
+		if _, ok := protectedSnapshots[epoch]; !ok {
+			t.Fatalf("expected epoch %d to be protected, got %v",
+				epoch, protectedSnapshots)
+		}
+	}
+}
+
+func TestLatestSnapshotRetentionWindow(t *testing.T) {
+	rootBolt := openTestBolt(t, "TestLatestSnapshotRetentionWindow")
+	s := &Scorch{
+		rootBolt:                 rootBolt,
+		rollbackSamplingInterval: 10 * time.Minute,
+		numSnapshotsToKeep:       3,
+		rollbackRetentionFactor:  0.5,
+	}
+	d := s.rollbackSamplingInterval
+	tc := time.Now()
+	seedBoltSnapshots(t, rootBolt, map[uint64]time.Time{
+		9: tc.Add(-(3 * d)),
+		7: tc.Add(-(4 * d)),
+		5: tc.Add(-(5 * d)),
+		3: tc.Add(-(6 * d)),
+		1: tc.Add(-(7 * d)),
+	})
+	s.checkPoints = []*snapshotMetaData{
+		{epoch: 5, timeStamp: tc.Add(-(5 * d))},
+		{epoch: 3, timeStamp: tc.Add(-(6 * d))},
+		{epoch: 1, timeStamp: tc.Add(-(7 * d))},
+	}
+	liveSnapshots, err := s.getLiveSnapshots()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedLiveEpochs := []uint64{9, 7, 5}
+	if len(liveSnapshots) != len(expectedLiveEpochs) {
+		t.Fatalf("expected %d live snapshots, got %d", len(expectedLiveEpochs),
+			len(liveSnapshots))
+	}
+	for i, epoch := range expectedLiveEpochs {
+		if liveSnapshots[i].epoch != epoch {
+			t.Fatalf("expected epoch %d at index %d, got %d", epoch, i,
+				liveSnapshots[i].epoch)
+		}
 	}
 }

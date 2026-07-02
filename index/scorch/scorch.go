@@ -415,8 +415,11 @@ func (s *Scorch) openBolt() error {
 	s.rollbackRetentionFactor = RollbackRetentionFactor
 	if v, ok := s.config["rollbackRetentionFactor"]; ok {
 		var r float64
-		if r, ok = v.(float64); ok {
+		if r, ok = v.(float64); !ok {
 			return fmt.Errorf("rollbackRetentionFactor parse err: %v", err)
+		}
+		if r < 0 || r > 1 {
+			return fmt.Errorf("rollbackRetentionFactor must be between 0 and 1")
 		}
 		s.rollbackRetentionFactor = r
 	}

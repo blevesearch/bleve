@@ -83,6 +83,30 @@ var (
 	// maximum size of data that a single worker is allowed to perform the in-memory
 	// merge operation.
 	DefaultMaxSizeInMemoryMergePerWorker int = 0
+
+	// NumSnapshotsToKeep represents how many recent, old snapshots to
+	// keep around per Scorch instance.  Useful for apps that require
+	// rollback'ability.
+	NumSnapshotsToKeep int = 1
+
+	// RollbackSamplingInterval controls how far back we are looking
+	// in the history to get the rollback points.
+	// If we have to keep N snapshots ( = NumSnapshotsToKeep ), then upon
+	// including the very latest snapshot there should be N snapshots.
+	// If the timestamp of the latest snapshot is T, and the
+	// RollbackSamplingInterval is D, then the very last one would be T - (N - 1) * D
+	// Example:
+	//  - For N = 3, and the below timing diagram:
+	//  	a     b     c     d
+	//  	|-----|-----|-----| --> time
+	//  	|  D  |  D  |  D  |
+	//  	X     Y     Z     T
+	// - The rollback points would be T, Z, and Y. X would be too old.
+	RollbackSamplingInterval time.Duration = 0
+
+	// Controls what portion of the earlier rollback points to retain during
+	// a infrequent/sparse mutation scenario
+	RollbackRetentionFactor float64 = 0.5
 )
 
 type persisterOptions struct {
@@ -796,6 +820,14 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 		return err
 	}
 
+	defer func() {
+		s.rootLock.Lock()
+		for _, filename := range filenames {
+			delete(s.ineligibleForRemoval, filename)
+		}
+		s.rootLock.Unlock()
+	}()
+
 	// we need to swap in a new root only when we've persisted 1 or
 	// more segments -- whereby the new root would have 1-for-1
 	// replacements of in-memory segments with file-based segments
@@ -833,11 +865,8 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 		case s.persists <- persist:
 		}
 
-		select {
-		case <-s.closeCh:
-			return segment.ErrClosed
-		case <-persist.applied:
-		}
+		// blockingly wait until the persist has been applied
+		<-persist.applied
 	}
 
 	err = tx.Commit()
@@ -849,14 +878,6 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 	if err != nil {
 		return err
 	}
-
-	// allow files to become eligible for removal after commit, such
-	// as file segments from snapshots that came from the merger
-	s.rootLock.Lock()
-	for _, filename := range filenames {
-		delete(s.ineligibleForRemoval, filename)
-	}
-	s.rootLock.Unlock()
 
 	return nil
 }
@@ -932,11 +953,11 @@ func (s *Scorch) loadFromBolt() error {
 		return err
 	}
 
-	persistedSnapshots, err := s.rootBoltSnapshotMetaData()
+	liveSnapshots, err := s.getLiveSnapshots()
 	if err != nil {
 		return err
 	}
-	s.checkPoints = persistedSnapshots
+	s.checkPoints = liveSnapshots
 	return nil
 }
 
@@ -1286,32 +1307,10 @@ func (s *Scorch) removeOldData() {
 	}
 }
 
-// NumSnapshotsToKeep represents how many recent, old snapshots to
-// keep around per Scorch instance.  Useful for apps that require
-// rollback'ability.
-var NumSnapshotsToKeep = 1
-
-// RollbackSamplingInterval controls how far back we are looking
-// in the history to get the rollback points.
-// For example, a value of 10 minutes ensures that the
-// protected snapshots (NumSnapshotsToKeep = 3) are:
-//
-//	the very latest snapshot(ie the current one),
-//	the snapshot that was persisted 10 minutes before the current one,
-//	the snapshot that was persisted 20 minutes before the current one
-//
-// By default however, the timeseries way of protecting snapshots is
-// disabled, and we protect the latest three contiguous snapshots
-var RollbackSamplingInterval = 0 * time.Minute
-
-// Controls what portion of the earlier rollback points to retain during
-// a infrequent/sparse mutation scenario
-var RollbackRetentionFactor = float64(0.5)
-
 func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
 	snapshots []*snapshotMetaData,
 ) (int, map[uint64]time.Time) {
-	if interval == 0 {
+	if interval == 0 || len(snapshots) == 0 || maxDataPoints <= 0 {
 		return len(snapshots), map[uint64]time.Time{}
 	}
 	// the map containing the time series snapshots, i.e the timeseries of snapshots
@@ -1355,20 +1354,17 @@ func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
 // getProtectedSnapshots aims to fetch the epochs keep based on a timestamp basis.
 // It tries to get NumSnapshotsToKeep snapshots, each of which are separated
 // by a time duration of RollbackSamplingInterval.
-func getProtectedSnapshots(rollbackSamplingInterval time.Duration,
-	numSnapshotsToKeep int,
-	persistedSnapshots []*snapshotMetaData,
-) map[uint64]time.Time {
+func (s *Scorch) getProtectedSnapshots(liveSnapshots []*snapshotMetaData) map[uint64]time.Time {
 	// keep numSnapshotsToKeep - 1 worth of time series snapshots, because we always
 	// must preserve the very latest snapshot in bolt as well to avoid accidental
 	// deletes of bolt entries and cleanups by the purger code.
-	lastPoint, protectedEpochs := getTimeSeriesSnapshots(numSnapshotsToKeep-1,
-		rollbackSamplingInterval, persistedSnapshots)
-	if len(protectedEpochs) < numSnapshotsToKeep {
-		numSnapshotsNeeded := numSnapshotsToKeep - len(protectedEpochs)
+	lastPoint, protectedEpochs := getTimeSeriesSnapshots(s.numSnapshotsToKeep-1,
+		s.rollbackSamplingInterval, liveSnapshots)
+	if len(protectedEpochs) < s.numSnapshotsToKeep {
+		numSnapshotsNeeded := s.numSnapshotsToKeep - len(protectedEpochs)
 		// we protected the contiguous snapshots from the last point in time series
 		for i := 0; i < numSnapshotsNeeded && i < lastPoint; i++ {
-			protectedEpochs[persistedSnapshots[i].epoch] = persistedSnapshots[i].timeStamp
+			protectedEpochs[liveSnapshots[i].epoch] = liveSnapshots[i].timeStamp
 		}
 	}
 
@@ -1397,21 +1393,20 @@ func newCheckPoints(snapshots map[uint64]time.Time) []*snapshotMetaData {
 	return rv
 }
 
-// Removes enough snapshots from the rootBolt so that the
-// s.eligibleForRemoval stays under the NumSnapshotsToKeep policy.
 func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
-	persistedSnapshots, err := s.rootBoltSnapshotMetaData()
+	// first get the set of live snapshots
+	liveSnapshots, err := s.getLiveSnapshots()
 	if err != nil {
 		return 0, err
 	}
 
-	if len(persistedSnapshots) <= s.numSnapshotsToKeep {
+	if len(liveSnapshots) <= s.numSnapshotsToKeep {
 		// we need to keep everything
 		return 0, nil
 	}
 
-	protectedSnapshots := getProtectedSnapshots(s.rollbackSamplingInterval,
-		s.numSnapshotsToKeep, persistedSnapshots)
+	// then get the set of protected snapshots, which are the ones we want to keep
+	protectedSnapshots := s.getProtectedSnapshots(liveSnapshots)
 
 	var epochsToRemove []uint64
 	var newEligible []uint64
@@ -1520,26 +1515,19 @@ func (s *Scorch) removeOldZapFiles() error {
 	return nil
 }
 
-// In sparse mutation scenario, it can so happen that all protected
-// snapshots are older than the numSnapshotsToKeep * rollbackSamplingInterval
-// duration. This results in all of them being purged from the boltDB
-// and the next iteration of the removeOldData() would end up protecting
-// latest contiguous snapshot which is a poor pattern in the rollback checkpoints.
-// Hence we try to retain at most retentionFactor portion worth of old snapshots
-// in such a scenario using the following function
-func getBoundaryCheckPoint(retentionFactor float64,
-	checkPoints []*snapshotMetaData, timeStamp time.Time,
-) time.Time {
-	if checkPoints != nil {
-		boundary := checkPoints[int(math.Floor(float64(len(checkPoints))*
-			retentionFactor))]
-		if timeStamp.Sub(boundary.timeStamp) > 0 {
-			// return the extended boundary which will dictate the older snapshots
-			// to be retained
-			return boundary.timeStamp
-		}
+func (s *Scorch) getBoundaryCheckPoint(timeStamp time.Time) time.Time {
+	numCheckpoints := float64(len(s.checkPoints))
+	if numCheckpoints == 0 {
+		return timeStamp
 	}
-
+	checkpointIdx := int(math.Floor(numCheckpoints * s.rollbackRetentionFactor))
+	if checkpointIdx >= len(s.checkPoints) {
+		checkpointIdx = len(s.checkPoints) - 1
+	}
+	boundary := s.checkPoints[checkpointIdx]
+	if boundary.timeStamp.Before(timeStamp) {
+		return boundary.timeStamp
+	}
 	return timeStamp
 }
 
@@ -1548,35 +1536,21 @@ type snapshotMetaData struct {
 	timeStamp time.Time
 }
 
+// returns all the snapshots that are currently persisted
+// in the rootBolt, sorted by latest to oldest epoch.
 func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 	var rv []*snapshotMetaData
-	currTime := time.Now()
-	// including the very latest snapshot there should be n snapshots, so the
-	// very last one would be tc - (n-1) * d
-	// for eg for n = 3 the checkpoints preserved should be tc, tc - d, tc - 2d
-	expirationDuration := time.Duration(s.numSnapshotsToKeep-1) * s.rollbackSamplingInterval
-
 	err := s.rootBolt.View(func(tx *util.BoltTxImpl) error {
 		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
 		}
 		sc := snapshots.Cursor()
-		var found bool
-		// traversal order - latest -> oldest epoch
 		for sk, _ := sc.Last(); sk != nil; sk, _ = sc.Prev() {
 			_, snapshotEpoch, err := decodeUvarintAscending(sk)
 			if err != nil {
 				continue
 			}
-
-			if expirationDuration == 0 {
-				rv = append(rv, &snapshotMetaData{
-					epoch: snapshotEpoch,
-				})
-				continue
-			}
-
 			snapshot := snapshots.GetBucket(sk)
 			if snapshot == nil {
 				continue
@@ -1594,32 +1568,74 @@ func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 			if err != nil {
 				continue
 			}
-			// Don't keep snapshots older than
-			// expiration duration (numSnapshotsToKeep *
-			// rollbackSamplingInterval, by default)
-			if currTime.Sub(timeStamp) <= expirationDuration {
-				rv = append(rv, &snapshotMetaData{
-					epoch:     snapshotEpoch,
-					timeStamp: timeStamp,
-				})
-			} else {
-				if !found {
-					found = true
-					boundary := getBoundaryCheckPoint(s.rollbackRetentionFactor,
-						s.checkPoints, timeStamp)
-					expirationDuration = currTime.Sub(boundary)
-					continue
-				}
-				k := encodeUvarintAscending(nil, snapshotEpoch)
-				err = snapshots.DeleteBucket(k)
-				if err == bolt.ErrBucketNotFound {
-					err = nil
-				}
+			meta := &snapshotMetaData{
+				epoch:     snapshotEpoch,
+				timeStamp: timeStamp,
 			}
+			rv = append(rv, meta)
 		}
 		return nil
 	})
-	return rv, err
+	if err != nil {
+		return nil, err
+	}
+	return rv, nil
+}
+
+func (s *Scorch) getLiveSnapshots() ([]*snapshotMetaData, error) {
+	// get all the snapshots that are currently persisted
+	meta, err := s.rootBoltSnapshotMetaData()
+	if err != nil {
+		return nil, err
+	}
+
+	// if none persisted, then nothing to do
+	if len(meta) == 0 {
+		return nil, nil
+	}
+
+	// we consider a snapshot to be live if:
+	// 1. it is the latest snapshot
+	// 2. it is within our expiration duration
+	var liveSnapshots []*snapshotMetaData
+
+	// always keep the latest snapshot
+	liveSnapshots = append(liveSnapshots, meta[0])
+	extraSnapshots := s.numSnapshotsToKeep - 1
+	if extraSnapshots <= 0 {
+		return liveSnapshots, nil
+	}
+
+	// if we need extra snapshots, compute an expiration duration
+	// beyond which we will not consider snapshots to be live
+	expirationDuration := time.Duration(extraSnapshots) * s.rollbackSamplingInterval
+	if expirationDuration <= 0 {
+		return liveSnapshots, nil
+	}
+
+	// if we have previous checkpoints, then we can extend the expiration duration
+	// to get our cutoff time based on the boundary checkpoint
+	currTime := time.Now()
+	cutoffTime := currTime.Add(-expirationDuration)
+	for pos := 1; pos < len(meta); pos++ {
+		snapshotTime := meta[pos].timeStamp
+		if snapshotTime.Before(cutoffTime) {
+			boundary := s.getBoundaryCheckPoint(snapshotTime)
+			if boundary.Before(cutoffTime) {
+				cutoffTime = boundary
+			}
+			break
+		}
+	}
+
+	// add all snapshots that are newer than the cutoff time
+	for _, snapshot := range meta[1:] {
+		if snapshot.timeStamp.After(cutoffTime) {
+			liveSnapshots = append(liveSnapshots, snapshot)
+		}
+	}
+
+	return liveSnapshots, nil
 }
 
 func (s *Scorch) RootBoltSnapshotEpochs() ([]uint64, error) {

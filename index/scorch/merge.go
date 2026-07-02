@@ -569,6 +569,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			// is updated - which is valid, since the snapshot updated in bolt is
 			// cleaned up only if its zero ref'd (MB-66163 for more details)
 			s.markIneligibleForRemoval(filename)
+			newMergedSegmentFileNames[flushID] = filename
 
 			// the newly merged segment is already flushed out to disk, just needs
 			// to be opened using mmap.
@@ -582,7 +583,6 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			}
 			newDocIDsSet[flushID] = newDocIDs
 			newMergedSegmentIDs[flushID] = newSegmentID
-			newMergedSegmentFileNames[flushID] = filename
 			newMergedSegments[flushID], err = s.segPlugin.OpenUsing(path, s.segmentConfig)
 			if err != nil {
 				em.Lock()
