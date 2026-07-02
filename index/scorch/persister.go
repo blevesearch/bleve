@@ -1324,22 +1324,18 @@ func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
 
 	// traverse the list in reverse order, older timestamps to newer ones.
 	for i := ptr - 1; i >= 0; i-- {
-		// If we find a timeStamp which is the next datapoint in our
-		// timeseries of snapshots, and newer by RollbackSamplingInterval duration
-		// (comparison in terms of minutes), which is the interval of our time
-		// series. In this case, add the epoch rv
-		if snapshots[i].timeStamp.Sub(snapshots[ptr].timeStamp).Minutes() >
-			interval.Minutes() {
-			if _, ok := rv[snapshots[i+1].epoch]; !ok {
-				rv[snapshots[i+1].epoch] = snapshots[i+1].timeStamp
-				ptr = i + 1
-				numSnapshotsProtected++
+		sinceLast := snapshots[i].timeStamp.Sub(snapshots[ptr].timeStamp)
+		if sinceLast >= interval {
+			// capture the snapshot at the interval boundary: the exact match
+			// if there is one, otherwise the older neighbour (i+1), which was
+			// the last snapshot seen before the interval was crossed
+			idx := i
+			if sinceLast > interval {
+				idx = i + 1
 			}
-		} else if snapshots[i].timeStamp.Sub(snapshots[ptr].timeStamp).Minutes() ==
-			interval.Minutes() {
-			if _, ok := rv[snapshots[i].epoch]; !ok {
-				rv[snapshots[i].epoch] = snapshots[i].timeStamp
-				ptr = i
+			if _, ok := rv[snapshots[idx].epoch]; !ok {
+				rv[snapshots[idx].epoch] = snapshots[idx].timeStamp
+				ptr = idx
 				numSnapshotsProtected++
 			}
 		}
