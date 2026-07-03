@@ -958,7 +958,10 @@ func (s *Scorch) loadFromBolt() error {
 	if err != nil {
 		return err
 	}
-	s.checkPoints = liveSnapshots
+	if len(liveSnapshots) != 0 {
+		protectedSnapshots := s.getProtectedSnapshots(liveSnapshots)
+		s.checkPoints = newCheckPoints(protectedSnapshots)
+	}
 	return nil
 }
 
@@ -1365,7 +1368,7 @@ func (s *Scorch) getProtectedSnapshots(liveSnapshots []*snapshotMetaData) map[ui
 }
 
 func newCheckPoints(snapshots map[uint64]time.Time) []*snapshotMetaData {
-	rv := make([]*snapshotMetaData, 0)
+	rv := make([]*snapshotMetaData, 0, len(snapshots))
 
 	keys := make([]uint64, 0, len(snapshots))
 	for k := range snapshots {
@@ -1373,7 +1376,7 @@ func newCheckPoints(snapshots map[uint64]time.Time) []*snapshotMetaData {
 	}
 
 	sort.SliceStable(keys, func(i, j int) bool {
-		return snapshots[keys[i]].Sub(snapshots[keys[j]]) > 0
+		return snapshots[keys[i]].After(snapshots[keys[j]])
 	})
 
 	for _, key := range keys {
@@ -1391,6 +1394,11 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 	liveSnapshots, err := s.getLiveSnapshots()
 	if err != nil {
 		return 0, err
+	}
+
+	// if no live snapshots, then nothing to do
+	if len(liveSnapshots) == 0 {
+		return 0, nil
 	}
 
 	// then get the set of protected snapshots, which are the ones we want to keep
