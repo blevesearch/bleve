@@ -259,7 +259,7 @@ func openTestBolt(t *testing.T, name string) *util.RootBoltImpl {
 	}
 	t.Cleanup(func() {
 		if err := DestroyTest(cfg); err != nil {
-			t.Log(err)
+			t.Error(err)
 		}
 	})
 	path := cfg["path"].(string)
@@ -272,7 +272,7 @@ func openTestBolt(t *testing.T, name string) *util.RootBoltImpl {
 	}
 	t.Cleanup(func() {
 		if err := rootBolt.Close(); err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 	})
 	return rootBolt
