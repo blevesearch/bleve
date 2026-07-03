@@ -953,7 +953,9 @@ func (s *Scorch) loadFromBolt() error {
 	if err != nil {
 		return err
 	}
-
+	// we initialize the checkPoints from all the persisted snapshots,
+	// because if we have state to load, the previous process was already
+	// maintaining checkpoints, whatever survives in the bucket now is that state.
 	persistedSnapshots, err := s.rootBoltSnapshotMetaData()
 	if err != nil {
 		return err
