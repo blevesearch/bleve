@@ -505,10 +505,7 @@ func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		return nil, nil
 	}
 
-	docNum, err := next.ID.Value()
-	if err != nil {
-		return nil, err
-	}
+	docNum := next.ID.Value()
 	segmentIndex, localDocNum := is.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
 	rvd := document.NewDocument(id)
@@ -575,10 +572,7 @@ func (is *IndexSnapshot) segmentIndexAndLocalDocNumFromGlobal(docNum uint64) (in
 }
 
 func (is *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
-	docNum, err := id.Value()
-	if err != nil {
-		return "", err
-	}
+	docNum := id.Value()
 	segmentIndex, localDocNum := is.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
 	v, err := is.segment[segmentIndex].DocID(localDocNum)
@@ -593,10 +587,7 @@ func (is *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
 }
 
 func (is *IndexSnapshot) segmentIndexAndLocalDocNum(id index.IndexInternalID) (int, uint64, error) {
-	docNum, err := id.Value()
-	if err != nil {
-		return 0, 0, err
-	}
+	docNum := id.Value()
 	segIdx, localDocNum := is.segmentIndexAndLocalDocNumFromGlobal(docNum)
 	return segIdx, localDocNum, nil
 }
@@ -902,10 +893,7 @@ func (dvr *DocValueReader) BytesRead() uint64 {
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
 	visitor index.DocValueVisitor,
 ) (err error) {
-	docNum, err := id.Value()
-	if err != nil {
-		return err
-	}
+	docNum := id.Value()
 
 	segmentIndex, localDocNum := dvr.i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 	if segmentIndex >= len(dvr.i.segment) {
