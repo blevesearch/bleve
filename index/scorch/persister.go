@@ -1405,8 +1405,8 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 		}
 	}
 	s.eligibleForRemoval = newEligible
-	s.checkPoints = newCheckPoints(protectedSnapshots)
 	s.rootLock.Unlock()
+	s.checkPoints = newCheckPoints(protectedSnapshots)
 
 	if len(epochsToRemove) == 0 {
 		return 0, nil
@@ -1605,8 +1605,8 @@ func (s *Scorch) getLiveSnapshots() ([]*snapshotMetaData, error) {
 	currTime := time.Now()
 	expirationDuration := time.Duration(extraSnapshots) * s.rollbackSamplingInterval
 	cutoffTime := currTime.Add(-expirationDuration)
-	// if we have previous checkpoints, then we can extend the expiration duration
-	// to get our cutoff time based on the boundary checkpoint
+	// if we have previous checkpoints, then we can extend
+	// the cutoff time based on the boundary checkpoint
 	for pos := 1; pos < len(meta); pos++ {
 		snapshotTime := meta[pos].timeStamp
 		if snapshotTime.Before(cutoffTime) {
