@@ -1622,7 +1622,7 @@ func (s *Scorch) getLiveSnapshots() ([]*snapshotMetaData, error) {
 
 	// add all snapshots that are newer than the cutoff time
 	for _, snapshot := range meta[1:] {
-		if snapshot.timeStamp.After(cutoffTime) {
+		if !snapshot.timeStamp.Before(cutoffTime) {
 			liveSnapshots = append(liveSnapshots, snapshot)
 		}
 	}
