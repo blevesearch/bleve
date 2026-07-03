@@ -232,6 +232,41 @@ func NewScorch(storeName string,
 	if ok {
 		rv.onAsyncError = RegistryAsyncErrorCallbacks[aecbName]
 	}
+
+	rv.numSnapshotsToKeep = NumSnapshotsToKeep
+	if v, ok := rv.config["numSnapshotsToKeep"]; ok {
+		var t int
+		var err error
+		if t, err = parseToInteger(v); err != nil {
+			return nil, fmt.Errorf("numSnapshotsToKeep parse err: %v", err)
+		}
+		if t > 0 {
+			rv.numSnapshotsToKeep = t
+		}
+	}
+
+	rv.rollbackSamplingInterval = RollbackSamplingInterval
+	if v, ok := rv.config["rollbackSamplingInterval"]; ok {
+		var t time.Duration
+		var err error
+		if t, err = parseToTimeDuration(v); err != nil {
+			return nil, fmt.Errorf("rollbackSamplingInterval parse err: %v", err)
+		}
+		rv.rollbackSamplingInterval = t
+	}
+
+	rv.rollbackRetentionFactor = RollbackRetentionFactor
+	if v, ok := rv.config["rollbackRetentionFactor"]; ok {
+		var r float64
+		if r, ok = v.(float64); !ok {
+			return nil, fmt.Errorf("rollbackRetentionFactor must be a float64")
+		}
+		if r < 0 || r > 1 {
+			return nil, fmt.Errorf("rollbackRetentionFactor must be between 0 and 1")
+		}
+		rv.rollbackRetentionFactor = r
+	}
+
 	// validate any custom persistor options to
 	// prevent an async error in the persistor routine
 	_, err = rv.parsePersisterOptions()
@@ -359,49 +394,6 @@ func (s *Scorch) openBolt() error {
 		rootBoltOpt.Timeout = boltTimeout
 	}
 
-	// scorch options
-	s.numSnapshotsToKeep = NumSnapshotsToKeep
-	if v, ok := s.config["numSnapshotsToKeep"]; ok {
-		var t int
-		var err error
-		if t, err = parseToInteger(v); err != nil {
-			return fmt.Errorf("numSnapshotsToKeep parse err: %v", err)
-		}
-		if t > 0 {
-			s.numSnapshotsToKeep = t
-		}
-	}
-
-	s.rollbackSamplingInterval = RollbackSamplingInterval
-	if v, ok := s.config["rollbackSamplingInterval"]; ok {
-		var t time.Duration
-		var err error
-		if t, err = parseToTimeDuration(v); err != nil {
-			return fmt.Errorf("rollbackSamplingInterval parse err: %v", err)
-		}
-		s.rollbackSamplingInterval = t
-	}
-
-	s.rollbackRetentionFactor = RollbackRetentionFactor
-	if v, ok := s.config["rollbackRetentionFactor"]; ok {
-		var r float64
-		if r, ok = v.(float64); !ok {
-			return fmt.Errorf("rollbackRetentionFactor must be a float64")
-		}
-		if r < 0 || r > 1 {
-			return fmt.Errorf("rollbackRetentionFactor must be between 0 and 1")
-		}
-		s.rollbackRetentionFactor = r
-	}
-
-	typ, ok := s.config["spatialPlugin"].(string)
-	if ok {
-		if err := s.loadSpatialAnalyzerPlugin(typ); err != nil {
-			return err
-		}
-	}
-
-	// open bolt
 	rootBoltPath := s.path + string(os.PathSeparator) + "root.bolt"
 	var err error
 	if s.path != "" {
