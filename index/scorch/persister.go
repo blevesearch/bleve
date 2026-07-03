@@ -101,7 +101,7 @@ var (
 	//  	|-----|-----|-----| --> time
 	//  	|  D  |  D  |  D  |
 	//  	X     Y     Z     T
-	// - The rollback points would be T, Z, and Y. X would be too old.
+	// - The rollback points would be b, c, and d. a would be too old.
 	RollbackSamplingInterval time.Duration = 0
 
 	// Controls what portion of the earlier rollback points to retain during
