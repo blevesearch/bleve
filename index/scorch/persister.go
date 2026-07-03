@@ -95,6 +95,7 @@ var (
 	// including the very latest snapshot there should be N snapshots.
 	// If the timestamp of the latest snapshot is T, and the
 	// RollbackSamplingInterval is D, then the very last one would be T - (N - 1) * D
+	// A value of 0 means we will not sample, and will keep the very latest N snapshots.
 	// Example:
 	//  - For N = 3, and the below timing diagram:
 	//  	a     b     c     d
@@ -1586,6 +1587,15 @@ func (s *Scorch) getLiveSnapshots() ([]*snapshotMetaData, error) {
 		return nil, nil
 	}
 
+	// check if we have a rollback sampling interval, if not,
+	// then we will just return the latest numSnapshotsToKeep snapshots
+	if s.rollbackSamplingInterval <= 0 {
+		if len(meta) <= s.numSnapshotsToKeep {
+			return meta, nil
+		}
+		return meta[:s.numSnapshotsToKeep], nil
+	}
+
 	// we consider a snapshot to be live if:
 	// 1. it is the latest snapshot
 	// 2. it is within our expiration duration
@@ -1600,15 +1610,11 @@ func (s *Scorch) getLiveSnapshots() ([]*snapshotMetaData, error) {
 
 	// if we need extra snapshots, compute an expiration duration
 	// beyond which we will not consider snapshots to be live
+	currTime := time.Now()
 	expirationDuration := time.Duration(extraSnapshots) * s.rollbackSamplingInterval
-	if expirationDuration <= 0 {
-		return liveSnapshots, nil
-	}
-
+	cutoffTime := currTime.Add(-expirationDuration)
 	// if we have previous checkpoints, then we can extend the expiration duration
 	// to get our cutoff time based on the boundary checkpoint
-	currTime := time.Now()
-	cutoffTime := currTime.Add(-expirationDuration)
 	for pos := 1; pos < len(meta); pos++ {
 		snapshotTime := meta[pos].timeStamp
 		if snapshotTime.Before(cutoffTime) {
