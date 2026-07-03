@@ -954,13 +954,12 @@ func (s *Scorch) loadFromBolt() error {
 		return err
 	}
 
-	liveSnapshots, err := s.getLiveSnapshots()
+	rawPersisted, err := s.rootBoltSnapshotMetaData()
 	if err != nil {
 		return err
 	}
-	if len(liveSnapshots) != 0 {
-		protectedSnapshots := s.getProtectedSnapshots(liveSnapshots)
-		s.checkPoints = newCheckPoints(protectedSnapshots)
+	if len(rawPersisted) != 0 {
+		s.checkPoints = rawPersisted
 	}
 	return nil
 }
