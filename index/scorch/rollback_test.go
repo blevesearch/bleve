@@ -544,7 +544,7 @@ func TestSparseMutationCheckpointing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedLiveEpochs := []uint64{9, 7}
+	expectedLiveEpochs := []uint64{9, 7, 5}
 	if len(liveSnapshots) != len(expectedLiveEpochs) {
 		t.Fatalf("expected %d live snapshots, got %d", len(expectedLiveEpochs),
 			len(liveSnapshots))
@@ -596,7 +596,7 @@ func TestLatestSnapshotRetentionWindow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedLiveEpochs := []uint64{9, 7, 5}
+	expectedLiveEpochs := []uint64{9, 7, 5, 3}
 	if len(liveSnapshots) != len(expectedLiveEpochs) {
 		t.Fatalf("expected %d live snapshots, got %d", len(expectedLiveEpochs),
 			len(liveSnapshots))
