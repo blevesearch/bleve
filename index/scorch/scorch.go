@@ -328,6 +328,7 @@ func (s *Scorch) openBolt() error {
 		s.unsafeBatch = true
 	}
 
+	// bolt options
 	rootBoltOpt := *bolt.DefaultOptions
 	if s.readOnly {
 		rootBoltOpt.ReadOnly = true
@@ -358,6 +359,49 @@ func (s *Scorch) openBolt() error {
 		rootBoltOpt.Timeout = boltTimeout
 	}
 
+	// scorch options
+	s.numSnapshotsToKeep = NumSnapshotsToKeep
+	if v, ok := s.config["numSnapshotsToKeep"]; ok {
+		var t int
+		var err error
+		if t, err = parseToInteger(v); err != nil {
+			return fmt.Errorf("numSnapshotsToKeep parse err: %v", err)
+		}
+		if t > 0 {
+			s.numSnapshotsToKeep = t
+		}
+	}
+
+	s.rollbackSamplingInterval = RollbackSamplingInterval
+	if v, ok := s.config["rollbackSamplingInterval"]; ok {
+		var t time.Duration
+		var err error
+		if t, err = parseToTimeDuration(v); err != nil {
+			return fmt.Errorf("rollbackSamplingInterval parse err: %v", err)
+		}
+		s.rollbackSamplingInterval = t
+	}
+
+	s.rollbackRetentionFactor = RollbackRetentionFactor
+	if v, ok := s.config["rollbackRetentionFactor"]; ok {
+		var r float64
+		if r, ok = v.(float64); !ok {
+			return fmt.Errorf("rollbackRetentionFactor must be a float64")
+		}
+		if r < 0 || r > 1 {
+			return fmt.Errorf("rollbackRetentionFactor must be between 0 and 1")
+		}
+		s.rollbackRetentionFactor = r
+	}
+
+	typ, ok := s.config["spatialPlugin"].(string)
+	if ok {
+		if err := s.loadSpatialAnalyzerPlugin(typ); err != nil {
+			return err
+		}
+	}
+
+	// open bolt
 	rootBoltPath := s.path + string(os.PathSeparator) + "root.bolt"
 	var err error
 	if s.path != "" {
@@ -388,45 +432,6 @@ func (s *Scorch) openBolt() error {
 		err := s.removeOldZapFiles() // Before persister or merger create any new files.
 		if err != nil {
 			_ = s.Close()
-			return err
-		}
-	}
-
-	s.numSnapshotsToKeep = NumSnapshotsToKeep
-	if v, ok := s.config["numSnapshotsToKeep"]; ok {
-		var t int
-		if t, err = parseToInteger(v); err != nil {
-			return fmt.Errorf("numSnapshotsToKeep parse err: %v", err)
-		}
-		if t > 0 {
-			s.numSnapshotsToKeep = t
-		}
-	}
-
-	s.rollbackSamplingInterval = RollbackSamplingInterval
-	if v, ok := s.config["rollbackSamplingInterval"]; ok {
-		var t time.Duration
-		if t, err = parseToTimeDuration(v); err != nil {
-			return fmt.Errorf("rollbackSamplingInterval parse err: %v", err)
-		}
-		s.rollbackSamplingInterval = t
-	}
-
-	s.rollbackRetentionFactor = RollbackRetentionFactor
-	if v, ok := s.config["rollbackRetentionFactor"]; ok {
-		var r float64
-		if r, ok = v.(float64); !ok {
-			return fmt.Errorf("rollbackRetentionFactor parse err: %v", err)
-		}
-		if r < 0 || r > 1 {
-			return fmt.Errorf("rollbackRetentionFactor must be between 0 and 1")
-		}
-		s.rollbackRetentionFactor = r
-	}
-
-	typ, ok := s.config["spatialPlugin"].(string)
-	if ok {
-		if err := s.loadSpatialAnalyzerPlugin(typ); err != nil {
 			return err
 		}
 	}
