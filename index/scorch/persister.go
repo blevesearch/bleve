@@ -158,16 +158,6 @@ func (s *Scorch) persisterLoop() {
 
 	var unpersistedCallbacks []index.BatchCallback
 
-	po, err := s.parsePersisterOptions()
-	if err != nil {
-		s.fireAsyncError(NewScorchError(
-			persister,
-			fmt.Sprintf("persisterOptions json parsing err: %v", err),
-			ErrOptionsParse,
-		))
-		return
-	}
-
 OUTER:
 	for {
 		atomic.AddUint64(&s.stats.TotPersistLoopBeg, 1)
@@ -183,7 +173,7 @@ OUTER:
 			lastMergedEpoch = ew.epoch
 		}
 		lastMergedEpoch, persistWatchers = s.pausePersisterForMergerCatchUp(lastPersistedEpoch,
-			lastMergedEpoch, persistWatchers, po)
+			lastMergedEpoch, persistWatchers, s.persisterOptions)
 
 		var ourSnapshot *IndexSnapshot
 		var ourPersisted []chan error
@@ -206,7 +196,7 @@ OUTER:
 		if ourSnapshot != nil {
 			startTime := time.Now()
 
-			err := s.persistSnapshot(ourSnapshot, po)
+			err := s.persistSnapshot(ourSnapshot, s.persisterOptions)
 			for _, ch := range ourPersisted {
 				if err != nil {
 					ch <- err

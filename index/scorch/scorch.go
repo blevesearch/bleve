@@ -70,6 +70,9 @@ type Scorch struct {
 	// must be accessed within the rootLock as it is accessed by the asynchronous cleanup routine.
 	copyScheduled map[string]int
 
+	persisterOptions    *persisterOptions
+	mergePlannerOptions *mergeplan.MergePlanOptions
+
 	numSnapshotsToKeep       int
 	rollbackRetentionFactor  float64
 	checkPoints              []*snapshotMetaData
@@ -130,10 +133,9 @@ func (t ScorchErrorType) Error() string {
 
 // ErrType values for ScorchError
 const (
-	ErrAsyncPanic   = ScorchErrorType("async panic error")
-	ErrPersist      = ScorchErrorType("persist error")
-	ErrCleanup      = ScorchErrorType("cleanup error")
-	ErrOptionsParse = ScorchErrorType("options parse error")
+	ErrAsyncPanic = ScorchErrorType("async panic error")
+	ErrPersist    = ScorchErrorType("persist error")
+	ErrCleanup    = ScorchErrorType("cleanup error")
 )
 
 // ScorchError is passed to onAsyncError when errors are
@@ -267,18 +269,17 @@ func NewScorch(storeName string,
 		rv.rollbackRetentionFactor = r
 	}
 
-	// validate any custom persistor options to
-	// prevent an async error in the persistor routine
-	_, err = rv.parsePersisterOptions()
+	po, err := rv.parsePersisterOptions()
 	if err != nil {
 		return nil, err
 	}
-	// validate any custom merge planner options to
-	// prevent an async error in the merger routine
-	_, err = rv.parseMergePlannerOptions()
+	rv.persisterOptions = po
+
+	mpo, err := rv.parseMergePlannerOptions(po)
 	if err != nil {
 		return nil, err
 	}
+	rv.mergePlannerOptions = mpo
 
 	if trainer := initTrainer(rv, config); trainer != nil {
 		rv.trainer = trainer
@@ -1365,10 +1366,6 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	var mergePlanner mergePlanFunc = func(ourSnapshot *IndexSnapshot) (*mergeplan.MergePlan, error) {
 		// Create a merge plan with the filtered segments and force a merge
 		// to remove the callback from the segments.
-		mergePlannerOptions, err := s.parseMergePlannerOptions()
-		if err != nil {
-			return nil, fmt.Errorf("mergePlannerOption json parsing err: %v", err)
-		}
 		atomic.AddUint64(&s.stats.TotFileMergePlan, 1)
 
 		// filter all segments that have callbacks that need to be removed
@@ -1387,7 +1384,7 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 		}
 
 		// attempt a merge plan with the default merge planner options
-		mergePlan, err := mergeplan.Plan(segsToCompact, mergePlannerOptions)
+		mergePlan, err := mergeplan.Plan(segsToCompact, s.mergePlannerOptions)
 		if err != nil {
 			atomic.AddUint64(&s.stats.TotFileMergePlanErr, 1)
 			return nil, fmt.Errorf("merge plan creation err: %v", err)

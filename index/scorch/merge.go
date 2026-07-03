@@ -60,17 +60,8 @@ func (s *Scorch) mergerLoop() {
 
 	var lastEpochMergePlanned uint64
 	var ctrlMsg *mergerCtrl
-	mergePlannerOptions, err := s.parseMergePlannerOptions()
-	if err != nil {
-		s.fireAsyncError(NewScorchError(
-			merger,
-			fmt.Sprintf("mergerPlannerOptions json parsing err: %v", err),
-			ErrOptionsParse,
-		))
-		return
-	}
 	ctrlMsgDflt := &mergerCtrl{ctx: context.Background(),
-		options: mergePlannerOptions,
+		options: s.mergePlannerOptions,
 		doneCh:  nil}
 
 OUTER:
@@ -234,14 +225,9 @@ func (s *Scorch) ForceMerge(ctx context.Context,
 	return nil
 }
 
-func (s *Scorch) parseMergePlannerOptions() (*mergeplan.MergePlanOptions,
+func (s *Scorch) parseMergePlannerOptions(po *persisterOptions) (*mergeplan.MergePlanOptions,
 	error) {
 	mergePlannerOptions := mergeplan.DefaultMergePlanOptions
-
-	po, err := s.parsePersisterOptions()
-	if err != nil {
-		return nil, err
-	}
 	// by default use the MaxSizeInMemoryMergePerWorker from the persister option
 	// as the FloorSegmentFileSize for the merge planner which would be the
 	// first tier size in the planning. If the value is 0, then we don't use the
