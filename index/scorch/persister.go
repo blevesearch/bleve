@@ -820,14 +820,6 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 		return err
 	}
 
-	defer func() {
-		s.rootLock.Lock()
-		for _, filename := range filenames {
-			delete(s.ineligibleForRemoval, filename)
-		}
-		s.rootLock.Unlock()
-	}()
-
 	// we need to swap in a new root only when we've persisted 1 or
 	// more segments -- whereby the new root would have 1-for-1
 	// replacements of in-memory segments with file-based segments
@@ -878,6 +870,14 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 	if err != nil {
 		return err
 	}
+
+	// allow files to become eligible for removal after commit, such
+	// as file segments from snapshots that came from the merger
+	s.rootLock.Lock()
+	for _, filename := range filenames {
+		delete(s.ineligibleForRemoval, filename)
+	}
+	s.rootLock.Unlock()
 
 	return nil
 }
