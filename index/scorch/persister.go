@@ -1393,11 +1393,6 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 		return 0, err
 	}
 
-	if len(liveSnapshots) <= s.numSnapshotsToKeep {
-		// we need to keep everything
-		return 0, nil
-	}
-
 	// then get the set of protected snapshots, which are the ones we want to keep
 	protectedSnapshots := s.getProtectedSnapshots(liveSnapshots)
 
