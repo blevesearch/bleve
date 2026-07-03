@@ -22,13 +22,6 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-// loadDocValuesOnHit resolves hit.ID and returns the hit's doc-value fields in a
-// new map the caller owns. See loadDocValuesOnHitWithTypes.
-func loadDocValuesOnHit(hit *search.DocumentMatch, dvReader index.DocValueReader,
-	r index.IndexReader) (map[string]interface{}, error) {
-	return loadDocValuesOnHitWithTypes(hit, dvReader, r, nil)
-}
-
 // loadDocValuesOnHitWithTypes resolves hit.ID and returns the hit's doc-value
 // fields in a new map. It does not touch hit.Fields, so these UDF-input fields
 // can't leak into SearchRequest.Fields; the caller owns the map. Returns nil
