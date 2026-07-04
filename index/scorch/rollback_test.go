@@ -15,14 +15,19 @@
 package scorch
 
 import (
+	"io"
+	"math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
 
 func TestIndexRollback(t *testing.T) {
@@ -278,39 +283,6 @@ func openTestBolt(t *testing.T, name string) *util.RootBoltImpl {
 	return rootBolt
 }
 
-func seedBoltSnapshots(t *testing.T, rootBolt *util.RootBoltImpl, snapshotTimes map[uint64]time.Time) {
-	t.Helper()
-	err := rootBolt.Update(func(tx *util.BoltTxImpl) error {
-		snapshots, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
-		if err != nil {
-			return err
-		}
-		for epoch, timeStamp := range snapshotTimes {
-			snapshot, err := snapshots.CreateBucketIfNotExists(
-				encodeUvarintAscending(nil, epoch))
-			if err != nil {
-				return err
-			}
-			metaBucket, err := snapshot.CreateBucketIfNotExists(util.BoltMetaDataKey)
-			if err != nil {
-				return err
-			}
-			timeStampBinary, err := timeStamp.MarshalText()
-			if err != nil {
-				return err
-			}
-			err = metaBucket.Put(util.BoltMetaDataTimeStamp, timeStampBinary, nil)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestGetProtectedSnapshots(t *testing.T) {
 	rootBolt := openTestBolt(t, "TestGetProtectedSnapshots")
 	interval := 10 * time.Minute
@@ -415,196 +387,368 @@ func TestGetProtectedSnapshots(t *testing.T) {
 	}
 }
 
-func TestLatestSnapshotProtected(t *testing.T) {
-	rootBolt := openTestBolt(t, "TestLatestSnapshotProtected")
-	s := &Scorch{
-		rootBolt:                 rootBolt,
-		rollbackSamplingInterval: 10 * time.Minute,
-		numSnapshotsToKeep:       3,
+// updateRoot creates a new snapshot and returns the new root snapshot.
+// if empty is true, then the new snapshot will be a delete-only snapshot,
+// otherwise it will contain a single document.
+func updateRoot(t *testing.T, s *Scorch, empty bool) *IndexSnapshot {
+	t.Helper()
+	var seg segment.Segment
+	var ids []string
+	var err error
+	if !empty {
+		doc := genDoc(t)
+		docs := []index.Document{doc}
+		ids = []string{doc.ID()}
+		seg, _, err = s.segPlugin.New(docs)
+		if err != nil {
+			t.Fatalf("failed to create segment: %v", err)
+		}
+	} else {
+		seg = nil
+		ids = []string{strconv.Itoa(rand.Intn(1000000))}
 	}
-	// seed snapshots with the following timestamps:
-	// 	tc, tc - d/12, tc - d/6, tc - 3d/4, tc - 5d/6, tc - 6d/5
-	// where d is the rollback sampling interval. the latest snapshot is only
-	// d/12 newer than the one before it, so it does not fit into the sampled
-	// time series anchored at the oldest snapshot, and must be retained by
-	// the fallback that always protects the latest snapshot.
-	d := s.rollbackSamplingInterval
-	tc := time.Now()
-	seedBoltSnapshots(t, rootBolt, map[uint64]time.Time{
-		100: tc,
-		99:  tc.Add(-(d / 12)),
-		88:  tc.Add(-(d / 6)),
-		50:  tc.Add(-(3 * d / 4)),
-		35:  tc.Add(-(5 * d / 6)),
-		10:  tc.Add(-(6 * d / 5)),
-	})
-	liveSnapshots, err := s.getLiveSnapshots()
+	intro := &segmentIntroduction{
+		id:      atomic.AddUint64(&s.nextSegmentID, 1),
+		data:    seg,
+		ids:     ids,
+		applied: make(chan error),
+	}
+	if err = s.introduceSegment(intro); err != nil {
+		t.Fatalf("introduceSegment failed: %v", err)
+	}
+	return s.root
+}
+
+// persistToBolt persists the given snapshot to bolt, and also sets the timestamp for the snapshot in the bolt metadata.
+func persistToBolt(t *testing.T, snapshot *IndexSnapshot, s *Scorch, timeStamp time.Time) error {
+	t.Helper()
+	tx, err := s.rootBolt.Begin(true)
+	if err != nil {
+		return err
+	}
+	_, _, err = prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin, nil)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	snapshotsBucket, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	newSnapshotKey := encodeUvarintAscending(nil, snapshot.epoch)
+	snapshotBucket, err := snapshotsBucket.CreateBucketIfNotExists(newSnapshotKey)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	metaBucket, err := snapshotBucket.CreateBucketIfNotExists(util.BoltMetaDataKey)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	timeStampBinary, err := timeStamp.MarshalText()
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	err = metaBucket.Put(util.BoltMetaDataTimeStamp, timeStampBinary, nil)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	for _, segmentSnapshot := range snapshot.segment {
+		if seg, ok := segmentSnapshot.segment.(segment.UnpersistedSegment); ok {
+			filename := zapFileName(segmentSnapshot.id)
+			path := filepath.Join(s.path, filename)
+			err := persistToDirectory(seg, nil, path)
+			if err != nil {
+				return err
+			}
+			persistedSeg, err := s.segPlugin.OpenUsing(path, s.segmentConfig)
+			if err != nil {
+				_ = tx.Rollback()
+				return err
+			}
+			segmentSnapshot.segment = persistedSeg
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	err = s.rootBolt.Sync()
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return nil
+}
+
+func TestLatestSnapshotProtected(t *testing.T) {
+	cfg := CreateConfig("TestLatestSnapshotProtected")
+	err := InitTest(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(liveSnapshots) != 6 {
-		t.Fatalf("expected 6 live snapshots, got %d", len(liveSnapshots))
+	defer func() { _ = DestroyTest(cfg) }()
+	dirPath := cfg["path"].(string)
+	if err = os.Mkdir(dirPath, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	for i, epoch := range []uint64{100, 99, 88, 50, 35, 10} {
-		if liveSnapshots[i].epoch != epoch {
-			t.Fatalf("expected epoch %d at index %d, got %d", epoch, i,
-				liveSnapshots[i].epoch)
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("failed to create Scorch: %v", err)
+	}
+	s, ok := idx.(*Scorch)
+	if !ok {
+		t.Fatalf("expected *Scorch, got %T", s)
+	}
+	s.path = dirPath
+	err = s.openBolt()
+	if err != nil {
+		t.Fatalf("failed to open bolt: %v", err)
+	}
+	s.numSnapshotsToKeep = 3
+	s.rollbackSamplingInterval = 10 * time.Second
+	// replicate the following scenario of persistence of snapshots
+	// tc - 9d/5, tc - 6d/5, tc - 3d/4, tc - d/6, tc - d/12, tc
+	// approximate timestamps where there's a chance that the latest snapshot
+	// might not fit into the time-series and get purged along with its segment
+	// files.
+	const (
+		numSnapshots = 6
+	)
+	curTime := time.Now()
+	d := s.rollbackSamplingInterval
+	// old --> new
+	timeStamps := []time.Time{
+		curTime.Add(-(9 * d / 5)),
+		curTime.Add(-(6 * d / 5)),
+		curTime.Add(-(3 * d / 4)),
+		curTime.Add(-(d / 6)),
+		curTime.Add(-(d / 12)),
+		curTime,
+	}
+	snapshots := make([]*IndexSnapshot, numSnapshots)
+	for i := 0; i < numSnapshots; i++ {
+		snapshots[i] = updateRoot(t, s, false)
+		err = persistToBolt(t, snapshots[i], s, timeStamps[i])
+		if err != nil {
+			t.Fatalf("failed to persist snapshot %d: %v", i, err)
 		}
 	}
-	protectedSnapshots := s.getProtectedSnapshots(liveSnapshots)
-	if len(protectedSnapshots) != s.numSnapshotsToKeep {
-		t.Fatalf("expected %d protected snapshots, got %d",
-			s.numSnapshotsToKeep, len(protectedSnapshots))
+	meta, err := s.getLiveSnapshots()
+	if err != nil {
+		t.Fatalf("failed to get live snapshots: %v", err)
 	}
-	for _, epoch := range []uint64{100, 50, 10} {
-		if _, found := protectedSnapshots[epoch]; !found {
-			t.Fatalf("expected epoch %d to be protected, got %v", epoch, protectedSnapshots)
+	if len(meta) != numSnapshots {
+		t.Fatalf("expected %d live snapshots, got %d", numSnapshots, len(meta))
+	}
+	for i, m := range meta {
+		expectIdx := numSnapshots - i - 1
+		expectedEpoch := snapshots[expectIdx].epoch
+		if m.epoch != expectedEpoch {
+			t.Fatalf("expected epoch %d, got %d", expectedEpoch, m.epoch)
+		}
+		expectedTimeStamp := timeStamps[expectIdx]
+		if !m.timeStamp.Equal(expectedTimeStamp) {
+			t.Fatalf("expected timestamp %v, got %v", expectedTimeStamp, m.timeStamp)
+		}
+	}
+	protectedSnapshots := s.getProtectedSnapshots(meta)
+	if len(protectedSnapshots) != s.numSnapshotsToKeep {
+		t.Fatalf("expected %d protected snapshots, got %d", s.numSnapshotsToKeep, len(protectedSnapshots))
+	}
+	expectedProtectedEpochs := []uint64{6, 2, 1}
+	for _, expectedEpoch := range expectedProtectedEpochs {
+		if _, found := protectedSnapshots[expectedEpoch]; !found {
+			t.Fatalf("expected epoch %d to be protected, but not found", expectedEpoch)
 		}
 	}
 }
 
+// testFSDirectory implements index.Directory by writing files under a
+// directory on the local filesystem, mirroring bleve.FileSystemDirectory. It
+// is used as the backup target for CopyTo.
+type testFSDirectory string
+
+func (d testFSDirectory) GetWriter(filePath string) (io.WriteCloser, error) {
+	dir, file := filepath.Split(filePath)
+	if dir != "" {
+		if err := os.MkdirAll(filepath.Join(string(d), dir), os.ModePerm); err != nil {
+			return nil, err
+		}
+	}
+	return os.OpenFile(filepath.Join(string(d), dir, file),
+		os.O_RDWR|os.O_CREATE, 0o600)
+}
+
 func TestBackupRacingWithPurge(t *testing.T) {
-	rootBolt := openTestBolt(t, "TestBackupRacingWithPurge")
-	s := &Scorch{
-		rootBolt:                 rootBolt,
-		rollbackSamplingInterval: 10 * time.Minute,
-		numSnapshotsToKeep:       3,
-	}
-	d := s.rollbackSamplingInterval
-	tc := time.Now()
-	seedBoltSnapshots(t, rootBolt, map[uint64]time.Time{
-		100: tc,
-		99:  tc.Add(-(d / 12)),
-		88:  tc.Add(-(d / 6)),
-		50:  tc.Add(-(3 * d / 4)),
-		35:  tc.Add(-(5 * d / 6)),
-		10:  tc.Add(-(6 * d / 5)),
-	})
-
-	// even if every epoch were marked eligible for removal while a backup
-	// reads from the latest snapshot, the purge must never delete the latest
-	// snapshot from bolt - else the backup's CopyTo would fail
-	s.eligibleForRemoval = []uint64{100, 99, 88, 50, 35, 10}
-
-	if _, err := s.removeOldBoltSnapshots(); err != nil {
-		t.Fatal(err)
-	}
-
-	remaining, err := s.RootBoltSnapshotEpochs()
+	cfg := CreateConfig("TestBackupRacingWithPurge")
+	err := InitTest(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(remaining) == 0 || remaining[0] != 100 {
-		t.Fatalf("expected the latest snapshot (epoch 100) to survive the "+
-			"purge, got remaining epochs %v", remaining)
+	defer func() { _ = DestroyTest(cfg) }()
+	dirPath := cfg["path"].(string)
+	if err = os.Mkdir(dirPath, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	expected := []uint64{100, 50, 10} // newest -> oldest
-	if len(remaining) != len(expected) {
-		t.Fatalf("expected snapshot epochs %v to remain in bolt, got %v",
-			expected, remaining)
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("failed to create Scorch: %v", err)
 	}
-	for i, epoch := range expected {
-		if remaining[i] != epoch {
-			t.Fatalf("expected snapshot epochs %v to remain in bolt, got %v",
-				expected, remaining)
+	s, ok := idx.(*Scorch)
+	if !ok {
+		t.Fatalf("expected *Scorch, got %T", s)
+	}
+	s.path = dirPath
+	err = s.openBolt()
+	if err != nil {
+		t.Fatalf("failed to open bolt: %v", err)
+	}
+	s.numSnapshotsToKeep = 3
+	s.rollbackSamplingInterval = 10 * time.Second
+	// replicate the following scenario of persistence of snapshots
+	// tc - 9d/5, tc - 6d/5, tc - 3d/4, tc - d/6, tc - d/12, tc
+	// approximate timestamps where there's a chance that the latest snapshot
+	// might not fit into the time-series and get purged along with its segment
+	// files.
+	const (
+		numSnapshots = 6
+	)
+	curTime := time.Now()
+	d := s.rollbackSamplingInterval
+	// old --> new
+	timeStamps := []time.Time{
+		curTime.Add(-(9 * d / 5)),
+		curTime.Add(-(6 * d / 5)),
+		curTime.Add(-(3 * d / 4)),
+		curTime.Add(-(d / 6)),
+		curTime.Add(-(d / 12)),
+		curTime,
+	}
+	for i := 0; i < numSnapshots; i++ {
+		snapshot := updateRoot(t, s, false)
+		if err = persistToBolt(t, snapshot, s, timeStamps[i]); err != nil {
+			t.Fatalf("failed to persist snapshot %d: %v", i, err)
 		}
+	}
+	// now update the root again, but with an empty snapshot,
+	// so that the latest root now references a segment that
+	// belongs to the snapshot which was just persisted to bolt.
+	updateRoot(t, s, true)
+	// now if the purge code is invoked, there's a possibility of the latest snapshot
+	// being removed from bolt and the corresponding file segment getting cleaned up.
+	s.removeOldData()
+	// acquire the copy reader which will now refer to
+	// the latest in-memory snapshot which was the
+	// empty snapshot we just introduced.
+	copyReader := s.CopyReader()
+	defer func() { copyReader.CloseCopyReader() }()
+
+	backupidxConfig := CreateConfig("backup-directory")
+	err = InitTest(backupidxConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := DestroyTest(backupidxConfig)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+	// if the latest snapshot was purged, the following will return error
+	err = copyReader.CopyTo(testFSDirectory(backupidxConfig["path"].(string)))
+	if err != nil {
+		t.Fatalf("error copying the index: %v", err)
 	}
 }
 
 func TestSparseMutationCheckpointing(t *testing.T) {
-	rootBolt := openTestBolt(t, "TestSparseMutationCheckpointing")
-	s := &Scorch{
-		rootBolt:                 rootBolt,
-		rollbackSamplingInterval: 10 * time.Minute,
-		numSnapshotsToKeep:       3,
-		rollbackRetentionFactor:  0.5,
-	}
-	// snapshots persisted at rollbackSamplingInterval (d) intervals, followed
-	// by a single new snapshot after a long (3d) mutation gap - so every
-	// older snapshot now falls outside the (numSnapshotsToKeep-1) * d
-	// expiration window
-	d := s.rollbackSamplingInterval
-	tc := time.Now()
-	seedBoltSnapshots(t, rootBolt, map[uint64]time.Time{
-		9: tc,
-		7: tc.Add(-(3 * d)),
-		5: tc.Add(-(4 * d)),
-		3: tc.Add(-(5 * d)),
-		1: tc.Add(-(6 * d)),
-	})
-	// checkpoints computed while epochs 7, 5 and 3 were still protected; the
-	// retention factor extends the expiration boundary to the middle
-	// checkpoint (epoch 5), so checkpoints newer than it survive the gap
-	s.checkPoints = []*snapshotMetaData{
-		{epoch: 7, timeStamp: tc.Add(-(3 * d))},
-		{epoch: 5, timeStamp: tc.Add(-(4 * d))},
-		{epoch: 3, timeStamp: tc.Add(-(5 * d))},
-	}
-	liveSnapshots, err := s.getLiveSnapshots()
+	cfg := CreateConfig("TestSparseMutationCheckpointing")
+	err := InitTest(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedLiveEpochs := []uint64{9, 7, 5}
-	if len(liveSnapshots) != len(expectedLiveEpochs) {
-		t.Fatalf("expected %d live snapshots, got %d", len(expectedLiveEpochs),
-			len(liveSnapshots))
+	defer func() { _ = DestroyTest(cfg) }()
+	dirPath := cfg["path"].(string)
+	if err = os.Mkdir(dirPath, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	for i, epoch := range expectedLiveEpochs {
-		if liveSnapshots[i].epoch != epoch {
-			t.Fatalf("expected epoch %d at index %d, got %d", epoch, i,
-				liveSnapshots[i].epoch)
-		}
-	}
-	// the latest snapshot (epoch 9) is always live and the cutoff time
-	// based on the retention factor is epoch 5, so epochs 7 and 9 are protected
-	protectedSnapshots := s.getProtectedSnapshots(liveSnapshots)
-	if len(protectedSnapshots) <= 1 {
-		t.Fatalf("expected more than 1 protected snapshot, got %d",
-			len(protectedSnapshots))
-	}
-	for _, epoch := range []uint64{9, 7} {
-		if _, ok := protectedSnapshots[epoch]; !ok {
-			t.Fatalf("expected epoch %d to be protected, got %v",
-				epoch, protectedSnapshots)
-		}
-	}
-}
 
-func TestLatestSnapshotRetentionWindow(t *testing.T) {
-	rootBolt := openTestBolt(t, "TestLatestSnapshotRetentionWindow")
-	s := &Scorch{
-		rootBolt:                 rootBolt,
-		rollbackSamplingInterval: 10 * time.Minute,
-		numSnapshotsToKeep:       3,
-		rollbackRetentionFactor:  0.5,
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("failed to create Scorch: %v", err)
 	}
+	s, ok := idx.(*Scorch)
+	if !ok {
+		t.Fatalf("expected *Scorch, got %T", s)
+	}
+	s.path = dirPath
+	err = s.openBolt()
+	if err != nil {
+		t.Fatalf("failed to open bolt: %v", err)
+	}
+	s.numSnapshotsToKeep = 3
+	s.rollbackSamplingInterval = 2 * time.Second
+	s.rollbackRetentionFactor = 0.5
+	const (
+		numSnapshots = 5
+	)
+	curTime := time.Now()
 	d := s.rollbackSamplingInterval
-	tc := time.Now()
-	seedBoltSnapshots(t, rootBolt, map[uint64]time.Time{
-		9: tc.Add(-(3 * d)),
-		7: tc.Add(-(4 * d)),
-		5: tc.Add(-(5 * d)),
-		3: tc.Add(-(6 * d)),
-		1: tc.Add(-(7 * d)),
-	})
-	s.checkPoints = []*snapshotMetaData{
-		{epoch: 5, timeStamp: tc.Add(-(5 * d))},
-		{epoch: 3, timeStamp: tc.Add(-(6 * d))},
-		{epoch: 1, timeStamp: tc.Add(-(7 * d))},
+	// old --> new
+	timeStamps := []time.Time{
+		curTime.Add(-(6 * d)),
+		curTime.Add(-(5 * d)),
+		curTime.Add(-(4 * d)),
+		curTime.Add(-(3 * d)),
+		curTime,
 	}
-	liveSnapshots, err := s.getLiveSnapshots()
+	for i := 0; i < numSnapshots; i++ {
+		snapshot := updateRoot(t, s, false)
+		if err = persistToBolt(t, snapshot, s, timeStamps[i]); err != nil {
+			t.Fatalf("failed to persist snapshot %d: %v", i, err)
+		}
+	}
+	// preseed the checkpoints
+	s.checkPoints = newCheckPoints(map[uint64]time.Time{
+		2: timeStamps[1],
+		3: timeStamps[2],
+		4: timeStamps[3],
+	})
+	meta, err := s.getLiveSnapshots()
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedLiveEpochs := []uint64{9, 7, 5, 3}
-	if len(liveSnapshots) != len(expectedLiveEpochs) {
-		t.Fatalf("expected %d live snapshots, got %d", len(expectedLiveEpochs),
-			len(liveSnapshots))
+	if len(meta) != s.numSnapshotsToKeep {
+		t.Fatalf("expected %d live snapshots, got %d", s.numSnapshotsToKeep, len(meta))
 	}
-	for i, epoch := range expectedLiveEpochs {
-		if liveSnapshots[i].epoch != epoch {
-			t.Fatalf("expected epoch %d at index %d, got %d", epoch, i,
-				liveSnapshots[i].epoch)
+	for i, m := range meta {
+		expectIdx := numSnapshots - i - 1
+		expectedEpoch := uint64(expectIdx + 1)
+		if m.epoch != expectedEpoch {
+			t.Fatalf("expected epoch %d, got %d", expectedEpoch, m.epoch)
+		}
+		expectedTimeStamp := timeStamps[expectIdx]
+		if !m.timeStamp.Equal(expectedTimeStamp) {
+			t.Fatalf("expected timestamp %v, got %v", expectedTimeStamp, m.timeStamp)
+		}
+	}
+	protectedSnapshots := s.getProtectedSnapshots(meta)
+	if len(protectedSnapshots) != s.numSnapshotsToKeep {
+		t.Fatalf("expected %d protected snapshots, got %d", s.numSnapshotsToKeep, len(protectedSnapshots))
+	}
+	expectedProtectedEpochs := []uint64{5, 4, 3}
+	for _, expectedEpoch := range expectedProtectedEpochs {
+		if _, found := protectedSnapshots[expectedEpoch]; !found {
+			t.Fatalf("expected epoch %d to be protected, but not found", expectedEpoch)
 		}
 	}
 }
