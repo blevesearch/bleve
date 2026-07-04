@@ -314,7 +314,6 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 					segments: roster,
 					score:    scoreSegments(roster, o),
 				}
-
 				if best == nil || candidate.betterThan(best) {
 					best = candidate
 				}
