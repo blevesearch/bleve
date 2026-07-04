@@ -369,27 +369,53 @@ func TestGetProtectedSnapshots(t *testing.T) {
 			expCount:           3,
 			expEpochs:          []uint64{100, 50, 10},
 		},
+		{
+			title: "sparse time series with a recent snapshot must still retain " +
+				"numSnapshotsToKeep by filling the skipped middle snapshots",
+			metaData: []*snapshotMetaData{
+				{epoch: 100, timeStamp: currentTimeStamp},
+				{epoch: 99, timeStamp: currentTimeStamp.Add(-(6 * interval / 10))},
+				{epoch: 88, timeStamp: currentTimeStamp.Add(-(7 * interval / 10))},
+				{epoch: 77, timeStamp: currentTimeStamp.Add(-(8 * interval / 10))},
+				{epoch: 10, timeStamp: currentTimeStamp.Add(-(15 * interval / 10))},
+			},
+			numSnapshotsToKeep: 4,
+			expCount:           4,
+			expEpochs:          []uint64{100, 99, 88, 10},
+		},
+		{
+			title: "latest snapshot exactly one interval from the oldest must " +
+				"still retain numSnapshotsToKeep",
+			metaData: []*snapshotMetaData{
+				{epoch: 100, timeStamp: currentTimeStamp},
+				{epoch: 99, timeStamp: currentTimeStamp.Add(-(interval / 2))},
+				{epoch: 10, timeStamp: currentTimeStamp.Add(-(interval))},
+			},
+			numSnapshotsToKeep: 3,
+			expCount:           3,
+			expEpochs:          []uint64{100, 99, 10},
+		},
 	}
-
 	for i, test := range tests {
 		s.numSnapshotsToKeep = test.numSnapshotsToKeep
 		protectedEpochs := s.getProtectedSnapshots(test.metaData)
 		if len(protectedEpochs) != test.expCount {
-			t.Errorf("%d test: %s, getProtectedSnapshots expected to return %d "+
+			t.Errorf("test %d: %s, getProtectedSnapshots expected to return %d "+
 				"snapshots, but got: %d", i, test.title, test.expCount, len(protectedEpochs))
 		}
 		for _, e := range test.expEpochs {
 			if _, found := protectedEpochs[e]; !found {
-				t.Errorf("%d test: %s, %d epoch expected to be protected, "+
+				t.Errorf("test %d: %s, %d epoch expected to be protected, "+
 					"but missing from protected list: %v", i, test.title, e, protectedEpochs)
 			}
 		}
 	}
 }
 
-// updateRoot creates a new snapshot and returns the new root snapshot.
-// if empty is true, then the new snapshot will be a delete-only snapshot,
-// otherwise it will contain a single document.
+// updateRoot creates a new snapshot, updates the root
+// to point to it, and returns the new snapshot.
+// if empty is true, then the new snapshot will be a delete-only
+// snapshot, otherwise it will contain a single document.
 func updateRoot(t *testing.T, s *Scorch, empty bool) *IndexSnapshot {
 	t.Helper()
 	var seg segment.Segment
@@ -423,7 +449,9 @@ func updateRoot(t *testing.T, s *Scorch, empty bool) *IndexSnapshot {
 	return s.root
 }
 
-// persistToBolt persists the given snapshot to bolt, and also sets the timestamp for the snapshot in the bolt metadata.
+// persistToBolt persists the given snapshot to bolt,
+// sets the timestamp for the snapshot in the bolt metadata and
+// persists any unpersisted segments to the directory.
 func persistToBolt(t *testing.T, snapshot *IndexSnapshot, s *Scorch, timeStamp time.Time) error {
 	t.Helper()
 	tx, err := s.rootBolt.Begin(true)
