@@ -1301,9 +1301,9 @@ func (s *Scorch) removeOldData() {
 }
 
 func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
-	snapshots []*snapshotMetaData) (int, map[uint64]time.Time) {
+	snapshots []*snapshotMetaData) map[uint64]time.Time {
 	if interval == 0 || len(snapshots) == 0 || maxDataPoints <= 0 {
-		return len(snapshots), map[uint64]time.Time{}
+		return map[uint64]time.Time{}
 	}
 	// the map containing the time series snapshots, i.e the timeseries of snapshots
 	// each of which is separated by rollbackSamplingInterval
@@ -1334,7 +1334,7 @@ func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
 			break
 		}
 	}
-	return ptr, rv
+	return rv
 }
 
 // getProtectedSnapshots aims to fetch the epochs keep based on a timestamp basis.
@@ -1344,13 +1344,20 @@ func (s *Scorch) getProtectedSnapshots(liveSnapshots []*snapshotMetaData) map[ui
 	// keep numSnapshotsToKeep - 1 worth of time series snapshots, because we always
 	// must preserve the very latest snapshot in bolt as well to avoid accidental
 	// deletes of bolt entries and cleanups by the purger code.
-	lastPoint, protectedEpochs := getTimeSeriesSnapshots(s.numSnapshotsToKeep-1,
+	protectedEpochs := getTimeSeriesSnapshots(s.numSnapshotsToKeep-1,
 		s.rollbackSamplingInterval, liveSnapshots)
-	if len(protectedEpochs) < s.numSnapshotsToKeep {
-		numSnapshotsNeeded := s.numSnapshotsToKeep - len(protectedEpochs)
-		// we protected the contiguous snapshots from the last point in time series
-		for i := 0; i < numSnapshotsNeeded && i < lastPoint; i++ {
+	numProtected := len(protectedEpochs)
+	// always protect the latest snapshot
+	latestSnapshot := liveSnapshots[0]
+	if _, ok := protectedEpochs[latestSnapshot.epoch]; !ok {
+		protectedEpochs[latestSnapshot.epoch] = latestSnapshot.timeStamp
+		numProtected++
+	}
+	// if we still have not protected enough snapshots, then protect the next most recent snapshots
+	for i := 1; i < len(liveSnapshots) && numProtected < s.numSnapshotsToKeep; i++ {
+		if _, ok := protectedEpochs[liveSnapshots[i].epoch]; !ok {
 			protectedEpochs[liveSnapshots[i].epoch] = liveSnapshots[i].timeStamp
+			numProtected++
 		}
 	}
 	return protectedEpochs
