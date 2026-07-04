@@ -54,8 +54,8 @@ func Plan(segments []Segment, o *MergePlanOptions) (*MergePlan, error) {
 
 // A MergePlan is the result of the Plan() API.
 //
-// The planner doesn’t know how or whether these tasks are executed --
-// that’s up to a separate merge execution system, which might execute
+// The planner doesn't know how or whether these tasks are executed --
+// that's up to a separate merge execution system, which might execute
 // these tasks concurrently or not, and which might execute all the
 // tasks or not.
 type MergePlan struct {
@@ -71,14 +71,14 @@ type MergeTask struct {
 // The MergePlanOptions is designed to be reusable between planning calls.
 type MergePlanOptions struct {
 	// Max # segments per logarithmic tier, or max width of any
-	// logarithmic “step”.  Smaller values mean more merging but fewer
+	// logarithmic "step".  Smaller values mean more merging but fewer
 	// segments.  Should be >= SegmentsPerMergeTask, else you'll have
 	// too much merging.
 	MaxSegmentsPerTier int
 
 	// Max size of any segment produced after merging.  Actual
 	// merging, however, may produce segment sizes different than the
-	// planner’s predicted sizes.
+	// planner's predicted sizes.
 	MaxSegmentSize int64
 
 	// Max size (in bytes) of the persisted segment file that contains the
@@ -171,6 +171,34 @@ var SingleSegmentMergePlanOptions = MergePlanOptions{
 
 // -------------------------------------------
 
+// rosterCandidate is a potential roster of segments considered while
+// planning, along with its computed score.
+type rosterCandidate struct {
+	segments []Segment
+	score    float64 // Lower is better.
+}
+
+// A real merge always beats a single-segment roster, since merging
+// a segment with nobody reclaims nothing.
+func (c *rosterCandidate) betterThan(other *rosterCandidate) bool {
+	ourSegmentCount := c.count()
+	otherSegmentCount := other.count()
+	if ourSegmentCount > 1 && otherSegmentCount <= 1 {
+		return true
+	}
+	if ourSegmentCount <= 1 && otherSegmentCount > 1 {
+		return false
+	}
+	return c.score < other.score
+}
+
+// Count returns the number of segments in the roster.
+func (c *rosterCandidate) count() int {
+	return len(c.segments)
+}
+
+// -------------------------------------------
+
 func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 	if len(segmentsIn) <= 1 {
 		return nil, nil
@@ -250,13 +278,12 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		eligibles = removeSegments(eligibles, empties)
 	}
 
-	// While we’re over budget, keep looping, which might produce
+	// While we're over budget, keep looping, which might produce
 	// another MergeTask.
 	for len(eligibles) > 0 && (len(eligibles)+len(rv.Tasks)) > budgetNumSegments {
-		// Track a current best roster as we examine and score
+		// Track the current best candidate as we examine and score
 		// potential rosters of merges.
-		var bestRoster []Segment
-		var bestRosterScore float64 // Lower score is better.
+		var best *rosterCandidate
 
 		for startIdx := 0; startIdx < len(eligibles); startIdx++ {
 			var roster []Segment
@@ -283,24 +310,26 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 			}
 
 			if len(roster) > 0 {
-				rosterScore := scoreSegments(roster, o)
+				candidate := &rosterCandidate{
+					segments: roster,
+					score:    scoreSegments(roster, o),
+				}
 
-				if len(bestRoster) == 0 || rosterScore < bestRosterScore {
-					bestRoster = roster
-					bestRosterScore = rosterScore
+				if best == nil || candidate.betterThan(best) {
+					best = candidate
 				}
 			}
 		}
 
-		if len(bestRoster) == 0 {
+		if best == nil {
 			return rv, nil
 		}
 		// create tasks with valid merges - i.e. there should be at least 2 non-empty segments
-		if len(bestRoster) > 1 {
-			rv.Tasks = append(rv.Tasks, &MergeTask{Segments: bestRoster})
+		if best.count() > 1 {
+			rv.Tasks = append(rv.Tasks, &MergeTask{Segments: best.segments})
 		}
 
-		eligibles = removeSegments(eligibles, bestRoster)
+		eligibles = removeSegments(eligibles, best.segments)
 	}
 
 	return rv, nil
