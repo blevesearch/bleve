@@ -1607,11 +1607,10 @@ func (s *Scorch) getLiveSnapshots() ([]*snapshotMetaData, error) {
 	cutoffTime := currTime.Add(-expirationDuration)
 	// if we have previous checkpoints, then we can extend
 	// the cutoff time based on the boundary checkpoint
-	for pos := 1; pos < len(meta); pos++ {
-		snapshotTime := meta[pos].timeStamp
-		if snapshotTime.Before(cutoffTime) {
-			boundary := s.getBoundaryCheckPoint(snapshotTime)
-			if boundary.Before(cutoffTime) {
+	for _, snapshot := range meta[1:] {
+		if snapshot.timeStamp.Before(cutoffTime) {
+			boundary := s.getBoundaryCheckPoint(snapshot.timeStamp)
+			if boundary.Before(snapshot.timeStamp) {
 				cutoffTime = boundary
 			}
 			break
