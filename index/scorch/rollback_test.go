@@ -395,6 +395,19 @@ func TestGetProtectedSnapshots(t *testing.T) {
 			expCount:           3,
 			expEpochs:          []uint64{100, 99, 10},
 		},
+		{
+			title: "numSnapshotsToKeep=2 with a boundary-spaced older snapshot must " +
+				"protect exactly the latest and the oldest",
+			metaData: []*snapshotMetaData{
+				{epoch: 100, timeStamp: currentTimeStamp},
+				{epoch: 99, timeStamp: currentTimeStamp.Add(-(interval / 12))},
+				{epoch: 50, timeStamp: currentTimeStamp.Add(-(2 * interval))},
+				{epoch: 10, timeStamp: currentTimeStamp.Add(-(3 * interval))},
+			},
+			numSnapshotsToKeep: 2,
+			expCount:           2,
+			expEpochs:          []uint64{100, 10},
+		},
 	}
 	for i, test := range tests {
 		s.numSnapshotsToKeep = test.numSnapshotsToKeep

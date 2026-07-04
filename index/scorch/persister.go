@@ -1315,6 +1315,9 @@ func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
 	numSnapshotsProtected := 1
 	// traverse the list in reverse order, older timestamps to newer ones.
 	for i := ptr - 1; i >= 0; i-- {
+		if numSnapshotsProtected >= maxDataPoints {
+			break
+		}
 		sinceLast := snapshots[i].timeStamp.Sub(snapshots[ptr].timeStamp)
 		if sinceLast >= interval {
 			// capture the snapshot at the interval boundary: the exact match
@@ -1329,9 +1332,6 @@ func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
 				ptr = idx
 				numSnapshotsProtected++
 			}
-		}
-		if numSnapshotsProtected >= maxDataPoints {
-			break
 		}
 	}
 	return rv
