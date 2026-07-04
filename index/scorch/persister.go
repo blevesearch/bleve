@@ -1573,12 +1573,10 @@ func (s *Scorch) getLiveSnapshots() ([]*snapshotMetaData, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	// if none persisted, then nothing to do
 	if len(meta) == 0 {
 		return nil, nil
 	}
-
 	// check if we have a rollback sampling interval, if not,
 	// then we will just return the latest numSnapshotsToKeep snapshots
 	if s.rollbackSamplingInterval <= 0 {
@@ -1587,19 +1585,16 @@ func (s *Scorch) getLiveSnapshots() ([]*snapshotMetaData, error) {
 		}
 		return meta[:s.numSnapshotsToKeep], nil
 	}
-
 	// we consider a snapshot to be live if:
 	// 1. it is the latest snapshot
 	// 2. it is within our expiration duration
 	var liveSnapshots []*snapshotMetaData
-
 	// always keep the latest snapshot
 	liveSnapshots = append(liveSnapshots, meta[0])
 	extraSnapshots := s.numSnapshotsToKeep - 1
 	if extraSnapshots <= 0 {
 		return liveSnapshots, nil
 	}
-
 	// if we need extra snapshots, compute an expiration duration
 	// beyond which we will not consider snapshots to be live
 	currTime := time.Now()
@@ -1616,14 +1611,12 @@ func (s *Scorch) getLiveSnapshots() ([]*snapshotMetaData, error) {
 			break
 		}
 	}
-
 	// add all snapshots that are newer than the cutoff time
 	for _, snapshot := range meta[1:] {
 		if !snapshot.timeStamp.Before(cutoffTime) {
 			liveSnapshots = append(liveSnapshots, snapshot)
 		}
 	}
-
 	return liveSnapshots, nil
 }
 
