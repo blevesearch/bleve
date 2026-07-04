@@ -413,8 +413,12 @@ func updateRoot(t *testing.T, s *Scorch, empty bool) *IndexSnapshot {
 		ids:     ids,
 		applied: make(chan error),
 	}
-	if err = s.introduceSegment(intro); err != nil {
-		t.Fatalf("introduceSegment failed: %v", err)
+	go func(intro *segmentIntroduction) {
+		s.introduceSegment(intro)
+	}(intro)
+	err = <-intro.applied
+	if err != nil {
+		t.Fatalf("failed to apply segment introduction: %v", err)
 	}
 	return s.root
 }
@@ -463,6 +467,7 @@ func persistToBolt(t *testing.T, snapshot *IndexSnapshot, s *Scorch, timeStamp t
 			path := filepath.Join(s.path, filename)
 			err := persistToDirectory(seg, nil, path)
 			if err != nil {
+				_ = tx.Rollback()
 				return err
 			}
 			persistedSeg, err := s.segPlugin.OpenUsing(path, s.segmentConfig)
@@ -568,6 +573,10 @@ func TestLatestSnapshotProtected(t *testing.T) {
 			t.Fatalf("expected epoch %d to be protected, but not found", expectedEpoch)
 		}
 	}
+	err = s.Close()
+	if err != nil {
+		t.Fatalf("failed to close Scorch: %v", err)
+	}
 }
 
 // testFSDirectory implements index.Directory by writing files under a
@@ -667,6 +676,10 @@ func TestBackupRacingWithPurge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error copying the index: %v", err)
 	}
+	err = s.Close()
+	if err != nil {
+		t.Fatalf("failed to close Scorch: %v", err)
+	}
 }
 
 func TestSparseMutationCheckpointing(t *testing.T) {
@@ -749,6 +762,10 @@ func TestSparseMutationCheckpointing(t *testing.T) {
 		if _, found := protectedSnapshots[expectedEpoch]; !found {
 			t.Fatalf("expected epoch %d to be protected, but not found", expectedEpoch)
 		}
+	}
+	err = s.Close()
+	if err != nil {
+		t.Fatalf("failed to close Scorch: %v", err)
 	}
 }
 
@@ -854,5 +871,9 @@ func TestRollbackCheckpointsOnRestart(t *testing.T) {
 		if _, found := protectedSnapshots[expectedEpoch]; !found {
 			t.Fatalf("expected epoch %d to be protected, but not found", expectedEpoch)
 		}
+	}
+	err = s.Close()
+	if err != nil {
+		t.Fatalf("failed to close Scorch: %v", err)
 	}
 }
