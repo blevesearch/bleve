@@ -350,10 +350,13 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 			}
 
 			if len(roster) > 0 {
+				rosterScore := scoreSegments(roster, o)
+
 				candidate := &rosterCandidate{
 					segments: roster,
-					score:    scoreSegments(roster, o),
+					score:    rosterScore,
 				}
+
 				if best == nil || candidate.betterThan(best) {
 					best = candidate
 				}
@@ -364,13 +367,15 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 			return rv, nil
 		}
 
+		bestRoster := best.segments
+
 		// create tasks with valid merges - i.e. there should be at least 2 non-empty segments
-		if best.count() > 1 {
-			rv.Tasks = append(rv.Tasks, &MergeTask{Segments: best.segments})
+		if len(bestRoster) > 1 {
+			rv.Tasks = append(rv.Tasks, &MergeTask{Segments: bestRoster})
 			numMergeTasks++
 		}
 
-		eligibles = removeSegments(eligibles, best.segments)
+		eligibles = removeSegments(eligibles, bestRoster)
 	}
 
 	return rv, nil
