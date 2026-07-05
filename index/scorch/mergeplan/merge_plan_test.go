@@ -538,6 +538,8 @@ type testCyclesSpec struct {
 	n int // Number of cycles to run.
 	o *MergePlanOptions
 
+	converge bool
+
 	beforePlan func(*testCyclesSpec)
 	afterPlan  func(*testCyclesSpec, *MergePlan)
 
@@ -575,31 +577,47 @@ func (spec *testCyclesSpec) runCycles(t *testing.T) {
 			emit(spec.descrip, spec.cycle, 2, spec.segments, plan)
 		}
 
-		if plan != nil {
-			if len(plan.Tasks) > 0 {
-				numPlansWithTasks++
+		if plan == nil || len(plan.Tasks) == 0 {
+			if spec.converge {
+				return
+			}
+			spec.cycle++
+			continue
+		}
+
+		numPlansWithTasks++
+		before := len(spec.segments)
+
+		for _, task := range plan.Tasks {
+			spec.segments = removeSegments(spec.segments, task.Segments)
+
+			var totLiveSize int64
+			for _, segment := range task.Segments {
+				totLiveSize += segment.LiveSize()
 			}
 
-			for _, task := range plan.Tasks {
-				spec.segments = removeSegments(spec.segments, task.Segments)
-
-				var totLiveSize int64
-				for _, segment := range task.Segments {
-					totLiveSize += segment.LiveSize()
-				}
-
-				if totLiveSize > 0 {
-					spec.segments = append(spec.segments, &segment{
-						MyId:       spec.nextSegmentId,
-						MyFullSize: totLiveSize,
-						MyLiveSize: totLiveSize,
-					})
-					spec.nextSegmentId++
-				}
+			if totLiveSize > 0 {
+				spec.segments = append(spec.segments, &segment{
+					MyId:       spec.nextSegmentId,
+					MyFullSize: totLiveSize,
+					MyLiveSize: totLiveSize,
+				})
+				spec.nextSegmentId++
 			}
 		}
 
+		if len(spec.segments) >= before {
+			t.Errorf("cycle %d: plan produced %d task(s) but the segment count "+
+				"did not shrink (%d -> %d)", spec.cycle, len(plan.Tasks), before, len(spec.segments))
+		}
+
 		spec.cycle++
+	}
+
+	if spec.converge {
+		t.Errorf("index did not converge within %d cycles (%d segments remain); "+
+			"the planner keeps producing tasks, likely an infinite loop",
+			spec.n, len(spec.segments))
 	}
 
 	if numPlansWithTasks <= 0 {
@@ -723,20 +741,12 @@ func TestPlanMaxSegmentFileSize(t *testing.T) {
 func TestSingleTaskMergePlan(t *testing.T) {
 	o := &DefaultMergePlanOptions
 	o.FloorSegmentFileSize = 209715200
-
-	// borrowing the spec values from MB-66112
-	//
-	// both segments are eligible, but the roster with a single segment is scored
-	// higher than the roster with two segments
-	// in this case the merge plan returns task with a single segment non-empty
-	// segment which when introduced into the scorch system doesn't cause any change
-	// and you'd be stuck in an infinite loop where the plan keeps generating the
-	// same task with the same single segment, which doesn't converge the index to
-	// a steady state
 	spec := testCyclesSpec{
-		descrip: "mssswdbm",
-		verbose: os.Getenv("VERBOSE") == "mssswdbm" || os.Getenv("VERBOSE") == "y",
-		o:       o,
+		descrip:  "stmp",
+		verbose:  os.Getenv("VERBOSE") == "stmp" || os.Getenv("VERBOSE") == "y",
+		n:        10,
+		o:        o,
+		converge: true,
 		segments: []Segment{
 			&segment{
 				MyId:       2,
@@ -751,14 +761,12 @@ func TestSingleTaskMergePlan(t *testing.T) {
 				MyFileSize: 24805725,
 			},
 		},
+		nextSegmentId: 3,
 	}
-
-	plan, err := Plan(spec.segments, spec.o)
-	if err != nil {
-		t.Fatalf("Plan failed, err: %v", err)
-	}
-
-	if len(plan.Tasks) > 0 {
-		t.Fatalf("expected 0 tasks, got: %d", len(plan.Tasks))
+	spec.runCycles(t)
+	// The index converged to the single budgeted segment.
+	if len(spec.segments) != 1 {
+		t.Fatalf("expected index to converge to 1 segment, got: %d",
+			len(spec.segments))
 	}
 }
