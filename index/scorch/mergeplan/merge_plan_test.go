@@ -36,11 +36,10 @@ type segment struct {
 	MyFileSize  int64
 }
 
-func (s *segment) Id() uint64          { return s.MyId }
-func (s *segment) FullSize() int64     { return s.MyFullSize }
-func (s *segment) LiveSize() int64     { return s.MyLiveSize }
-func (s *segment) HasVector() bool     { return s.MyHasVector }
-func (s *segment) FullFileSize() int64 { return s.MyFileSize }
+func (s *segment) Id() uint64      { return s.MyId }
+func (s *segment) FullSize() int64 { return s.MyFullSize }
+func (s *segment) LiveSize() int64 { return s.MyLiveSize }
+func (s *segment) HasVector() bool { return s.MyHasVector }
 func (s *segment) LiveFileSize() int64 {
 	fullSize := float64(s.MyFullSize)
 	if fullSize <= 0 {
