@@ -237,31 +237,32 @@ func NewScorch(storeName string,
 
 	rv.numSnapshotsToKeep = NumSnapshotsToKeep
 	if v, ok := rv.config["numSnapshotsToKeep"]; ok {
-		var t int
+		var n int
 		var err error
-		if t, err = parseToInteger(v); err != nil {
+		if n, err = parseToInteger(v); err != nil {
 			return nil, fmt.Errorf("numSnapshotsToKeep parse err: %v", err)
 		}
-		if t > 0 {
-			rv.numSnapshotsToKeep = t
+		if n > 0 {
+			rv.numSnapshotsToKeep = n
 		}
 	}
 
 	rv.rollbackSamplingInterval = RollbackSamplingInterval
 	if v, ok := rv.config["rollbackSamplingInterval"]; ok {
-		var t time.Duration
+		var d time.Duration
 		var err error
-		if t, err = parseToTimeDuration(v); err != nil {
+		if d, err = parseToTimeDuration(v); err != nil {
 			return nil, fmt.Errorf("rollbackSamplingInterval parse err: %v", err)
 		}
-		rv.rollbackSamplingInterval = t
+		rv.rollbackSamplingInterval = d
 	}
 
 	rv.rollbackRetentionFactor = RollbackRetentionFactor
 	if v, ok := rv.config["rollbackRetentionFactor"]; ok {
 		var r float64
-		if r, ok = v.(float64); !ok {
-			return nil, fmt.Errorf("rollbackRetentionFactor must be a float64")
+		var err error
+		if r, err = parseToFloat(v); err != nil {
+			return nil, fmt.Errorf("rollbackRetentionFactor parse err: %v", err)
 		}
 		if r < 0 || r > 1 {
 			return nil, fmt.Errorf("rollbackRetentionFactor must be between 0 and 1")
@@ -1001,6 +1002,20 @@ func parseToInteger(i interface{}) (int, error) {
 
 	default:
 		return 0, fmt.Errorf("expects int or float64 value")
+	}
+}
+
+func parseToFloat(i interface{}) (float64, error) {
+	switch v := i.(type) {
+	case float64:
+		return v, nil
+	case float32:
+		return float64(v), nil
+	case int:
+		return float64(v), nil
+
+	default:
+		return 0, fmt.Errorf("expects float64, float32 or int value")
 	}
 }
 

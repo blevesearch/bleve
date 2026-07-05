@@ -918,3 +918,93 @@ func TestRollbackCheckpointsOnRestart(t *testing.T) {
 		t.Fatalf("failed to close Scorch: %v", err)
 	}
 }
+
+func TestRollackOptions(t *testing.T) {
+	cfg := CreateConfig("TestRollackOptions")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = DestroyTest(cfg) }()
+	dirPath := cfg["path"].(string)
+	if err = os.Mkdir(dirPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	type testCase struct {
+		cfg       map[string]interface{}
+		expectErr bool
+	}
+	tests := []testCase{
+		{
+			cfg: map[string]interface{}{
+				"numSnapshotsToKeep":       3,
+				"rollbackSamplingInterval": "10m",
+				"rollbackRetentionFactor":  0.5,
+			},
+			expectErr: false,
+		},
+		{
+			cfg: map[string]interface{}{
+				"numSnapshotsToKeep":       0.5,
+				"rollbackSamplingInterval": "10a",
+				"rollbackRetentionFactor":  1,
+			},
+			expectErr: true,
+		},
+		{
+			cfg: map[string]interface{}{
+				"numSnapshotsToKeep":       3.0,
+				"rollbackSamplingInterval": 10,
+				"rollbackRetentionFactor":  1.5,
+			},
+			expectErr: true,
+		},
+		{
+			cfg: map[string]interface{}{
+				"numSnapshotsToKeep":       3.0,
+				"rollbackSamplingInterval": "10s",
+				"rollbackRetentionFactor":  0,
+			},
+			expectErr: false,
+		},
+		{
+			cfg: map[string]interface{}{
+				"numSnapshotsToKeep":       "3.0",
+				"rollbackSamplingInterval": "10s",
+				"rollbackRetentionFactor":  2,
+			},
+			expectErr: true,
+		},
+		{
+			cfg: map[string]interface{}{
+				"numSnapshotsToKeep":       3.0,
+				"rollbackSamplingInterval": "10s",
+				"rollbackRetentionFactor":  "2",
+			},
+			expectErr: true,
+		},
+		{
+			cfg: map[string]interface{}{
+				"numSnapshotsToKeep":       3.0,
+				"rollbackSamplingInterval": "10s",
+				"rollbackRetentionFactor":  2,
+			},
+			expectErr: true,
+		},
+	}
+	for i, test := range tests {
+		test.cfg["path"] = dirPath
+		s, err := NewScorch(Name, test.cfg, index.NewAnalysisQueue(1))
+		gotErr := err != nil
+		wantErr := test.expectErr
+		if gotErr != wantErr {
+			t.Fatalf("test %d: expected error: %v, got error: %v", i, wantErr, gotErr)
+		}
+		if err == nil {
+			err = s.Close()
+			if err != nil {
+				t.Fatalf("test %d: failed to close Scorch: %v", i, err)
+			}
+		}
+	}
+}
