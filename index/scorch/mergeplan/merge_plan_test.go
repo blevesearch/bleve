@@ -35,11 +35,27 @@ type segment struct {
 	MyFileSize  int64
 }
 
-func (s *segment) Id() uint64      { return s.MyId }
-func (s *segment) FullSize() int64 { return s.MyFullSize }
-func (s *segment) LiveSize() int64 { return s.MyLiveSize }
-func (s *segment) HasVector() bool { return s.MyHasVector }
-func (s *segment) FileSize() int64 { return s.MyFileSize }
+func (s *segment) Id() uint64          { return s.MyId }
+func (s *segment) FullSize() int64     { return s.MyFullSize }
+func (s *segment) LiveSize() int64     { return s.MyLiveSize }
+func (s *segment) HasVector() bool     { return s.MyHasVector }
+func (s *segment) FullFileSize() int64 { return s.MyFileSize }
+func (s *segment) LiveFileSize() int64 {
+	fullSize := float64(s.MyFullSize)
+	if fullSize <= 0 {
+		return 0
+	}
+	liveSize := float64(s.MyLiveSize)
+	if liveSize <= 0 {
+		return 0
+	}
+	fullSizeOnDisk := float64(s.MyFileSize)
+	if fullSizeOnDisk <= 0 {
+		return 0
+	}
+	liveRatio := liveSize / fullSize
+	return int64(fullSizeOnDisk * liveRatio)
+}
 
 func makeLinearSegments(n int) (rv []Segment) {
 	for i := 0; i < n; i++ {
@@ -592,15 +608,23 @@ func (spec *testCyclesSpec) runCycles(t *testing.T) {
 			spec.segments = removeSegments(spec.segments, task.Segments)
 
 			var totLiveSize int64
+			var totFileSize int64
+			var hasVector bool
 			for _, segment := range task.Segments {
 				totLiveSize += segment.LiveSize()
+				totFileSize += segment.LiveFileSize()
+				if segment.HasVector() {
+					hasVector = true
+				}
 			}
 
 			if totLiveSize > 0 {
 				spec.segments = append(spec.segments, &segment{
-					MyId:       spec.nextSegmentId,
-					MyFullSize: totLiveSize,
-					MyLiveSize: totLiveSize,
+					MyId:        spec.nextSegmentId,
+					MyFullSize:  totLiveSize,
+					MyLiveSize:  totLiveSize,
+					MyFileSize:  totFileSize,
+					MyHasVector: hasVector,
 				})
 				spec.nextSegmentId++
 			}

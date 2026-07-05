@@ -74,7 +74,7 @@ func (s *SegmentSnapshot) HasVector() bool {
 	return len(numVecs) > 0
 }
 
-func (s *SegmentSnapshot) FileSize() int64 {
+func (s *SegmentSnapshot) FullFileSize() int64 {
 	ps, ok := s.segment.(segment.PersistedSegment)
 	if !ok {
 		return 0
@@ -91,6 +91,26 @@ func (s *SegmentSnapshot) FileSize() int64 {
 	}
 
 	return fi.Size()
+}
+
+func (s *SegmentSnapshot) LiveFileSize() int64 {
+	fullSize := float64(s.FullSize())
+	if fullSize <= 0 {
+		return 0
+	}
+
+	liveSize := float64(s.LiveSize())
+	if liveSize <= 0 {
+		return 0
+	}
+
+	fullSizeOnDisk := float64(s.FullFileSize())
+	if fullSizeOnDisk <= 0 {
+		return 0
+	}
+
+	liveRatio := liveSize / fullSize
+	return int64(fullSizeOnDisk * liveRatio)
 }
 
 func (s *SegmentSnapshot) Close() error {
