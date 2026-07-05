@@ -1006,3 +1006,98 @@ func TestEmptySegmentsDoNotForceOverMerge(t *testing.T) {
 		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
 	}
 }
+
+func TestOnlyEmptySegments(t *testing.T) {
+	o := &MergePlanOptions{
+		MaxSegmentsPerTier:   10,
+		MaxSegmentSize:       1000000,
+		SegmentsPerMergeTask: 10,
+		FloorSegmentSize:     1,
+	}
+
+	spec := testCyclesSpec{
+		descrip:  "oes",
+		verbose:  os.Getenv("VERBOSE") == "oes" || os.Getenv("VERBOSE") == "y",
+		n:        10,
+		o:        o,
+		converge: true,
+		segments: []Segment{
+			&segment{MyId: 1, MyFullSize: 100, MyLiveSize: 0},
+			&segment{MyId: 2, MyFullSize: 100, MyLiveSize: 0},
+			&segment{MyId: 3, MyFullSize: 100, MyLiveSize: 0},
+		},
+		nextSegmentId: 4,
+	}
+
+	spec.runCycles(t)
+
+	expectedSegments := []Segment{}
+
+	if !reflect.DeepEqual(spec.segments, expectedSegments) {
+		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
+	}
+}
+
+func TestEligibleAndFilteredSegments(t *testing.T) {
+	o := &MergePlanOptions{
+		MaxSegmentsPerTier:   10,
+		MaxSegmentSize:       1000000,
+		MaxSegmentFileSize:   1000,
+		SegmentsPerMergeTask: 10,
+		FloorSegmentSize:     1,
+		FloorSegmentFileSize: 2000,
+	}
+
+	spec := testCyclesSpec{
+		descrip:  "eafs",
+		verbose:  os.Getenv("VERBOSE") == "eafs" || os.Getenv("VERBOSE") == "y",
+		n:        10,
+		o:        o,
+		converge: true,
+		segments: []Segment{
+			&segment{MyId: 1, MyFullSize: 100, MyLiveSize: 100, MyFileSize: 400, MyHasVector: true},
+			&segment{MyId: 2, MyFullSize: 100, MyLiveSize: 100, MyFileSize: 400, MyHasVector: true},
+			&segment{MyId: 3, MyFullSize: 100, MyLiveSize: 100, MyFileSize: 400, MyHasVector: true},
+			&segment{MyId: 4, MyFullSize: 100, MyLiveSize: 100, MyFileSize: 400, MyHasVector: true},
+		},
+		nextSegmentId: 5,
+	}
+
+	spec.runCycles(t)
+
+	expectedSegments := []Segment{
+		&segment{MyId: 5, MyFullSize: 200, MyLiveSize: 200, MyFileSize: 800, MyHasVector: true},
+		&segment{MyId: 6, MyFullSize: 200, MyLiveSize: 200, MyFileSize: 800, MyHasVector: true},
+	}
+
+	if !reflect.DeepEqual(spec.segments, expectedSegments) {
+		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
+	}
+}
+
+func TestPlanWithNoBestRoster(t *testing.T) {
+	o := DefaultMergePlanOptions
+	o.SegmentsPerMergeTask = 0
+
+	spec := testCyclesSpec{
+		descrip:  "pwnbr",
+		verbose:  os.Getenv("VERBOSE") == "pwnbr" || os.Getenv("VERBOSE") == "y",
+		n:        10,
+		o:        &o,
+		converge: true,
+		segments: []Segment{
+			&segment{MyId: 1, MyFullSize: 100, MyLiveSize: 0, MyFileSize: 400},
+			&segment{MyId: 2, MyFullSize: 100, MyLiveSize: 100, MyFileSize: 400},
+			&segment{MyId: 3, MyFullSize: 100, MyLiveSize: 50, MyFileSize: 4000},
+		},
+		nextSegmentId: 5,
+	}
+
+	spec.runCycles(t)
+
+	expectedSegments := spec.segments
+
+	if !reflect.DeepEqual(spec.segments, expectedSegments) {
+		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
+	}
+}
