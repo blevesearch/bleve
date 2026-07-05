@@ -278,9 +278,11 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		eligibles = removeSegments(eligibles, empties)
 	}
 
+	numMergeTasks := 0
+
 	// While we're over budget, keep looping, which might produce
 	// another MergeTask.
-	for len(eligibles) > 0 && (len(eligibles)+len(rv.Tasks)) > budgetNumSegments {
+	for len(eligibles) > 0 && (len(eligibles)+numMergeTasks) > budgetNumSegments {
 		// Track the current best candidate as we examine and score
 		// potential rosters of merges.
 		var best *rosterCandidate
@@ -326,6 +328,7 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		// create tasks with valid merges - i.e. there should be at least 2 non-empty segments
 		if best.count() > 1 {
 			rv.Tasks = append(rv.Tasks, &MergeTask{Segments: best.segments})
+			numMergeTasks++
 		}
 
 		eligibles = removeSegments(eligibles, best.segments)

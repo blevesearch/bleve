@@ -739,13 +739,13 @@ func TestPlanMaxSegmentFileSize(t *testing.T) {
 }
 
 func TestSingleTaskMergePlan(t *testing.T) {
-	o := &DefaultMergePlanOptions
+	o := DefaultMergePlanOptions
 	o.FloorSegmentFileSize = 209715200
 	spec := testCyclesSpec{
 		descrip:  "stmp",
 		verbose:  os.Getenv("VERBOSE") == "stmp" || os.Getenv("VERBOSE") == "y",
 		n:        10,
-		o:        o,
+		o:        &o,
 		converge: true,
 		segments: []Segment{
 			&segment{
@@ -767,6 +767,39 @@ func TestSingleTaskMergePlan(t *testing.T) {
 	// The index converged to the single budgeted segment.
 	if len(spec.segments) != 1 {
 		t.Fatalf("expected index to converge to 1 segment, got: %d",
+			len(spec.segments))
+	}
+}
+
+func TestEmptySegmentsDoNotForceOverMerge(t *testing.T) {
+	o := &MergePlanOptions{
+		MaxSegmentsPerTier:   10,
+		MaxSegmentSize:       1000000,
+		SegmentsPerMergeTask: 10,
+		FloorSegmentSize:     1,
+		CalcBudget: func(totalSize, firstTierSize int64, o *MergePlanOptions) int {
+			return 2
+		},
+	}
+
+	spec := testCyclesSpec{
+		descrip:  "esdnfom",
+		verbose:  os.Getenv("VERBOSE") == "esdnfom" || os.Getenv("VERBOSE") == "y",
+		n:        10,
+		o:        o,
+		converge: true,
+		segments: []Segment{
+			&segment{MyId: 1, MyFullSize: 100, MyLiveSize: 100},
+			&segment{MyId: 2, MyFullSize: 100, MyLiveSize: 100},
+			&segment{MyId: 3, MyFullSize: 100, MyLiveSize: 0},
+		},
+		nextSegmentId: 4,
+	}
+
+	spec.runCycles(t)
+
+	if len(spec.segments) != 2 {
+		t.Fatalf("expected index to converge to 2 segments, got: %d",
 			len(spec.segments))
 	}
 }
