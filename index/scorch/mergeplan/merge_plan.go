@@ -40,7 +40,10 @@ type Segment interface {
 
 	HasVector() bool
 
-	// Live on-disk size of the persisted segment file
+	// Size of the persisted segment file.
+	FileSize() int64
+
+	// Size of the persisted segment file
 	// accounting for any logical deletions.
 	LiveFileSize() int64
 }
