@@ -104,14 +104,14 @@ func (s *SegmentSnapshot) LiveFileSize() int64 {
 		return 0
 	}
 
-	fullSizeOnDisk := float64(s.FileSize())
-	if fullSizeOnDisk <= 0 {
+	fileSize := float64(s.FileSize())
+	if fileSize <= 0 {
 		return 0
 	}
 
 	liveRatio := liveSize / fullSize
 
-	return int64(fullSizeOnDisk * liveRatio)
+	return int64(fileSize * liveRatio)
 }
 
 func (s *SegmentSnapshot) Close() error {
