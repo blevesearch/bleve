@@ -243,7 +243,7 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 
 	var eligibles []Segment
 	var eligiblesLiveSize int64
-	var eligiblesFileSize int64
+	var eligiblesLiveFileSize int64
 
 	for _, segment := range segments {
 		liveSize := segment.LiveSize()
@@ -270,7 +270,7 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		if isEligible {
 			eligibles = append(eligibles, segment)
 			eligiblesLiveSize += liveSize
-			eligiblesFileSize += liveFileSize
+			eligiblesLiveFileSize += liveFileSize
 		}
 	}
 
@@ -285,7 +285,7 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 	switch currency {
 	case FileSizeBudget:
 		minLiveFileSize = o.RaiseToFloorSegmentFileSize(minLiveFileSize)
-		budgetNumSegments = calcBudget(eligiblesFileSize, minLiveFileSize, o)
+		budgetNumSegments = calcBudget(eligiblesLiveFileSize, minLiveFileSize, o)
 	case LiveSizeBudget:
 		minLiveSize = o.RaiseToFloorSegmentSize(minLiveSize)
 		budgetNumSegments = calcBudget(eligiblesLiveSize, minLiveSize, o)

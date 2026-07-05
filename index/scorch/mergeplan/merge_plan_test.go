@@ -845,6 +845,126 @@ func TestSingleTaskMergePlan(t *testing.T) {
 			MyFileSize: 129475914 + 24805725,
 		},
 	}
+
+	if !reflect.DeepEqual(spec.segments, expectedSegments) {
+		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
+	}
+}
+
+func TestPlanLiveFileSizeEligibility(t *testing.T) {
+	o := &MergePlanOptions{
+		MaxSegmentFileSize:   4 * 1000 * 1000,
+		MaxSegmentSize:       100 * 1000,
+		SegmentsPerMergeTask: 2,
+		TierGrowth:           2.0,
+		FloorSegmentSize:     2000,
+	}
+
+	segments := []Segment{
+		&segment{
+			MyId:        1,
+			MyFullSize:  1000,
+			MyLiveSize:  500,
+			MyHasVector: true,
+			MyFileSize:  3 * 1000 * 1000,
+		},
+		&segment{
+			MyId:        2,
+			MyFullSize:  1000,
+			MyLiveSize:  500,
+			MyHasVector: true,
+			MyFileSize:  3 * 1000 * 1000,
+		},
+		&segment{
+			MyId:        3,
+			MyFullSize:  1000,
+			MyLiveSize:  1000,
+			MyHasVector: true,
+			MyFileSize:  3 * 1000 * 1000,
+		},
+	}
+
+	spec := testCyclesSpec{
+		descrip:       "plfse",
+		verbose:       os.Getenv("VERBOSE") == "plfse" || os.Getenv("VERBOSE") == "y",
+		n:             10,
+		o:             o,
+		converge:      true,
+		segments:      slices.Clone(segments),
+		nextSegmentId: 4,
+	}
+
+	spec.runCycles(t)
+
+	expectedSegments := []Segment{
+		&segment{
+			MyId:        3,
+			MyFullSize:  1000,
+			MyLiveSize:  1000,
+			MyHasVector: true,
+			MyFileSize:  3 * 1000 * 1000,
+		},
+		&segment{
+			MyId:        4,
+			MyFullSize:  1000,
+			MyLiveSize:  1000,
+			MyHasVector: true,
+			MyFileSize:  3 * 1000 * 1000,
+		},
+	}
+
+	if !reflect.DeepEqual(spec.segments, expectedSegments) {
+		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
+	}
+}
+
+func TestPlanLiveFileSizeBudget(t *testing.T) {
+	o := &MergePlanOptions{
+		MaxSegmentsPerTier:   1,
+		SegmentsPerMergeTask: 2,
+		TierGrowth:           2.0,
+		FloorSegmentSize:     1,
+		FloorSegmentFileSize: 10 * 1000 * 1000,
+		MaxSegmentSize:       100 * 1000,
+		MaxSegmentFileSize:   4 * 1000 * 1000 * 1000,
+	}
+
+	segments := []Segment{
+		&segment{
+			MyId:       1,
+			MyFullSize: 1000,
+			MyLiveSize: 100,
+			MyFileSize: 10 * 1000 * 1000,
+		},
+		&segment{
+			MyId:       2,
+			MyFullSize: 1000,
+			MyLiveSize: 100,
+			MyFileSize: 10 * 1000 * 1000,
+		},
+	}
+
+	spec := testCyclesSpec{
+		descrip:       "plfsb",
+		verbose:       os.Getenv("VERBOSE") == "plfsb" || os.Getenv("VERBOSE") == "y",
+		n:             10,
+		o:             o,
+		converge:      true,
+		segments:      slices.Clone(segments),
+		nextSegmentId: 3,
+	}
+
+	spec.runCycles(t)
+
+	expectedSegments := []Segment{
+		&segment{
+			MyId:       3,
+			MyFullSize: 200,
+			MyLiveSize: 200,
+			MyFileSize: 2 * 1000 * 1000,
+		},
+	}
+
 	if !reflect.DeepEqual(spec.segments, expectedSegments) {
 		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
 	}
@@ -881,6 +1001,7 @@ func TestEmptySegmentsDoNotForceOverMerge(t *testing.T) {
 		&segment{MyId: 1, MyFullSize: 100, MyLiveSize: 100},
 		&segment{MyId: 2, MyFullSize: 100, MyLiveSize: 100},
 	}
+
 	if !reflect.DeepEqual(spec.segments, expectedSegments) {
 		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
 	}
