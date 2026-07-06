@@ -196,7 +196,7 @@ const (
 	LiveSizeBudget
 )
 
-var ErrUnknownCurrency = errors.New("Unknown Budget Currency")
+var ErrUnknownCurrency = errors.New("unknown budget currency")
 
 // -------------------------------------------
 
@@ -207,8 +207,6 @@ type rosterCandidate struct {
 	score    float64 // Lower is better.
 }
 
-// A real merge always beats a single-segment roster, since merging
-// a segment with nobody reclaims nothing.
 func (c *rosterCandidate) betterThan(other *rosterCandidate) bool {
 	ourSegmentCount := c.count()
 	otherSegmentCount := other.count()
@@ -221,7 +219,6 @@ func (c *rosterCandidate) betterThan(other *rosterCandidate) bool {
 	return c.score < other.score
 }
 
-// Count returns the number of segments in the roster.
 func (c *rosterCandidate) count() int {
 	return len(c.segments)
 }
@@ -331,22 +328,25 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 			for idx := startIdx; idx < len(eligibles) && len(roster) < o.SegmentsPerMergeTask; idx++ {
 				eligible := eligibles[idx]
 
-				els := eligible.LiveSize()
+				liveSize := eligible.LiveSize()
 
-				if rosterLiveSize+els >= o.MaxSegmentSize {
+				if rosterLiveSize+liveSize >= o.MaxSegmentSize {
 					continue
 				}
 
 				if eligible.HasVector() {
-					elfs := eligible.LiveFileSize()
-					if rosterLiveFileSize+elfs >= o.MaxSegmentFileSize {
+					liveFileSize := eligible.LiveFileSize()
+
+					if rosterLiveFileSize+liveFileSize >= o.MaxSegmentFileSize {
 						continue
 					}
-					rosterLiveFileSize += elfs
+
+					rosterLiveFileSize += liveFileSize
 				}
 
 				roster = append(roster, eligible)
-				rosterLiveSize += els
+
+				rosterLiveSize += liveSize
 			}
 
 			if len(roster) > 0 {

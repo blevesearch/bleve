@@ -284,6 +284,8 @@ func (w *closeChWrapper) listen() {
 	}
 }
 
+// mergeBatch represents a single merge task in a merge plan,
+// which may consist of multiple segments to be merged into a new segment.
 type mergeBatch struct {
 	snapshots  []*SegmentSnapshot
 	segments   []segment.Segment
@@ -492,7 +494,7 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 		err = segment.ErrClosed
 		return err
 	case s.merges <- sm:
-		atomic.AddUint64(&s.stats.TotFileMergeIntroductions, uint64(len(mergeBatches)))
+		atomic.AddUint64(&s.stats.TotFileMergeIntroductions, uint64(numBatches))
 	}
 
 	introStartTime := time.Now()
@@ -504,7 +506,7 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 	if atomic.LoadUint64(&s.stats.MaxFileMergeZapIntroductionTime) < introTime {
 		atomic.StoreUint64(&s.stats.MaxFileMergeZapIntroductionTime, introTime)
 	}
-	atomic.AddUint64(&s.stats.TotFileMergeIntroductionsDone, uint64(len(mergeBatches)))
+	atomic.AddUint64(&s.stats.TotFileMergeIntroductionsDone, uint64(numBatches))
 
 	_ = introStatus.indexSnapshot.DecRef()
 	for batchID, skipped := range introStatus.skipped {
@@ -517,7 +519,7 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 		}
 	}
 
-	atomic.AddUint64(&s.stats.TotFileMergePlanTasksDone, uint64(len(mergeBatches)))
+	atomic.AddUint64(&s.stats.TotFileMergePlanTasksDone, uint64(numBatches))
 	s.fireEvent(EventKindMergeTaskIntroduction, 0)
 	return nil
 }
