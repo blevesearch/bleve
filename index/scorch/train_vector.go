@@ -465,4 +465,41 @@ func (t *vectorTrainer) removeFileWriterIDs(ids map[string]struct{}) error {
 
 		}
 	}
+func (t *vectorTrainer) FileWriterIDsInUse() (map[string]struct{}, error) {
+	t.m.RLock()
+	defer t.m.RUnlock()
+	writerIDs := make(map[string]struct{})
+	if t.trainedIndex != nil {
+		if seg, ok := t.trainedIndex.segment.(segment.SegmentWithCallbacks); ok {
+			writerIDs[seg.CallbackId()] = struct{}{}
+		}
+	}
+
+	err := t.parent.rootBolt.View(func(tx *util.BoltTxImpl) error {
+		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
+		if snapshots == nil {
+			return nil
+		}
+		c := snapshots.Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			if !bytes.Equal(k, util.BoltTrainerKey) {
+				continue
+			}
+			trainerBucket := snapshots.GetBucket(k)
+			if trainerBucket == nil {
+				continue
+			}
+			id, err := trainerBucket.Get(util.BoltMetaDataFileWriterIDKey, nil)
+			if err != nil {
+				return err
+			}
+			writerIDs[string(id)] = struct{}{}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return writerIDs, nil
 }

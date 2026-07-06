@@ -1332,6 +1332,16 @@ func (s *Scorch) FileWriterIDsInUse() (map[string]struct{}, error) {
 		}
 	}
 
+	if s.trainer != nil {
+		trainerKeys, err := s.trainer.FileWriterIDsInUse()
+		if err != nil {
+			return nil, err
+		}
+		for k, _ := range trainerKeys {
+			keyMap[k] = struct{}{}
+		}
+	}
+
 	boltKeys, err := s.boltFileWriterIDsInUse()
 	if err != nil {
 		return nil, err
