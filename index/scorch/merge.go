@@ -443,11 +443,11 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 			seg.ResetBytesRead(totalBytesRead)
 
 			for j, idx := range fl.sbsBatchIndexes {
-				segSnapshot := task.Segments[idx].(*SegmentSnapshot)
-				mergedSegHistory[segSnapshot.id] = &mergedSegmentHistory{
+				ss := task.Segments[idx].(*SegmentSnapshot)
+				mergedSegHistory[ss.id] = &mergedSegmentHistory{
 					flushID:      0,
-					oldSegment:   segSnapshot,
 					oldNewDocIDs: newDocNums[j],
+					oldSegment:   ss,
 				}
 			}
 
