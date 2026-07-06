@@ -1116,7 +1116,10 @@ func TestPlanWithNoBestRoster(t *testing.T) {
 
 	spec.runCycles(t)
 
-	expectedSegments := spec.segments
+	expectedSegments := []Segment{
+		&segment{MyId: 2, MyFullSize: 100, MyLiveSize: 100, MyFileSize: 400},
+		&segment{MyId: 3, MyFullSize: 100, MyLiveSize: 50, MyFileSize: 4000},
+	}
 
 	if !reflect.DeepEqual(spec.segments, expectedSegments) {
 		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
