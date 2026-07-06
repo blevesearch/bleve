@@ -42,6 +42,8 @@ func (s *segment) LiveSize() int64 { return s.MyLiveSize }
 func (s *segment) HasVector() bool { return s.MyHasVector }
 func (s *segment) FileSize() int64 { return s.MyFileSize }
 func (s *segment) LiveFileSize() int64 {
+	// LiveFileSize is an estimate of the live portion of the file size,
+	// based on the ratio of live to full size.
 	fullSize := float64(s.MyFullSize)
 	if fullSize <= 0 {
 		return 0
@@ -605,15 +607,20 @@ func (spec *testCyclesSpec) runCycles(t *testing.T) {
 		numPlansWithTasks++
 		before := len(spec.segments)
 
+		var beforeFullSize int64
+		for _, s := range spec.segments {
+			beforeFullSize += s.FullSize()
+		}
+
 		for _, task := range plan.Tasks {
 			spec.segments = removeSegments(spec.segments, task.Segments)
 
 			var totLiveSize int64
-			var totFileSize int64
+			var totLiveFileSize int64
 			var hasVector bool
 			for _, segment := range task.Segments {
 				totLiveSize += segment.LiveSize()
-				totFileSize += segment.LiveFileSize()
+				totLiveFileSize += segment.LiveFileSize()
 				if segment.HasVector() {
 					hasVector = true
 				}
@@ -624,16 +631,30 @@ func (spec *testCyclesSpec) runCycles(t *testing.T) {
 					MyId:        spec.nextSegmentId,
 					MyFullSize:  totLiveSize,
 					MyLiveSize:  totLiveSize,
-					MyFileSize:  totFileSize,
+					MyFileSize:  totLiveFileSize,
 					MyHasVector: hasVector,
 				})
 				spec.nextSegmentId++
 			}
 		}
 
-		if len(spec.segments) >= before {
-			t.Errorf("cycle %d: plan produced %d task(s) but the segment count "+
-				"did not shrink (%d -> %d)", spec.cycle, len(plan.Tasks), before, len(spec.segments))
+		after := len(spec.segments)
+
+		var afterFullSize int64
+		for _, s := range spec.segments {
+			afterFullSize += s.FullSize()
+		}
+
+		if after > before {
+			t.Errorf("cycle %d: plan produced %d task(s) but increased segment count (%d segs -> %d segs)",
+				spec.cycle, len(plan.Tasks), before, after)
+		}
+
+		if after == before && afterFullSize >= beforeFullSize {
+			t.Errorf("cycle %d: plan produced %d task(s) but made no progress "+
+				"(%d segs / %d bytes -> %d segs / %d bytes)",
+				spec.cycle, len(plan.Tasks), before, beforeFullSize,
+				len(spec.segments), afterFullSize)
 		}
 
 		spec.cycle++
@@ -808,7 +829,7 @@ func TestPlanMaxSegmentFileSize(t *testing.T) {
 	}
 }
 
-func TestSingleTaskMergePlan(t *testing.T) {
+func TestSingleSegmentTaskMergePlan(t *testing.T) {
 	o := DefaultMergePlanOptions
 	o.FloorSegmentFileSize = 209715200
 

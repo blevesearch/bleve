@@ -370,7 +370,8 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		bestRoster := best.segments
 
 		// create tasks with valid merges - i.e. there should be at least 2 non-empty segments
-		if len(bestRoster) > 1 {
+		// or the bestRoster should have 1 segment with deletes to reclaim.
+		if len(bestRoster) > 1 || bestRoster[0].LiveSize() < bestRoster[0].FullSize() {
 			rv.Tasks = append(rv.Tasks, &MergeTask{Segments: bestRoster})
 			numMergeTasks++
 		}
