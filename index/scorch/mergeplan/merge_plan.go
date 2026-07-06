@@ -210,11 +210,21 @@ type rosterCandidate struct {
 func (c *rosterCandidate) betterThan(other *rosterCandidate) bool {
 	ourSegmentCount := c.count()
 	otherSegmentCount := other.count()
-	if ourSegmentCount > 1 && otherSegmentCount <= 1 {
-		return true
+	// if we have more than one segment and the other has only one, and that
+	// one segment is fully live, then we are better than the other.
+	if ourSegmentCount > 1 && otherSegmentCount == 1 {
+		solo := other.segments[0]
+		if solo.LiveSize() == solo.FullSize() {
+			return true
+		}
 	}
-	if ourSegmentCount <= 1 && otherSegmentCount > 1 {
-		return false
+	// if we have only one segment and the other has more than one, and that
+	// one segment is fully live, then we are worse than the other.
+	if ourSegmentCount == 1 && otherSegmentCount > 1 {
+		solo := c.segments[0]
+		if solo.LiveSize() == solo.FullSize() {
+			return false
+		}
 	}
 	return c.score < other.score
 }
