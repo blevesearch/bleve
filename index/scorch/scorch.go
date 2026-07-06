@@ -70,6 +70,9 @@ type Scorch struct {
 	// must be accessed within the rootLock as it is accessed by the asynchronous cleanup routine.
 	copyScheduled map[string]int
 
+	persisterOptions    *persisterOptions
+	mergePlannerOptions *mergeplan.MergePlanOptions
+
 	numSnapshotsToKeep       int
 	rollbackRetentionFactor  float64
 	checkPoints              []*snapshotMetaData
@@ -130,10 +133,9 @@ func (t ScorchErrorType) Error() string {
 
 // ErrType values for ScorchError
 const (
-	ErrAsyncPanic   = ScorchErrorType("async panic error")
-	ErrPersist      = ScorchErrorType("persist error")
-	ErrCleanup      = ScorchErrorType("cleanup error")
-	ErrOptionsParse = ScorchErrorType("options parse error")
+	ErrAsyncPanic = ScorchErrorType("async panic error")
+	ErrPersist    = ScorchErrorType("persist error")
+	ErrCleanup    = ScorchErrorType("cleanup error")
 )
 
 // ScorchError is passed to onAsyncError when errors are
@@ -232,18 +234,53 @@ func NewScorch(storeName string,
 	if ok {
 		rv.onAsyncError = RegistryAsyncErrorCallbacks[aecbName]
 	}
-	// validate any custom persistor options to
-	// prevent an async error in the persistor routine
-	_, err = rv.parsePersisterOptions()
+
+	rv.numSnapshotsToKeep = NumSnapshotsToKeep
+	if v, ok := rv.config["numSnapshotsToKeep"]; ok {
+		var n int
+		var err error
+		if n, err = parseToInteger(v); err != nil {
+			return nil, fmt.Errorf("numSnapshotsToKeep parse err: %v", err)
+		}
+		if n > 0 {
+			rv.numSnapshotsToKeep = n
+		}
+	}
+
+	rv.rollbackSamplingInterval = RollbackSamplingInterval
+	if v, ok := rv.config["rollbackSamplingInterval"]; ok {
+		var d time.Duration
+		var err error
+		if d, err = parseToTimeDuration(v); err != nil {
+			return nil, fmt.Errorf("rollbackSamplingInterval parse err: %v", err)
+		}
+		rv.rollbackSamplingInterval = d
+	}
+
+	rv.rollbackRetentionFactor = RollbackRetentionFactor
+	if v, ok := rv.config["rollbackRetentionFactor"]; ok {
+		var r float64
+		var err error
+		if r, err = parseToFloat(v); err != nil {
+			return nil, fmt.Errorf("rollbackRetentionFactor parse err: %v", err)
+		}
+		if r < 0 || r > 1 {
+			return nil, fmt.Errorf("rollbackRetentionFactor must be between 0 and 1")
+		}
+		rv.rollbackRetentionFactor = r
+	}
+
+	po, err := rv.parsePersisterOptions()
 	if err != nil {
 		return nil, err
 	}
-	// validate any custom merge planner options to
-	// prevent an async error in the merger routine
-	_, err = rv.parseMergePlannerOptions()
+	rv.persisterOptions = po
+
+	mpo, err := rv.parseMergePlannerOptions(po)
 	if err != nil {
 		return nil, err
 	}
+	rv.mergePlannerOptions = mpo
 
 	if trainer := initTrainer(rv, config); trainer != nil {
 		rv.trainer = trainer
@@ -328,6 +365,7 @@ func (s *Scorch) openBolt() error {
 		s.unsafeBatch = true
 	}
 
+	// bolt options
 	rootBoltOpt := *bolt.DefaultOptions
 	if s.readOnly {
 		rootBoltOpt.ReadOnly = true
@@ -388,42 +426,6 @@ func (s *Scorch) openBolt() error {
 		err := s.removeOldZapFiles() // Before persister or merger create any new files.
 		if err != nil {
 			_ = s.Close()
-			return err
-		}
-	}
-
-	s.numSnapshotsToKeep = NumSnapshotsToKeep
-	if v, ok := s.config["numSnapshotsToKeep"]; ok {
-		var t int
-		if t, err = parseToInteger(v); err != nil {
-			return fmt.Errorf("numSnapshotsToKeep parse err: %v", err)
-		}
-		if t > 0 {
-			s.numSnapshotsToKeep = t
-		}
-	}
-
-	s.rollbackSamplingInterval = RollbackSamplingInterval
-	if v, ok := s.config["rollbackSamplingInterval"]; ok {
-		var t time.Duration
-		if t, err = parseToTimeDuration(v); err != nil {
-			return fmt.Errorf("rollbackSamplingInterval parse err: %v", err)
-		}
-		s.rollbackSamplingInterval = t
-	}
-
-	s.rollbackRetentionFactor = RollbackRetentionFactor
-	if v, ok := s.config["rollbackRetentionFactor"]; ok {
-		var r float64
-		if r, ok = v.(float64); ok {
-			return fmt.Errorf("rollbackRetentionFactor parse err: %v", err)
-		}
-		s.rollbackRetentionFactor = r
-	}
-
-	typ, ok := s.config["spatialPlugin"].(string)
-	if ok {
-		if err := s.loadSpatialAnalyzerPlugin(typ); err != nil {
 			return err
 		}
 	}
@@ -1003,6 +1005,20 @@ func parseToInteger(i interface{}) (int, error) {
 	}
 }
 
+func parseToFloat(i interface{}) (float64, error) {
+	switch v := i.(type) {
+	case float64:
+		return v, nil
+	case float32:
+		return float64(v), nil
+	case int:
+		return float64(v), nil
+
+	default:
+		return 0, fmt.Errorf("expects float64, float32 or int value")
+	}
+}
+
 // Holds Zap's field level stats at a segment level
 type fieldStats struct {
 	// StatName -> FieldName -> value
@@ -1365,10 +1381,6 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	var mergePlanner mergePlanFunc = func(ourSnapshot *IndexSnapshot) (*mergeplan.MergePlan, error) {
 		// Create a merge plan with the filtered segments and force a merge
 		// to remove the callback from the segments.
-		mergePlannerOptions, err := s.parseMergePlannerOptions()
-		if err != nil {
-			return nil, fmt.Errorf("mergePlannerOption json parsing err: %v", err)
-		}
 		atomic.AddUint64(&s.stats.TotFileMergePlan, 1)
 
 		// filter all segments that have callbacks that need to be removed
@@ -1387,7 +1399,7 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 		}
 
 		// attempt a merge plan with the default merge planner options
-		mergePlan, err := mergeplan.Plan(segsToCompact, mergePlannerOptions)
+		mergePlan, err := mergeplan.Plan(segsToCompact, s.mergePlannerOptions)
 		if err != nil {
 			atomic.AddUint64(&s.stats.TotFileMergePlanErr, 1)
 			return nil, fmt.Errorf("merge plan creation err: %v", err)
