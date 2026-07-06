@@ -311,7 +311,7 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 	}
 
 	// default to making a merge plan if a custom one is not provided
-	if mergePlan == nil {
+	if mergePlan == nil || len(mergePlan.Tasks) == 0 {
 		// build list of persisted segments in this snapshot
 		var onlyPersistedSnapshots []mergeplan.Segment
 		for _, segmentSnapshot := range ourSnapshot.segment {
@@ -365,7 +365,11 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 	mergeBatches := make([]*mergeBatch, numBatches)
 	defer func() {
 		if err != nil {
-			for _, batch := range mergeBatches {
+			for batchID := 0; batchID < numBatches; batchID++ {
+				batch := mergeBatches[batchID]
+				if batch == nil {
+					continue
+				}
 				if batch.new != nil {
 					_ = batch.new.Close()
 				}
