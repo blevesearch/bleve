@@ -29,7 +29,7 @@ require (
 	github.com/couchbase/moss v0.2.0
 	github.com/spf13/cobra v1.10.2
 	go.etcd.io/bbolt v1.4.0
-	golang.org/x/text v0.35.0
+	golang.org/x/text v0.37.0
 	google.golang.org/protobuf v1.36.6
 )
 
@@ -41,6 +41,6 @@ require (
 	github.com/json-iterator/go v0.0.0-20171115153421-f7279a603ede // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
-	golang.org/x/net v0.51.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 )

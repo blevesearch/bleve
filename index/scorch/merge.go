@@ -60,17 +60,8 @@ func (s *Scorch) mergerLoop() {
 
 	var lastEpochMergePlanned uint64
 	var ctrlMsg *mergerCtrl
-	mergePlannerOptions, err := s.parseMergePlannerOptions()
-	if err != nil {
-		s.fireAsyncError(NewScorchError(
-			merger,
-			fmt.Sprintf("mergerPlannerOptions json parsing err: %v", err),
-			ErrOptionsParse,
-		))
-		return
-	}
 	ctrlMsgDflt := &mergerCtrl{ctx: context.Background(),
-		options: mergePlannerOptions,
+		options: s.mergePlannerOptions,
 		doneCh:  nil}
 
 OUTER:
@@ -234,14 +225,9 @@ func (s *Scorch) ForceMerge(ctx context.Context,
 	return nil
 }
 
-func (s *Scorch) parseMergePlannerOptions() (*mergeplan.MergePlanOptions,
+func (s *Scorch) parseMergePlannerOptions(po *persisterOptions) (*mergeplan.MergePlanOptions,
 	error) {
 	mergePlannerOptions := mergeplan.DefaultMergePlanOptions
-
-	po, err := s.parsePersisterOptions()
-	if err != nil {
-		return nil, err
-	}
 	// by default use the MaxSizeInMemoryMergePerWorker from the persister option
 	// as the FloorSegmentFileSize for the merge planner which would be the
 	// first tier size in the planning. If the value is 0, then we don't use the
@@ -580,6 +566,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			// is updated - which is valid, since the snapshot updated in bolt is
 			// cleaned up only if its zero ref'd (MB-66163 for more details)
 			s.markIneligibleForRemoval(filename)
+			newMergedSegmentFileNames[flushID] = filename
 
 			// the newly merged segment is already flushed out to disk, just needs
 			// to be opened using mmap.
@@ -593,7 +580,6 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 			}
 			newDocIDsSet[flushID] = newDocIDs
 			newMergedSegmentIDs[flushID] = newSegmentID
-			newMergedSegmentFileNames[flushID] = filename
 			newMergedSegments[flushID], err = s.segPlugin.OpenUsing(path, s.segmentConfig)
 			if err != nil {
 				em.Lock()
