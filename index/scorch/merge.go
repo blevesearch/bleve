@@ -360,6 +360,7 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 		atomic.AddUint64(&s.stats.TotFileMergePlanTasksSegments, uint64(len(task.Segments)))
 
 		newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
+
 		fl := &flushable{
 			sbsBatch:        make([]segment.Segment, 0, len(task.Segments)),
 			sbsBatchDrops:   make([]*roaring.Bitmap, 0, len(task.Segments)),
@@ -385,6 +386,7 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 				}
 			}
 		}
+
 		mergedSegHistory := make(map[uint64]*mergedSegmentHistory, len(fl.sbsBatchIndexes))
 
 		var seg segment.Segment
