@@ -380,6 +380,7 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 		}
 	}()
 
+	numMergedSegments := 0
 	for batchID, task := range mergePlan.Tasks {
 		if len(task.Segments) == 0 {
 			atomic.AddUint64(&s.stats.TotFileMergePlanTasksSegmentsEmpty, 1)
@@ -424,6 +425,7 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 			continue
 		}
 
+		numMergedSegments += len(batch.snapshots)
 		s.markIneligibleForRemoval(batch.filename)
 		path := s.path + string(os.PathSeparator) + batch.filename
 
@@ -465,7 +467,7 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 
 	newSegmentIDs := make([]uint64, numBatches)
 	newSegments := make([]segment.Segment, numBatches)
-	mergedSegHistory := make(map[uint64]*mergedSegmentHistory, numBatches)
+	mergedSegHistory := make(map[uint64]*mergedSegmentHistory, numMergedSegments)
 	for batchID := 0; batchID < numBatches; batchID++ {
 		batch := mergeBatches[batchID]
 		newSegmentIDs[batchID] = batch.id
@@ -663,6 +665,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 		new:              newMergedSegments,
 		mergedSegHistory: make(map[uint64]*mergedSegmentHistory, numSegments),
 		notifyCh:         make(chan *mergeTaskIntroStatus),
+		mmaped:           1,
 	}
 
 	// create a history map which maps the old in-memory segments with the specific
