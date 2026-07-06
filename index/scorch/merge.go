@@ -284,6 +284,17 @@ func (w *closeChWrapper) listen() {
 	}
 }
 
+type mergeBatch struct {
+	snapshots  []*SegmentSnapshot
+	segments   []segment.Segment
+	drops      []*roaring.Bitmap
+	newDocNums [][]uint64
+
+	new      segment.Segment
+	id       uint64
+	filename string
+}
+
 // planMergeAtSnapshot plans and executes the merge operations for a given snapshot
 // if there is a custom merge plan function provided, it uses that to get the merge plan
 // otherwise, it builds the merge plan using the default planner and executes the merge tasks in the plan.
@@ -318,7 +329,8 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 			atomic.AddUint64(&s.stats.TotFileMergePlanErr, 1)
 			return fmt.Errorf("merge planning err: %v", err)
 		}
-		if mergePlan == nil {
+
+		if mergePlan == nil || len(mergePlan.Tasks) == 0 {
 			// nothing to do
 			atomic.AddUint64(&s.stats.TotFileMergePlanNone, 1)
 			return nil
@@ -339,11 +351,9 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 			done <- err
 		}
 	}()
+
 	var filenames []string
 	defer func() {
-		// once all the newly merged segment introductions are done,
-		// its safe to unflip the removal ineligibility for the replaced
-		// older segments
 		s.rootLock.Lock()
 		for _, filename := range filenames {
 			delete(s.ineligibleForRemoval, filename)
@@ -351,31 +361,47 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 		s.rootLock.Unlock()
 	}()
 
-	for _, task := range mergePlan.Tasks {
+	numBatches := len(mergePlan.Tasks)
+	mergeBatches := make([]*mergeBatch, numBatches)
+	defer func() {
+		if err != nil {
+			for _, batch := range mergeBatches {
+				if batch.new != nil {
+					_ = batch.new.Close()
+				}
+				s.unmarkIneligibleForRemoval(batch.filename)
+			}
+		}
+	}()
+
+	for batchID, task := range mergePlan.Tasks {
 		if len(task.Segments) == 0 {
 			atomic.AddUint64(&s.stats.TotFileMergePlanTasksSegmentsEmpty, 1)
-			continue
 		}
-
 		atomic.AddUint64(&s.stats.TotFileMergePlanTasksSegments, uint64(len(task.Segments)))
-
 		newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
 
-		fl := &flushable{
-			sbsBatch:        make([]segment.Segment, 0, len(task.Segments)),
-			sbsBatchDrops:   make([]*roaring.Bitmap, 0, len(task.Segments)),
-			sbsBatchIndexes: make([]int, 0, len(task.Segments)),
+		batch := &mergeBatch{
+			snapshots: make([]*SegmentSnapshot, 0, len(task.Segments)),
+			segments:  make([]segment.Segment, 0, len(task.Segments)),
+			drops:     make([]*roaring.Bitmap, 0, len(task.Segments)),
+
+			newDocNums: nil,
+			new:        nil,
+
+			id:       newSegmentID,
+			filename: zapFileName(newSegmentID),
 		}
 
-		for idx, planSegment := range task.Segments {
+		for _, planSegment := range task.Segments {
 			if segSnapshot, ok := planSegment.(*SegmentSnapshot); ok {
 				if persistedSeg, ok := segSnapshot.segment.(segment.PersistedSegment); ok {
 					if segSnapshot.LiveSize() == 0 {
 						atomic.AddUint64(&s.stats.TotFileMergeSegmentsEmpty, 1)
 					} else {
-						fl.sbsBatch = append(fl.sbsBatch, segSnapshot.segment)
-						fl.sbsBatchDrops = append(fl.sbsBatchDrops, segSnapshot.deleted)
-						fl.sbsBatchIndexes = append(fl.sbsBatchIndexes, idx)
+						batch.snapshots = append(batch.snapshots, segSnapshot)
+						batch.segments = append(batch.segments, segSnapshot.segment)
+						batch.drops = append(batch.drops, segSnapshot.deleted)
 					}
 					// track the files getting merged for unsetting the
 					// removal ineligibility. This helps to unflip files
@@ -387,110 +413,108 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 			}
 		}
 
-		mergedSegHistory := make(map[uint64]*mergedSegmentHistory, len(fl.sbsBatchIndexes))
+		if len(batch.segments) == 0 {
+			mergeBatches[batchID] = batch
+			continue
+		}
 
-		var seg segment.Segment
-		var filename string
-		if len(fl.sbsBatch) > 0 {
-			filename = zapFileName(newSegmentID)
-			s.markIneligibleForRemoval(filename)
-			path := s.path + string(os.PathSeparator) + filename
+		s.markIneligibleForRemoval(batch.filename)
+		path := s.path + string(os.PathSeparator) + batch.filename
 
-			fileMergeZapStartTime := time.Now()
+		fileMergeZapStartTime := time.Now()
+		atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
+		prevBytesReadTotal := cumulateBytesRead(batch.segments)
+		batch.newDocNums, _, err = s.segPlugin.MergeUsing(batch.segments, batch.drops, path,
+			cw.cancelCh, s, s.segmentConfig)
+		atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
 
-			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
-			prevBytesReadTotal := cumulateBytesRead(fl.sbsBatch)
-			var newDocNums [][]uint64
-			newDocNums, _, err = s.segPlugin.MergeUsing(fl.sbsBatch, fl.sbsBatchDrops, path,
-				cw.cancelCh, s, s.segmentConfig)
-			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
+		fileMergeZapTime := uint64(time.Since(fileMergeZapStartTime))
+		atomic.AddUint64(&s.stats.TotFileMergeZapTime, fileMergeZapTime)
+		if atomic.LoadUint64(&s.stats.MaxFileMergeZapTime) < fileMergeZapTime {
+			atomic.StoreUint64(&s.stats.MaxFileMergeZapTime, fileMergeZapTime)
+		}
 
-			fileMergeZapTime := uint64(time.Since(fileMergeZapStartTime))
-			atomic.AddUint64(&s.stats.TotFileMergeZapTime, fileMergeZapTime)
-			if atomic.LoadUint64(&s.stats.MaxFileMergeZapTime) < fileMergeZapTime {
-				atomic.StoreUint64(&s.stats.MaxFileMergeZapTime, fileMergeZapTime)
-			}
-
-			if err != nil {
-				s.unmarkIneligibleForRemoval(filename)
-				atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
-				if err == segment.ErrClosed {
-					return err
-				}
-				return fmt.Errorf("merging failed: %v", err)
-			}
-
-			seg, err = s.segPlugin.OpenUsing(path, s.segmentConfig)
-			if err != nil {
-				s.unmarkIneligibleForRemoval(filename)
-				atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
+		if err != nil {
+			s.unmarkIneligibleForRemoval(batch.filename)
+			atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
+			if err == segment.ErrClosed {
 				return err
 			}
-
-			totalBytesRead := seg.BytesRead() + prevBytesReadTotal
-			seg.ResetBytesRead(totalBytesRead)
-
-			for j, idx := range fl.sbsBatchIndexes {
-				ss := task.Segments[idx].(*SegmentSnapshot)
-				mergedSegHistory[ss.id] = &mergedSegmentHistory{
-					flushID:      0,
-					oldNewDocIDs: newDocNums[j],
-					oldSegment:   ss,
-				}
-			}
-
-			atomic.AddUint64(&s.stats.TotFileMergeSegments, uint64(len(fl.sbsBatch)))
-		}
-
-		sm := &segmentMerge{
-			id:               []uint64{newSegmentID},
-			mergedSegHistory: mergedSegHistory,
-			new:              []segment.Segment{seg},
-			notifyCh:         make(chan *mergeTaskIntroStatus),
-			mmaped:           1,
-		}
-
-		s.fireEvent(EventKindMergeTaskIntroductionStart, 0)
-
-		// give it to the introducer
-		select {
-		case <-s.closeCh:
-			if seg != nil {
-				_ = seg.Close()
-			}
-			s.unmarkIneligibleForRemoval(filename)
-			err = segment.ErrClosed
+			err = fmt.Errorf("merging failed: %v", err)
 			return err
-		case s.merges <- sm:
-			atomic.AddUint64(&s.stats.TotFileMergeIntroductions, 1)
 		}
 
-		introStartTime := time.Now()
-		// it is safe to blockingly wait for the merge introduction
-		// here as the introducer is bound to handle the notify channel.
-		introStatus := <-sm.notifyCh
-		introTime := uint64(time.Since(introStartTime))
-		atomic.AddUint64(&s.stats.TotFileMergeZapIntroductionTime, introTime)
-		if atomic.LoadUint64(&s.stats.MaxFileMergeZapIntroductionTime) < introTime {
-			atomic.StoreUint64(&s.stats.MaxFileMergeZapIntroductionTime, introTime)
-		}
-		atomic.AddUint64(&s.stats.TotFileMergeIntroductionsDone, 1)
-		if introStatus != nil && introStatus.indexSnapshot != nil {
-			_ = introStatus.indexSnapshot.DecRef()
-			if introStatus.skipped[0] {
-				// close the segment on skipping introduction.
-				if seg != nil {
-					_ = seg.Close()
-				}
-				s.unmarkIneligibleForRemoval(filename)
-			}
+		batch.new, err = s.segPlugin.OpenUsing(path, s.segmentConfig)
+		if err != nil {
+			s.unmarkIneligibleForRemoval(batch.filename)
+			atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
+			return err
 		}
 
-		atomic.AddUint64(&s.stats.TotFileMergePlanTasksDone, 1)
-
-		s.fireEvent(EventKindMergeTaskIntroduction, 0)
+		totalBytesRead := batch.new.BytesRead() + prevBytesReadTotal
+		batch.new.ResetBytesRead(totalBytesRead)
+		atomic.AddUint64(&s.stats.TotFileMergeSegments, uint64(len(batch.segments)))
+		mergeBatches[batchID] = batch
 	}
 
+	newSegmentIDs := make([]uint64, numBatches)
+	newSegments := make([]segment.Segment, numBatches)
+	mergedSegHistory := make(map[uint64]*mergedSegmentHistory, numBatches)
+	for batchID := 0; batchID < numBatches; batchID++ {
+		batch := mergeBatches[batchID]
+		newSegmentIDs[batchID] = batch.id
+		newSegments[batchID] = batch.new
+		for j, ss := range batch.snapshots {
+			mergedSegHistory[ss.id] = &mergedSegmentHistory{
+				batchID:      batchID,
+				oldNewDocIDs: batch.newDocNums[j],
+				oldSegment:   ss,
+			}
+		}
+	}
+
+	sm := &segmentMerge{
+		id:               newSegmentIDs,
+		new:              newSegments,
+		mergedSegHistory: mergedSegHistory,
+		notifyCh:         make(chan *mergeTaskIntroStatus),
+		mmaped:           1,
+	}
+
+	s.fireEvent(EventKindMergeTaskIntroductionStart, 0)
+	// give it to the introducer
+	select {
+	case <-s.closeCh:
+		err = segment.ErrClosed
+		return err
+	case s.merges <- sm:
+		atomic.AddUint64(&s.stats.TotFileMergeIntroductions, uint64(len(mergeBatches)))
+	}
+
+	introStartTime := time.Now()
+	// it is safe to blockingly wait for the merge introduction
+	// here as the introducer is bound to handle the notify channel.
+	introStatus := <-sm.notifyCh
+	introTime := uint64(time.Since(introStartTime))
+	atomic.AddUint64(&s.stats.TotFileMergeZapIntroductionTime, introTime)
+	if atomic.LoadUint64(&s.stats.MaxFileMergeZapIntroductionTime) < introTime {
+		atomic.StoreUint64(&s.stats.MaxFileMergeZapIntroductionTime, introTime)
+	}
+	atomic.AddUint64(&s.stats.TotFileMergeIntroductionsDone, uint64(len(mergeBatches)))
+
+	_ = introStatus.indexSnapshot.DecRef()
+	for batchID, skipped := range introStatus.skipped {
+		if skipped {
+			batch := mergeBatches[batchID]
+			if batch.new != nil {
+				_ = batch.new.Close()
+			}
+			s.unmarkIneligibleForRemoval(batch.filename)
+		}
+	}
+
+	atomic.AddUint64(&s.stats.TotFileMergePlanTasksDone, uint64(len(mergeBatches)))
+	s.fireEvent(EventKindMergeTaskIntroduction, 0)
 	return nil
 }
 
@@ -503,7 +527,7 @@ type mergeTaskIntroStatus struct {
 // single introducer channel push. That way there is a check to ensure that the
 // file count doesn't explode during the index's lifetime.
 type mergedSegmentHistory struct {
-	flushID      uint64
+	batchID      int
 	oldNewDocIDs []uint64
 	oldSegment   *SegmentSnapshot
 }
@@ -643,7 +667,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(snapshot *IndexSnapshot,
 		for j, idx := range flush.sbsBatchIndexes {
 			ss := snapshot.segment[idx]
 			sm.mergedSegHistory[ss.id] = &mergedSegmentHistory{
-				flushID:      uint64(flushID),
+				batchID:      flushID,
 				oldNewDocIDs: newDocIDsSet[flushID][j],
 				oldSegment:   ss,
 			}
