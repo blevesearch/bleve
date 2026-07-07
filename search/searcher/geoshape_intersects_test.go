@@ -19,16 +19,15 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/index/scorch"
-	"github.com/blevesearch/bleve/v2/index/upsidedown/store/gtreap"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
 func setupIndex(t *testing.T) index.Index {
 	analysisQueue := index.NewAnalysisQueue(1)
 	i, err := scorch.NewScorch(
-		gtreap.Name,
+		scorch.Name,
 		map[string]interface{}{
-			"path": "",
+			"path": t.TempDir(),
 		},
 		analysisQueue)
 	if err != nil {
@@ -92,6 +91,11 @@ func TestPointIntersects(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestPointMultiPointIntersects(t *testing.T) {
@@ -142,6 +146,11 @@ func TestPointMultiPointIntersects(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -203,6 +212,11 @@ func TestPointLinestringIntersects(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestPointMultiLinestringIntersects(t *testing.T) {
@@ -262,6 +276,11 @@ func TestPointMultiLinestringIntersects(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -330,6 +349,11 @@ func TestPointPolygonIntersects(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -402,6 +426,11 @@ func TestPointMultiPolygonIntersects(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestEnvelopePointIntersects(t *testing.T) {
@@ -456,6 +485,11 @@ func TestEnvelopePointIntersects(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -520,6 +554,11 @@ func TestEnvelopeLinestringIntersect(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestEnvelopePolygonIntersect(t *testing.T) {
@@ -575,6 +614,11 @@ func TestEnvelopePolygonIntersect(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestMultiPointIntersects(t *testing.T) {
@@ -617,6 +661,11 @@ func TestMultiPointIntersects(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -703,6 +752,11 @@ func TestLinestringIntersects(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -807,6 +861,11 @@ func TestLinestringPolygonIntersects(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestLinestringPointIntersects(t *testing.T) {
@@ -886,6 +945,11 @@ func TestLinestringPointIntersects(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestMultiLinestringIntersects(t *testing.T) {
@@ -937,6 +1001,11 @@ func TestMultiLinestringIntersects(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestMultiLinestringMultiPointIntersects(t *testing.T) {
@@ -987,6 +1056,11 @@ func TestMultiLinestringMultiPointIntersects(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -1132,6 +1206,11 @@ func TestPolygonIntersects(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestPolygonLinestringIntersects(t *testing.T) {
@@ -1204,6 +1283,11 @@ func TestPolygonLinestringIntersects(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -1278,6 +1362,11 @@ func TestPolygonMultiLinestringIntersects(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestPolygonPointIntersects(t *testing.T) {
@@ -1329,6 +1418,11 @@ func TestPolygonPointIntersects(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -1404,6 +1498,11 @@ func TestMultiPolygonIntersects(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestMultiPolygonMultiPointIntersects(t *testing.T) {
@@ -1461,6 +1560,11 @@ func TestMultiPolygonMultiPointIntersects(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestMultiPolygonMultiLinestringIntersects(t *testing.T) {
@@ -1511,6 +1615,11 @@ func TestMultiPolygonMultiLinestringIntersects(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestGeometryCollectionIntersects(t *testing.T) {
@@ -1557,6 +1666,11 @@ func TestGeometryCollectionIntersects(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -1620,6 +1734,11 @@ func TestGeometryCollectionPointIntersects(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestGeometryCollectionLinestringIntersects(t *testing.T) {
@@ -1673,6 +1792,11 @@ func TestGeometryCollectionLinestringIntersects(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -1728,6 +1852,11 @@ func TestGeometryCollectionPolygonIntersects(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestPointGeometryCollectionIntersects(t *testing.T) {
@@ -1781,5 +1910,10 @@ func TestPointGeometryCollectionIntersects(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }

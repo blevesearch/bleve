@@ -22,7 +22,6 @@ import (
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/index/scorch"
-	"github.com/blevesearch/bleve/v2/index/upsidedown/store/gtreap"
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -131,6 +130,10 @@ func TestGeoJsonEnvelopeWithInQuery(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		err = i.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	for n, test := range tests {
@@ -212,6 +215,10 @@ func TestGeoJsonEnvelopeIntersectsQuery(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		err = i.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	for n, test := range tests {
@@ -288,6 +295,10 @@ func TestGeoJsonEnvelopeContainsQuery(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		err = i.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	for n, test := range tests {
@@ -331,9 +342,9 @@ func runGeoShapeEnvelopeRelationQuery(relation string, i index.IndexReader,
 func setupGeoJsonShapesIndexForEnvelopeQuery(t *testing.T) index.Index {
 	analysisQueue := index.NewAnalysisQueue(1)
 	i, err := scorch.NewScorch(
-		gtreap.Name,
+		scorch.Name,
 		map[string]interface{}{
-			"path":          "",
+			"path":          t.TempDir(),
 			"spatialPlugin": "s2",
 		},
 		analysisQueue)

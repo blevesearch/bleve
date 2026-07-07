@@ -120,6 +120,11 @@ func TestPointWithin(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestMultiPointWithin(t *testing.T) {
@@ -174,6 +179,10 @@ func TestMultiPointWithin(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -238,6 +247,10 @@ func TestEnvelopePointWithin(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestEnvelopeLinestringWithin(t *testing.T) {
@@ -300,6 +313,10 @@ func TestEnvelopeLinestringWithin(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -364,6 +381,10 @@ func TestEnvelopePolygonWithin(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestPointLinestringWithin(t *testing.T) {
@@ -417,6 +438,10 @@ func TestPointLinestringWithin(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -472,6 +497,10 @@ func TestPointPolygonWithin(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -552,6 +581,10 @@ func TestLinestringPointWithin(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestMultiPointMultiLinestringWithin(t *testing.T) {
@@ -605,6 +638,10 @@ func TestMultiPointMultiLinestringWithin(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -660,6 +697,10 @@ func TestLinestringWithin(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestLinestringGeometryCollectionWithin(t *testing.T) {
@@ -707,6 +748,10 @@ func TestLinestringGeometryCollectionWithin(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -824,6 +869,10 @@ func TestPolygonPointWithin(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestPolygonLinestringWithin(t *testing.T) {
@@ -907,6 +956,11 @@ func TestPolygonLinestringWithin(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -993,6 +1047,10 @@ func TestPolygonWithin(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestMultiPolygonMultiPointWithin(t *testing.T) {
@@ -1065,6 +1123,10 @@ func TestMultiPolygonMultiPointWithin(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestMultiLinestringWithin(t *testing.T) {
@@ -1110,6 +1172,10 @@ func TestMultiLinestringWithin(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -1170,6 +1236,10 @@ func TestMultiPolygonMultiLinestringWithin(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestMultiPolygonWithin(t *testing.T) {
@@ -1228,6 +1298,10 @@ func TestMultiPolygonWithin(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -1300,6 +1374,10 @@ func TestGeometryCollectionWithin(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestGeometryCollectionPointWithin(t *testing.T) {
@@ -1347,5 +1425,9 @@ func TestGeometryCollectionPointWithin(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }

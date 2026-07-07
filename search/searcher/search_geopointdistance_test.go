@@ -17,6 +17,7 @@ package searcher
 import (
 	"context"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/geo"
@@ -50,6 +51,10 @@ func TestGeoPointDistanceSearcher(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		err = i.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	for _, test := range tests {
@@ -75,12 +80,17 @@ func testGeoPointDistanceSearch(i index.IndexReader, centerLon, centerLat, dist 
 	}
 	docMatch, err := gds.Next(ctx)
 	for docMatch != nil && err == nil {
-		rv = append(rv, string(docMatch.IndexInternalID))
+		docID, err := i.ExternalID(docMatch.IndexInternalID)
+		if err != nil {
+			return nil, err
+		}
+		rv = append(rv, docID)
 		docMatch, err = gds.Next(ctx)
 	}
 	if err != nil {
 		return nil, err
 	}
+	sort.Strings(rv)
 	return rv, nil
 }
 

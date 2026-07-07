@@ -24,12 +24,18 @@ import (
 )
 
 func TestDisjunctionSearch(t *testing.T) {
+	dir := t.TempDir()
+	twoDocIndex := initTwoDocScorch(dir)
 	twoDocIndexReader, err := twoDocIndex.Reader()
 	if err != nil {
 		t.Error(err)
 	}
 	defer func() {
 		err := twoDocIndexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = twoDocIndex.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -121,26 +127,30 @@ func TestDisjunctionSearch(t *testing.T) {
 			DocumentMatchPool: search.NewDocumentMatchPool(test.searcher.DocumentMatchPoolSize(), 0),
 		}
 		next, err := test.searcher.Next(ctx)
-		i := 0
+		actualMatches := make(map[string]float64)
 		for err == nil && next != nil {
-			if i < len(test.results) {
-				if !next.IndexInternalID.Equals(test.results[i].IndexInternalID) {
-					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].IndexInternalID, next.IndexInternalID, testIndex)
-				}
-				if !scoresCloseEnough(next.Score, test.results[i].Score) {
-					t.Errorf("expected result %d to have score %v got  %v for test %d", i, test.results[i].Score, next.Score, testIndex)
-					t.Logf("scoring explanation: %s", next.Expl)
-				}
+			extID, err := twoDocIndexReader.ExternalID(next.IndexInternalID)
+			if err != nil {
+				t.Fatalf("error getting external id: %v for test %d", err, testIndex)
 			}
+			actualMatches[extID] = next.Score
 			ctx.DocumentMatchPool.Put(next)
 			next, err = test.searcher.Next(ctx)
-			i++
 		}
 		if err != nil {
 			t.Fatalf("error iterating searcher: %v for test %d", err, testIndex)
 		}
-		if len(test.results) != i {
-			t.Errorf("expected %d results got %d for test %d", len(test.results), i, testIndex)
+		if len(test.results) != len(actualMatches) {
+			t.Errorf("expected %d results got %d for test %d", len(test.results), len(actualMatches), testIndex)
+		}
+		for i, expected := range test.results {
+			extID := string(expected.IndexInternalID)
+			actualScore, ok := actualMatches[extID]
+			if !ok {
+				t.Errorf("expected result with id %s not found for test %d", extID, testIndex)
+			} else if !scoresCloseEnough(actualScore, expected.Score) {
+				t.Errorf("expected result %d (id %s) to have score %v got %v for test %d", i, extID, expected.Score, actualScore, testIndex)
+			}
 		}
 	}
 }
@@ -235,6 +245,10 @@ func TestUnadornedDisjunctionAdvance(t *testing.T) {
 	}
 	defer func() {
 		err := twoDocIndexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = twoDocIndex.Close()
 		if err != nil {
 			t.Fatal(err)
 		}

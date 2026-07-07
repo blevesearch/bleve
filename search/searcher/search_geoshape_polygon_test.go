@@ -22,7 +22,6 @@ import (
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/index/scorch"
-	"github.com/blevesearch/bleve/v2/index/upsidedown/store/gtreap"
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -136,6 +135,10 @@ func TestGeoJsonPolygonIntersectsQuery(t *testing.T) {
 	}
 	defer func() {
 		err = indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = i.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -291,6 +294,10 @@ func TestGeoJsonPolygonContainsQuery(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		err = i.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	for n, test := range tests {
@@ -443,6 +450,10 @@ func TestGeoJsonPolygonWithInQuery(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		err = i.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	for n, test := range tests {
@@ -486,9 +497,9 @@ func runGeoShapePolygonQueryWithRelation(relation string, i index.IndexReader,
 func setupGeoJsonShapesIndexForPolygonQuery(t *testing.T) index.Index {
 	analysisQueue := index.NewAnalysisQueue(1)
 	i, err := scorch.NewScorch(
-		gtreap.Name,
+		scorch.Name,
 		map[string]interface{}{
-			"path":          "",
+			"path":          t.TempDir(),
 			"spatialPlugin": "s2",
 		},
 		analysisQueue)
@@ -873,6 +884,10 @@ func TestGeoJsonMultiPolygonWithInQuery(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		err = i.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	for n, test := range tests {
@@ -918,9 +933,9 @@ func runGeoShapeMultiPolygonQueryWithRelation(relation string,
 func setupGeoJsonShapesIndexForMultiPolygonQuery(t *testing.T) index.Index {
 	analysisQueue := index.NewAnalysisQueue(1)
 	i, err := scorch.NewScorch(
-		gtreap.Name,
+		scorch.Name,
 		map[string]interface{}{
-			"path":          "",
+			"path":          t.TempDir(),
 			"spatialPlugin": "s2",
 		},
 		analysisQueue)
@@ -1000,9 +1015,9 @@ func setupGeoJsonShapesIndexForMultiPolygonQuery(t *testing.T) index.Index {
 func setupGeoJsonPolygonS2LoopPortingIssue(t *testing.T) index.Index {
 	analysisQueue := index.NewAnalysisQueue(1)
 	i, err := scorch.NewScorch(
-		gtreap.Name,
+		scorch.Name,
 		map[string]interface{}{
-			"path":          "",
+			"path":          t.TempDir(),
 			"spatialPlugin": "s2",
 		},
 		analysisQueue)
@@ -1067,6 +1082,10 @@ func TestGeoJsonPolygonContainsQueryS2LoopPortingIssue(t *testing.T) {
 	}
 	defer func() {
 		err = indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = i.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1149,6 +1168,10 @@ func TestGeoJsonPolygonIntersectsQuery1(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		err = i.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	for n, test := range tests {
@@ -1167,9 +1190,9 @@ func TestGeoJsonPolygonIntersectsQuery1(t *testing.T) {
 func setupGeoJsonShapesIndexForPolygonQuery1(t *testing.T) index.Index {
 	analysisQueue := index.NewAnalysisQueue(1)
 	i, err := scorch.NewScorch(
-		gtreap.Name,
+		scorch.Name,
 		map[string]interface{}{
-			"path":          "",
+			"path":          t.TempDir(),
 			"spatialPlugin": "s2",
 		},
 		analysisQueue)

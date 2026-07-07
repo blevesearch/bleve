@@ -111,6 +111,11 @@ func TestPointPolygonContains(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestLinestringPolygonContains(t *testing.T) {
@@ -174,6 +179,11 @@ func TestLinestringPolygonContains(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestEnvelopePointContains(t *testing.T) {
@@ -221,6 +231,11 @@ func TestEnvelopePointContains(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestEnvelopeLinestringContains(t *testing.T) {
@@ -267,6 +282,11 @@ func TestEnvelopeLinestringContains(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -331,6 +351,11 @@ func TestEnvelopePolygonContains(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestPolygonPointContains(t *testing.T) {
@@ -393,6 +418,11 @@ func TestPolygonPointContains(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestPolygonLinestringContains(t *testing.T) {
@@ -439,6 +469,11 @@ func TestPolygonLinestringContains(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -495,6 +530,11 @@ func TestPolygonEnvelopeContains(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -562,6 +602,11 @@ func TestMultiPointPolygonContains(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestMultiPointLinestringContains(t *testing.T) {
@@ -616,6 +661,11 @@ func TestMultiPointLinestringContains(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -672,6 +722,11 @@ func TestMultiPointContains(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestPolygonContains(t *testing.T) {
@@ -726,6 +781,11 @@ func TestPolygonContains(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -790,6 +850,11 @@ func TestPolygonMultiPointContains(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestMultiPolygonPolygonContains(t *testing.T) {
@@ -845,6 +910,11 @@ func TestMultiPolygonPolygonContains(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestMultiLinestringMultiPolygonContains(t *testing.T) {
@@ -898,6 +968,11 @@ func TestMultiLinestringMultiPolygonContains(t *testing.T) {
 			t.Error(err.Error())
 		}
 	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
 }
 
 func TestGeometryCollectionPolygonContains(t *testing.T) {
@@ -945,6 +1020,11 @@ func TestGeometryCollectionPolygonContains(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }
 
@@ -1002,5 +1082,10 @@ func TestGeometryCollectionMultiPolygonContains(t *testing.T) {
 		if err != nil {
 			t.Error(err.Error())
 		}
+	}
+
+	err := i.Close()
+	if err != nil {
+		t.Fatalf("error closing index: %v", err)
 	}
 }

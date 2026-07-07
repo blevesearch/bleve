@@ -17,12 +17,12 @@ package searcher
 import (
 	"context"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/geo"
-	"github.com/blevesearch/bleve/v2/index/upsidedown"
-	"github.com/blevesearch/bleve/v2/index/upsidedown/store/gtreap"
+	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
@@ -57,6 +57,10 @@ func TestGeoBoundingBox(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		err = i.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	for _, test := range tests {
@@ -82,21 +86,27 @@ func testGeoBoundingBoxSearch(i index.IndexReader, minLon, minLat, maxLon, maxLa
 	}
 	docMatch, err := gbs.Next(ctx)
 	for docMatch != nil && err == nil {
-		rv = append(rv, string(docMatch.IndexInternalID))
+		docID, err := i.ExternalID(docMatch.IndexInternalID)
+		if err != nil {
+			return nil, err
+		}
+		rv = append(rv, docID)
 		docMatch, err = gbs.Next(ctx)
 	}
 	if err != nil {
 		return nil, err
 	}
+	sort.Strings(rv)
 	return rv, nil
 }
 
 func setupGeo(t *testing.T) index.Index {
 	analysisQueue := index.NewAnalysisQueue(1)
-	i, err := upsidedown.NewUpsideDownCouch(
-		gtreap.Name,
+	i, err := scorch.NewScorch(
+		scorch.Name,
 		map[string]interface{}{
-			"path": "",
+			"path":          t.TempDir(),
+			"spatialPlugin": "s2",
 		},
 		analysisQueue)
 	if err != nil {

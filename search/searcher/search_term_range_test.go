@@ -226,6 +226,10 @@ func TestTermRangeSearchTooManyTerms(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		err = scorchIndex.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	want := []string{"1", "3", "4", "5"}

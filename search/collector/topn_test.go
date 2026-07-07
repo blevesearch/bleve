@@ -727,7 +727,7 @@ func setupIndex(t *testing.T) index.Index {
 	i, err := scorch.NewScorch(
 		scorch.Name,
 		map[string]interface{}{
-			"path": "",
+			"path": t.TempDir(),
 		},
 		analysisQueue)
 	if err != nil {
@@ -752,6 +752,16 @@ func TestSetFacetsBuilder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = i.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	fb := search.NewFacetsBuilder(indexReader)
 	facetBuilder := facet.NewTermsFacetBuilder(sortFacetsField, 100)

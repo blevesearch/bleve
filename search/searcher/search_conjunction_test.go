@@ -247,6 +247,10 @@ func TestScorchCompositeSearchOptimizations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		err = twoDocIndex.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	tests := []compositeSearchOptimizationTest{

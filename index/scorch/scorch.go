@@ -323,10 +323,12 @@ func (s *Scorch) fireEvent(kind EventKind, dur time.Duration) bool {
 }
 
 func (s *Scorch) fireAsyncError(err error) {
+	atomic.AddUint64(&s.stats.TotOnErrors, 1)
 	if s.onAsyncError != nil {
 		s.onAsyncError(err, s.path)
+	} else {
+		panic(err)
 	}
-	atomic.AddUint64(&s.stats.TotOnErrors, 1)
 }
 
 func (s *Scorch) Open() error {
