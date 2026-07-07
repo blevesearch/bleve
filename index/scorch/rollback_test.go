@@ -919,8 +919,8 @@ func TestRollbackCheckpointsOnRestart(t *testing.T) {
 	}
 }
 
-func TestRollackOptions(t *testing.T) {
-	cfg := CreateConfig("TestRollackOptions")
+func TestRollbackOptions(t *testing.T) {
+	cfg := CreateConfig("TestRollbackOptions")
 	err := InitTest(cfg)
 	if err != nil {
 		t.Fatal(err)
