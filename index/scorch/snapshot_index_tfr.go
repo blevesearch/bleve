@@ -313,10 +313,7 @@ func (i *IndexSnapshotTermFieldReader) MaxTFNormForSegment(segIdx int, avgDocLen
 
 // SegmentIndexOf returns the segment index for the given global docID.
 func (i *IndexSnapshotTermFieldReader) SegmentIndexOf(id index.IndexInternalID) int {
-	num, err := id.Value()
-	if err != nil {
-		return 0
-	}
+	num := id.Value()
 	segIdx, _ := i.snapshot.segmentIndexAndLocalDocNumFromGlobal(num)
 	return segIdx
 }
