@@ -3332,8 +3332,6 @@ func TestDeletionsBetweenMergeAndIntroduction(t *testing.T) {
 		ids[i] = doc.ID()
 	}
 	for i := 0; i < numSegments; i++ {
-		// s0 = doc0, doc2, doc4
-		// s1 = doc1, doc3, doc5
 		doc1 := docs[i]
 		doc2 := docs[i+numSegments]
 		doc3 := docs[i+2*numSegments]
@@ -3468,6 +3466,28 @@ func TestDeletionsBetweenMergeAndIntroduction(t *testing.T) {
 	}
 	if docCount != 1 {
 		t.Fatalf("expected %d docs, got %d", 1, docCount)
+	}
+	reader, err := snapshot.DocIDReaderAll()
+	if err != nil {
+		t.Fatalf("failed to get DocIDReaderAll: %v", err)
+	}
+	var liveIDs []string
+	for {
+		id, err := reader.Next()
+		if err != nil {
+			t.Fatalf("failed to read next doc ID: %v", err)
+		}
+		if id == nil {
+			break
+		}
+		eid, err := snapshot.ExternalID(id)
+		if err != nil {
+			t.Fatalf("failed to get external ID: %v", err)
+		}
+		liveIDs = append(liveIDs, eid)
+	}
+	if len(liveIDs) != 1 || liveIDs[0] != ids[5] {
+		t.Fatalf("expected live doc ID %s, got %v", ids[5], liveIDs)
 	}
 	err = idx.Close()
 	if err != nil {
