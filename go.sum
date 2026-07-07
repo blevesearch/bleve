@@ -2,8 +2,6 @@ github.com/RoaringBitmap/roaring/v2 v2.18.2 h1:oPq3Cgx//iDuJQVp6xSInAKW34J9CEwE5
 github.com/RoaringBitmap/roaring/v2 v2.18.2/go.mod h1:eq4wdNXxtJIS/oikeCzdX1rBzek7ANzbth041hrU8Q4=
 github.com/bits-and-blooms/bitset v1.24.2 h1:M7/NzVbsytmtfHbumG+K2bremQPMJuqv1JD3vOaFxp0=
 github.com/bits-and-blooms/bitset v1.24.2/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
-github.com/blevesearch/bleve_index_api v1.3.13-0.20260611191213-ecd8257d019b h1:NIo05KjK2jjEbxcEAiYomPBZmayMjgPODvIY3l2xLP8=
-github.com/blevesearch/bleve_index_api v1.3.13-0.20260611191213-ecd8257d019b/go.mod h1:xvd48t5XMeeioWQ5/jZvgLrV98flT2rdvEJ3l/ki4Ko=
 github.com/blevesearch/bleve_index_api v1.4.1-0.20260707065413-4b241f361ec2 h1:Nc8lOn/fmchbYX2bi9hdAxhngW3XC0wf31xEjSKzY1U=
 github.com/blevesearch/bleve_index_api v1.4.1-0.20260707065413-4b241f361ec2/go.mod h1:xvd48t5XMeeioWQ5/jZvgLrV98flT2rdvEJ3l/ki4Ko=
 github.com/blevesearch/geo v0.2.5 h1:yJg9FX1oRwLnjXSXF+ECHfXFTF4diF02Ca/qUGVjJhE=
@@ -49,8 +47,6 @@ github.com/blevesearch/zapx/v16 v16.3.4 h1:hDAqA8qusZTNbPEL7//w5P65UZ2de6yhSeUaT
 github.com/blevesearch/zapx/v16 v16.3.4/go.mod h1:zqkPPqs9GS9FzVWzCO3Wf1X044yWAV17+4zb+FTiEHg=
 github.com/blevesearch/zapx/v17 v17.1.8 h1:RhlEYVsjJuXbPaIHdKi3qbKpc8HLIToiTYf7A8CVkoo=
 github.com/blevesearch/zapx/v17 v17.1.8/go.mod h1:34TIaJmdo5hMh2IBLoE4Day65j7DJ++8s5trz1yrsGY=
-github.com/blevesearch/zapx/v18 v18.0.0-20260626073507-972adfe71e93 h1:lme73SBy/F1BB6qIj5Wqs0PdRL8UiEZ0tY2sY6J2h2Q=
-github.com/blevesearch/zapx/v18 v18.0.0-20260626073507-972adfe71e93/go.mod h1:OQ/HrAtXAmUG40C02RCRb+5PjJIhcZFivmkw+acaGvw=
 github.com/blevesearch/zapx/v18 v18.0.0-20260707065421-f1ceb9717cca h1:k6+l1lMGDpW+YHWEVVPLI8zozhIVzZ+jFlp4kYgmnRo=
 github.com/blevesearch/zapx/v18 v18.0.0-20260707065421-f1ceb9717cca/go.mod h1:OQ/HrAtXAmUG40C02RCRb+5PjJIhcZFivmkw+acaGvw=
 github.com/couchbase/ghistogram v0.1.0 h1:b95QcQTCzjTUocDXp/uMgSNQi8oj1tGwnJ4bODWZnps=
