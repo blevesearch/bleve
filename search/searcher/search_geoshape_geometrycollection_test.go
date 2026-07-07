@@ -17,6 +17,7 @@ package searcher
 import (
 	"context"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/document"
@@ -449,9 +450,11 @@ func TestGeoJSONContainsQueryAgainstGeometryCollection(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(got, test.want) {
+		want := test.want
+		sort.Strings(want)
+		if !reflect.DeepEqual(got, want) {
 			t.Errorf("test %d, expected %v, got %v for polygon: %+v",
-				n, test.want, got, test.points)
+				n, want, got, test.points)
 		}
 	}
 }
@@ -474,13 +477,17 @@ func runGeoShapeGeometryCollectionRelationQuery(relation string, i index.IndexRe
 	}
 	docMatch, err := gbs.Next(ctx)
 	for docMatch != nil && err == nil {
-		docID, _ := i.ExternalID(docMatch.IndexInternalID)
+		docID, err := i.ExternalID(docMatch.IndexInternalID)
+		if err != nil {
+			return nil, err
+		}
 		rv = append(rv, docID)
 		docMatch, err = gbs.Next(ctx)
 	}
 	if err != nil {
 		return nil, err
 	}
+	sort.Strings(rv)
 	return rv, nil
 }
 
