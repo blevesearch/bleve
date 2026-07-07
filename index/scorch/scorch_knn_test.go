@@ -102,15 +102,12 @@ func TestFieldStatPersistence(t *testing.T) {
 	errCh := make(chan error, 1)
 	doneCh := make(chan struct{})
 	go func() {
-		po := persisterOptions{
-			PersisterNapTimeMSec:          DefaultPersisterNapTimeMSec,
-			PersisterNapUnderNumFiles:     DefaultPersisterNapUnderNumFiles,
-			MemoryPressurePauseThreshold:  DefaultMemoryPressurePauseThreshold,
-			NumPersisterWorkers:           DefaultNumPersisterWorkers,
-			MaxSizeInMemoryMergePerWorker: DefaultMaxSizeInMemoryMergePerWorker,
-		}
-		if persistErr := s.persistSnapshot(s.root, &po); persistErr != nil {
-			errCh <- persistErr
+		snapshot := s.root
+		snapshot.AddRef()
+		defer snapshot.DecRef()
+		err := s.persistSnapshot(snapshot, s.persisterOptions)
+		if err != nil {
+			errCh <- err
 			return
 		}
 		doneCh <- struct{}{}
