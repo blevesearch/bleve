@@ -137,8 +137,10 @@ type Stats struct {
 	TotMemMergeSegments     uint64
 	TotMemorySegmentsAtRoot uint64
 
-	TotTrainedSamples uint64
-	TotTrainTime      uint64
+	TotTrainedSamples          uint64
+	TotTrainTime               uint64
+	TotTrainFireIndexEventTime uint64
+	TotTrainFireIndexEvents    uint64
 }
 
 // atomically populates the returned map

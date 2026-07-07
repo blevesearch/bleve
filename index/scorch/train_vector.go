@@ -276,7 +276,10 @@ func (t *vectorTrainer) loadTrainedData(bucket *util.BoltBucketImpl) error {
 
 func (t *vectorTrainer) train(batch *index.Batch) error {
 	// regulate the Train function
+	start := time.Now()
 	t.parent.FireIndexEvent()
+	atomic.AddUint64(&t.parent.stats.TotTrainFireIndexEventTime, uint64(time.Since(start)))
+	atomic.AddUint64(&t.parent.stats.TotTrainFireIndexEvents, 1)
 	if t.trainingComplete.Load() {
 		return fmt.Errorf("training is already complete, cannot accept more training data")
 	}
