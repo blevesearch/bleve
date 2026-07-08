@@ -93,6 +93,27 @@ func (s *SegmentSnapshot) FileSize() int64 {
 	return fi.Size()
 }
 
+func (s *SegmentSnapshot) LiveFileSize() int64 {
+	fullSize := float64(s.FullSize())
+	if fullSize <= 0 {
+		return 0
+	}
+
+	liveSize := float64(s.LiveSize())
+	if liveSize <= 0 {
+		return 0
+	}
+
+	fileSize := float64(s.FileSize())
+	if fileSize <= 0 {
+		return 0
+	}
+
+	liveRatio := liveSize / fullSize
+
+	return int64(fileSize * liveRatio)
+}
+
 func (s *SegmentSnapshot) Close() error {
 	return s.segment.Close()
 }

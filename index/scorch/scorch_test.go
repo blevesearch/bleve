@@ -2795,6 +2795,57 @@ func TestPersistorMergerOptions(t *testing.T) {
 			}`,
 			expectErr: true,
 		},
+		{
+			config: `{
+				"scorchPersisterOptions": {
+					"numPersisterWorkers": 4,
+					"maxSizeInMemoryMergePerWorker" : 20971520
+				},
+				"scorchMergePlanOptions": {
+					"floorSegmentFileSize": 20971520
+				}
+			}`,
+			expectErr: false,
+		},
+		{
+			config: `{
+				"scorchPersisterOptions": {
+					"numPersisterWorkers": 1,
+					"maxSizeInMemoryMergePerWorker" : 0
+				}
+			}`,
+			expectErr: false,
+		},
+		{
+			config: `{
+				"scorchPersisterOptions": {
+					"numPersisterWorkers": 1,
+					"maxSizeInMemoryMergePerWorker" : 20971520
+				}
+			}`,
+			expectErr: false,
+		},
+		{
+			config: `{
+				"scorchPersisterOptions": {
+					"numPersisterWorkers": -1,
+					"maxSizeInMemoryMergePerWorker" : 20971520
+				},
+				"scorchMergePlanOptions": {
+					"floorSegmentFileSize": 20971520
+				}
+			}`,
+			expectErr: true,
+		},
+		{
+			config: `{
+				"scorchPersisterOptions": {
+					"numPersisterWorkers": 4,
+					"maxSizeInMemoryMergePerWorker" : 0
+				}
+			}`,
+			expectErr: true,
+		},
 	}
 	for i, test := range tests {
 		cfg := map[string]interface{}{}
@@ -2917,14 +2968,9 @@ func TestPersistenceMergedBatches(t *testing.T) {
 	var errCh = make(chan error, 1)
 	var doneCh = make(chan struct{})
 	go func() {
-		po := persisterOptions{
-			PersisterNapTimeMSec:          DefaultPersisterNapTimeMSec,
-			PersisterNapUnderNumFiles:     DefaultPersisterNapUnderNumFiles,
-			MemoryPressurePauseThreshold:  DefaultMemoryPressurePauseThreshold,
-			NumPersisterWorkers:           DefaultNumPersisterWorkers,
-			MaxSizeInMemoryMergePerWorker: DefaultMaxSizeInMemoryMergePerWorker,
-		}
-		err := s.persistSnapshot(snapshot, &po)
+		snapshot.AddRef()
+		defer snapshot.DecRef()
+		err := s.persistSnapshot(snapshot, s.persisterOptions)
 		if err != nil {
 			errCh <- err
 			return
@@ -3135,14 +3181,9 @@ func TestIneligibleForRemovalOnSkippedMerge(t *testing.T) {
 	var errCh = make(chan error, 1)
 	var doneCh = make(chan struct{})
 	go func() {
-		po := persisterOptions{
-			PersisterNapTimeMSec:          DefaultPersisterNapTimeMSec,
-			PersisterNapUnderNumFiles:     DefaultPersisterNapUnderNumFiles,
-			MemoryPressurePauseThreshold:  DefaultMemoryPressurePauseThreshold,
-			NumPersisterWorkers:           DefaultNumPersisterWorkers,
-			MaxSizeInMemoryMergePerWorker: DefaultMaxSizeInMemoryMergePerWorker,
-		}
-		err := s.persistSnapshot(snapshot, &po)
+		snapshot.AddRef()
+		defer snapshot.DecRef()
+		err := s.persistSnapshot(snapshot, s.persisterOptions)
 		if err != nil {
 			errCh <- err
 			return
@@ -3247,6 +3288,206 @@ func TestIneligibleForRemovalOnSkippedMerge(t *testing.T) {
 	}
 	if numZapFiles != numDocs {
 		t.Fatalf("expected %d zap files, got %d", numDocs, numZapFiles)
+	}
+	err = idx.Close()
+	if err != nil {
+		t.Fatalf("failed to close index: %v", err)
+	}
+}
+
+func TestDeletionsBetweenMergeAndIntroduction(t *testing.T) {
+	cfg := CreateConfig("TestDeletionsBetweenMergeAndIntroduction")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = DestroyTest(cfg) }()
+	dirPath := cfg["path"].(string)
+	if err = os.Mkdir(dirPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("failed to create Scorch: %v", err)
+	}
+	s, ok := idx.(*Scorch)
+	if !ok {
+		t.Fatalf("expected *Scorch, got %T", s)
+	}
+	s.path = dirPath
+	err = s.openBolt()
+	if err != nil {
+		t.Fatalf("failed to open bolt: %v", err)
+	}
+	const (
+		numDocs     = 6
+		numSegments = 2
+	)
+	docs := make([]index.Document, numDocs)
+	ids := make([]string, numDocs)
+	for i := 0; i < numDocs; i++ {
+		doc := genDoc(t)
+		docs[i] = doc
+		ids[i] = doc.ID()
+	}
+	for i := 0; i < numSegments; i++ {
+		doc1 := docs[i]
+		doc2 := docs[i+numSegments]
+		doc3 := docs[i+2*numSegments]
+		id1 := ids[i]
+		id2 := ids[i+numSegments]
+		id3 := ids[i+2*numSegments]
+		docs := []index.Document{doc1, doc2, doc3}
+		ids := []string{id1, id2, id3}
+		seg, _, err := s.segPlugin.New(docs)
+		if err != nil {
+			t.Fatalf("failed to create segment: %v", err)
+		}
+		intro := &segmentIntroduction{
+			id:      atomic.AddUint64(&s.nextSegmentID, 1),
+			data:    seg,
+			ids:     ids,
+			applied: make(chan error),
+		}
+		if err = s.introduceSegment(intro); err != nil {
+			t.Fatalf("introduceSegment: %v", err)
+		}
+	}
+	snapshot := s.root
+	if len(snapshot.segment) != numSegments {
+		t.Fatalf("expected %d segments, got %d", numSegments, len(snapshot.segment))
+	}
+	docCount, err := snapshot.DocCount()
+	if err != nil {
+		t.Fatalf("failed to get doc count: %v", err)
+	}
+	if docCount != numDocs {
+		t.Fatalf("expected %d docs, got %d", numDocs, docCount)
+	}
+	var errCh = make(chan error, 1)
+	var doneCh = make(chan struct{})
+	go func() {
+		snapshot.AddRef()
+		defer snapshot.DecRef()
+		err := s.persistSnapshotDirect(snapshot)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		doneCh <- struct{}{}
+	}()
+	select {
+	case persist := <-s.persists:
+		s.introducePersist(persist)
+	case err := <-errCh:
+		t.Fatalf("unexpected error during persist: %v", err)
+	}
+	<-doneCh
+	snapshot = s.root
+	if len(snapshot.segment) != 2 {
+		t.Fatalf("expected %d segments, got %d", 2, len(snapshot.segment))
+	}
+	docCount, err = snapshot.DocCount()
+	if err != nil {
+		t.Fatalf("failed to get doc count: %v", err)
+	}
+	if docCount != numDocs {
+		t.Fatalf("expected %d docs, got %d", numDocs, docCount)
+	}
+	intro := &segmentIntroduction{
+		id:      atomic.AddUint64(&s.nextSegmentID, 1),
+		data:    nil,
+		ids:     []string{ids[0], ids[1]},
+		applied: make(chan error),
+	}
+	if err = s.introduceSegment(intro); err != nil {
+		t.Fatalf("introduceSegment: %v", err)
+	}
+	snapshot = s.root
+	if len(snapshot.segment) != 2 {
+		t.Fatalf("expected %d segments, got %d", 2, len(snapshot.segment))
+	}
+	docCount, err = snapshot.DocCount()
+	if err != nil {
+		t.Fatalf("failed to get doc count: %v", err)
+	}
+	if docCount != 4 {
+		t.Fatalf("expected %d docs, got %d", 4, docCount)
+	}
+	go func() {
+		ctrlMsgDflt := &mergerCtrl{ctx: context.Background(),
+			options: s.mergePlannerOptions,
+			doneCh:  nil,
+		}
+		snapshot.AddRef()
+		defer snapshot.DecRef()
+		err := s.planMergeAtSnapshot(ctrlMsgDflt, snapshot)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		doneCh <- struct{}{}
+	}()
+	select {
+	case merge := <-s.merges:
+		intro := &segmentIntroduction{
+			id:      atomic.AddUint64(&s.nextSegmentID, 1),
+			data:    nil,
+			ids:     []string{ids[2], ids[3], ids[4]},
+			applied: make(chan error),
+		}
+		if err = s.introduceSegment(intro); err != nil {
+			t.Fatalf("introduceSegment: %v", err)
+		}
+		snapshot = s.root
+		if len(snapshot.segment) != 1 {
+			t.Fatalf("expected %d segments, got %d", 1, len(snapshot.segment))
+		}
+		docCount, err := snapshot.DocCount()
+		if err != nil {
+			t.Fatalf("failed to get doc count: %v", err)
+		}
+		if docCount != 1 {
+			t.Fatalf("expected %d docs, got %d", 1, docCount)
+		}
+		s.introduceMerge(merge)
+	case err := <-errCh:
+		t.Fatalf("unexpected error during persist: %v", err)
+	}
+	<-doneCh
+	snapshot = s.root
+	if len(snapshot.segment) != 1 {
+		t.Fatalf("expected %d segments, got %d", 1, len(snapshot.segment))
+	}
+	docCount, err = snapshot.DocCount()
+	if err != nil {
+		t.Fatalf("failed to get doc count: %v", err)
+	}
+	if docCount != 1 {
+		t.Fatalf("expected %d docs, got %d", 1, docCount)
+	}
+	reader, err := snapshot.DocIDReaderAll()
+	if err != nil {
+		t.Fatalf("failed to get DocIDReaderAll: %v", err)
+	}
+	var liveIDs []string
+	for {
+		id, err := reader.Next()
+		if err != nil {
+			t.Fatalf("failed to read next doc ID: %v", err)
+		}
+		if id == nil {
+			break
+		}
+		eid, err := snapshot.ExternalID(id)
+		if err != nil {
+			t.Fatalf("failed to get external ID: %v", err)
+		}
+		liveIDs = append(liveIDs, eid)
+	}
+	if len(liveIDs) != 1 || liveIDs[0] != ids[5] {
+		t.Fatalf("expected live doc ID %s, got %v", ids[5], liveIDs)
 	}
 	err = idx.Close()
 	if err != nil {
@@ -3468,6 +3709,8 @@ func TestPersistSnapshotMaybeMergeMultipleWorkers(t *testing.T) {
 		t.Fatalf("expected at least one persisted bolt snapshot")
 	}
 }
+
+// ------------------------------------------------------------------------
 
 // mockSegmentBase satisfies segment.Segment but does NOT implement
 // VectorFieldStatsReporter. Both mock types embed this so the stubs are

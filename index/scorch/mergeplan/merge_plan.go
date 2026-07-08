@@ -42,6 +42,10 @@ type Segment interface {
 
 	// Size of the persisted segment file.
 	FileSize() int64
+
+	// Size of the persisted segment file
+	// accounting for any logical deletions.
+	LiveFileSize() int64
 }
 
 // Plan() will functionally compute a merge plan.  A segment will be
@@ -54,8 +58,8 @@ func Plan(segments []Segment, o *MergePlanOptions) (*MergePlan, error) {
 
 // A MergePlan is the result of the Plan() API.
 //
-// The planner doesn’t know how or whether these tasks are executed --
-// that’s up to a separate merge execution system, which might execute
+// The planner doesn't know how or whether these tasks are executed --
+// that's up to a separate merge execution system, which might execute
 // these tasks concurrently or not, and which might execute all the
 // tasks or not.
 type MergePlan struct {
@@ -71,14 +75,14 @@ type MergeTask struct {
 // The MergePlanOptions is designed to be reusable between planning calls.
 type MergePlanOptions struct {
 	// Max # segments per logarithmic tier, or max width of any
-	// logarithmic “step”.  Smaller values mean more merging but fewer
+	// logarithmic "step".  Smaller values mean more merging but fewer
 	// segments.  Should be >= SegmentsPerMergeTask, else you'll have
 	// too much merging.
 	MaxSegmentsPerTier int
 
 	// Max size of any segment produced after merging.  Actual
 	// merging, however, may produce segment sizes different than the
-	// planner’s predicted sizes.
+	// planner's predicted sizes.
 	MaxSegmentSize int64
 
 	// Max size (in bytes) of the persisted segment file that contains the
@@ -137,6 +141,13 @@ func (o *MergePlanOptions) RaiseToFloorSegmentFileSize(s int64) int64 {
 	return o.FloorSegmentFileSize
 }
 
+func (o *MergePlanOptions) BudgetCurrency() BudgetCurrency {
+	if o.FloorSegmentFileSize > 0 {
+		return FileSizeBudget
+	}
+	return LiveSizeBudget
+}
+
 // MaxSegmentSizeLimit represents the maximum size of a segment,
 // this limit comes with hit-1 optimisation/max encoding limit uint31.
 const MaxSegmentSizeLimit = 1<<31 - 1
@@ -149,7 +160,7 @@ var ErrMaxSegmentSizeTooLarge = errors.New("MaxSegmentSize exceeds the size limi
 var DefaultMergePlanOptions = MergePlanOptions{
 	MaxSegmentsPerTier:   10,
 	MaxSegmentSize:       5000000,
-	MaxSegmentFileSize:   4000000000, // 4GB
+	MaxSegmentFileSize:   4 * 1024 * 1024 * 1024, // 4GiB
 	TierGrowth:           10.0,
 	SegmentsPerMergeTask: 10,
 	FloorSegmentSize:     2000,
@@ -171,6 +182,59 @@ var SingleSegmentMergePlanOptions = MergePlanOptions{
 
 // -------------------------------------------
 
+// BudgetCurrency is the currency used for budget
+// calculations in the merge planner.
+type BudgetCurrency int
+
+const (
+	// FileSizeBudget uses the file size
+	// of the segments to determine the budget.
+	FileSizeBudget BudgetCurrency = iota
+
+	// LiveSizeBudget uses the live size
+	// of the segments to determine the budget.
+	LiveSizeBudget
+)
+
+var ErrUnknownCurrency = errors.New("unknown budget currency")
+
+// -------------------------------------------
+
+// rosterCandidate is a potential roster of segments considered while
+// planning, along with its computed score.
+type rosterCandidate struct {
+	segments []Segment
+	score    float64 // Lower is better.
+}
+
+func (c *rosterCandidate) betterThan(other *rosterCandidate) bool {
+	ourSegmentCount := c.count()
+	otherSegmentCount := other.count()
+	// if we have more than one segment and the other has only one, and that
+	// one segment is fully live, then we are better than the other.
+	if ourSegmentCount > 1 && otherSegmentCount == 1 {
+		solo := other.segments[0]
+		if solo.LiveSize() == solo.FullSize() {
+			return true
+		}
+	}
+	// if we have only one segment and the other has more than one, and that
+	// one segment is fully live, then we are worse than the other.
+	if ourSegmentCount == 1 && otherSegmentCount > 1 {
+		solo := c.segments[0]
+		if solo.LiveSize() == solo.FullSize() {
+			return false
+		}
+	}
+	return c.score < other.score
+}
+
+func (c *rosterCandidate) count() int {
+	return len(c.segments)
+}
+
+// -------------------------------------------
+
 func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 	if len(segmentsIn) <= 1 {
 		return nil, nil
@@ -185,35 +249,38 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 	sort.Sort(byLiveSizeDescending(segments))
 
 	var minLiveSize int64 = math.MaxInt64
+	var minLiveFileSize int64 = math.MaxInt64
 
 	var eligibles []Segment
 	var eligiblesLiveSize int64
-	var eligiblesFileSize int64
-	var minFileSize int64 = math.MaxInt64
+	var eligiblesLiveFileSize int64
 
 	for _, segment := range segments {
-		if minLiveSize > segment.LiveSize() {
-			minLiveSize = segment.LiveSize()
+		liveSize := segment.LiveSize()
+		liveFileSize := segment.LiveFileSize()
+
+		if minLiveSize > liveSize {
+			minLiveSize = liveSize
 		}
 
-		if minFileSize > segment.FileSize() {
-			minFileSize = segment.FileSize()
+		if minLiveFileSize > liveFileSize {
+			minLiveFileSize = liveFileSize
 		}
 
-		isEligible := segment.LiveSize() < o.MaxSegmentSize/2
+		isEligible := liveSize < o.MaxSegmentSize/2
 		// An eligible segment (based on #documents) may be too large
 		// and thus need a stricter check based on the file size.
 		// This is particularly important for segments that contain
 		// vectors.
-		if isEligible && segment.HasVector() && o.MaxSegmentFileSize > 0 {
-			isEligible = segment.FileSize() < o.MaxSegmentFileSize/2
+		if segment.HasVector() {
+			isEligible = isEligible && liveFileSize < o.MaxSegmentFileSize/2
 		}
 
 		// Only small-enough segments are eligible.
 		if isEligible {
 			eligibles = append(eligibles, segment)
-			eligiblesLiveSize += segment.LiveSize()
-			eligiblesFileSize += segment.FileSize()
+			eligiblesLiveSize += liveSize
+			eligiblesLiveFileSize += liveFileSize
 		}
 	}
 
@@ -222,14 +289,18 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		calcBudget = CalcBudget
 	}
 
-	var budgetNumSegments int
-	if o.FloorSegmentFileSize > 0 {
-		minFileSize = o.RaiseToFloorSegmentFileSize(minFileSize)
-		budgetNumSegments = calcBudget(eligiblesFileSize, minFileSize, o)
+	currency := o.BudgetCurrency()
 
-	} else {
+	var budgetNumSegments int
+	switch currency {
+	case FileSizeBudget:
+		minLiveFileSize = o.RaiseToFloorSegmentFileSize(minLiveFileSize)
+		budgetNumSegments = calcBudget(eligiblesLiveFileSize, minLiveFileSize, o)
+	case LiveSizeBudget:
 		minLiveSize = o.RaiseToFloorSegmentSize(minLiveSize)
 		budgetNumSegments = calcBudget(eligiblesLiveSize, minLiveSize, o)
+	default:
+		return nil, ErrUnknownCurrency
 	}
 
 	scoreSegments := o.ScoreSegments
@@ -250,54 +321,69 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		eligibles = removeSegments(eligibles, empties)
 	}
 
-	// While we’re over budget, keep looping, which might produce
+	numMergeTasks := 0
+
+	// While we're over budget, keep looping, which might produce
 	// another MergeTask.
-	for len(eligibles) > 0 && (len(eligibles)+len(rv.Tasks)) > budgetNumSegments {
-		// Track a current best roster as we examine and score
+	for len(eligibles) > 0 && (len(eligibles)+numMergeTasks) > budgetNumSegments {
+		// Track the current best candidate as we examine and score
 		// potential rosters of merges.
-		var bestRoster []Segment
-		var bestRosterScore float64 // Lower score is better.
+		var best *rosterCandidate
 
 		for startIdx := 0; startIdx < len(eligibles); startIdx++ {
 			var roster []Segment
 			var rosterLiveSize int64
-			var rosterFileSize int64 // useful for segments with vectors
+			var rosterLiveFileSize int64
 
 			for idx := startIdx; idx < len(eligibles) && len(roster) < o.SegmentsPerMergeTask; idx++ {
 				eligible := eligibles[idx]
 
-				if rosterLiveSize+eligible.LiveSize() >= o.MaxSegmentSize {
+				liveSize := eligible.LiveSize()
+
+				if rosterLiveSize+liveSize >= o.MaxSegmentSize {
 					continue
 				}
 
 				if eligible.HasVector() {
-					efs := eligible.FileSize()
-					if rosterFileSize+efs >= o.MaxSegmentFileSize {
+					liveFileSize := eligible.LiveFileSize()
+
+					if rosterLiveFileSize+liveFileSize >= o.MaxSegmentFileSize {
 						continue
 					}
-					rosterFileSize += efs
+
+					rosterLiveFileSize += liveFileSize
 				}
 
 				roster = append(roster, eligible)
-				rosterLiveSize += eligible.LiveSize()
+
+				rosterLiveSize += liveSize
 			}
 
 			if len(roster) > 0 {
 				rosterScore := scoreSegments(roster, o)
 
-				if len(bestRoster) == 0 || rosterScore < bestRosterScore {
-					bestRoster = roster
-					bestRosterScore = rosterScore
+				candidate := &rosterCandidate{
+					segments: roster,
+					score:    rosterScore,
+				}
+
+				if best == nil || candidate.betterThan(best) {
+					best = candidate
 				}
 			}
 		}
 
-		if len(bestRoster) == 0 {
+		if best == nil {
 			return rv, nil
 		}
+
+		bestRoster := best.segments
+
 		// create tasks with valid merges - i.e. there should be at least 2 non-empty segments
-		if len(bestRoster) > 1 {
+		// or the bestRoster should have 1 segment with deletes to reclaim.
+		if len(bestRoster) > 1 || bestRoster[0].LiveSize() < bestRoster[0].FullSize() {
 			rv.Tasks = append(rv.Tasks, &MergeTask{Segments: bestRoster})
+			numMergeTasks++
 		}
 
 		eligibles = removeSegments(eligibles, bestRoster)
