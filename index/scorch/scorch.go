@@ -277,12 +277,6 @@ func NewScorch(storeName string,
 	}
 	rv.persisterOptions = po
 
-	mo, err := rv.parseMergerOptions()
-	if err != nil {
-		return nil, err
-	}
-	rv.mergerOptions = mo
-
 	mpo, err := rv.parseMergePlannerOptions(po)
 	if err != nil {
 		return nil, err

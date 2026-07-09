@@ -50,41 +50,6 @@ var (
 	DefaultNumMergeWorkers int = 1
 )
 
-type mergerOptions struct {
-	// NumMergeWorkers decides the number of workers that will
-	// be used to perform the merge operations.
-	NumMergeWorkers int
-}
-
-func (s *Scorch) parseMergerOptions() (*mergerOptions, error) {
-	mo := mergerOptions{
-		NumMergeWorkers: DefaultNumMergeWorkers,
-	}
-	if v, ok := s.config["scorchMergerOptions"]; ok {
-		b, err := util.MarshalJSON(v)
-		if err != nil {
-			return &mo, err
-		}
-
-		err = util.UnmarshalJSON(b, &mo)
-		if err != nil {
-			return &mo, err
-		}
-	}
-	if err := validateMergerOptions(&mo); err != nil {
-		return nil, err
-	}
-	return &mo, nil
-}
-
-// validateMergerOptions validates the merger options
-func validateMergerOptions(options *mergerOptions) error {
-	if options.NumMergeWorkers <= 0 {
-		return fmt.Errorf("NumMergeWorkers must be greater than 0")
-	}
-	return nil
-}
-
 func (s *Scorch) mergerLoop() {
 	defer func() {
 		if r := recover(); r != nil {
