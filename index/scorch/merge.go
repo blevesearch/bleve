@@ -697,7 +697,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(flushes []*flushable, po *persi
 	atomic.AddUint64(&s.stats.TotMemMergeDone, 1)
 
 	// if we could not introduce all of the newly merged segments,
-	// then we cannot cannot persist a snapshot with any merged segments at all
+	// then we cannot persist a snapshot with any merged segments at all
 	if len(introducedSegmentIDs) != numBatches {
 		_ = introducedSnapshot.DecRef()
 		return nil, nil, nil
