@@ -19,8 +19,8 @@ github.com/blevesearch/gtreap v0.1.1/go.mod h1:QaQyDRAT51sotthUWAH4Sj08awFSSWzgY
 github.com/blevesearch/mmap-go v1.0.2/go.mod h1:ol2qBqYaOUsGdm7aRMRrYGgPvnwLe6Y+7LMvAB5IbSA=
 github.com/blevesearch/mmap-go v1.2.0 h1:l33nNKPFcBjJUMwem6sAYJPUzhUCABoK9FxZDGiFNBI=
 github.com/blevesearch/mmap-go v1.2.0/go.mod h1:Vd6+20GBhEdwJnU1Xohgt88XCD/CTWcqbCNxkZpyBo0=
-github.com/blevesearch/scorch_segment_api/v2 v2.4.7 h1:GlMzW08hcsM3DnLUxhyF/1PcDal1qtvvIuytuph5djw=
-github.com/blevesearch/scorch_segment_api/v2 v2.4.7/go.mod h1://IJ7tG3QCf0cWW/aVSXqy77tc1AvLu3fcJLYEvOAFs=
+github.com/blevesearch/scorch_segment_api/v2 v2.4.8 h1:ueWgv4xcTUbll2Lm42p/C9spOtFiuzs6iSLfJMnxg5Y=
+github.com/blevesearch/scorch_segment_api/v2 v2.4.8/go.mod h1:dkeBYwY/JqzXo/q55PLDzmxoiXH9Y8vr52q2+gY0nxk=
 github.com/blevesearch/segment v0.9.1 h1:+dThDy+Lvgj5JMxhmOVlgFfkUtZV2kw49xax4+jTfSU=
 github.com/blevesearch/segment v0.9.1/go.mod h1:zN21iLm7+GnBHWTao9I+Au/7MBiL8pPFtJBJTsk6kQw=
 github.com/blevesearch/snowball v0.6.1 h1:cDYjn/NCH+wwt2UdehaLpr2e4BwLIjN4V/TdLsL+B5A=
@@ -45,8 +45,8 @@ github.com/blevesearch/zapx/v15 v15.4.3 h1:iJiMJOHrz216jyO6lS0m9RTCEkprUnzvqAI2l
 github.com/blevesearch/zapx/v15 v15.4.3/go.mod h1:1pssev/59FsuWcgSnTa0OeEpOzmhtmr/0/11H0Z8+Nw=
 github.com/blevesearch/zapx/v16 v16.3.4 h1:hDAqA8qusZTNbPEL7//w5P65UZ2de6yhSeUaTbp0Po0=
 github.com/blevesearch/zapx/v16 v16.3.4/go.mod h1:zqkPPqs9GS9FzVWzCO3Wf1X044yWAV17+4zb+FTiEHg=
-github.com/blevesearch/zapx/v17 v17.1.9 h1:K5MsArRyuwfylDTN1+cU7plGVIFz4gPoH4HD5M7I8ik=
-github.com/blevesearch/zapx/v17 v17.1.9/go.mod h1:34TIaJmdo5hMh2IBLoE4Day65j7DJ++8s5trz1yrsGY=
+github.com/blevesearch/zapx/v17 v17.2.0 h1:+4Zn/lDFqnoD2XRvwcw3K1ivwUjIQKIxST3Jr1LCcDE=
+github.com/blevesearch/zapx/v17 v17.2.0/go.mod h1:qwCdOYIG1kG0V4iYxwzNMwhxZxw7IXnSRrMobR1C/S0=
 github.com/couchbase/ghistogram v0.1.0 h1:b95QcQTCzjTUocDXp/uMgSNQi8oj1tGwnJ4bODWZnps=
 github.com/couchbase/ghistogram v0.1.0/go.mod h1:s1Jhy76zqfEecpNWJfWUiKZookAFaiGOEoyzgHt9i7k=
 github.com/couchbase/moss v0.2.0 h1:VCYrMzFwEryyhRSeI+/b3tRBSeTpi/8gn5Kf6dxqn+o=
