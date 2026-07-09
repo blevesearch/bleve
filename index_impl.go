@@ -225,12 +225,12 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		if err != nil {
 			return nil, err
 		}
-		defer func(rv *indexImpl) {
-			if !rv.open {
-				rv.i.Close()
-			}
-		}(rv)
 	}
+	defer func(rv *indexImpl) {
+		if !rv.open {
+			rv.i.Close()
+		}
+	}(rv)
 
 	// now load the mapping
 	indexReader, err := rv.i.Reader()
@@ -269,7 +269,8 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 			return nil, err
 		}
 
-		fieldInfo, err := DeletedFields(im, um)
+		var fieldInfo map[string]*index.UpdateFieldInfo
+		fieldInfo, err = DeletedFields(im, um)
 		if err != nil {
 			return nil, err
 		}
@@ -284,11 +285,6 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		if err != nil {
 			return nil, err
 		}
-		defer func(rv *indexImpl) {
-			if !rv.open {
-				rv.i.Close()
-			}
-		}(rv)
 	}
 
 	// mark the index as open
