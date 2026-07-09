@@ -37,11 +37,12 @@ import (
 )
 
 type trainRequest struct {
-	finalSample    bool
-	sampleSize     int
-	ackCh          chan error
-	sample         segment.Segment
-	trainingParams *index.TrainingParams
+	finalSample          bool
+	sampleSize           int
+	ackCh                chan error
+	sample               segment.Segment
+	trainingParams       *index.TrainingParams
+	removedFileWriterIDs map[string]struct{}
 }
 
 type vectorTrainer struct {
@@ -85,6 +86,7 @@ func moveFile(sourcePath, destPath string) error {
 	return nil
 }
 
+// update with the new writer API
 func (t *vectorTrainer) persistToBolt(trainReq *trainRequest) error {
 	tx, err := t.parent.rootBolt.Begin(true)
 	if err != nil {
@@ -157,6 +159,16 @@ func (t *vectorTrainer) trainLoop() {
 			sampleSeg := trainReq.sample
 			if trainReq.trainingParams != nil {
 				t.config[index.TrainingKey] = trainReq.trainingParams
+			}
+
+			// remove any file writer ids that are no longer in use
+			if trainReq.removedFileWriterIDs != nil {
+				err := t.removeFileWriterIDs(trainReq.removedFileWriterIDs)
+				if err != nil {
+					trainReq.ackCh <- fmt.Errorf("error removing file writer ids: %v", err)
+					close(trainReq.ackCh)
+					return
+				}
 			}
 
 			// no sample segment: just persist state if this is the final sample and move on.
@@ -430,31 +442,76 @@ func (t *vectorTrainer) updateBolt(snapshotsBucket *util.BoltBucketImpl, key []b
 	return nil
 }
 
-func (t *vectorTrainer) removeFileWriterIDs(ids map[string]struct{}) error {
+func (t *vectorTrainer) dropFileWriterIDs(ids map[string]struct{}) error {
 	t.m.Lock()
 	defer t.m.Unlock()
-	path := filepath.Join(t.parent.path, index.TrainedIndexFileName)
-	writer, err := util.NewFileWriter([]byte(path))
+
+	trainReq := &trainRequest{
+		ackCh:                make(chan error),
+		removedFileWriterIDs: ids,
+	}
+	t.trainCh <- trainReq
+	err := <-trainReq.ackCh
+	if err != nil {
+		return fmt.Errorf("train_vector: dropFileWriterIDs() err'd out with: %w", err)
+	}
+
+	return err
+}
+
+func (t *vectorTrainer) removeFileWriterIDs(ids map[string]struct{}) error {
+	// create a new writer to update the trainerBucket in bolt
+	boltPath := filepath.Join(t.parent.path, "root.bolt")
+	writer, err := util.NewFileWriter([]byte(boltPath))
 	if err != nil {
 		return err
 	}
 
+	// only the writer id needs to be updated in the bucket
+	err = t.parent.rootBolt.Update(func(tx *util.BoltTxImpl) error {
+		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
+		if snapshots == nil {
+			return nil
+		}
+		c := snapshots.Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			if bytes.Equal(k, util.BoltTrainerKey) {
+				trainerBucket := snapshots.GetBucket(k)
+				if trainerBucket == nil {
+					continue
+				}
+				oldWriterID, err := trainerBucket.Get(util.BoltMetaDataFileWriterIDKey, nil)
+				if err != nil {
+					return err
+				}
+				if _, ok := ids[string(oldWriterID)]; ok {
+					err = trainerBucket.Put(util.BoltMetaDataFileWriterIDKey, []byte(writer.Id()), writer)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+		return nil
+	})
+
+	// invoke the merge API and let the zap side of things handle the update of writer IDs and also
+	// the data in the trained index.
+	trainedIndexPath := filepath.Join(t.parent.path, index.TrainedIndexFileName)
 	if encryptedIndex, ok := t.trainedIndex.segment.(segment.SegmentWithCallbacks); ok {
 		if _, ok := ids[encryptedIndex.CallbackId()]; ok {
-
 			_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.trainedIndex.segment},
-				[]*roaring.Bitmap{nil, nil}, path+".tmp", t.parent.closeCh, nil, t.config)
+				[]*roaring.Bitmap{nil, nil}, trainedIndexPath+".tmp", t.parent.closeCh, nil, t.config)
 			if err != nil {
 				return err
 			}
 
-			// todo: handle removeFileWriterIDs call happens during training
 			t.trainedIndex.segment.Close()
-			if err = moveFile(path+".tmp", path); err != nil {
+			if err = moveFile(trainedIndexPath+".tmp", trainedIndexPath); err != nil {
 				return err
 			}
 
-			trainedIndex, err := t.parent.segPlugin.OpenUsing(path, t.config)
+			trainedIndex, err := t.parent.segPlugin.OpenUsing(trainedIndexPath, t.config)
 			if err != nil {
 				return err
 			}
@@ -465,7 +522,10 @@ func (t *vectorTrainer) removeFileWriterIDs(ids map[string]struct{}) error {
 
 		}
 	}
-func (t *vectorTrainer) FileWriterIDsInUse() (map[string]struct{}, error) {
+	return err
+}
+
+func (t *vectorTrainer) fileWriterIDsInUse() (map[string]struct{}, error) {
 	t.m.RLock()
 	defer t.m.RUnlock()
 	writerIDs := make(map[string]struct{})

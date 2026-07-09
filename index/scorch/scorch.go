@@ -123,6 +123,9 @@ type trainer interface {
 	// trainer specific file transfer operations
 	copyFileLOCKED(file string, d index.IndexDirectory) error
 	updateBolt(snapshotsBucket *util.BoltBucketImpl, key []byte, value []byte) error
+
+	dropFileWriterIDs(ids map[string]struct{}) error
+	fileWriterIDsInUse() (map[string]struct{}, error)
 }
 
 type ScorchErrorType string
@@ -1333,7 +1336,7 @@ func (s *Scorch) FileWriterIDsInUse() (map[string]struct{}, error) {
 	}
 
 	if s.trainer != nil {
-		trainerKeys, err := s.trainer.FileWriterIDsInUse()
+		trainerKeys, err := s.trainer.fileWriterIDsInUse()
 		if err != nil {
 			return nil, err
 		}
@@ -1365,7 +1368,7 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	}
 
 	if s.trainer != nil {
-		err := s.trainer.removeFileWriterIDs(ids)
+		err := s.trainer.dropFileWriterIDs(ids)
 		if err != nil {
 			return err
 		}
