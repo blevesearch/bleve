@@ -71,6 +71,7 @@ type Scorch struct {
 	copyScheduled map[string]int
 
 	persisterOptions    *persisterOptions
+	mergerOptions       *mergerOptions
 	mergePlannerOptions *mergeplan.MergePlanOptions
 
 	numSnapshotsToKeep       int
@@ -275,6 +276,12 @@ func NewScorch(storeName string,
 		return nil, err
 	}
 	rv.persisterOptions = po
+
+	mo, err := rv.parseMergerOptions()
+	if err != nil {
+		return nil, err
+	}
+	rv.mergerOptions = mo
 
 	mpo, err := rv.parseMergePlannerOptions(po)
 	if err != nil {

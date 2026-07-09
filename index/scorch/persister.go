@@ -439,9 +439,9 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot,
 }
 
 type flushable struct {
-	sbsBatch        []segment.Segment
-	sbsBatchDrops   []*roaring.Bitmap
-	sbsBatchIndexes []int
+	sbsBatch          []segment.Segment
+	sbsBatchDrops     []*roaring.Bitmap
+	sbsBatchSnapshots []*SegmentSnapshot
 }
 
 func legacyFlushBehaviour(maxSizeInMemoryMergePerWorker, numPersisterWorkers int) bool {
@@ -462,16 +462,14 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	// collect details of the unpersisted segments
 	sbs := make([]segment.Segment, 0, numSegments)
 	sbsDrops := make([]*roaring.Bitmap, 0, numSegments)
-	sbsIndexes := make([]int, 0, numSegments)
 	sbsSizes := make([]int, 0, numSegments)
-	for idx, segmentSnapshot := range snapshot.segment {
+	for _, segmentSnapshot := range snapshot.segment {
 		if _, ok := segmentSnapshot.segment.(segment.PersistedSegment); ok {
 			persistedSegments = append(persistedSegments, segmentSnapshot)
 		} else {
 			unpersistedSegments = append(unpersistedSegments, segmentSnapshot)
 			sbs = append(sbs, segmentSnapshot.segment)
 			sbsDrops = append(sbsDrops, segmentSnapshot.deleted)
-			sbsIndexes = append(sbsIndexes, idx)
 			sbsSizes = append(sbsSizes, segmentSnapshot.Size())
 		}
 	}
@@ -490,43 +488,43 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 	var flushSet []*flushable
 	if legacyFlushBehaviour(po.MaxSizeInMemoryMergePerWorker, po.NumPersisterWorkers) {
 		val := &flushable{
-			sbsBatch:        slices.Clone(sbs),
-			sbsBatchDrops:   slices.Clone(sbsDrops),
-			sbsBatchIndexes: slices.Clone(sbsIndexes),
+			sbsBatch:          slices.Clone(sbs),
+			sbsBatchDrops:     slices.Clone(sbsDrops),
+			sbsBatchSnapshots: slices.Clone(unpersistedSegments),
 		}
 		flushSet = append(flushSet, val)
 	} else {
 		sbsBatch := make([]segment.Segment, 0, numUnpersistedSegments)
 		sbsBatchDrops := make([]*roaring.Bitmap, 0, numUnpersistedSegments)
-		sbsBatchIndexes := make([]int, 0, numUnpersistedSegments)
+		sbsBatchSnapshots := make([]*SegmentSnapshot, 0, numUnpersistedSegments)
 		runningSize := 0
 		for i := 0; i < numUnpersistedSegments; i++ {
 			sbsBatch = append(sbsBatch, sbs[i])
 			sbsBatchDrops = append(sbsBatchDrops, sbsDrops[i])
-			sbsBatchIndexes = append(sbsBatchIndexes, sbsIndexes[i])
+			sbsBatchSnapshots = append(sbsBatchSnapshots, unpersistedSegments[i])
 			runningSize += sbsSizes[i]
 			if runningSize >= po.MaxSizeInMemoryMergePerWorker && len(sbsBatch) >= DefaultMinSegmentsForInMemoryMerge {
 				flushSet = append(flushSet, &flushable{
-					sbsBatch:        slices.Clone(sbsBatch),
-					sbsBatchDrops:   slices.Clone(sbsBatchDrops),
-					sbsBatchIndexes: slices.Clone(sbsBatchIndexes),
+					sbsBatch:          slices.Clone(sbsBatch),
+					sbsBatchDrops:     slices.Clone(sbsBatchDrops),
+					sbsBatchSnapshots: slices.Clone(sbsBatchSnapshots),
 				})
-				sbsBatch, sbsBatchDrops, sbsBatchIndexes = sbsBatch[:0], sbsBatchDrops[:0], sbsBatchIndexes[:0]
+				sbsBatch, sbsBatchDrops, sbsBatchSnapshots = sbsBatch[:0], sbsBatchDrops[:0], sbsBatchSnapshots[:0]
 				runningSize = 0
 			}
 		}
 		if len(sbsBatch) > 0 {
 			flushSet = append(flushSet, &flushable{
-				sbsBatch:        slices.Clone(sbsBatch),
-				sbsBatchDrops:   slices.Clone(sbsBatchDrops),
-				sbsBatchIndexes: slices.Clone(sbsBatchIndexes),
+				sbsBatch:          slices.Clone(sbsBatch),
+				sbsBatchDrops:     slices.Clone(sbsBatchDrops),
+				sbsBatchSnapshots: slices.Clone(sbsBatchSnapshots),
 			})
 		}
 	}
 
 	// now merge each batch into a new segment, and persist all of them to disk,
 	// and construct a new snapshot with the merged segments
-	newSnapshot, newSegmentIDs, err := s.mergeAndPersistInMemorySegments(snapshot, flushSet, po)
+	newSnapshot, newSegmentIDs, err := s.mergeAndPersistInMemorySegments(flushSet)
 	if err != nil {
 		return false, err
 	}
