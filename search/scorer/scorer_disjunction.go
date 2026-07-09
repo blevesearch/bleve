@@ -51,10 +51,15 @@ func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	}
 	coord := float64(countMatch) / float64(countTotal)
 	rv.Score = sum * coord
-	rv.Expl = nil
 	rv.FieldTermLocations = search.MergeFieldTermLocations(rv.FieldTermLocations, constituents[1:])
 	if s.options.Explain {
+		// scoreExplain reads each constituent's Expl — including constituents[0],
+		// which is rv itself — so it must run BEFORE rv.Expl is cleared. Clearing
+		// rv.Expl first (as a prior version did) nulled the first child of the
+		// "sum of:" explanation.
 		s.scoreExplain(rv, constituents, sum, coord, countMatch, countTotal)
+	} else {
+		rv.Expl = nil
 	}
 	return rv
 }
