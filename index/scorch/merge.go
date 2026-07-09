@@ -421,7 +421,7 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 			continue
 		}
 
-		numMergedSegments += len(batch.segments)
+		numMergedSegments += len(batch.snapshots)
 		s.markIneligibleForRemoval(batch.newFilename)
 		path := s.path + string(os.PathSeparator) + batch.newFilename
 
