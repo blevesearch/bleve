@@ -196,7 +196,7 @@ OUTER:
 		if ourSnapshot != nil {
 			startTime := time.Now()
 
-			err := s.persistSnapshot(ourSnapshot)
+			err := s.persistSnapshot(ourSnapshot, s.persisterOptions)
 			for _, ch := range ourPersisted {
 				if err != nil {
 					ch <- err
@@ -419,12 +419,12 @@ func validatePersisterOptions(options *persisterOptions) error {
 	return nil
 }
 
-func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
+func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot, po *persisterOptions) error {
 	// Perform in-memory segment merging only when the memory pressure is
 	// below the configured threshold, else the persister performs the
 	// direct persistence of segments.
-	if s.NumEventsBlocking() < s.persisterOptions.MemoryPressurePauseThreshold {
-		persisted, err := s.persistSnapshotMaybeMerge(snapshot, s.persisterOptions)
+	if s.NumEventsBlocking() < po.MemoryPressurePauseThreshold {
+		persisted, err := s.persistSnapshotMaybeMerge(snapshot, po)
 		if err != nil {
 			return err
 		}
