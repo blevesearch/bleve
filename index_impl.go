@@ -213,9 +213,6 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		if !ok {
 			return nil, fmt.Errorf("updated mapping present for unupdatable index")
 		}
-
-		// Load the meta data from bolt so that we can read the current index
-		// mapping to compare with
 		err = ui.OpenMeta()
 		if err != nil {
 			return nil, err
