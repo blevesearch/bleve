@@ -360,6 +360,9 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 	defer func() {
 		for batchID := 0; batchID < numBatches; batchID++ {
 			batch := mergeBatches[batchID]
+			if batch == nil {
+				continue
+			}
 			if err == nil {
 				s.rootLock.Lock()
 				for _, filename := range batch.filenames {
