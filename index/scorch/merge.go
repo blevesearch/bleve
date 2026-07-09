@@ -546,7 +546,7 @@ func cumulateBytesRead(sbs []segment.Segment) uint64 {
 	return rv
 }
 
-func (s *Scorch) mergeAndPersistInMemorySegments(flushes []*flushable) (*IndexSnapshot, map[uint64]struct{}, error) {
+func (s *Scorch) mergeAndPersistInMemorySegments(flushes []*flushable, po *persisterOptions) (*IndexSnapshot, map[uint64]struct{}, error) {
 	atomic.AddUint64(&s.stats.TotMemMergeBeg, 1)
 
 	var err error
@@ -565,7 +565,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(flushes []*flushable) (*IndexSn
 	}()
 
 	var numMergedSegments uint64
-	sem := make(chan struct{}, s.persisterOptions.NumPersisterWorkers)
+	sem := make(chan struct{}, po.NumPersisterWorkers)
 	var wg sync.WaitGroup
 	var errM sync.Mutex
 	var errs []error
