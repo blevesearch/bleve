@@ -438,14 +438,12 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 			atomic.StoreUint64(&s.stats.MaxFileMergeZapTime, fileMergeZapTime)
 		}
 		if err != nil {
-			s.unmarkIneligibleForRemoval(batch.newFilename)
 			atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
 			return err
 		}
 
 		batch.new, err = s.segPlugin.OpenUsing(path, s.segmentConfig)
 		if err != nil {
-			s.unmarkIneligibleForRemoval(batch.newFilename)
 			atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
 			return err
 		}
