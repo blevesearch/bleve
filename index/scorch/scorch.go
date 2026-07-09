@@ -71,7 +71,6 @@ type Scorch struct {
 	copyScheduled map[string]int
 
 	persisterOptions    *persisterOptions
-	mergerOptions       *mergerOptions
 	mergePlannerOptions *mergeplan.MergePlanOptions
 
 	numSnapshotsToKeep       int
