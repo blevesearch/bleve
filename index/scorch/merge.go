@@ -599,8 +599,7 @@ func (s *Scorch) mergeAndPersistInMemorySegments(flushes []*flushable) (*IndexSn
 			}
 			mergeBatches[batchID] = batch
 
-			sbsCount := uint64(len(flush.sbsBatch))
-			atomic.AddUint64(&numMergedSegments, sbsCount)
+			atomic.AddUint64(&numMergedSegments, uint64(len(flush.sbsBatch)))
 			s.markIneligibleForRemoval(batch.newFilename)
 			path := s.path + string(os.PathSeparator) + batch.newFilename
 
