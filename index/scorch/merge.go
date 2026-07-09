@@ -375,7 +375,7 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 		}
 	}()
 
-	var numMergedSegments uint64
+	numMergedSegments := 0
 	for batchID := 0; batchID < numBatches; batchID++ {
 		task := mergePlan.Tasks[batchID]
 		if len(task.Segments) == 0 {
@@ -421,7 +421,7 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 			continue
 		}
 
-		atomic.AddUint64(&numMergedSegments, uint64(len(batch.segments)))
+		numMergedSegments += len(batch.segments)
 		s.markIneligibleForRemoval(batch.newFilename)
 		path := s.path + string(os.PathSeparator) + batch.newFilename
 
