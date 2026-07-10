@@ -430,9 +430,9 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 		s.markIneligibleForRemoval(batch.newFilename)
 		path := s.path + string(os.PathSeparator) + batch.newFilename
 
+		prevBytesReadTotal := cumulateBytesRead(batch.segments)
 		fileMergeZapStartTime := time.Now()
 		atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
-		prevBytesReadTotal := cumulateBytesRead(batch.segments)
 		batch.newDocNums, _, err = s.segPlugin.MergeUsing(batch.segments, batch.drops, path,
 			cw.cancelCh, s, s.segmentConfig)
 		atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
