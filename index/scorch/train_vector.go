@@ -18,7 +18,6 @@
 package scorch
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"maps"
@@ -205,6 +204,7 @@ func (t *vectorTrainer) handleRequest(req *trainRequest, path string, config map
 		if err := t.removeFileWriterIDs(req.removedFileWriterIDs); err != nil {
 			return true, fmt.Errorf("error removing file writer ids: %v", err)
 		}
+		return false, nil
 	}
 
 	// no sample segment: just persist state if this is the final sample.
@@ -472,13 +472,20 @@ func (t *vectorTrainer) copyFileLOCKED(file string, d index.IndexDirectory) erro
 		if err != nil {
 			return fmt.Errorf("error updating dest index bolt: %w", err)
 		}
+
+		// update the stats in destination
+		err = d.SetPathInBolt(util.BoltTrainedSamplesKey, binary.LittleEndian.AppendUint64(nil, atomic.LoadUint64(&t.trainedSamples)))
+		if err != nil {
+			return fmt.Errorf("error updating trained samples key: %w", err)
+		}
 	}
 
 	return nil
 }
 
 func (t *vectorTrainer) updateBolt(snapshotsBucket *util.BoltBucketImpl, key []byte, value []byte) error {
-	if bytes.Equal(key, util.BoltTrainerKey) {
+	switch string(key) {
+	case string(util.BoltTrainerKey):
 		trainerBucket, err := snapshotsBucket.CreateBucketIfNotExists(util.BoltTrainerKey)
 		if err != nil {
 			return err
@@ -515,12 +522,34 @@ func (t *vectorTrainer) updateBolt(snapshotsBucket *util.BoltBucketImpl, key []b
 		t.m.Lock()
 		t.trainedIndex = seg
 		t.m.Unlock()
+
+	case string(util.BoltTrainedSamplesKey):
+		trainedSamples := binary.LittleEndian.Uint64(value)
+		atomic.StoreUint64(&t.trainedSamples, trainedSamples)
+		trainerBucket, err := snapshotsBucket.CreateBucketIfNotExists(util.BoltTrainerKey)
+		if err != nil {
+			return err
+		}
+		err = trainerBucket.Put(util.BoltTrainedSamplesKey, value, nil)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
+// dropFileWriterIDs removes the given file writer ids from the trained index.
+// This is a lifecycle operation (key rotation) that must work for the entire
+// life of the trained index, not just while training is running.
 func (t *vectorTrainer) dropFileWriterIDs(ids map[string]struct{}) error {
+	if t.trainingComplete.Load() {
+		if err := t.removeFileWriterIDs(ids); err != nil {
+			return fmt.Errorf("train_vector: dropFileWriterIDs() err'd out with: %w", err)
+		}
+		return nil
+	}
+
 	trainReq := &trainRequest{
 		ackCh:                make(chan error),
 		removedFileWriterIDs: ids,
