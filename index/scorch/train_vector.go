@@ -573,8 +573,11 @@ func (t *vectorTrainer) removeFileWriterIDs(ids map[string]struct{}) error {
 		if encryptedIndex, ok := t.trainedIndex.segment.(segment.SegmentWithCallbacks); ok {
 			if _, ok := ids[encryptedIndex.CallbackId()]; ok {
 				_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.trainedIndex.segment},
-					[]*roaring.Bitmap{nil, nil}, trainedIndexPath+"temp", t.parent.closeCh, nil, t.config)
+					[]*roaring.Bitmap{nil}, trainedIndexPath+"temp", t.parent.closeCh, nil, t.config)
 				if err != nil {
+					if serr := os.Remove(trainedIndexPath + "temp"); serr != nil {
+						return fmt.Errorf("error removing temp trained index: %v", serr)
+					}
 					return err
 				}
 
@@ -583,14 +586,21 @@ func (t *vectorTrainer) removeFileWriterIDs(ids map[string]struct{}) error {
 					if serr := os.Remove(trainedIndexPath + "temp"); serr != nil {
 						return fmt.Errorf("error removing temp trained index: %v", serr)
 					}
+					t.trainedIndex = nil
 					return err
 				}
 
-				trainedIndex, err := t.parent.segPlugin.OpenUsing(trainedIndexPath+"temp", t.config)
-				if err != nil {
+				if err := moveFile(trainedIndexPath+"temp", trainedIndexPath); err != nil {
 					if serr := os.Remove(trainedIndexPath + "temp"); serr != nil {
 						return fmt.Errorf("error removing temp trained index: %v", serr)
 					}
+					t.trainedIndex = nil
+					return err
+				}
+
+				trainedIndex, err := t.parent.segPlugin.OpenUsing(trainedIndexPath, t.config)
+				if err != nil {
+					t.trainedIndex = nil
 					return err
 				}
 
