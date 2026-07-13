@@ -326,12 +326,16 @@ func (t *vectorTrainer) loadTrainedData(bucket *util.BoltBucketImpl) error {
 	if err != nil {
 		return fmt.Errorf("error getting trained samples: %v", err)
 	}
-	atomic.StoreUint64(&t.trainedSamples, binary.LittleEndian.Uint64(trainedSamples))
-	comp, err := strconv.ParseBool(string(trainComplete))
-	if err != nil {
-		return fmt.Errorf("error parsing train complete: %v", err)
+	if len(trainedSamples) == 8 {
+		atomic.StoreUint64(&t.trainedSamples, binary.LittleEndian.Uint64(trainedSamples))
 	}
-	t.trainingComplete.Store(comp)
+	if len(trainComplete) > 0 {
+		comp, err := strconv.ParseBool(string(trainComplete))
+		if err != nil {
+			return fmt.Errorf("error parsing train complete: %v", err)
+		}
+		t.trainingComplete.Store(comp)
+	}
 
 	t.m.Lock()
 	defer t.m.Unlock()

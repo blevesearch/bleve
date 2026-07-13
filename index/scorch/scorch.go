@@ -1119,10 +1119,12 @@ func (s *Scorch) SetPathInBolt(key []byte, value []byte) error {
 		return err
 	}
 
-	// currently this is specific to trained index file update
-	err = s.trainer.updateBolt(snapshotsBucket, key, value)
-	if err != nil {
-		return err
+	if s.trainer != nil {
+		// currently this is specific to trained index file update
+		err = s.trainer.updateBolt(snapshotsBucket, key, value)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = tx.Commit()
