@@ -56,6 +56,10 @@ type vectorTrainer struct {
 	// the data vectors, returns trained centroid layout
 	trainedIndex *SegmentSnapshot
 	trainCh      chan *trainRequest
+	// closed by trainLoop when it exits (via close, training completion, or
+	// error). Producers select on it so they never block on a request that the
+	// trainer will never consume/ack.
+	doneCh chan struct{}
 }
 
 const IndexTrainedWithFastMerge = "vector_index_fast_merge"
@@ -68,6 +72,7 @@ func initTrainer(s *Scorch, config map[string]interface{}) *vectorTrainer {
 				parent:  s,
 				config:  maps.Clone(s.config),
 				trainCh: make(chan *trainRequest, 1),
+				doneCh:  make(chan struct{}),
 			}
 			// update the parent scorch config with the trainer's callback to fetch the trained index
 			s.segmentConfig[index.TrainedIndexCallback] = index.TrainedIndexCallbackFn(trainer.getTrainedIndex)
@@ -86,7 +91,6 @@ func moveFile(sourcePath, destPath string) error {
 	return nil
 }
 
-// update with the new writer API
 func (t *vectorTrainer) persistToBolt(trainReq *trainRequest) error {
 	tx, err := t.parent.rootBolt.Begin(true)
 	if err != nil {
@@ -132,122 +136,171 @@ func (t *vectorTrainer) persistToBolt(trainReq *trainRequest) error {
 	return t.parent.rootBolt.Sync()
 }
 
-// this is not a routine that will be running throughout the lifetime of the index. It's purpose
-// is to only train the vector index before the data ingestion starts.
+// trainLoop is not a routine that runs throughout the lifetime of the index.
+// Its purpose is only to train the vector index before data ingestion starts.
+// It is the sole consumer of trainCh and the sole owner of trainedIndex
+// mutations originating from training.
 func (t *vectorTrainer) trainLoop() {
 	defer t.parent.asyncTasks.Done()
+	// signal any blocked producers that no further requests will be serviced.
+	defer close(t.doneCh)
 
-	trainLoopStartTime := time.Now()
+	start := time.Now()
 	path := filepath.Join(t.parent.path, index.TrainedIndexFileName)
+	// config is owned exclusively by this goroutine. t.config is read
+	// concurrently by train(), so it must not be mutated here.
+	config := maps.Clone(t.config)
+
 	for {
 		// exit once the final sample set has been ingested and training is complete.
 		if t.trainingComplete.Load() {
-			atomic.StoreUint64(&t.parent.stats.TotTrainedSamples, t.trainedSamples)
-			atomic.StoreUint64(&t.parent.stats.TotTrainTime, uint64(time.Since(trainLoopStartTime).Milliseconds()))
+			t.recordTrainingStats(start)
 			return
 		}
 		select {
 		case <-t.parent.closeCh:
-			select {
-			case req := <-t.trainCh:
-				req.ackCh <- fmt.Errorf("trainer is closed")
-				close(req.ackCh)
-			default:
-			}
+			// the deferred close(doneCh) releases any producer blocked on
+			// trainCh or its ackCh, so there is no need to drain here.
 			return
-		case trainReq := <-t.trainCh:
-			sampleSeg := trainReq.sample
-			if trainReq.trainingParams != nil {
-				t.config[index.TrainingKey] = trainReq.trainingParams
-			}
-
-			// remove any file writer ids that are no longer in use
-			if trainReq.removedFileWriterIDs != nil {
-				err := t.removeFileWriterIDs(trainReq.removedFileWriterIDs)
-				if err != nil {
-					trainReq.ackCh <- fmt.Errorf("error removing file writer ids: %v", err)
-					close(trainReq.ackCh)
-					return
-				}
-			}
-
-			// no sample segment: just persist state if this is the final sample and move on.
-			if sampleSeg == nil {
-				if trainReq.finalSample {
-					if err := t.persistToBolt(trainReq); err != nil {
-						trainReq.ackCh <- fmt.Errorf("error persisting to bolt: %v", err)
-						close(trainReq.ackCh)
-						return
-					}
-				}
-				close(trainReq.ackCh)
-				continue
-			}
-
-			if t.trainedIndex == nil {
-				switch seg := sampleSeg.(type) {
-				case segment.UnpersistedSegment:
-					if err := persistToDirectory(seg, nil, path); err != nil {
-						trainReq.ackCh <- fmt.Errorf("error persisting segment: %v", err)
-						close(trainReq.ackCh)
-						continue
-					}
-				}
-			} else {
-				// merge the new segment with the existing one into a .tmp file, then
-				// atomically rename it into place (Os.Open on the live path is unsafe
-				// during the merge).
-				_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.trainedIndex.segment, sampleSeg},
-					[]*roaring.Bitmap{nil, nil}, path+".tmp", t.parent.closeCh, nil, t.config)
-				if err != nil {
-					trainReq.ackCh <- fmt.Errorf("error merging trained index: %v", err)
-					close(trainReq.ackCh)
-					return
-				}
-
-				t.trainedIndex.segment.Close()
-				if err = moveFile(path+".tmp", path); err != nil {
-					trainReq.ackCh <- fmt.Errorf("error renaming trained index: %v", err)
-					close(trainReq.ackCh)
-					return
-				}
-			}
-
-			// bolt write acts as a checkpoint for failover-recovery: callers downstream
-			// can rely on the trained index being available once this completes.
-			// todo: rethink the frequency of bolt writes
-			if err := t.persistToBolt(trainReq); err != nil {
-				trainReq.ackCh <- fmt.Errorf("error persisting to bolt: %v", err)
-				close(trainReq.ackCh)
+		case req := <-t.trainCh:
+			shutdown, err := t.handleRequest(req, path, config)
+			ackRequest(req, err)
+			if shutdown {
 				return
 			}
-
-			trainedIndex, err := t.parent.segPlugin.OpenUsing(path, t.config)
-			if err != nil {
-				trainReq.ackCh <- fmt.Errorf("error opening trained index: %v", err)
-				close(trainReq.ackCh)
-				return
-			}
-
-			t.m.Lock()
-			t.trainedIndex = &SegmentSnapshot{segment: trainedIndex}
-			t.m.Unlock()
-			close(trainReq.ackCh)
 		}
 	}
 }
 
-// loads the metadata specific to the trained index from boltdb, happens during init
-// no lock needed
+// recordTrainingStats publishes the final training counters once the loop exits.
+func (t *vectorTrainer) recordTrainingStats(start time.Time) {
+	atomic.StoreUint64(&t.parent.stats.TotTrainedSamples, atomic.LoadUint64(&t.trainedSamples))
+	atomic.StoreUint64(&t.parent.stats.TotTrainTime, uint64(time.Since(start).Milliseconds()))
+}
+
+// ackRequest delivers a request's result to the producer waiting in submit and
+// then releases it. A non-nil err is sent before the close so submit observes
+// it; the send blocks until submit receives, which the shutdown handshake in
+// submit relies on.
+func ackRequest(req *trainRequest, err error) {
+	if err != nil {
+		req.ackCh <- err
+	}
+	close(req.ackCh)
+}
+
+// handleRequest processes a single training request. The returned err, if
+// non-nil, is already formatted for the producer. shutdown reports whether the
+// trainLoop must exit: every failure is fatal except a failed initial persist,
+// which leaves the trainer able to retry on the next sample.
+func (t *vectorTrainer) handleRequest(req *trainRequest, path string, config map[string]interface{}) (shutdown bool, err error) {
+	if req.trainingParams != nil {
+		// mutate the goroutine-local config only; t.config is read concurrently
+		// by train() and must stay immutable after init.
+		config[index.TrainingKey] = req.trainingParams
+	}
+
+	// remove any file writer ids that are no longer in use
+	if req.removedFileWriterIDs != nil {
+		if err := t.removeFileWriterIDs(req.removedFileWriterIDs); err != nil {
+			return true, fmt.Errorf("error removing file writer ids: %v", err)
+		}
+	}
+
+	// no sample segment: just persist state if this is the final sample.
+	if req.sample == nil {
+		if req.finalSample {
+			if err := t.persistToBolt(req); err != nil {
+				return true, fmt.Errorf("error persisting to bolt: %v", err)
+			}
+		}
+		return false, nil
+	}
+
+	// snapshot the current trained segment under the read lock; MergeUsing below
+	// only reads it, so concurrent getTrainedIndex readers stay safe.
+	t.m.RLock()
+	prev := t.trainedIndex
+	t.m.RUnlock()
+
+	if prev == nil {
+		if seg, ok := req.sample.(segment.UnpersistedSegment); ok {
+			if err := persistToDirectory(seg, nil, path); err != nil {
+				// recoverable: retry on the next sample rather than tear down.
+				return false, fmt.Errorf("error persisting segment: %v", err)
+			}
+		}
+	} else {
+		// merge the new sample with the existing index into a .tmp file; it is
+		// renamed into place by publishTrainedIndex (Os.Open on the live path is
+		// unsafe during the merge).
+		_, _, mErr := t.parent.segPlugin.MergeUsing([]segment.Segment{prev.segment, req.sample},
+			[]*roaring.Bitmap{nil, nil}, path+".tmp", t.parent.closeCh, nil, config)
+		if mErr != nil {
+			return true, fmt.Errorf("error merging trained index: %v", mErr)
+		}
+	}
+
+	if err := t.publishTrainedIndex(req, prev, path, config); err != nil {
+		return true, err
+	}
+	return false, nil
+}
+
+// publishTrainedIndex makes the freshly written index visible to readers. The
+// old segment handle must be closed before moveFile can replace the backing
+// file, so the close -> rename -> open -> pointer-swap sequence runs under the
+// write lock; otherwise a reader holding RLock could observe a closed segment
+// or a missing file. On any error past the close, the pointer is reset to nil
+// so readers never see the freed prev segment (callers fall back to naive
+// merge). The bolt write acts as a failover-recovery checkpoint: callers
+// downstream can rely on the trained index being available once this completes.
+// todo: rethink the frequency of bolt writes
+func (t *vectorTrainer) publishTrainedIndex(req *trainRequest, prev *SegmentSnapshot, path string, config map[string]interface{}) error {
+	if prev != nil {
+		t.m.Lock()
+		if err := prev.segment.Close(); err != nil {
+			t.trainedIndex = nil
+			t.m.Unlock()
+			return fmt.Errorf("error closing previous trained index: %v", err)
+		}
+		if err := moveFile(path+".tmp", path); err != nil {
+			t.trainedIndex = nil
+			t.m.Unlock()
+			return fmt.Errorf("error renaming trained index: %v", err)
+		}
+		t.m.Unlock()
+	}
+
+	if err := t.persistToBolt(req); err != nil {
+		if prev != nil {
+			t.m.Lock()
+			t.trainedIndex = nil
+			t.m.Unlock()
+		}
+		return fmt.Errorf("error persisting to bolt: %v", err)
+	}
+
+	t.m.Lock()
+	defer t.m.Unlock()
+	trainedIndex, err := t.parent.segPlugin.OpenUsing(path, config)
+	if err != nil {
+		t.trainedIndex = nil
+		return fmt.Errorf("error opening trained index: %v", err)
+	}
+	t.trainedIndex = &SegmentSnapshot{segment: trainedIndex}
+	return nil
+}
+
+// loadTrainedData loads the trained-index metadata from boltdb during init. The
+// trainedIndex write is guarded because callback-driven readers may already be
+// registered by the time this runs.
 func (t *vectorTrainer) loadTrainedData(bucket *util.BoltBucketImpl) error {
 	if bucket == nil {
 		return nil
 	}
-	writerID, err := bucket.Get(util.BoltMetaDataFileWriterIDKey, nil)
-	if err != nil {
-		return fmt.Errorf("error getting writer id: %v", err)
-	}
-	reader, err := util.NewFileReader(string(writerID), nil)
+
+	reader, err := util.NewFileReader("", nil)
 	if err != nil {
 		return fmt.Errorf("error creating file reader: %v", err)
 	}
@@ -350,13 +403,38 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 		}
 	}
 
-	t.trainCh <- trainReq
-	err = <-trainReq.ackCh
-	if err != nil {
+	if err := t.submit(trainReq); err != nil {
 		return fmt.Errorf("train_vector: train() err'd out with: %w", err)
 	}
 
-	return err
+	return nil
+}
+
+// submit hands a request to the trainLoop and waits for its ack. It never
+// blocks past trainer shutdown: if the trainLoop has already exited (via close,
+// training completion, or error) the doneCh releases the caller instead of
+// letting it hang on a request that will never be consumed or acked.
+func (t *vectorTrainer) submit(req *trainRequest) error {
+	select {
+	case t.trainCh <- req:
+	case <-t.doneCh:
+		return fmt.Errorf("trainer is closed")
+	}
+
+	select {
+	case err := <-req.ackCh:
+		return err
+	case <-t.doneCh:
+		// trainLoop acks every request it consumes before returning, so if our
+		// request was processed the ack is already available — prefer it over
+		// reporting a shutdown that didn't actually drop this request.
+		select {
+		case err := <-req.ackCh:
+			return err
+		default:
+			return fmt.Errorf("trainer is closed")
+		}
+	}
 }
 
 func (t *vectorTrainer) getInternal(key []byte) ([]byte, error) {
@@ -423,106 +501,75 @@ func (t *vectorTrainer) updateBolt(snapshotsBucket *util.BoltBucketImpl, key []b
 			return err
 		}
 
-		writerID, err := trainerBucket.Get(util.BoltMetaDataFileWriterIDKey, nil)
-		if err != nil {
-			return fmt.Errorf("error getting writer id: %v", err)
-		}
-		reader, err := util.NewFileReader(string(writerID), nil)
+		reader, err := util.NewFileReader("", nil)
 		if err != nil {
 			return fmt.Errorf("error creating file reader: %v", err)
 		}
 
-		// update the centroid index pointer
-		t.trainedIndex, err = t.parent.loadSegment(trainerBucket, reader)
+		// update the centroid index pointer under the write lock; getTrainedIndex
+		// and trainLoop may read t.trainedIndex concurrently.
+		seg, err := t.parent.loadSegment(trainerBucket, reader)
 		if err != nil {
 			return err
 		}
+		t.m.Lock()
+		t.trainedIndex = seg
+		t.m.Unlock()
 	}
 
 	return nil
 }
 
 func (t *vectorTrainer) dropFileWriterIDs(ids map[string]struct{}) error {
-	t.m.Lock()
-	defer t.m.Unlock()
-
 	trainReq := &trainRequest{
 		ackCh:                make(chan error),
 		removedFileWriterIDs: ids,
 	}
-	t.trainCh <- trainReq
-	err := <-trainReq.ackCh
-	if err != nil {
+	if err := t.submit(trainReq); err != nil {
 		return fmt.Errorf("train_vector: dropFileWriterIDs() err'd out with: %w", err)
 	}
 
-	return err
+	return nil
 }
 
 func (t *vectorTrainer) removeFileWriterIDs(ids map[string]struct{}) error {
-	// create a new writer to update the trainerBucket in bolt
-	boltPath := filepath.Join(t.parent.path, "root.bolt")
-	writer, err := util.NewFileWriter([]byte(boltPath))
-	if err != nil {
-		return err
-	}
-
-	// only the writer id needs to be updated in the bucket
-	err = t.parent.rootBolt.Update(func(tx *util.BoltTxImpl) error {
-		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
-		if snapshots == nil {
-			return nil
-		}
-		c := snapshots.Cursor()
-		for k, _ := c.First(); k != nil; k, _ = c.Next() {
-			if bytes.Equal(k, util.BoltTrainerKey) {
-				trainerBucket := snapshots.GetBucket(k)
-				if trainerBucket == nil {
-					continue
-				}
-				oldWriterID, err := trainerBucket.Get(util.BoltMetaDataFileWriterIDKey, nil)
+	// trainer bucket in the bolt file doesn't have any sensitive data to be encrypted,
+	// so we don't have to update it with new writer ids.
+	// invoke the merge API and let the zap side of things handle the update of writer IDs and also
+	// the data in the trained index.
+	t.m.Lock()
+	defer t.m.Unlock()
+	trainedIndexPath := filepath.Join(t.parent.path, index.TrainedIndexFileName)
+	if t.trainedIndex != nil {
+		if encryptedIndex, ok := t.trainedIndex.segment.(segment.SegmentWithCallbacks); ok {
+			if _, ok := ids[encryptedIndex.CallbackId()]; ok {
+				_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.trainedIndex.segment},
+					[]*roaring.Bitmap{nil, nil}, trainedIndexPath+"temp", t.parent.closeCh, nil, t.config)
 				if err != nil {
 					return err
 				}
-				if _, ok := ids[string(oldWriterID)]; ok {
-					err = trainerBucket.Put(util.BoltMetaDataFileWriterIDKey, []byte(writer.Id()), writer)
-					if err != nil {
-						return err
+
+				err = t.trainedIndex.segment.Close()
+				if err != nil {
+					if serr := os.Remove(trainedIndexPath + "temp"); serr != nil {
+						return fmt.Errorf("error removing temp trained index: %v", serr)
 					}
+					return err
 				}
+
+				trainedIndex, err := t.parent.segPlugin.OpenUsing(trainedIndexPath+"temp", t.config)
+				if err != nil {
+					if serr := os.Remove(trainedIndexPath + "temp"); serr != nil {
+						return fmt.Errorf("error removing temp trained index: %v", serr)
+					}
+					return err
+				}
+
+				t.trainedIndex = &SegmentSnapshot{segment: trainedIndex}
 			}
-		}
-		return nil
-	})
-
-	// invoke the merge API and let the zap side of things handle the update of writer IDs and also
-	// the data in the trained index.
-	trainedIndexPath := filepath.Join(t.parent.path, index.TrainedIndexFileName)
-	if encryptedIndex, ok := t.trainedIndex.segment.(segment.SegmentWithCallbacks); ok {
-		if _, ok := ids[encryptedIndex.CallbackId()]; ok {
-			_, _, err := t.parent.segPlugin.MergeUsing([]segment.Segment{t.trainedIndex.segment},
-				[]*roaring.Bitmap{nil, nil}, trainedIndexPath+".tmp", t.parent.closeCh, nil, t.config)
-			if err != nil {
-				return err
-			}
-
-			t.trainedIndex.segment.Close()
-			if err = moveFile(trainedIndexPath+".tmp", trainedIndexPath); err != nil {
-				return err
-			}
-
-			trainedIndex, err := t.parent.segPlugin.OpenUsing(trainedIndexPath, t.config)
-			if err != nil {
-				return err
-			}
-
-			t.m.Lock()
-			t.trainedIndex = &SegmentSnapshot{segment: trainedIndex}
-			t.m.Unlock()
-
 		}
 	}
-	return err
+	return nil
 }
 
 func (t *vectorTrainer) fileWriterIDsInUse() (map[string]struct{}, error) {
@@ -533,32 +580,6 @@ func (t *vectorTrainer) fileWriterIDsInUse() (map[string]struct{}, error) {
 		if seg, ok := t.trainedIndex.segment.(segment.SegmentWithCallbacks); ok {
 			writerIDs[seg.CallbackId()] = struct{}{}
 		}
-	}
-
-	err := t.parent.rootBolt.View(func(tx *util.BoltTxImpl) error {
-		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
-		if snapshots == nil {
-			return nil
-		}
-		c := snapshots.Cursor()
-		for k, _ := c.First(); k != nil; k, _ = c.Next() {
-			if !bytes.Equal(k, util.BoltTrainerKey) {
-				continue
-			}
-			trainerBucket := snapshots.GetBucket(k)
-			if trainerBucket == nil {
-				continue
-			}
-			id, err := trainerBucket.Get(util.BoltMetaDataFileWriterIDKey, nil)
-			if err != nil {
-				return err
-			}
-			writerIDs[string(id)] = struct{}{}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
 
 	return writerIDs, nil
