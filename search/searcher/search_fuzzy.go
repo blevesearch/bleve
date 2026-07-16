@@ -66,11 +66,13 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 	}
 
 	// Note: we don't byte slice the term for a prefix because of runes.
-	prefixTerm := ""
-	for i, r := range term {
-		if i < prefix {
-			prefixTerm += string(r)
-		} else {
+	// prefixTerm is the leading runes of term whose start byte offset is
+	// below prefix; slicing term at the first rune boundary at/after prefix
+	// yields the same string without per-rune string concatenation.
+	prefixTerm := term
+	for i := range term {
+		if i >= prefix {
+			prefixTerm = term[:i]
 			break
 		}
 	}
@@ -89,21 +91,21 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 		dictBytesRead = fuzzyCandidates.bytesRead
 	}
 
+	var fuzzyTermMatches map[string][]string
 	if ctx != nil {
 		reportIOStats(ctx, dictBytesRead)
 		search.RecordSearchCost(ctx, search.AddM, dictBytesRead)
-		fuzzyTermMatches := ctx.Value(search.FuzzyMatchPhraseKey)
-		if fuzzyTermMatches != nil {
-			fuzzyTermMatches.(map[string][]string)[term] = candidates
+		if ftm := ctx.Value(search.FuzzyMatchPhraseKey); ftm != nil {
+			fuzzyTermMatches = ftm.(map[string][]string)
 		}
+	}
+	if fuzzyTermMatches != nil {
+		fuzzyTermMatches[term] = candidates
 	}
 	// check if the candidates are empty or have one term which is the term itself
 	if len(candidates) == 0 || (len(candidates) == 1 && candidates[0] == term) {
-		if ctx != nil {
-			fuzzyTermMatches := ctx.Value(search.FuzzyMatchPhraseKey)
-			if fuzzyTermMatches != nil {
-				fuzzyTermMatches.(map[string][]string)[term] = []string{term}
-			}
+		if fuzzyTermMatches != nil {
+			fuzzyTermMatches[term] = []string{term}
 		}
 		return NewTermSearcher(ctx, indexReader, term, field, boost, options)
 	}
@@ -156,15 +158,33 @@ func findFuzzyCandidateTerms(ctx context.Context, indexReader index.IndexReader,
 	// the levenshtein automaton based iterator to collect the
 	// candidate terms
 	if ir, ok := indexReader.(index.IndexReaderFuzzy); ok {
-		termSet := make(map[string]struct{})
+		// Synonym terms (if any) for this field need to be matched against the
+		// automaton and de-duplicated against the dictionary candidates.
+		var synonymTerms map[string][]string
+		if ctx != nil {
+			if fts, ok := ctx.Value(search.FieldTermSynonymMapKey).(search.FieldTermSynonymMap); ok {
+				synonymTerms = fts[field]
+			}
+		}
+		// The dictionary iterator already yields each term exactly once (merged
+		// across segments), so the only purpose of termSet is to de-duplicate
+		// synonym terms against the dictionary candidates. When there are no
+		// synonyms, skip the map entirely to avoid a per-candidate map insert.
+		var termSet map[string]struct{}
+		if len(synonymTerms) > 0 {
+			termSet = make(map[string]struct{}, len(synonymTerms))
+		}
 		addCandidateTerm := func(term string, editDistance uint8) error {
-			if _, exists := termSet[term]; !exists {
-				termSet[term] = struct{}{}
-				rv.candidates = append(rv.candidates, term)
-				rv.editDistances = append(rv.editDistances, editDistance)
-				if tooManyClauses(len(rv.candidates)) {
-					return tooManyClausesErr(field, len(rv.candidates))
+			if termSet != nil {
+				if _, exists := termSet[term]; exists {
+					return nil
 				}
+				termSet[term] = struct{}{}
+			}
+			rv.candidates = append(rv.candidates, term)
+			rv.editDistances = append(rv.editDistances, editDistance)
+			if tooManyClauses(len(rv.candidates)) {
+				return tooManyClausesErr(field, len(rv.candidates))
 			}
 			return nil
 		}
@@ -188,24 +208,18 @@ func findFuzzyCandidateTerms(ctx context.Context, indexReader index.IndexReader,
 		if err != nil {
 			return nil, err
 		}
-		if ctx != nil {
-			if fts, ok := ctx.Value(search.FieldTermSynonymMapKey).(search.FieldTermSynonymMap); ok {
-				if ts, exists := fts[field]; exists {
-					for term := range ts {
-						if _, exists := termSet[term]; exists {
-							continue
-						}
-						if !strings.HasPrefix(term, prefixTerm) {
-							continue
-						}
-						match, editDistance := a.MatchAndDistance(term)
-						if match {
-							err = addCandidateTerm(term, editDistance)
-							if err != nil {
-								return nil, err
-							}
-						}
-					}
+		for term := range synonymTerms {
+			if _, exists := termSet[term]; exists {
+				continue
+			}
+			if !strings.HasPrefix(term, prefixTerm) {
+				continue
+			}
+			match, editDistance := a.MatchAndDistance(term)
+			if match {
+				err = addCandidateTerm(term, editDistance)
+				if err != nil {
+					return nil, err
 				}
 			}
 		}
