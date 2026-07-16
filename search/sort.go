@@ -274,6 +274,27 @@ func (so SortOrder) Compare(cachedScoring, cachedDesc []bool, i, j *DocumentMatc
 	return -1
 }
 
+// CompareScoreDescending compares two document matches for the common case of a
+// single score-descending sort, breaking ties by natural (HitNumber) order. It
+// is equivalent to SortOrder.Compare for that sort but avoids iterating the
+// sort slice and checking the cachedScoring/cachedDesc flags per call.
+func CompareScoreDescending(i, j *DocumentMatch) int {
+	if i.Score < j.Score {
+		return 1
+	}
+	if i.Score > j.Score {
+		return -1
+	}
+	// tie-break on natural index order: earlier hit sorts first
+	if i.HitNumber > j.HitNumber {
+		return 1
+	}
+	if i.HitNumber < j.HitNumber {
+		return -1
+	}
+	return 0
+}
+
 func (so SortOrder) RequiresScore() bool {
 	for _, soi := range so {
 		if soi.RequiresScoring() {

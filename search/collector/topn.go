@@ -83,8 +83,8 @@ type TopNCollector struct {
 
 	nestedStore *collectStoreNested
 
-	// fastPrepare is true when prepareDocumentMatch can skip KNN/neededFields/
-	// needDocIds/sort-value-compute branches — set once in Collect after loadID
+	// fastPrepare is true when a hit needs only basicPrepare plus the shared
+	// score sort value (see canFastPrepare) — set once in Collect after loadID
 	// is known. Applies only to score-sorted queries with no field-loading needs.
 	fastPrepare bool
 }
@@ -131,39 +131,17 @@ func NewNestedTopNCollectorAfter(size int, sort search.SortOrder, after []string
 }
 
 func newTopNCollector(size int, skip int, sort search.SortOrder, nr index.NestedReader) *TopNCollector {
-	hc := &TopNCollector{size: size, skip: skip, sort: sort}
-
-	// Compute once up-front; comparator and store creation need them.
-	hc.neededFields = sort.RequiredFields()
-	hc.cachedScoring = sort.CacheIsScore()
-	hc.cachedDesc = sort.CacheDescending()
-
-	// Specialize for the common case: single score-descending sort.
-	// SortOrder.Compare iterates a slice and checks two bool flags per call,
-	// adding ~40% overhead to every heap comparison. The direct float64 path
-	// eliminates that overhead; measured at ~18% of total CPU for k=1000 queries.
-	if len(sort) == 1 && hc.cachedScoring[0] && hc.cachedDesc[0] {
-		hc.cmp = func(i, j *search.DocumentMatch) int {
-			if i.Score < j.Score {
-				return 1 // i is worse (lower score → closer to heap root)
-			}
-			if i.Score > j.Score {
-				return -1
-			}
-			if i.HitNumber > j.HitNumber {
-				return 1 // tie-break: earlier hit is better
-			}
-			if i.HitNumber < j.HitNumber {
-				return -1
-			}
-			return 0
-		}
-	} else {
-		hc.cmp = func(i, j *search.DocumentMatch) int {
-			return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
-		}
+	hc := &TopNCollector{
+		size:          size,
+		skip:          skip,
+		sort:          sort,
+		neededFields:  sort.RequiredFields(),
+		cachedScoring: sort.CacheIsScore(),
+		cachedDesc:    sort.CacheDescending(),
+		needDocIds:    sort.RequiresDocID(),
 	}
 
+	hc.cmp = getOptimalCollectorCompare(hc)
 	hc.store = getOptimalCollectorStore(size, skip, hc.cmp)
 
 	if nr != nil {
@@ -193,11 +171,22 @@ func newTopNCollector(size int, skip int, sort search.SortOrder, nr index.Nested
 		hc.nestedStore = newStoreNested(nr, search.DescendantAdderCallbackFn(descAdder))
 	}
 
-	if sort.RequiresDocID() {
-		hc.needDocIds = true
-	}
-
 	return hc
+}
+
+// getOptimalCollectorCompare returns the comparator the collector should use for
+// its sort order. It specializes the overwhelmingly common single
+// score-descending sort to a direct float64 comparison
+// (search.CompareScoreDescending), which avoids the generic SortOrder.Compare
+// path (a per-call slice iteration plus two bool-flag checks). All other sort
+// orders fall back to SortOrder.Compare.
+func getOptimalCollectorCompare(hc *TopNCollector) collectorCompare {
+	if len(hc.sort) == 1 && hc.cachedScoring[0] && hc.cachedDesc[0] {
+		return search.CompareScoreDescending
+	}
+	return func(i, j *search.DocumentMatch) int {
+		return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
+	}
 }
 
 // Creates a dummy document to compare with for pagination.
@@ -358,8 +347,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 
 	hc.needDocIds = hc.needDocIds || loadID
-	hc.fastPrepare = len(hc.neededFields) == 0 && !hc.needDocIds &&
-		len(hc.sort) == 1 && hc.cachedScoring[0]
+	hc.fastPrepare = hc.canFastPrepare()
 	select {
 	case <-ctx.Done():
 		search.RecordSearchCost(ctx, search.AbortM, 0)
@@ -400,9 +388,14 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 					break
 				}
 			}
-			err = hc.prepareDocumentMatch(searchContext, reader, next, false)
-			if err != nil {
-				break
+			hc.basicPrepare(next)
+			if hc.fastPrepare {
+				next.Sort = sortByScoreOpt
+			} else {
+				err = hc.prepareDocumentMatch(searchContext, reader, next)
+				if err != nil {
+					break
+				}
 			}
 			err = dmHandler(next)
 			if err != nil {
@@ -427,9 +420,14 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 				}
 			}
 			// no descendants at this point
-			err = hc.prepareDocumentMatch(searchContext, reader, currRoot, false)
-			if err != nil {
-				return err
+			hc.basicPrepare(currRoot)
+			if hc.fastPrepare {
+				currRoot.Sort = sortByScoreOpt
+			} else {
+				err = hc.prepareDocumentMatch(searchContext, reader, currRoot)
+				if err != nil {
+					return err
+				}
 			}
 
 			err = dmHandler(currRoot)
@@ -443,7 +441,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		// we may have some knn hits left that did not match any of the top N tf-idf hits
 		// we need to add them to the collector store to consider them as well.
 		for _, knnDoc := range hc.knnHits {
-			err = hc.prepareDocumentMatch(searchContext, reader, knnDoc, true)
+			err = hc.prepareKnnDocumentMatch(searchContext, reader, knnDoc)
 			if err != nil {
 				return err
 			}
@@ -484,72 +482,57 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 
 var sortByScoreOpt = []string{"_score"}
 
+// adjustDocumentMatch merges any KNN hit corresponding to d into d. Callers
+// must only invoke it when hc.knnHits != nil (checked at the call sites).
 func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 	reader index.IndexReader, d *search.DocumentMatch) (err error) {
-	if hc.knnHits != nil {
-		d.ID, err = reader.ExternalID(d.IndexInternalID)
-		if err != nil {
-			return err
-		}
-		if knnHit, ok := hc.knnHits[d.ID]; ok {
-			// we have a knn hit corresponding to this document
-			hc.hybridMergeCallback(d, knnHit)
-			// remove this knn hit from the map as it's already
-			// been merged
-			delete(hc.knnHits, d.ID)
-		}
+	d.ID, err = reader.ExternalID(d.IndexInternalID)
+	if err != nil {
+		return err
+	}
+	if knnHit, ok := hc.knnHits[d.ID]; ok {
+		// we have a knn hit corresponding to this document
+		hc.hybridMergeCallback(d, knnHit)
+		// remove this knn hit from the map as it's already
+		// been merged
+		delete(hc.knnHits, d.ID)
 	}
 	return nil
 }
 
-func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
-	reader index.IndexReader, d *search.DocumentMatch, isKnnDoc bool) (err error) {
-
-	// Fast path: score-sorted queries with no field loading, no KNN, no docID needs.
-	// Skips all conditional branches that are always false in this common case.
-	if hc.fastPrepare && !isKnnDoc {
-		hc.total++
-		d.HitNumber = hc.total
-		if d.Score > hc.maxScore {
-			hc.maxScore = d.Score
-		}
-		d.Sort = sortByScoreOpt
-		return nil
+// basicPrepare performs the bookkeeping every collected hit needs regardless of
+// sort/facet/knn specifics: counting the hit, assigning its hit number, and
+// updating the running max score. It deliberately does not touch d.Sort (the
+// sort value is score-specific for the fast path and computed/appended for the
+// slow path).
+func (hc *TopNCollector) basicPrepare(d *search.DocumentMatch) {
+	hc.total++
+	d.HitNumber = hc.total
+	if d.Score > hc.maxScore {
+		hc.maxScore = d.Score
 	}
+}
+
+// canFastPrepare reports whether the fast preparation path applies: a single
+// score-descending sort with no field loading and no docID needs, so a hit
+// requires only basicPrepare plus the shared score sort value.
+func (hc *TopNCollector) canFastPrepare() bool {
+	return len(hc.neededFields) == 0 && !hc.needDocIds &&
+		len(hc.sort) == 1 && hc.cachedScoring[0]
+}
+
+// prepareDocumentMatch does the non-fast preparation for a regular (non-KNN)
+// hit: visiting field terms required for sort/facets, loading the docID if
+// needed, and computing the sort value. basicPrepare must be called first.
+func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
+	reader index.IndexReader, d *search.DocumentMatch) (err error) {
 
 	// visit field terms for features that require it (sort, facets)
-	if !isKnnDoc && len(hc.neededFields) > 0 {
+	if len(hc.neededFields) > 0 {
 		err = hc.visitFieldTerms(reader, d, hc.updateFieldVisitor)
 		if err != nil {
 			return err
 		}
-	} else if isKnnDoc && hc.facetsBuilder != nil {
-		// we need to visit the field terms for the knn document
-		// only for those fields that are required for faceting
-		// and not for sorting. This is because the knn document's
-		// sort value is already computed in the knn collector.
-		err = hc.visitFieldTerms(reader, d, func(field string, term []byte) {
-			if hc.facetsBuilder != nil {
-				hc.facetsBuilder.UpdateVisitor(field, term)
-			}
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	// increment total hits
-	hc.total++
-	d.HitNumber = hc.total
-
-	// update max score
-	if d.Score > hc.maxScore {
-		hc.maxScore = d.Score
-	}
-	// early exit as the document match had its sort value calculated in the knn
-	// collector itself
-	if isKnnDoc {
-		return nil
 	}
 
 	// see if we need to load ID (at this early stage, for example to sort on it)
@@ -567,6 +550,25 @@ func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
 		hc.sort.Value(d)
 	}
 
+	return nil
+}
+
+// prepareKnnDocumentMatch prepares a KNN hit. Its sort value was already
+// computed by the KNN collector, so only facet field visiting (if any) and the
+// basic bookkeeping are needed.
+func (hc *TopNCollector) prepareKnnDocumentMatch(ctx *search.SearchContext,
+	reader index.IndexReader, d *search.DocumentMatch) (err error) {
+
+	if hc.facetsBuilder != nil {
+		err = hc.visitFieldTerms(reader, d, func(field string, term []byte) {
+			hc.facetsBuilder.UpdateVisitor(field, term)
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	hc.basicPrepare(d)
 	return nil
 }
 
