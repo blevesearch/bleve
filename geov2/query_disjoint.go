@@ -29,7 +29,7 @@ type disjointQuery struct {
 }
 
 func NewDisjointQuery(shape index.GeoJSON) Query {
-	inner, cross := shape.Cells()
+	inner, cross := shape.QueryCells()
 
 	return &disjointQuery{
 		innerCells: inner,

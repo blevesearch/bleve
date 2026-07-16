@@ -251,6 +251,11 @@ func (p *Point) Cells() ([]uint64, []uint64) {
 	return nil, nil
 }
 
+func (p *Point) QueryCells() ([]uint64, []uint64) {
+	// placeholder implementation
+	return nil, nil
+}
+
 func (p *Point) BoundingBox() index.GeoJSON {
 	// placeholder implementation
 	return nil
@@ -304,6 +309,11 @@ func (br *boundedRectangle) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 }
 
 func (br *boundedRectangle) Cells() ([]uint64, []uint64) {
+	// placeholder implementation
+	return nil, nil
+}
+
+func (br *boundedRectangle) QueryCells() ([]uint64, []uint64) {
 	// placeholder implementation
 	return nil, nil
 }
@@ -366,6 +376,11 @@ func (bp *boundedPolygon) Cells() ([]uint64, []uint64) {
 	return nil, nil
 }
 
+func (bp *boundedPolygon) QueryCells() ([]uint64, []uint64) {
+	// placeholder implementation
+	return nil, nil
+}
+
 func (bp *boundedPolygon) BoundingBox() index.GeoJSON {
 	// placeholder implementation
 	return nil
@@ -420,6 +435,11 @@ func (pd *pointDistance) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 }
 
 func (pd *pointDistance) Cells() ([]uint64, []uint64) {
+	// placeholder implementation
+	return nil, nil
+}
+
+func (pd *pointDistance) QueryCells() ([]uint64, []uint64) {
 	// placeholder implementation
 	return nil, nil
 }

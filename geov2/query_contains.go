@@ -34,7 +34,7 @@ type containsQuery struct {
 }
 
 func NewContainsQuery(shape index.GeoJSON) Query {
-	inner, cross := shape.Cells()
+	inner, cross := shape.QueryCells()
 
 	score := CalcCellsScore(inner) + CalcCellsScore(cross)
 
@@ -56,8 +56,12 @@ func (cq *containsQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	hits := util.NewBitset(numDocs, exclude)
 	maybeHits := util.NewBitset(numDocs, exclude)
 
-	innerScores := make([]uint64, numDocs)
-	crossScores := make([]uint64, numDocs)
+	// obtain zeroed score arrays from the segment-level pool and return
+	// them once the evaluation is done
+	innerScores := geoData.GetScoreArray()
+	crossScores := geoData.GetScoreArray()
+	defer geoData.PutScoreArray(innerScores)
+	defer geoData.PutScoreArray(crossScores)
 
 	// create an evaluator instance to scan the query cells against the index cells
 	evaluator := NewQueryEvaluator(cq, geoData)
