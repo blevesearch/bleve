@@ -168,6 +168,20 @@ func (i *unadornedPostingsIterator1Hit) BytesWritten() uint64 {
 
 func (i *unadornedPostingsIterator1Hit) ResetBytesRead(uint64) {}
 
+// Implement OptimizablePostingsIterator so a 1-hit iterator produced by one
+// optimization pass (e.g. the unadorned conjunction/disjunction Finish) can be
+// re-optimized when it feeds into a nested conjunction/disjunction, rather than
+// aborting the outer optimization on a failed type assertion.
+func (i *unadornedPostingsIterator1Hit) ActualBitmap() *roaring.Bitmap { return nil }
+
+func (i *unadornedPostingsIterator1Hit) DocNum1Hit() (uint64, bool) {
+	return i.docNumOrig, true
+}
+
+// ReplaceActual is a no-op: a 1-hit iterator has no actual bitmap, and callers
+// only invoke ReplaceActual on iterators whose ActualBitmap is non-nil.
+func (i *unadornedPostingsIterator1Hit) ReplaceActual(*roaring.Bitmap) {}
+
 // ResetIterator resets the iterator to the original state.
 func (i *unadornedPostingsIterator1Hit) ResetIterator() {
 	i.docNum = i.docNumOrig

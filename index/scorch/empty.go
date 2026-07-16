@@ -41,10 +41,9 @@ func (e *emptyPostingsIterator) ResetBytesRead(uint64) {}
 
 func (e *emptyPostingsIterator) BytesWritten() uint64 { return 0 }
 
-// Implement OptimizablePostingsIterator so that anEmptyPostingsIterator can
-// participate in nested conjunction/disjunction optimizations without aborting
-// them.  ActualBitmap returning nil and DocNum1Hit returning false cause the
-// iterator to contribute nothing to any AND or OR, which is correct.
+// Implement OptimizablePostingsIterator so an empty iterator can participate in
+// nested conjunction/disjunction optimizations instead of aborting them; a nil
+// bitmap and no 1-hit contribute nothing to any AND/OR.
 func (e *emptyPostingsIterator) ActualBitmap() *roaring.Bitmap { return nil }
 func (e *emptyPostingsIterator) DocNum1Hit() (uint64, bool)    { return 0, false }
 func (e *emptyPostingsIterator) ReplaceActual(*roaring.Bitmap) {}
