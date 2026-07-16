@@ -257,32 +257,27 @@ func (t *vectorTrainer) handleRequest(req *trainRequest, path string, config map
 // downstream can rely on the trained index being available once this completes.
 // todo: rethink the frequency of bolt writes
 func (t *vectorTrainer) publishTrainedIndex(req *trainRequest, prev *SegmentSnapshot, path string, config map[string]interface{}) error {
+	t.m.Lock()
+	defer t.m.Unlock()
+
 	if prev != nil {
-		t.m.Lock()
 		if err := prev.segment.Close(); err != nil {
 			t.trainedIndex = nil
-			t.m.Unlock()
 			return fmt.Errorf("error closing previous trained index: %v", err)
 		}
 		if err := moveFile(path+".tmp", path); err != nil {
 			t.trainedIndex = nil
-			t.m.Unlock()
 			return fmt.Errorf("error renaming trained index: %v", err)
 		}
-		t.m.Unlock()
 	}
 
 	if err := t.persistToBolt(req); err != nil {
 		if prev != nil {
-			t.m.Lock()
 			t.trainedIndex = nil
-			t.m.Unlock()
 		}
 		return fmt.Errorf("error persisting to bolt: %v", err)
 	}
 
-	t.m.Lock()
-	defer t.m.Unlock()
 	trainedIndex, err := t.parent.segPlugin.OpenUsing(path, config)
 	if err != nil {
 		t.trainedIndex = nil
