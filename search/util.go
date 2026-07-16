@@ -55,7 +55,7 @@ func MergeFieldTermLocations(dest []FieldTermLocation, matches []*DocumentMatch)
 		}
 	}
 	if n == len(dest) {
-		return dest // fast path: no constituent has field term locations to merge
+		return dest
 	}
 	if cap(dest) < n {
 		dest = append(make([]FieldTermLocation, 0, n), dest...)

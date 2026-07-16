@@ -235,9 +235,7 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	}
 	// remember the score breakdown map
 	scoreBreakdown := dm.ScoreBreakdown
-	// clear out the score breakdown map; nil-guard because clear(nil) still
-	// dispatches through the map runtime (~1ns), and ScoreBreakdown is nil on
-	// the common path (no KNN, no score-breakdown retrieval)
+	// clear out the score breakdown map
 	if scoreBreakdown != nil {
 		clear(scoreBreakdown)
 	}
