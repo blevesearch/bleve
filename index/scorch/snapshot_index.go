@@ -329,8 +329,9 @@ func (is *IndexSnapshot) fieldDictRegexp(field string,
 		return nil, nil, err
 	}
 
-	fd, err := is.newIndexSnapshotFieldDict(field, func(is segment.TermDictionary) segment.DictionaryIterator {
-		return is.AutomatonIterator(a, prefixBeg, prefixEnd)
+	fd, err := is.newIndexSnapshotFieldDict(field, func(dict segment.TermDictionary) segment.DictionaryIterator {
+		// regexp/wildcard candidate collection discards DictEntry.Count.
+		return automatonIteratorOmitCount(dict, a, prefixBeg, prefixEnd)
 	}, false)
 	if err != nil {
 		return nil, nil, err
@@ -379,8 +380,9 @@ func (is *IndexSnapshot) fieldDictFuzzy(field string,
 		prefixBeg = []byte(prefix)
 		prefixEnd = calculateExclusiveEndFromPrefix(prefixBeg)
 	}
-	fd, err := is.newIndexSnapshotFieldDict(field, func(is segment.TermDictionary) segment.DictionaryIterator {
-		return is.AutomatonIterator(a, prefixBeg, prefixEnd)
+	fd, err := is.newIndexSnapshotFieldDict(field, func(dict segment.TermDictionary) segment.DictionaryIterator {
+		// fuzzy candidate collection discards DictEntry.Count.
+		return automatonIteratorOmitCount(dict, a, prefixBeg, prefixEnd)
 	}, false)
 	if err != nil {
 		return nil, nil, err

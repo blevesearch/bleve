@@ -21,6 +21,26 @@ import (
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
 
+// termDictionaryOmitCount is an optional interface a segment's TermDictionary
+// may implement to return an automaton iterator that skips the per-term
+// postings read used to populate DictEntry.Count. It is used by candidate-term
+// collection (fuzzy/regexp) where the count is discarded, and falls back to the
+// regular AutomatonIterator when the segment does not implement it.
+type termDictionaryOmitCount interface {
+	AutomatonIteratorOmitCount(a segment.Automaton,
+		startKeyInclusive, endKeyExclusive []byte) segment.DictionaryIterator
+}
+
+// automatonIteratorOmitCount returns a count-omitting automaton iterator when
+// the dictionary supports it, otherwise the standard one.
+func automatonIteratorOmitCount(dict segment.TermDictionary, a segment.Automaton,
+	startKeyInclusive, endKeyExclusive []byte) segment.DictionaryIterator {
+	if oc, ok := dict.(termDictionaryOmitCount); ok {
+		return oc.AutomatonIteratorOmitCount(a, startKeyInclusive, endKeyExclusive)
+	}
+	return dict.AutomatonIterator(a, startKeyInclusive, endKeyExclusive)
+}
+
 type segmentDictCursor struct {
 	dict segment.TermDictionary
 	itr  segment.DictionaryIterator
