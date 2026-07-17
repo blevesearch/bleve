@@ -383,7 +383,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		}
 		if next != nil {
 			if hc.knnHits != nil {
-				err = hc.adjustDocumentMatch(searchContext, reader, next)
+				err = hc.adjustKNNDocumentMatch(searchContext, reader, next)
 				if err != nil {
 					break
 				}
@@ -414,7 +414,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		currRoot := hc.nestedStore.Current()
 		if currRoot != nil {
 			if hc.knnHits != nil {
-				err = hc.adjustDocumentMatch(searchContext, reader, currRoot)
+				err = hc.adjustKNNDocumentMatch(searchContext, reader, currRoot)
 				if err != nil {
 					return err
 				}
@@ -482,9 +482,9 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 
 var sortByScoreOpt = []string{"_score"}
 
-// adjustDocumentMatch merges any KNN hit corresponding to d into d. Callers
+// adjustKNNDocumentMatch merges any KNN hit corresponding to d into d. Callers
 // must only invoke it when hc.knnHits != nil (checked at the call sites).
-func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
+func (hc *TopNCollector) adjustKNNDocumentMatch(ctx *search.SearchContext,
 	reader index.IndexReader, d *search.DocumentMatch) (err error) {
 	d.ID, err = reader.ExternalID(d.IndexInternalID)
 	if err != nil {
