@@ -72,10 +72,6 @@ func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 				return nil, err
 			}
 			if rv != nil {
-				// Finish() extracted all it needs (bitmaps are cloned/new).
-				// Close the original sub-searchers so their TFRs are returned
-				// to the snapshot per-field pool, avoiding re-allocation of
-				// Dictionary+FST Reader objects on the next query.
 				for _, s := range qsearchers {
 					_ = s.Close()
 				}
