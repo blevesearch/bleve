@@ -198,6 +198,23 @@ type ResetablePostingsIterator interface {
 	ResetIterator()
 }
 
+// Compile-time guarantee that every postings-iterator type placed into an
+// optimized termFieldReader's per-segment iterator slice implements
+// OptimizablePostingsIterator, so a nested conjunction/disjunction optimization
+// composes it instead of silently aborting on a failed type assertion.
+//
+// The two stateful iterators must additionally be resettable so termFieldReader
+// reuse rewinds them; the empty iterator is stateless and intentionally opts out
+// (ResetIterator is invoked via an optional type assertion).
+var (
+	_ segment.OptimizablePostingsIterator = (*emptyPostingsIterator)(nil)
+	_ segment.OptimizablePostingsIterator = (*unadornedPostingsIteratorBitmap)(nil)
+	_ segment.OptimizablePostingsIterator = (*unadornedPostingsIterator1Hit)(nil)
+
+	_ ResetablePostingsIterator = (*unadornedPostingsIteratorBitmap)(nil)
+	_ ResetablePostingsIterator = (*unadornedPostingsIterator1Hit)(nil)
+)
+
 type UnadornedPosting struct {
 	docNum uint64
 }

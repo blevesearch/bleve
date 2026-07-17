@@ -41,11 +41,10 @@ func (e *emptyPostingsIterator) ResetBytesRead(uint64) {}
 
 func (e *emptyPostingsIterator) BytesWritten() uint64 { return 0 }
 
-// Implement OptimizablePostingsIterator so an empty iterator can participate in
-// nested conjunction/disjunction optimizations instead of aborting them; a nil
-// bitmap and no 1-hit contribute nothing to any AND/OR.
 func (e *emptyPostingsIterator) ActualBitmap() *roaring.Bitmap { return nil }
-func (e *emptyPostingsIterator) DocNum1Hit() (uint64, bool)    { return 0, false }
+
+func (e *emptyPostingsIterator) DocNum1Hit() (uint64, bool) { return 0, false }
+
 func (e *emptyPostingsIterator) ReplaceActual(*roaring.Bitmap) {}
 
 var anEmptyPostingsIterator = &emptyPostingsIterator{}
