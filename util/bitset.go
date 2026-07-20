@@ -1,4 +1,4 @@
-//  Copyright (c) 2017 Couchbase, Inc.
+//  Copyright (c) 2026 Couchbase, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 
 type Bitset struct {
 	data    []uint64
+	numBits int
 	exclude *roaring.Bitmap
 }
 
@@ -31,6 +32,7 @@ func NewBitset(maxVal int, exclude *roaring.Bitmap) *Bitset {
 	size := (maxVal / 64) + 1
 	return &Bitset{
 		data:    make([]uint64, size),
+		numBits: maxVal,
 		exclude: exclude,
 	}
 }
@@ -69,6 +71,16 @@ func (b *Bitset) Contains(val int) bool {
 func (b *Bitset) Invert() {
 	for i := range b.data {
 		b.data[i] = ^b.data[i]
+	}
+	// the flip above sets the trailing bits beyond numBits in the last
+	// bucket(s), which do not correspond to valid values - clear them so
+	// that Iterate and Count never see them
+	lastBucket := b.numBits >> 6
+	if lastBucket < len(b.data) {
+		b.data[lastBucket] &= (1 << uint(b.numBits&63)) - 1
+		for i := lastBucket + 1; i < len(b.data); i++ {
+			b.data[i] = 0
+		}
 	}
 	if b.exclude != nil {
 		it := b.exclude.Iterator()

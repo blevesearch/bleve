@@ -44,7 +44,7 @@ func NewWithinQuery(shape index.GeoJSON) Query {
 
 func (wq *withinQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	numDocs := int(geoData.NumDocs())
-	exclude := geoData.Exclude()
+	exclude := geoData.Excluded()
 
 	// create bitsets for hits and maybeHits providing exclude to the bitset
 	// which will make it impossible to set those bits
@@ -58,7 +58,7 @@ func (wq *withinQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	defer geoData.PutScoreArray(innerScores)
 	defer geoData.PutScoreArray(crossScores)
 
-	docScores := geoData.DocScores()
+	docScoresInner, docScoresCross := geoData.DocScores()
 
 	// create an evaluator instance to scan the query cells against the index cells
 	evaluator := NewQueryEvaluator(wq, geoData)
@@ -67,9 +67,12 @@ func (wq *withinQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	evaluator.rangeScanInner(innerScores, crossScores)
 
 	// if all of the index cells are contained within the query inner cells,
-	// then we have a guaranteed hit
+	// then we have a guaranteed hit. The "!= 0" guard excludes documents
+	// with no inner or cross cells at all (docScoresInner[i]+docScoresCross[i]
+	// == 0), which would otherwise vacuously satisfy the equality check
+	// (0 == 0) despite having no actual geo content to be "within" anything.
 	for i := 0; i < numDocs; i++ {
-		if innerScores[i]+crossScores[i] == docScores[i] {
+		if innerScores[i]+crossScores[i] == docScoresInner[i]+docScoresCross[i] && innerScores[i]+crossScores[i] != 0 {
 			hits.Add(i)
 		}
 	}
@@ -77,10 +80,24 @@ func (wq *withinQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	// scan and score the overlap of query cross cells with all index cells
 	evaluator.rangeScanCross(innerScores, crossScores)
 
-	// if all of the index cells are contained within the query inner and cross cells,
-	// then we have a maybe hit
+	// A document is a maybe-hit once the accumulated score reaches at least
+	// its own inner-cell score. Note this compares against docScoresInner[i]
+	// alone, not the full docScoresInner[i]+docScoresCross[i] total: a
+	// document's inner and cross cell coverings are each computed by an
+	// independent call to the region coverer (once at index time with a
+	// smaller cell budget, once at query time with a larger one), so even
+	// for a truly-within document, the query's cross-cell coverage of the
+	// document's cross (boundary) cells is not guaranteed to reach exact
+	// parity with docScoresCross[i] - unlike inner cells, which are safely
+	// interior and in practice match exactly since neither side's smaller
+	// cell budget is typically exhausted by them. Requiring only the inner
+	// portion avoids dropping true candidates from this net; any documents
+	// that are not actually within the query are still filtered out below
+	// by the exact bounding-box and shape containment checks, so being
+	// permissive here costs extra exact-geometry checks, not correctness.
+	// The "!= 0" guard again excludes documents with no cells at all.
 	for i := 0; i < numDocs; i++ {
-		if !hits.Contains(i) && innerScores[i]+crossScores[i] == docScores[i] {
+		if !hits.Contains(i) && innerScores[i]+crossScores[i] >= docScoresInner[i] && innerScores[i]+crossScores[i] != 0 {
 			maybeHits.Add(i)
 		}
 	}

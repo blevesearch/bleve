@@ -40,6 +40,7 @@ func testCaseSetupGeometryCollection(t *testing.T, docShapeName string, types []
 		return nil, nil, fmt.Errorf("the GC field is nil")
 	}
 	doc.AddField(gcField)
+	addGeoCollectionV2Parallel(doc, "geometry", docShapeVertices, types)
 	if doc == nil {
 		return nil, nil, fmt.Errorf("the doc is nil")
 	}

@@ -44,7 +44,7 @@ func NewIntersectsQuery(shape index.GeoJSON) Query {
 
 func (iq *intersectsQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	numDocs := int(geoData.NumDocs())
-	exclude := geoData.Exclude()
+	exclude := geoData.Excluded()
 
 	// create bitsets for hits and maybeHits providing exclude to the bitset
 	// which will make it impossible to set those bits
@@ -65,7 +65,7 @@ func (iq *intersectsQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset
 	evaluator.rangeScanInner(innerScores, crossScores)
 
 	// if there is any overlap of query inner cells with any of the index cells
-	// then we have a quaranteed hit. Reset scores to reuse score arrays for the
+	// then we have a guaranteed hit. Reset scores to reuse score arrays for the
 	// next step
 	for i := 0; i < numDocs; i++ {
 		if innerScores[i] > 0 || crossScores[i] > 0 {
@@ -79,7 +79,7 @@ func (iq *intersectsQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset
 	evaluator.rangeScanCross(innerScores, crossScores)
 
 	// if there is any overlap of query cross cells with any of the index inner
-	// cells then we have a quaranteed hit, if there is any overlap of query cross
+	// cells then we have a guaranteed hit, if there is any overlap of query cross
 	// cells with any of the index cross cells then we have a maybe hit, otherwise
 	// we have no hit.
 	for i := 0; i < numDocs; i++ {

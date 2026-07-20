@@ -49,12 +49,22 @@ func NewContainsQuery(shape index.GeoJSON) Query {
 
 func (cq *containsQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	numDocs := int(geoData.NumDocs())
-	exclude := geoData.Exclude()
+	exclude := geoData.Excluded()
 
 	// create bitsets for hits and maybeHits providing exclude to the bitset
 	// which will make it impossible to set those bits
 	hits := util.NewBitset(numDocs, exclude)
 	maybeHits := util.NewBitset(numDocs, exclude)
+
+	// failsafe for a degenerate query shape that produced no cells, and
+	// hence a zero total score. Without this guard the guaranteed-hit test
+	// below (innerScores[i] == cq.score) would be 0 == 0 for every document,
+	// so a contains query with an empty or zero-area shape would spuriously
+	// match the entire index. A shape that covers nothing contains nothing,
+	// so return the empty hit set before doing any scanning or scoring.
+	if cq.score == 0 {
+		return hits
+	}
 
 	// obtain zeroed score arrays from the segment-level pool and return
 	// them once the evaluation is done

@@ -53,7 +53,7 @@ type asynchSegmentResult struct {
 
 var reflectStaticSizeIndexSnapshot int
 var reflectStaticSizeIndexSnapshotGeoShapeV2Reader int
-var reflectStaticSizeRoaringIntPeekable int
+var reflectStaticSizeRoaringIntIterator int
 
 func init() {
 	var is interface{} = IndexSnapshot{}
@@ -70,7 +70,7 @@ func init() {
 	var gcr IndexSnapshotGeoShapeV2Reader
 	reflectStaticSizeIndexSnapshotGeoShapeV2Reader = int(reflect.TypeOf(gcr).Size())
 	var rip roaring.IntIterator
-	reflectStaticSizeRoaringIntPeekable = int(reflect.TypeOf(rip).Size())
+	reflectStaticSizeRoaringIntIterator = int(reflect.TypeOf(rip).Size())
 }
 
 type IndexSnapshot struct {
@@ -1403,6 +1403,13 @@ func (g *IndexSnapshotGeoShapeV2Reader) searchSeg(segID int,
 		return err
 	}
 
+	if geoData == nil {
+		return nil
+	}
+	// release the reference on the segment's cached geo data once the
+	// evaluation is done, so that the cache is free to evict it
+	defer geoData.Close()
+
 	// evaluate the query against the geo shape data to
 	// get the matching document IDs
 	hits := query.Evaluate(geoData)
@@ -1412,7 +1419,8 @@ func (g *IndexSnapshotGeoShapeV2Reader) searchSeg(segID int,
 
 	// generate the postings list from the matching internal document numbers
 	addFunc := func(docNumInternal int) {
-		postings.Add(uint32(docNums[docNumInternal]))
+		val := uint32(docNums[docNumInternal])
+		postings.Add(val)
 	}
 
 	hits.Iterate(addFunc)
@@ -1477,7 +1485,9 @@ func (g *IndexSnapshotGeoShapeV2Reader) Advance(ID index.IndexInternalID,
 	return g.Next(rv)
 }
 
-// close is a no-op since the cache is cleared via ewma
+// Close is a no-op: the reader holds no resources of its own, and the
+// segment-level geo data it reads from is owned and evicted by the
+// segment's cache
 func (g *IndexSnapshotGeoShapeV2Reader) Close() error {
 	return nil
 }
@@ -1504,7 +1514,7 @@ func (g *IndexSnapshotGeoShapeV2Reader) Size() int {
 		rv += int(posting.GetSizeInBytes())
 	}
 
-	rv += (reflectStaticSizeRoaringIntPeekable + size.SizeOfPtr) * len(g.iterators)
+	rv += (reflectStaticSizeRoaringIntIterator + size.SizeOfPtr) * len(g.iterators)
 
 	return rv
 }

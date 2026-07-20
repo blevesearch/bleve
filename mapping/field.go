@@ -356,32 +356,56 @@ func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
 	fm.processGeoShapeInternal(propertyMightBeGeoShape, pathString, path, context,
 		func(fieldName string, shapes []*geojson.GeoShape,
 			options index.FieldIndexingOptions) document.Field {
-			return document.NewGeometryCollectionFieldFromShapesWithIndexingOptions(
+			field := document.NewGeometryCollectionFieldFromShapesWithIndexingOptions(
 				fieldName, indexes, shapes, options)
+			if field == nil {
+				// return an untyped nil, so that the caller's nil check works;
+				// returning the nil *GeoShapeField directly would produce a
+				// non-nil document.Field interface wrapping a nil pointer
+				return nil
+			}
+			return field
 		},
 		func(fieldName string, shape *geojson.GeoShape,
 			options index.FieldIndexingOptions) document.Field {
-			return document.NewGeoShapeFieldFromShapeWithIndexingOptions(
+			field := document.NewGeoShapeFieldFromShapeWithIndexingOptions(
 				fieldName, indexes, shape, options)
+			if field == nil {
+				return nil
+			}
+			return field
 		},
 	)
 }
 
 // processGeoShapeV2 processes a property that might be a GeoJSON
 // shape and adds the appropriate field to the document using the new GeoShapeV2 format.
+// Note: array positions are intentionally not tracked for geoshape_v2 fields,
+// which is why there is no indexes parameter here.
 func (fm *FieldMapping) processGeoShapeV2(propertyMightBeGeoShape interface{},
 	pathString string, path []string, context *walkContext,
 ) {
 	fm.processGeoShapeInternal(propertyMightBeGeoShape, pathString, path, context,
 		func(fieldName string, shapes []*geojson.GeoShape,
 			options index.FieldIndexingOptions) document.Field {
-			return document.NewGeometryCollectionV2FieldFromShapesWithIndexingOptions(
+			field := document.NewGeometryCollectionV2FieldFromShapesWithIndexingOptions(
 				fieldName, shapes, options)
+			if field == nil {
+				// return an untyped nil, so that the caller's nil check works;
+				// returning the nil *GeoShapeV2Field directly would produce a
+				// non-nil document.Field interface wrapping a nil pointer
+				return nil
+			}
+			return field
 		},
 		func(fieldName string, shape *geojson.GeoShape,
 			options index.FieldIndexingOptions) document.Field {
-			return document.NewGeoShapeV2FieldFromShapeWithIndexingOptions(
+			field := document.NewGeoShapeV2FieldFromShapeWithIndexingOptions(
 				fieldName, shape, options)
+			if field == nil {
+				return nil
+			}
+			return field
 		},
 	)
 }
@@ -426,7 +450,9 @@ func (fm *FieldMapping) processGeoShapeInternal(
 		}
 	}
 
-	if found {
+	// field is nil when the constructor failed to encode the shape,
+	// in which case nothing is added to the document
+	if found && field != nil {
 		context.doc.AddField(field)
 		if !fm.IncludeInAll {
 			context.excludedFromAll = append(context.excludedFromAll, field.Name())

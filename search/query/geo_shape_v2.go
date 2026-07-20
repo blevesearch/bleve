@@ -16,6 +16,7 @@ package query
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -80,8 +81,18 @@ func (q *GeoShapeV2Query) SetField(f string) {
 	q.FieldVal = f
 }
 
+// Validate ensures that the relation is one of the supported values,
+// as an unsupported relation would result in an empty query coming
+// out of geov2.NewQuery
 func (q *GeoShapeV2Query) Validate() error {
-	return nil
+	switch q.GeometryV2.Relation {
+	case "intersects", "contains", "within", "disjoint":
+		return nil
+	default:
+		return fmt.Errorf("invalid relation: %q for geoshape_v2 query, "+
+			"valid relations are: intersects, contains, within, disjoint",
+			q.GeometryV2.Relation)
+	}
 }
 
 func (q *GeoShapeV2Query) Searcher(ctx context.Context,

@@ -16,6 +16,7 @@ package searcher
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -62,7 +63,10 @@ func NewGeoShapeV2Searcher(ctx context.Context, indexReader index.IndexReader,
 			gd:                  index.GeoShapeV2FieldDoc{},
 		}, nil
 	}
-	return nil, nil
+	// returning an error (rather than a nil searcher) is important here:
+	// callers such as ConjunctionQuery.Searcher do not nil-check the
+	// returned searcher, so a nil would be appended and later panic on use
+	return nil, fmt.Errorf("indexReader does not support geoshape_v2 queries")
 }
 
 // Next returns the next document match for the GeoShapeV2Searcher.
@@ -84,15 +88,15 @@ func (g *GeoShapeV2Searcher) Next(ctx *search.SearchContext) (*search.DocumentMa
 // Advance moves the searcher to the first document with an ID greater than or equal to the specified ID.
 // It retrieves the next matching document from the GeoShapeV2FieldReader and scores it using the ConstantScorer.
 func (g *GeoShapeV2Searcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
-	knnMatch, err := g.geoShapeIndexReader.Advance(ID, g.gd.Reset())
+	match, err := g.geoShapeIndexReader.Advance(ID, g.gd.Reset())
 	if err != nil {
 		return nil, err
 	}
-	if knnMatch == nil {
+	if match == nil {
 		return nil, nil
 	}
 
-	docMatch := g.scorer.Score(ctx, knnMatch.ID)
+	docMatch := g.scorer.Score(ctx, match.ID)
 	return docMatch, nil
 }
 

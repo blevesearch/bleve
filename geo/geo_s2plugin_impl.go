@@ -246,7 +246,7 @@ func (p *Point) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 	return nil
 }
 
-func (p *Point) Cells() ([]uint64, []uint64) {
+func (p *Point) IndexCells() ([]uint64, []uint64) {
 	// placeholder implementation
 	return nil, nil
 }
@@ -308,7 +308,7 @@ func (br *boundedRectangle) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 	return geojson.StripCoveringTerms(terms)
 }
 
-func (br *boundedRectangle) Cells() ([]uint64, []uint64) {
+func (br *boundedRectangle) IndexCells() ([]uint64, []uint64) {
 	// placeholder implementation
 	return nil, nil
 }
@@ -371,7 +371,7 @@ func (bp *boundedPolygon) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 	return geojson.StripCoveringTerms(terms)
 }
 
-func (bp *boundedPolygon) Cells() ([]uint64, []uint64) {
+func (bp *boundedPolygon) IndexCells() ([]uint64, []uint64) {
 	// placeholder implementation
 	return nil, nil
 }
@@ -434,7 +434,7 @@ func (pd *pointDistance) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 	return geojson.StripCoveringTerms(terms)
 }
 
-func (pd *pointDistance) Cells() ([]uint64, []uint64) {
+func (pd *pointDistance) IndexCells() ([]uint64, []uint64) {
 	// placeholder implementation
 	return nil, nil
 }

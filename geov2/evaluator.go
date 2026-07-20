@@ -21,10 +21,10 @@ type queryEvaluator struct {
 	queryCrossCells []uint64
 
 	innerCells  []uint64
-	innerDocIds []uint64
+	innerDocIDs []uint64
 
 	crossCells  []uint64
-	crossDocIds []uint64
+	crossDocIDs []uint64
 }
 
 func NewQueryEvaluator(query Query, geoData segment.GeoShapeV2Data) *queryEvaluator {
@@ -32,9 +32,9 @@ func NewQueryEvaluator(query Query, geoData segment.GeoShapeV2Data) *queryEvalua
 		queryInnerCells: query.InnerCells(),
 		queryCrossCells: query.CrossCells(),
 		innerCells:      geoData.InnerCells(),
-		innerDocIds:     geoData.InnerDocIDs(),
+		innerDocIDs:     geoData.InnerDocIDs(),
 		crossCells:      geoData.CrossCells(),
-		crossDocIds:     geoData.CrossDocIDs(),
+		crossDocIDs:     geoData.CrossDocIDs(),
 	}
 }
 
@@ -58,8 +58,8 @@ func (qe *queryEvaluator) rangeScanInner(innerScores []uint64, crossScores []uin
 	for _, cell := range qe.queryInnerCells {
 		minVal, maxVal := getCellSearchBounds(cell)
 		cellLevel := getCellLevel(cell)
-		rangeScanOne(cell, minVal, maxVal, cellLevel, qe.innerCells, qe.innerDocIds, innerScores)
-		rangeScanOne(cell, minVal, maxVal, cellLevel, qe.crossCells, qe.crossDocIds, crossScores)
+		rangeScanOne(cell, minVal, maxVal, cellLevel, qe.innerCells, qe.innerDocIDs, innerScores)
+		rangeScanOne(cell, minVal, maxVal, cellLevel, qe.crossCells, qe.crossDocIDs, crossScores)
 	}
 }
 
@@ -68,8 +68,8 @@ func (qe *queryEvaluator) rangeScanCross(innerScores, crossScores []uint64) {
 	for _, cell := range qe.queryCrossCells {
 		minVal, maxVal := getCellSearchBounds(cell)
 		cellLevel := getCellLevel(cell)
-		rangeScanOne(cell, minVal, maxVal, cellLevel, qe.innerCells, qe.innerDocIds, innerScores)
-		rangeScanOne(cell, minVal, maxVal, cellLevel, qe.crossCells, qe.crossDocIds, crossScores)
+		rangeScanOne(cell, minVal, maxVal, cellLevel, qe.innerCells, qe.innerDocIDs, innerScores)
+		rangeScanOne(cell, minVal, maxVal, cellLevel, qe.crossCells, qe.crossDocIDs, crossScores)
 	}
 }
 

@@ -37,7 +37,8 @@ type GeoShapeV2Field struct {
 	shape      index.GeoJSON
 	inner      []uint64
 	cross      []uint64
-	score      uint64
+	scoreInner uint64
+	scoreCross uint64
 	bBoxBytes  []byte
 	shapeBytes []byte
 
@@ -57,8 +58,9 @@ func (f *GeoShapeV2Field) Options() index.FieldIndexingOptions {
 }
 
 func (f *GeoShapeV2Field) Analyze() {
-	f.inner, f.cross = f.shape.Cells()
-	f.score = geov2.CalcCellsScore(f.inner) + geov2.CalcCellsScore(f.cross)
+	f.inner, f.cross = f.shape.IndexCells()
+	f.scoreInner = geov2.CalcCellsScore(f.inner)
+	f.scoreCross = geov2.CalcCellsScore(f.cross)
 
 	if bBox, ok := f.shape.BoundingBox().(*geojson.Envelope); ok {
 		bBoxBytes, err := bBox.Marshal()
@@ -114,8 +116,8 @@ func (f *GeoShapeV2Field) EncodedShape() []byte {
 	return f.shapeBytes
 }
 
-func (f *GeoShapeV2Field) Score() uint64 {
-	return f.score
+func (f *GeoShapeV2Field) Scores() (uint64, uint64) {
+	return f.scoreInner, f.scoreCross
 }
 
 func NewGeoShapeV2FieldFromShapeWithIndexingOptions(name string, geoShape *geojson.GeoShape,
