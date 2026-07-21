@@ -274,11 +274,8 @@ func (so SortOrder) Compare(cachedScoring, cachedDesc []bool, i, j *DocumentMatc
 	return -1
 }
 
-// CompareScoreDescending compares two document matches for the common case of a
-// single score-descending sort, breaking ties by natural (HitNumber) order. It
-// is equivalent to SortOrder.Compare for that sort but avoids iterating the
-// sort slice and checking the cachedScoring/cachedDesc flags per call.
 func CompareScoreDescending(i, j *DocumentMatch) int {
+	// first try to sort the two hits based on their score value
 	if i.Score < j.Score {
 		return 1
 	}

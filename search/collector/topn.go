@@ -174,12 +174,6 @@ func newTopNCollector(size int, skip int, sort search.SortOrder, nr index.Nested
 	return hc
 }
 
-// getOptimalCollectorCompare returns the comparator the collector should use for
-// its sort order. It specializes the overwhelmingly common single
-// score-descending sort to a direct float64 comparison
-// (search.CompareScoreDescending), which avoids the generic SortOrder.Compare
-// path (a per-call slice iteration plus two bool-flag checks). All other sort
-// orders fall back to SortOrder.Compare.
 func getOptimalCollectorCompare(hc *TopNCollector) collectorCompare {
 	if len(hc.sort) == 1 && hc.cachedScoring[0] && hc.cachedDesc[0] {
 		return search.CompareScoreDescending
@@ -482,8 +476,6 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 
 var sortByScoreOpt = []string{"_score"}
 
-// adjustKNNDocumentMatch merges any KNN hit corresponding to d into d. Callers
-// must only invoke it when hc.knnHits != nil (checked at the call sites).
 func (hc *TopNCollector) adjustKNNDocumentMatch(ctx *search.SearchContext,
 	reader index.IndexReader, d *search.DocumentMatch) (err error) {
 	d.ID, err = reader.ExternalID(d.IndexInternalID)
@@ -491,20 +483,13 @@ func (hc *TopNCollector) adjustKNNDocumentMatch(ctx *search.SearchContext,
 		return err
 	}
 	if knnHit, ok := hc.knnHits[d.ID]; ok {
-		// we have a knn hit corresponding to this document
+		// merge this document's hit with its knn score, expl etc. and remove it from the map
 		hc.hybridMergeCallback(d, knnHit)
-		// remove this knn hit from the map as it's already
-		// been merged
 		delete(hc.knnHits, d.ID)
 	}
 	return nil
 }
 
-// basicPrepare performs the bookkeeping every collected hit needs regardless of
-// sort/facet/knn specifics: counting the hit, assigning its hit number, and
-// updating the running max score. It deliberately does not touch d.Sort (the
-// sort value is score-specific for the fast path and computed/appended for the
-// slow path).
 func (hc *TopNCollector) basicPrepare(d *search.DocumentMatch) {
 	hc.total++
 	d.HitNumber = hc.total
@@ -513,10 +498,8 @@ func (hc *TopNCollector) basicPrepare(d *search.DocumentMatch) {
 	}
 }
 
-// canFastPrepare reports whether the fast preparation path applies: a single
-// score-descending sort with no field loading and no docID needs, so a hit
-// requires only basicPrepare plus the shared score sort value.
 func (hc *TopNCollector) canFastPrepare() bool {
+
 	return len(hc.neededFields) == 0 && !hc.needDocIds &&
 		len(hc.sort) == 1 && hc.cachedScoring[0]
 }
