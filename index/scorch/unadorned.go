@@ -168,10 +168,6 @@ func (i *unadornedPostingsIterator1Hit) BytesWritten() uint64 {
 
 func (i *unadornedPostingsIterator1Hit) ResetBytesRead(uint64) {}
 
-// Implement OptimizablePostingsIterator so a 1-hit iterator produced by one
-// optimization pass (e.g. the unadorned conjunction/disjunction Finish) can be
-// re-optimized when it feeds into a nested conjunction/disjunction, rather than
-// aborting the outer optimization on a failed type assertion.
 func (i *unadornedPostingsIterator1Hit) ActualBitmap() *roaring.Bitmap { return nil }
 
 func (i *unadornedPostingsIterator1Hit) DocNum1Hit() (uint64, bool) {
@@ -197,23 +193,6 @@ func newUnadornedPostingsIteratorFrom1Hit(docNum1Hit uint64) segment.PostingsIte
 type ResetablePostingsIterator interface {
 	ResetIterator()
 }
-
-// Compile-time guarantee that every postings-iterator type placed into an
-// optimized termFieldReader's per-segment iterator slice implements
-// OptimizablePostingsIterator, so a nested conjunction/disjunction optimization
-// composes it instead of silently aborting on a failed type assertion.
-//
-// The two stateful iterators must additionally be resettable so termFieldReader
-// reuse rewinds them; the empty iterator is stateless and intentionally opts out
-// (ResetIterator is invoked via an optional type assertion).
-var (
-	_ segment.OptimizablePostingsIterator = (*emptyPostingsIterator)(nil)
-	_ segment.OptimizablePostingsIterator = (*unadornedPostingsIteratorBitmap)(nil)
-	_ segment.OptimizablePostingsIterator = (*unadornedPostingsIterator1Hit)(nil)
-
-	_ ResetablePostingsIterator = (*unadornedPostingsIteratorBitmap)(nil)
-	_ ResetablePostingsIterator = (*unadornedPostingsIterator1Hit)(nil)
-)
 
 type UnadornedPosting struct {
 	docNum uint64

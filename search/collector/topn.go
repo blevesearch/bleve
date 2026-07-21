@@ -83,9 +83,6 @@ type TopNCollector struct {
 
 	nestedStore *collectStoreNested
 
-	// fastPrepare is true when a hit needs only basicPrepare plus the shared
-	// score sort value (see canFastPrepare) — set once in Collect after loadID
-	// is known. Applies only to score-sorted queries with no field-loading needs.
 	fastPrepare bool
 }
 
@@ -341,6 +338,10 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 
 	hc.needDocIds = hc.needDocIds || loadID
+
+	// fastPrepare is set to true when a hit needs only basicPrepare plus the shared
+	// score sort value (see canFastPrepare). Applies only to score-sorted queries
+	//  with no field-loading needs.
 	hc.fastPrepare = hc.canFastPrepare()
 	select {
 	case <-ctx.Done():
@@ -499,7 +500,6 @@ func (hc *TopNCollector) basicPrepare(d *search.DocumentMatch) {
 }
 
 func (hc *TopNCollector) canFastPrepare() bool {
-
 	return len(hc.neededFields) == 0 && !hc.needDocIds &&
 		len(hc.sort) == 1 && hc.cachedScoring[0]
 }
