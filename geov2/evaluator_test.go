@@ -62,7 +62,7 @@ func TestRangeScanOne(t *testing.T) {
 	// assign each cell a distinct doc ID
 	type entry struct {
 		cell  uint64
-		docID uint64
+		docID uint32
 	}
 	entries := []entry{
 		{queryCell, 0},
@@ -76,7 +76,7 @@ func TestRangeScanOne(t *testing.T) {
 		return entries[i].cell < entries[j].cell
 	})
 	indexCells := make([]uint64, len(entries))
-	docIds := make([]uint64, len(entries))
+	docIds := make([]uint32, len(entries))
 	for i, e := range entries {
 		indexCells[i] = e.cell
 		docIds[i] = e.docID
@@ -116,7 +116,7 @@ func TestRangeScanOneNoMatches(t *testing.T) {
 		uint64(s2.CellIDFromFace(5).ChildBeginAtLevel(queryLevel)),
 		uint64(s2.CellIDFromFace(5).ChildBeginAtLevel(queryLevel).Next()),
 	}
-	docIds := []uint64{0, 1}
+	docIds := []uint32{0, 1}
 	scores := make([]uint64, 2)
 
 	minVal, maxVal := getCellSearchBounds(queryCell)

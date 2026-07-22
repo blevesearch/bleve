@@ -1417,10 +1417,8 @@ func (g *IndexSnapshotGeoShapeV2Reader) searchSeg(segID int,
 
 	docNums := geoData.DocNums()
 
-	// generate the postings list from the matching internal document numbers
 	addFunc := func(docNumInternal int) {
-		val := uint32(docNums[docNumInternal])
-		postings.Add(val)
+		postings.Add(docNums[docNumInternal])
 	}
 
 	hits.Iterate(addFunc)

@@ -21,10 +21,10 @@ type queryEvaluator struct {
 	queryCrossCells []uint64
 
 	innerCells  []uint64
-	innerDocIDs []uint64
+	innerDocIDs []uint32
 
 	crossCells  []uint64
-	crossDocIDs []uint64
+	crossDocIDs []uint32
 }
 
 func NewQueryEvaluator(query Query, geoData segment.GeoShapeV2Data) *queryEvaluator {
@@ -75,7 +75,7 @@ func (qe *queryEvaluator) rangeScanCross(innerScores, crossScores []uint64) {
 
 // scan and score the overlap of a single query cell with the given index cells
 func rangeScanOne(queryCell uint64, minVal, maxVal, cellLevel uint64,
-	indexCells, docIds, scores []uint64) {
+	indexCells []uint64, docIds []uint32, scores []uint64) {
 	// find the range of index cells within the min/max bounds of the query cell
 	// end will be < start if there are no index cells within the bounds
 	start := binarySearchLeftmostGreaterOrEqual(indexCells, minVal)
