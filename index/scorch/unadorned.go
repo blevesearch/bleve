@@ -168,6 +168,16 @@ func (i *unadornedPostingsIterator1Hit) BytesWritten() uint64 {
 
 func (i *unadornedPostingsIterator1Hit) ResetBytesRead(uint64) {}
 
+func (i *unadornedPostingsIterator1Hit) ActualBitmap() *roaring.Bitmap { return nil }
+
+func (i *unadornedPostingsIterator1Hit) DocNum1Hit() (uint64, bool) {
+	return i.docNumOrig, true
+}
+
+// ReplaceActual is a no-op: a 1-hit iterator has no actual bitmap, and callers
+// only invoke ReplaceActual on iterators whose ActualBitmap is non-nil.
+func (i *unadornedPostingsIterator1Hit) ReplaceActual(*roaring.Bitmap) {}
+
 // ResetIterator resets the iterator to the original state.
 func (i *unadornedPostingsIterator1Hit) ResetIterator() {
 	i.docNum = i.docNumOrig

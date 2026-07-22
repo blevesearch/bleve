@@ -236,7 +236,9 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	// remember the score breakdown map
 	scoreBreakdown := dm.ScoreBreakdown
 	// clear out the score breakdown map
-	clear(scoreBreakdown)
+	if scoreBreakdown != nil {
+		clear(scoreBreakdown)
+	}
 	// remember the Descendants backing array
 	descendants := dm.Descendants
 	for i := range descendants { // recycle each IndexInternalID
