@@ -380,8 +380,6 @@ func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
 
 // processGeoShapeV2 processes a property that might be a GeoJSON
 // shape and adds the appropriate field to the document using the new GeoShapeV2 format.
-// Note: array positions are intentionally not tracked for geoshape_v2 fields,
-// which is why there is no indexes parameter here.
 func (fm *FieldMapping) processGeoShapeV2(propertyMightBeGeoShape interface{},
 	pathString string, path []string, context *walkContext,
 ) {

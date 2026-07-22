@@ -63,9 +63,7 @@ func NewGeoShapeV2Searcher(ctx context.Context, indexReader index.IndexReader,
 			gd:                  index.GeoShapeV2FieldDoc{},
 		}, nil
 	}
-	// returning an error (rather than a nil searcher) is important here:
-	// callers such as ConjunctionQuery.Searcher do not nil-check the
-	// returned searcher, so a nil would be appended and later panic on use
+
 	return nil, fmt.Errorf("indexReader does not support geoshape_v2 queries")
 }
 

@@ -56,12 +56,7 @@ func (cq *containsQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	hits := util.NewBitset(numDocs, exclude)
 	maybeHits := util.NewBitset(numDocs, exclude)
 
-	// failsafe for a degenerate query shape that produced no cells, and
-	// hence a zero total score. Without this guard the guaranteed-hit test
-	// below (innerScores[i] == cq.score) would be 0 == 0 for every document,
-	// so a contains query with an empty or zero-area shape would spuriously
-	// match the entire index. A shape that covers nothing contains nothing,
-	// so return the empty hit set before doing any scanning or scoring.
+	// failsafe for a degenerate query shape that produced no cells
 	if cq.score == 0 {
 		return hits
 	}

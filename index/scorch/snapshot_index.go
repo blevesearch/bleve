@@ -1402,7 +1402,7 @@ func (g *IndexSnapshotGeoShapeV2Reader) searchSeg(segID int,
 	if err != nil {
 		return err
 	}
-
+	// return if segment does not have any geo shape data for the field
 	if geoData == nil {
 		return nil
 	}

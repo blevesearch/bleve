@@ -116,8 +116,6 @@ func (b *Bitset) Iterate(f func(int)) {
 func (b *Bitset) Count() int {
 	count := 0
 
-	// Explicitly range over the slice. The Go compiler optimizes this loop,
-	// often utilizing SIMD or unrolling where appropriate.
 	for _, word := range b.data {
 		count += bits.OnesCount64(word)
 	}

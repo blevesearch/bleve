@@ -81,9 +81,6 @@ func (q *GeoShapeV2Query) SetField(f string) {
 	q.FieldVal = f
 }
 
-// Validate ensures that the relation is one of the supported values,
-// as an unsupported relation would result in an empty query coming
-// out of geov2.NewQuery
 func (q *GeoShapeV2Query) Validate() error {
 	switch q.GeometryV2.Relation {
 	case "intersects", "contains", "within", "disjoint":

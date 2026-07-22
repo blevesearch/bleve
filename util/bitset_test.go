@@ -130,9 +130,6 @@ func TestBitsetExcludeBlocksAdd(t *testing.T) {
 	}
 }
 
-// TestBitsetInvertRespectsNumBits is the regression test for the bug where
-// Invert flipped the unused trailing bits in the final word(s), causing
-// Iterate/Count to surface values beyond the valid range [0, numDocs).
 func TestBitsetInvertRespectsNumBits(t *testing.T) {
 	// numDocs = 10 means the valid doc IDs are 0..9. NewBitset allocates a
 	// full 64-bit word, so bits 10..63 are unused and must never surface.

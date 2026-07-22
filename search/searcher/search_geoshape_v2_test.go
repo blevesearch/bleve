@@ -66,9 +66,6 @@ func addGeoShapeV2Doc(t *testing.T, i index.Index, id, typ string,
 //	overlapping   : polygon straddling the corner of Q
 //	bigOutside    : polygon fully disjoint from Q
 //	hugeContainer : polygon that fully contains Q
-//
-// Each doc is indexed via its own Update, so scorch keeps them in separate
-// in-memory segments, exercising the multi-segment read path.
 func setupGeoShapeV2Index(t *testing.T) index.Index {
 	analysisQueue := index.NewAnalysisQueue(1)
 	i, err := scorch.NewScorch(gtreap.Name,
