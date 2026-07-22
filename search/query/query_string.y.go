@@ -543,7 +543,7 @@ yydefault:
 			str := yyDollar[1].s
 			logDebugGrammar("STRING - %s", str)
 			var q FieldableQuery
-			if strings.HasPrefix(str, "/") && strings.HasSuffix(str, "/") {
+			if len(str) > 1 && strings.HasPrefix(str, "/") && strings.HasSuffix(str, "/") {
 				q = NewRegexpQuery(str[1 : len(str)-1])
 			} else if strings.ContainsAny(str, "*?") {
 				q = NewWildcardQuery(str)
@@ -616,7 +616,7 @@ yydefault:
 			str := yyDollar[3].s
 			logDebugGrammar("FIELD - %s STRING - %s", field, str)
 			var q FieldableQuery
-			if strings.HasPrefix(str, "/") && strings.HasSuffix(str, "/") {
+			if len(str) > 1 && strings.HasPrefix(str, "/") && strings.HasSuffix(str, "/") {
 				q = NewRegexpQuery(str[1 : len(str)-1])
 			} else if strings.ContainsAny(str, "*?") {
 				q = NewWildcardQuery(str)
