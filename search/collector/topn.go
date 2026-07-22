@@ -436,7 +436,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		// we may have some knn hits left that did not match any of the top N tf-idf hits
 		// we need to add them to the collector store to consider them as well.
 		for _, knnDoc := range hc.knnHits {
-			err = hc.prepareKnnDocumentMatch(searchContext, reader, knnDoc)
+			err = hc.prepareKNNDocumentMatch(searchContext, reader, knnDoc)
 			if err != nil {
 				return err
 			}
@@ -536,10 +536,10 @@ func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
 	return nil
 }
 
-// prepareKnnDocumentMatch prepares a KNN hit. Its sort value was already
+// prepareKNNDocumentMatch prepares a KNN hit. Its sort value was already
 // computed by the KNN collector, so only facet field visiting (if any) and the
 // basic bookkeeping are needed.
-func (hc *TopNCollector) prepareKnnDocumentMatch(ctx *search.SearchContext,
+func (hc *TopNCollector) prepareKNNDocumentMatch(ctx *search.SearchContext,
 	reader index.IndexReader, d *search.DocumentMatch) (err error) {
 
 	if hc.facetsBuilder != nil {
