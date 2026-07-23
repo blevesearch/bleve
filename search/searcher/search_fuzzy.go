@@ -66,9 +66,7 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 	}
 
 	// Note: we don't byte slice the term for a prefix because of runes.
-	// prefixTerm is the leading runes of term whose start byte offset is
-	// below prefix; slicing term at the first rune boundary at/after prefix
-	// yields the same string without per-rune string concatenation.
+	// we instead slice the term at the first rune boundary at/after prefix index
 	prefixTerm := term
 	for i := range term {
 		if i >= prefix {
@@ -158,18 +156,14 @@ func findFuzzyCandidateTerms(ctx context.Context, indexReader index.IndexReader,
 	// the levenshtein automaton based iterator to collect the
 	// candidate terms
 	if ir, ok := indexReader.(index.IndexReaderFuzzy); ok {
-		// Synonym terms (if any) for this field need to be matched against the
-		// automaton and de-duplicated against the dictionary candidates.
 		var synonymTerms map[string][]string
 		if ctx != nil {
 			if fts, ok := ctx.Value(search.FieldTermSynonymMapKey).(search.FieldTermSynonymMap); ok {
 				synonymTerms = fts[field]
 			}
 		}
-		// The dictionary iterator already yields each term exactly once (merged
-		// across segments), so the only purpose of termSet is to de-duplicate
-		// synonym terms against the dictionary candidates. When there are no
-		// synonyms, skip the map entirely to avoid a per-candidate map insert.
+		// termSet is used to de-duplicate synonym terms against the candidates
+		// gathered across all the segments' dictionaries.
 		var termSet map[string]struct{}
 		if len(synonymTerms) > 0 {
 			termSet = make(map[string]struct{}, len(synonymTerms))
