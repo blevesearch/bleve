@@ -27,6 +27,8 @@ import (
 
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/document"
+	geov2 "github.com/blevesearch/bleve/v2/geov2"
+	"github.com/blevesearch/bleve/v2/size"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
@@ -50,6 +52,8 @@ type asynchSegmentResult struct {
 }
 
 var reflectStaticSizeIndexSnapshot int
+var reflectStaticSizeIndexSnapshotGeoShapeV2Reader int
+var reflectStaticSizeRoaringIntIterator int
 
 func init() {
 	var is interface{} = IndexSnapshot{}
@@ -63,6 +67,10 @@ func init() {
 	if err != nil {
 		panic(fmt.Errorf("levenshtein automaton ed2 builder err: %v", err))
 	}
+	var gcr IndexSnapshotGeoShapeV2Reader
+	reflectStaticSizeIndexSnapshotGeoShapeV2Reader = int(reflect.TypeOf(gcr).Size())
+	var rip roaring.IntIterator
+	reflectStaticSizeRoaringIntIterator = int(reflect.TypeOf(rip).Size())
 }
 
 type IndexSnapshot struct {
@@ -1307,4 +1315,192 @@ func (i *IndexSnapshot) Ancestors(ID index.IndexInternalID, prealloc []index.Anc
 	}
 	// return adjusted ancestors
 	return prealloc, nil
+}
+
+func (i *IndexSnapshot) GeoShapeV2FieldReader(ctx context.Context, field string) (
+	index.GeoShapeV2FieldReader, error) {
+
+	rv := &IndexSnapshotGeoShapeV2Reader{
+		field:     field,
+		postings:  make([]*roaring.Bitmap, len(i.segment)),
+		iterators: make([]roaring.IntPeekable, len(i.segment)),
+		snapshot:  i,
+	}
+
+	return rv, nil
+}
+
+type IndexSnapshotGeoShapeV2Reader struct {
+	field string
+
+	postings      []*roaring.Bitmap
+	iterators     []roaring.IntPeekable
+	segmentOffset int
+
+	snapshot *IndexSnapshot
+}
+
+// Search performs a spatial search for the given GeoJSON shape and relation
+// across all segments in the index snapshot.
+func (g *IndexSnapshotGeoShapeV2Reader) Search(shape index.GeoJSON,
+	relation string) error {
+
+	numSegments := len(g.snapshot.segment)
+	// create a single query object that is thread safe
+	// to be used across all segments
+	query := geov2.NewQuery(shape, relation)
+
+	var wg sync.WaitGroup
+	wg.Add(numSegments)
+
+	var errm sync.Mutex
+	var err error
+	// search each segment concurrently
+	for i := 0; i < numSegments; i++ {
+		go func(segID int) {
+			defer wg.Done()
+			err2 := g.searchSeg(segID, query)
+			if err2 != nil {
+				errm.Lock()
+				if err == nil {
+					err = err2
+				}
+				errm.Unlock()
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	return err
+}
+
+// searchSeg performs a spatial search for the given GeoJSON shape and relation
+// on a single segment in the index snapshot.
+func (g *IndexSnapshotGeoShapeV2Reader) searchSeg(segID int,
+	query geov2.Query) error {
+
+	snapshot := g.snapshot.segment[segID]
+	geoSeg, ok := snapshot.segment.(segment.GeoShapeV2Segment)
+	if !ok {
+		return nil
+	}
+
+	// obtain the geo shape data from the segment
+	geoData, err := geoSeg.GeoShapeV2Data(g.field, snapshot.deleted)
+	if err != nil {
+		return err
+	}
+	// return if segment does not have any geo shape data for the field
+	if geoData == nil {
+		return nil
+	}
+	// release the reference on the segment's cached geo data once the
+	// evaluation is done, so that the cache is free to evict it
+	defer geoData.Close()
+
+	// evaluate the query against the geo shape data to
+	// get the matching document IDs
+	hits := query.Evaluate(geoData)
+	postings := roaring.New()
+
+	docNums := geoData.DocNums()
+
+	addFunc := func(docNumInternal int) {
+		postings.Add(docNums[docNumInternal])
+	}
+
+	hits.Iterate(addFunc)
+
+	g.postings[segID] = postings
+	g.iterators[segID] = postings.Iterator()
+
+	return nil
+}
+
+// Next returns the next GeoShapeV2FieldDoc from the postings list across all segments in the index snapshot.
+func (g *IndexSnapshotGeoShapeV2Reader) Next(preAlloced *index.GeoShapeV2FieldDoc) (
+	*index.GeoShapeV2FieldDoc, error) {
+	rv := preAlloced
+	if rv == nil {
+		rv = &index.GeoShapeV2FieldDoc{}
+	}
+
+	for g.segmentOffset < len(g.iterators) {
+		if !g.iterators[g.segmentOffset].HasNext() {
+			g.segmentOffset++
+			continue
+		}
+
+		next := g.iterators[g.segmentOffset].Next()
+		globalOffset := g.snapshot.offsets[g.segmentOffset]
+		rv.ID = index.NewIndexInternalID(rv.ID, uint64(next)+globalOffset)
+		return rv, nil
+	}
+
+	return nil, nil
+}
+
+// Advance moves the reader to the specified document ID, returning the corresponding GeoShapeV2FieldDoc if it exists.
+func (g *IndexSnapshotGeoShapeV2Reader) Advance(ID index.IndexInternalID,
+	preAlloced *index.GeoShapeV2FieldDoc) (*index.GeoShapeV2FieldDoc, error) {
+	rv := preAlloced
+	if rv == nil {
+		rv = &index.GeoShapeV2FieldDoc{}
+	}
+
+	num, err := ID.Value()
+	if err != nil {
+		return nil, fmt.Errorf("error converting IndexInternalID to doc "+
+			"number ID - %v, err: %w", ID, err)
+	}
+
+	segIdx, localDocNum := g.snapshot.segmentIndexAndLocalDocNumFromGlobal(num)
+	if segIdx >= len(g.iterators) {
+		return nil, fmt.Errorf("error advancing to doc number %d, segment "+
+			"index %d out of bounds", num, segIdx)
+	}
+
+	if g.segmentOffset > segIdx {
+		return nil, fmt.Errorf("error advancing to doc number %d, segment "+
+			"index %d is less than current segment offset %d", num, segIdx, g.segmentOffset)
+	}
+
+	g.segmentOffset = segIdx
+	g.iterators[g.segmentOffset].AdvanceIfNeeded(uint32(localDocNum))
+
+	return g.Next(rv)
+}
+
+// Close is a no-op: the reader holds no resources of its own, and the
+// segment-level geo data it reads from is owned and evicted by the
+// segment's cache
+func (g *IndexSnapshotGeoShapeV2Reader) Close() error {
+	return nil
+}
+
+// Count returns the total number of documents across all segments
+// in the index snapshot that match the GeoShapeV2FieldReader's criteria.
+func (g *IndexSnapshotGeoShapeV2Reader) Count() uint64 {
+	var rv uint64
+	for _, posting := range g.postings {
+		if posting != nil {
+			rv += uint64(posting.GetCardinality())
+		}
+	}
+	return rv
+}
+
+// Size returns the estimated size in bytes of the
+// IndexSnapshotGeoShapeV2Reader, including its postings and iterators.
+func (g *IndexSnapshotGeoShapeV2Reader) Size() int {
+	rv := reflectStaticSizeIndexSnapshotGeoShapeV2Reader + size.SizeOfPtr +
+		len(g.field) + size.SizeOfInt
+
+	for _, posting := range g.postings {
+		rv += int(posting.GetSizeInBytes())
+	}
+
+	rv += (reflectStaticSizeRoaringIntIterator + size.SizeOfPtr) * len(g.iterators)
+
+	return rv
 }

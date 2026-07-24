@@ -368,7 +368,24 @@ func runGeoShapeLinestringQueryWithRelation(relation string, i index.IndexReader
 	return executeSearch(relation, i, s, field)
 }
 
+// executeSearch runs the v1 geoshape searcher and, so that the same corpus
+// also exercises the v2 implementation, requires the geoshape_v2 searcher to
+// agree on the result set (see assertGeoShapeV2Agrees). It returns the v1
+// result in v1 order so existing order-sensitive assertions keep working.
 func executeSearch(relation string, i index.IndexReader,
+	s index.GeoJSON, field string,
+) ([]string, error) {
+	rv, err := executeGeoShapeV1Search(relation, i, s, field)
+	if err != nil {
+		return nil, err
+	}
+	if err := assertGeoShapeV2Agrees(relation, i, s, field, rv); err != nil {
+		return nil, err
+	}
+	return rv, nil
+}
+
+func executeGeoShapeV1Search(relation string, i index.IndexReader,
 	s index.GeoJSON, field string,
 ) ([]string, error) {
 	var rv []string
@@ -419,9 +436,9 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 		{74.84642028808594, 22.402776071459712},
 	}}}
 	doc := document.NewDocument("polygon1")
-	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry",
+	addGeoShapeFieldV1V2(doc,"geometry",
 		[]uint64{}, polygon1, "polygon",
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -439,9 +456,9 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 		{74.93431091308592, 22.376428433285266},
 	}}}
 	doc = document.NewDocument("polygon2")
-	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry",
+	addGeoShapeFieldV1V2(doc,"geometry",
 		[]uint64{}, polygon2, "polygon",
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -452,9 +469,9 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 		{74.87028121948242, 22.345471522338478},
 	}}}
 	doc = document.NewDocument("envelope1")
-	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry",
+	addGeoShapeFieldV1V2(doc,"geometry",
 		[]uint64{}, envelope1, "envelope",
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -465,27 +482,27 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 		{36.25333786010742, 50.03068093791795},
 	}}}
 	doc = document.NewDocument("envelope2")
-	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry",
+	addGeoShapeFieldV1V2(doc,"geometry",
 		[]uint64{}, envelope2, "envelope",
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	doc = document.NewDocument("circle1")
-	doc.AddField(document.NewGeoCircleFieldWithIndexingOptions("geometry",
+	addGeoCircleFieldV1V2(doc,"geometry",
 		[]uint64{}, []float64{74.93671417236328, 22.308314152382284}, "300m",
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	doc = document.NewDocument("circle2")
-	doc.AddField(document.NewGeoCircleFieldWithIndexingOptions("geometry",
+	addGeoCircleFieldV1V2(doc,"geometry",
 		[]uint64{}, []float64{36.22243881225586, 50.02941280037234}, "600m",
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -496,9 +513,9 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 		{74.94036197662354, 22.32054224254707},
 	}}}
 	doc = document.NewDocument("linestring1")
-	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry",
+	addGeoShapeFieldV1V2(doc,"geometry",
 		[]uint64{}, linestring, "linestring",
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -509,9 +526,9 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 		{77.60557651519775, 12.987329508048184},
 	}}}
 	doc = document.NewDocument("linestring2")
-	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry",
+	addGeoShapeFieldV1V2(doc,"geometry",
 		[]uint64{}, linestring1, "linestring",
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -526,9 +543,9 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 		{{74.9223804473877, 22.311688894660474}, {74.92534160614014, 22.30930673210729}},
 	}}
 	doc = document.NewDocument("multilinestring1")
-	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry",
+	addGeoShapeFieldV1V2(doc,"geometry",
 		[]uint64{}, multilinestring, "multilinestring",
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -543,9 +560,9 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 		{{77.60188579559325, 12.982604078764705}, {77.60557651519775, 12.987329508048184}},
 	}}
 	doc = document.NewDocument("multilinestring2")
-	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry",
+	addGeoShapeFieldV1V2(doc,"geometry",
 		[]uint64{}, multilinestring1, "multilinestring",
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -557,9 +574,9 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 		{77.56922721862793, 12.956173473406446},
 	}}}
 	doc = document.NewDocument("multipoint1")
-	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry",
+	addGeoShapeFieldV1V2(doc,"geometry",
 		[]uint64{}, multipoint1, "multipoint",
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -584,9 +601,9 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 	}}
 
 	doc = document.NewDocument("polygonWithHole1")
-	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry",
+	addGeoShapeFieldV1V2(doc,"geometry",
 		[]uint64{}, polygonWithHole1, "polygon",
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -614,9 +631,9 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 	}}
 
 	doc = document.NewDocument("polygonWithHole2")
-	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry",
+	addGeoShapeFieldV1V2(doc,"geometry",
 		[]uint64{}, polygonWithHole2, "polygon",
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -646,9 +663,9 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 			{36.221065521240234, 50.00365685169585},
 		}}}
 	doc = document.NewDocument("multipolygon1")
-	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry",
+	addGeoShapeFieldV1V2(doc,"geometry",
 		[]uint64{}, multipolygon1, "multipolygon",
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -675,9 +692,9 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 	coordinates := [][][][][]float64{polygonInGc, multipolygonInGc}
 	types := []string{"polygon", "multipolygon"}
 	doc = document.NewDocument("gc_polygonInGc_multipolygonInGc")
-	doc.AddField(document.NewGeometryCollectionFieldWithIndexingOptions("geometry",
+	addGeoCollectionFieldV1V2(doc,"geometry",
 		[]uint64{}, coordinates, types,
-		document.DefaultGeoShapeIndexingOptions))
+		document.DefaultGeoShapeIndexingOptions)
 	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)

@@ -201,6 +201,18 @@ func NewGeoShapeFieldMapping() *FieldMapping {
 	}
 }
 
+// NewGeoShapeV2FieldMapping returns a default field mapping for
+// geoshapes using the new GeoShapeV2 format
+func NewGeoShapeV2FieldMapping() *FieldMapping {
+	return &FieldMapping{
+		Type:         "geoshape_v2",
+		Store:        false,
+		Index:        true,
+		IncludeInAll: false,
+		DocValues:    false,
+	}
+}
+
 // NewIPFieldMapping returns a default field mapping for IP points
 func NewIPFieldMapping() *FieldMapping {
 	return &FieldMapping{
@@ -336,47 +348,112 @@ func (fm *FieldMapping) processIP(ip net.IP, pathString string, path []string, i
 	}
 }
 
+// processGeoShape processes a property that might be a GeoJSON
+// shape and adds the appropriate field to the document.
 func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
 	pathString string, path []string, indexes []uint64, context *walkContext,
+) {
+	fm.processGeoShapeInternal(propertyMightBeGeoShape, pathString, path, context,
+		func(fieldName string, shapes []*geojson.GeoShape,
+			options index.FieldIndexingOptions) document.Field {
+			field := document.NewGeometryCollectionFieldFromShapesWithIndexingOptions(
+				fieldName, indexes, shapes, options)
+			if field == nil {
+				// return an untyped nil, so that the caller's nil check works;
+				// returning the nil *GeoShapeField directly would produce a
+				// non-nil document.Field interface wrapping a nil pointer
+				return nil
+			}
+			return field
+		},
+		func(fieldName string, shape *geojson.GeoShape,
+			options index.FieldIndexingOptions) document.Field {
+			field := document.NewGeoShapeFieldFromShapeWithIndexingOptions(
+				fieldName, indexes, shape, options)
+			if field == nil {
+				return nil
+			}
+			return field
+		},
+	)
+}
+
+// processGeoShapeV2 processes a property that might be a GeoJSON
+// shape and adds the appropriate field to the document using the new GeoShapeV2 format.
+func (fm *FieldMapping) processGeoShapeV2(propertyMightBeGeoShape interface{},
+	pathString string, path []string, context *walkContext,
+) {
+	fm.processGeoShapeInternal(propertyMightBeGeoShape, pathString, path, context,
+		func(fieldName string, shapes []*geojson.GeoShape,
+			options index.FieldIndexingOptions) document.Field {
+			field := document.NewGeometryCollectionV2FieldFromShapesWithIndexingOptions(
+				fieldName, shapes, options)
+			if field == nil {
+				// return an untyped nil, so that the caller's nil check works;
+				// returning the nil *GeoShapeV2Field directly would produce a
+				// non-nil document.Field interface wrapping a nil pointer
+				return nil
+			}
+			return field
+		},
+		func(fieldName string, shape *geojson.GeoShape,
+			options index.FieldIndexingOptions) document.Field {
+			field := document.NewGeoShapeV2FieldFromShapeWithIndexingOptions(
+				fieldName, shape, options)
+			if field == nil {
+				return nil
+			}
+			return field
+		},
+	)
+}
+
+// processGeoShapeInternal is a helper function that processes
+// a property that might be a GeoJSON shape and adds the appropriate
+// field to the document. It takes two functions as parameters to handle
+// the creation of fields for geometry collections and individual shapes.
+func (fm *FieldMapping) processGeoShapeInternal(
+	propertyMightBeGeoShape interface{},
+	pathString string, path []string, context *walkContext,
+	makeCollection func(fieldName string, shapes []*geojson.GeoShape,
+		options index.FieldIndexingOptions) document.Field,
+	makeShape func(fieldName string, shape *geojson.GeoShape,
+		options index.FieldIndexingOptions) document.Field,
 ) {
 	coordValue, shape, err := geo.ParseGeoShapeField(propertyMightBeGeoShape)
 	if err != nil {
 		return
 	}
 
+	var field document.Field
+	var found bool
+
 	if shape == geo.GeometryCollectionType {
-		geoShapes, found := geo.ExtractGeometryCollection(propertyMightBeGeoShape)
+		var geoShapes []*geojson.GeoShape
+		geoShapes, found = geo.ExtractGeometryCollection(propertyMightBeGeoShape)
 		if found {
 			fieldName := getFieldName(pathString, path, fm)
-			options := fm.Options()
-			field := document.NewGeometryCollectionFieldFromShapesWithIndexingOptions(fieldName,
-				indexes, geoShapes, options)
-			context.doc.AddField(field)
-
-			if !fm.IncludeInAll {
-				context.excludedFromAll = append(context.excludedFromAll, fieldName)
-			}
+			field = makeCollection(fieldName, geoShapes, fm.Options())
 		}
 	} else {
 		var geoShape *geojson.GeoShape
-		var found bool
-
 		if shape == geo.CircleType {
 			geoShape, found = geo.ExtractCircle(propertyMightBeGeoShape)
 		} else {
 			geoShape, found = geo.ExtractGeoShapeCoordinates(coordValue, shape)
 		}
-
 		if found {
 			fieldName := getFieldName(pathString, path, fm)
-			options := fm.Options()
-			field := document.NewGeoShapeFieldFromShapeWithIndexingOptions(fieldName,
-				indexes, geoShape, options)
-			context.doc.AddField(field)
+			field = makeShape(fieldName, geoShape, fm.Options())
+		}
+	}
 
-			if !fm.IncludeInAll {
-				context.excludedFromAll = append(context.excludedFromAll, fieldName)
-			}
+	// field is nil when the constructor failed to encode the shape,
+	// in which case nothing is added to the document
+	if found && field != nil {
+		context.doc.AddField(field)
+		if !fm.IncludeInAll {
+			context.excludedFromAll = append(context.excludedFromAll, field.Name())
 		}
 	}
 }

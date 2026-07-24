@@ -36,8 +36,8 @@ func testCaseSetup(t *testing.T, docShapeName, docShapeType string, docShapeVert
 	i index.Index,
 ) (index.IndexReader, func() error, error) {
 	doc := document.NewDocument(docShapeName)
-	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry", []uint64{},
-		docShapeVertices, docShapeType, document.DefaultGeoShapeIndexingOptions))
+	addGeoShapeFieldV1V2(doc, "geometry", []uint64{},
+		docShapeVertices, docShapeType, document.DefaultGeoShapeIndexingOptions)
 	err := i.Update(doc)
 	if err != nil {
 		return nil, nil, err
