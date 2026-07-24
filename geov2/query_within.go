@@ -85,7 +85,8 @@ func (wq *withinQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	// non exhaustive in the sense that the boundaries are not always only
 	// covered by the smallest possible cells.
 	for i := 0; i < numDocs; i++ {
-		if !hits.Contains(i) && innerScores[i]+crossScores[i] >= docScoresInner[i] && innerScores[i]+crossScores[i] != 0 {
+		if !hits.Contains(i) && innerScores[i]+crossScores[i] >= docScoresInner[i] &&
+			innerScores[i]+crossScores[i] != 0 {
 			maybeHits.Add(i)
 		}
 	}

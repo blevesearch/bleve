@@ -61,14 +61,14 @@ func pow4(exp uint64) uint64 {
 }
 
 // returns the overlap of query and index cells based on their levels.
-// Both levels are assumed to be at most 14 (maxCellLevel in the geo repo's
+// Both levels are assumed to be at most 16 (maxCellLevel in the geo repo's
 // region coverer configuration - see geo/geojson/geojson_v2.go), the deepest
 // level used across the geoshape_v2 indexing and query cell coverings;
-// cells deeper than level 14 are outside this function's contract by design.
+// cells deeper than level 16 are outside this function's contract by design.
 func calcScore(queryCellLevel, indexCellLevel uint64) uint64 {
 	if indexCellLevel > queryCellLevel {
-		return pow4(14 - indexCellLevel)
+		return pow4(16 - indexCellLevel)
 	} else {
-		return pow4(14 - queryCellLevel)
+		return pow4(16 - queryCellLevel)
 	}
 }

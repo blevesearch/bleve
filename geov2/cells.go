@@ -38,7 +38,7 @@ func getParentCell(cell uint64, level int) uint64 {
 }
 
 // CalcCellsScore returns the total area of the given S2 cells
-// in level 14 cell units (maxCellLevel in the geo repo's region coverer
+// in level 16 cell units (maxCellLevel in the geo repo's region coverer
 // configuration - see geo/geojson/geojson_v2.go)
 func CalcCellsScore(cells []uint64) uint64 {
 	var score uint64

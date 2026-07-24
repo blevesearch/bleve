@@ -49,21 +49,21 @@ func TestCalcScore(t *testing.T) {
 	}{
 		{
 			// equal levels: the overlap is a single cell at that level
-			name: "equal levels", queryCellLevel: 14, indexCellLevel: 14, want: pow4(0),
+			name: "equal levels", queryCellLevel: 16, indexCellLevel: 16, want: pow4(0),
 		},
 		{
-			name: "equal levels shallow", queryCellLevel: 6, indexCellLevel: 6, want: pow4(8),
+			name: "equal levels shallow", queryCellLevel: 6, indexCellLevel: 6, want: pow4(10),
 		},
 		{
 			// index cell is deeper (smaller): the overlap is the index cell
-			name: "index deeper", queryCellLevel: 6, indexCellLevel: 10, want: pow4(4),
+			name: "index deeper", queryCellLevel: 6, indexCellLevel: 10, want: pow4(6),
 		},
 		{
 			// query cell is deeper (smaller): the overlap is the query cell
-			name: "query deeper", queryCellLevel: 11, indexCellLevel: 8, want: pow4(3),
+			name: "query deeper", queryCellLevel: 11, indexCellLevel: 8, want: pow4(5),
 		},
 		{
-			name: "both at level 0", queryCellLevel: 0, indexCellLevel: 0, want: pow4(14),
+			name: "both at level 0", queryCellLevel: 0, indexCellLevel: 0, want: pow4(16),
 		},
 	}
 	for _, test := range tests {
@@ -82,11 +82,11 @@ func cellAtLevel(level int) uint64 {
 
 func TestCalcCellsScore(t *testing.T) {
 	// build cells at known levels; each contributes calcScore(0, level)
-	// which equals pow4(14 - level)
+	// which equals pow4(16 - level)
 	cells := []uint64{
-		cellAtLevel(14), // contributes pow4(0) = 1
-		cellAtLevel(13), // contributes pow4(1) = 4
-		cellAtLevel(12), // contributes pow4(2) = 16
+		cellAtLevel(16), // contributes pow4(0) = 1
+		cellAtLevel(15), // contributes pow4(1) = 4
+		cellAtLevel(14), // contributes pow4(2) = 16
 	}
 	want := pow4(0) + pow4(1) + pow4(2)
 	if got := CalcCellsScore(cells); got != want {
