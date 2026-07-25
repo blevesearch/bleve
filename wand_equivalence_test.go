@@ -289,10 +289,13 @@ func TestWANDTopScoresMatchesCompleteSingleSegment(t *testing.T) {
 // it, since every v18 segment supplies a real bound.
 //
 // This is not a hypothetical migration: an index written by an earlier bleve is
-// read in place, not rewritten, so any deployment that upgrades binaries lands
-// here until every segment has been merged forward.  Mixed v17/v18 snapshots are
-// covered by the same mechanism, the cross-segment max being poisoned by any one
-// segment that cannot supply a bound.
+// read in place, never rewritten in the new format, so a deployment that upgrades
+// binaries lands here and stays here.  scorch pins the plugin from the version
+// recorded in bolt meta at open time, so such an index is homogeneous rather than
+// mixed — segments added after the upgrade are written in the old format too.
+// The cross-segment bound in IndexSnapshotTermFieldReader.MaxTFNorm is
+// nevertheless poisoned by any single segment that cannot supply a bound, which
+// keeps a mixed snapshot sound if one ever became reachable.
 func TestWANDTopScoresMatchesCompleteZapV17(t *testing.T) {
 	idx, terms := buildWANDEquivIndexWithConfig(t, 5, 400, map[string]interface{}{
 		"forceSegmentType":    "zap",
