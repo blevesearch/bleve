@@ -731,7 +731,7 @@ func (is *IndexSnapshot) TermFieldReaderForSegmentRange(
 		includeFreq:        includeFreq,
 		includeNorm:        includeNorm,
 		includeTermVectors: includeTermVectors,
-		recycle: false, // sub-range TFR must not be returned to the snapshot pool
+		recycle:            false, // sub-range TFR must not be returned to the snapshot pool
 	}
 
 	for i, s := range segs {
@@ -748,6 +748,9 @@ func (is *IndexSnapshot) TermFieldReaderForSegmentRange(
 		rv.dicts[i] = dict
 	}
 
+	if includeNorm {
+		rv.normColumnIters = make([]normColumnIterator, n)
+	}
 	for i, s := range segs {
 		pl, err := rv.dicts[i].PostingsList(term, s.deleted, nil)
 		if err != nil {
@@ -755,6 +758,9 @@ func (is *IndexSnapshot) TermFieldReaderForSegmentRange(
 		}
 		rv.postings[i] = pl
 		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, nil)
+		if includeNorm {
+			rv.normColumnIters[i], _ = rv.iterators[i].(normColumnIterator)
+		}
 	}
 
 	rv.updateBytesRead = includeFreq || includeNorm || includeTermVectors

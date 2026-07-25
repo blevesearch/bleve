@@ -12,8 +12,13 @@ import (
 // Size history:
 //
 //	384 bytes (6 cache lines) — original
-//	456 bytes — §7 added options/ctx/parallelResults/parallelPos (cold, end of struct)
-//	464 bytes — §35 added TopK int to SearcherOptions (stored in options field)
+//	408 bytes — currIDs []uint64 cache (24 bytes: slice header); eliminates BigEndian
+//	           decode + pointer chase in nextMAXSCORE collect/advance loops
+//	480 bytes — §7 added options/ctx/parallelResults/parallelPos (cold, end of struct)
+//	488 bytes — §35 added TopK int to SearcherOptions (stored in options field)
+//
+// The 408/480 steps are 456/464 in perf-gar-mod-fix-2's ordering, where currIDs
+// landed after §7 rather than before it. The end state is 488 either way.
 func TestDSSStructSize(t *testing.T) {
 	var s DisjunctionSliceSearcher
 	size := unsafe.Sizeof(s)

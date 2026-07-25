@@ -47,12 +47,12 @@ type DisjunctionSliceSearcher struct {
 	// line 5, cold) to avoid the cold-line load on every nextMAXSCORE call.
 	// Two bools fit in the 7-byte padding gap between retrieveScoreBreakdown
 	// and currs — struct size stays 384 bytes (§7 later extends to 456).
-	lazyMode        bool
+	lazyMode bool
 	// parallelDecided marks that shouldRunParallel has been called once for
 	// this DSS. Without it the check would fire on every Next() call when §7
 	// is disabled (parallelResults stays nil), adding O(NumCandidates) overhead.
 	parallelDecided bool
-	currs    []*search.DocumentMatch
+	currs           []*search.DocumentMatch
 	// currIDs caches the decoded big-endian uint64 docID for each currs[i].
 	// math.MaxUint64 signals nil or exhausted (len(IndexInternalID) != 8).
 	// Updated after every s.currs[i] assignment so the hot nextMAXSCORE loops
@@ -150,7 +150,7 @@ type DisjunctionSliceSearcher struct {
 	// calls drain it in score-descending order. parallelDecided (offset 82,
 	// packed with lazyMode in the bool-padding gap) ensures shouldRunParallel
 	// is called at most once per DSS instance.
-	// Struct size: 464 bytes (§35 added TopK int to SearcherOptions; was 456).
+	// Struct size: 488 bytes (§35 added TopK int to SearcherOptions; was 480).
 	options         search.SearcherOptions
 	ctx             context.Context
 	parallelResults []*search.DocumentMatch
