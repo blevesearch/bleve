@@ -17,6 +17,7 @@ package scorch
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"sync/atomic"
 
@@ -295,22 +296,33 @@ type maxTFNormPostings interface {
 	MaxTFNorm(avgDocLength float64) float32
 }
 
+// maxTFNormUnavailable signals that NO per-term bound could be computed, as
+// distinct from a bound that happens to be zero. Callers must treat it as
+// "unknown" and disable pruning — see TermSearcher.MaxImpact. Using 0 for this is
+// unsafe: 0 reads as "this term can contribute nothing", which prunes every
+// candidate. Segments from a pre-§14 codec (zapx v17 and earlier) hit this path.
+const maxTFNormUnavailable = float32(math.MaxFloat32)
+
 // segmentMaxTFNorm returns the per-term bound for segment j, preferring the
 // already-resolved posting list and falling back to re-resolving via the
-// dictionary.  Returns 0 only when neither is available, which callers treat as
-// "no bound" — see TermSearcher.MaxImpact.
-func (i *IndexSnapshotTermFieldReader) segmentMaxTFNorm(j int, avgDocLength float64) float32 {
+// dictionary.
+//
+// The bool reports whether a bound could be obtained at all, which is not the
+// same as the bound being zero. A legacy index is exactly where conflating those
+// is unsafe: zapx v17 and earlier implement neither interface, so every segment
+// reports 0, and a ceiling of zero prunes everything.
+func (i *IndexSnapshotTermFieldReader) segmentMaxTFNorm(j int, avgDocLength float64) (float32, bool) {
 	if j < len(i.postings) {
 		if p, ok := i.postings[j].(maxTFNormPostings); ok {
-			return p.MaxTFNorm(avgDocLength)
+			return p.MaxTFNorm(avgDocLength), true
 		}
 	}
 	if j < len(i.dicts) {
 		if d, ok := i.dicts[j].(maxTFNormProvider); ok {
-			return d.MaxTFNorm(i.term, avgDocLength)
+			return d.MaxTFNorm(i.term, avgDocLength), true
 		}
 	}
-	return 0
+	return 0, false
 }
 
 // MaxTFNorm returns the max BM25 tf-norm contribution for this term across
@@ -337,7 +349,19 @@ func (i *IndexSnapshotTermFieldReader) MaxTFNorm(avgDocLength float64) float32 {
 	i.segMaxTFNormsAvgDl = avgDocLength
 	var maxV float32
 	for j := range i.dicts {
-		v := i.segmentMaxTFNorm(j, avgDocLength)
+		v, ok := i.segmentMaxTFNorm(j, avgDocLength)
+		if !ok {
+			// This segment cannot supply a bound (pre-§14 codec, e.g. a zapx v17
+			// index opened by a newer bleve), so nothing computed here is a valid
+			// ceiling over the whole reader. Report "unknown" so WAND is disabled
+			// for the query instead of pruning against a bound that does not
+			// hold, and poison the per-segment cache so MaxTFNormForSegment
+			// agrees.
+			for k := range i.segMaxTFNorms {
+				i.segMaxTFNorms[k] = maxTFNormUnavailable
+			}
+			return maxTFNormUnavailable
+		}
 		i.segMaxTFNorms[j] = v
 		if v > maxV {
 			maxV = v
@@ -364,7 +388,11 @@ func (i *IndexSnapshotTermFieldReader) MaxTFNormForSegment(segIdx int, avgDocLen
 	if i.segMaxTFNorms != nil && i.segMaxTFNormsAvgDl == avgDocLength && segIdx < len(i.segMaxTFNorms) {
 		return i.segMaxTFNorms[segIdx]
 	}
-	return i.segmentMaxTFNorm(segIdx, avgDocLength)
+	v, ok := i.segmentMaxTFNorm(segIdx, avgDocLength)
+	if !ok {
+		return maxTFNormUnavailable
+	}
+	return v
 }
 
 // SegmentIndexOf returns the shard-relative segment index for the given global
