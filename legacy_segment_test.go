@@ -505,7 +505,19 @@ func TestLegacySegmentTopScoresEquivalence(t *testing.T) {
 	queries := legacyQueries()
 	for _, version := range append(legacySegmentVersions, legacyCurrentVersion) {
 		t.Run(fmt.Sprintf("v%d", version), func(t *testing.T) {
-			idx := buildLegacyIndex(t, version, index.BM25Scoring)
+			// Merged, even though this test compares two searches of the SAME index
+			// and so looks immune to the cross-index problem buildLegacyIndexMerged
+			// exists for. It is not: avgDocLength is ceil(FieldCardinality/docCount)
+			// and FieldCardinality sums each segment's fst.Len(), so a background
+			// merge landing BETWEEN the complete and top_scores searches shifts every
+			// BM25 score and the comparison fails with no bug present. Observed once
+			// in five runs before this change, as the 0.8614-vs-0.7980 pair that the
+			// avgDocLength investigation had already identified.
+			//
+			// Cost is cross-segment §15 skipping, which this test no longer exercises;
+			// TestWANDTopScoresMatchesComplete covers that on the current format, and
+			// what matters here is the legacy format rather than the segment count.
+			idx := buildLegacyIndexMerged(t, version, index.BM25Scoring)
 			for _, tc := range queries {
 				for _, size := range []int{1, 10, 100} {
 					label := fmt.Sprintf("%s size=%d", tc.name, size)
