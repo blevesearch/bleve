@@ -277,8 +277,40 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 }
 
 // maxTFNormProvider is the optional interface implemented by zapx.Dictionary.
+// Reaching the bound this way costs a full term resolution (FST traversal plus
+// posting-list header decode); prefer maxTFNormPostings when the posting list
+// is already in hand.
 type maxTFNormProvider interface {
 	MaxTFNorm(term []byte, avgDocLength float64) float32
+}
+
+// maxTFNormPostings is the optional interface implemented by zapx.PostingsList.
+// The TFR has already resolved this term's posting list, which carries the
+// segment, field and postings offset the §14 sidecar lookup needs, so asking it
+// for the bound costs a binary search and nothing else.  Going through
+// maxTFNormProvider instead re-resolves the same term from the FST — profiling
+// a 6-field keyword-ID disjunction showed that redundant work accounting for
+// ~48% of all dictionary lookups in the query.
+type maxTFNormPostings interface {
+	MaxTFNorm(avgDocLength float64) float32
+}
+
+// segmentMaxTFNorm returns the per-term bound for segment j, preferring the
+// already-resolved posting list and falling back to re-resolving via the
+// dictionary.  Returns 0 only when neither is available, which callers treat as
+// "no bound" — see TermSearcher.MaxImpact.
+func (i *IndexSnapshotTermFieldReader) segmentMaxTFNorm(j int, avgDocLength float64) float32 {
+	if j < len(i.postings) {
+		if p, ok := i.postings[j].(maxTFNormPostings); ok {
+			return p.MaxTFNorm(avgDocLength)
+		}
+	}
+	if j < len(i.dicts) {
+		if d, ok := i.dicts[j].(maxTFNormProvider); ok {
+			return d.MaxTFNorm(i.term, avgDocLength)
+		}
+	}
+	return 0
 }
 
 // MaxTFNorm returns the max BM25 tf-norm contribution for this term across
@@ -304,11 +336,8 @@ func (i *IndexSnapshotTermFieldReader) MaxTFNorm(avgDocLength float64) float32 {
 	}
 	i.segMaxTFNormsAvgDl = avgDocLength
 	var maxV float32
-	for j, dict := range i.dicts {
-		var v float32
-		if p, ok := dict.(maxTFNormProvider); ok {
-			v = p.MaxTFNorm(i.term, avgDocLength)
-		}
+	for j := range i.dicts {
+		v := i.segmentMaxTFNorm(j, avgDocLength)
 		i.segMaxTFNorms[j] = v
 		if v > maxV {
 			maxV = v
@@ -335,10 +364,7 @@ func (i *IndexSnapshotTermFieldReader) MaxTFNormForSegment(segIdx int, avgDocLen
 	if i.segMaxTFNorms != nil && i.segMaxTFNormsAvgDl == avgDocLength && segIdx < len(i.segMaxTFNorms) {
 		return i.segMaxTFNorms[segIdx]
 	}
-	if p, ok := i.dicts[segIdx].(maxTFNormProvider); ok {
-		return p.MaxTFNorm(i.term, avgDocLength)
-	}
-	return 0
+	return i.segmentMaxTFNorm(segIdx, avgDocLength)
 }
 
 // SegmentIndexOf returns the shard-relative segment index for the given global
