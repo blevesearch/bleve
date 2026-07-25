@@ -245,7 +245,17 @@ func (s *TermSearcher) MaxImpact() float64 {
 	}
 	if r, ok := s.reader.(maxTFNormReader); ok {
 		maxTFNorm := r.MaxTFNorm(avgDl)
+		if maxTFNorm >= math.MaxFloat32 {
+			// No bound could be computed for at least one segment — e.g. a zapx
+			// v17 index opened by this bleve, whose segments predate the §14
+			// MaxTFNorm sidecar. Report "unknown" so initWANDMaxImpacts falls
+			// back and pruning is disabled, rather than pruning against a bound
+			// that does not hold.
+			s.cachedMaxImpact = math.MaxFloat64
+			return s.cachedMaxImpact
+		}
 		if maxTFNorm <= 0 {
+			// A genuine zero: the term is absent from every segment.
 			s.cachedMaxImpact = 0
 			return 0
 		}
@@ -274,6 +284,11 @@ func (s *TermSearcher) MaxImpactForSegment(segIdx int) float64 {
 	}
 	if r, ok := s.reader.(perSegmentTFR); ok {
 		v := r.MaxTFNormForSegment(segIdx, avgDl)
+		if v >= math.MaxFloat32 {
+			// No bound available for this segment (pre-§14 codec); §15 must not
+			// skip it.
+			return math.MaxFloat64
+		}
 		return s.scorer.IDF() * float64(v) * s.scorer.QueryWeight()
 	}
 	return math.MaxFloat64

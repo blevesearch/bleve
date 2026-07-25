@@ -20,6 +20,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search/query"
 	index "github.com/blevesearch/bleve_index_api"
@@ -31,6 +32,15 @@ import (
 // actually exercised.  nBatches > 1 produces multiple segments.
 func buildWANDEquivIndex(t *testing.T, nBatches, perBatch int) (Index, []string) {
 	t.Helper()
+	return buildWANDEquivIndexWithConfig(t, nBatches, perBatch, nil)
+}
+
+// buildWANDEquivIndexWithConfig is buildWANDEquivIndex with control over the
+// segment codec, so the same corpus and the same contract can be checked against
+// an older on-disk format.  cfg == nil means the default (current) codec.
+func buildWANDEquivIndexWithConfig(t *testing.T, nBatches, perBatch int,
+	cfg map[string]interface{}) (Index, []string) {
+	t.Helper()
 
 	dir, err := os.MkdirTemp("", "wand_equiv")
 	if err != nil {
@@ -41,7 +51,12 @@ func buildWANDEquivIndex(t *testing.T, nBatches, perBatch int) (Index, []string)
 	im := mapping.NewIndexMapping()
 	im.DefaultAnalyzer = "standard"
 	im.ScoringModel = index.BM25Scoring
-	idx, err := New(dir+"/i.bleve", im)
+	var idx Index
+	if cfg == nil {
+		idx, err = New(dir+"/i.bleve", im)
+	} else {
+		idx, err = NewUsing(dir+"/i.bleve", im, scorch.Name, scorch.Name, cfg)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,6 +114,14 @@ func buildWANDEquivIndex(t *testing.T, nBatches, perBatch int) (Index, []string)
 // has more opportunity to skip a document that belongs in the results.
 func TestWANDTopScoresMatchesComplete(t *testing.T) {
 	idx, terms := buildWANDEquivIndex(t, 5, 400)
+	assertTopScoresMatchesComplete(t, idx, terms, 1, 5, 10, 50, 200)
+}
+
+// assertTopScoresMatchesComplete runs a disjunction over terms in both score
+// modes at each size and asserts the contract documented on
+// TestWANDTopScoresMatchesComplete.
+func assertTopScoresMatchesComplete(t *testing.T, idx Index, terms []string, sizes ...int) {
+	t.Helper()
 
 	mkQuery := func() query.Query {
 		clauses := make([]query.Query, 0, len(terms))
@@ -132,7 +155,7 @@ func TestWANDTopScoresMatchesComplete(t *testing.T) {
 		return r
 	}
 
-	for _, size := range []int{1, 5, 10, 50, 200} {
+	for _, size := range sizes {
 		complete := run(size, ScoreModeComplete)
 		pruned := run(size, ScoreModeTopScores)
 
@@ -152,6 +175,14 @@ func TestWANDTopScoresMatchesComplete(t *testing.T) {
 		const tol = 1e-9
 		tied := func(a, b float64) bool { return math.Abs(a-b) <= tol }
 
+		// A truncated window hides one neighbour: the last returned rank may tie
+		// with the first document that did not fit, and nothing in the window
+		// reveals that.  Its id is therefore not determined either.  This corpus
+		// really does produce such ties — the same document shape occurs once per
+		// batch, so the top five documents all score identically — and at size=1
+		// the last rank is also the first.
+		truncated := len(complete.ids) == size && complete.total > uint64(size)
+
 		mismatch := false
 		for i := range complete.scores {
 			if !tied(complete.scores[i], pruned.scores[i]) {
@@ -170,6 +201,9 @@ func TestWANDTopScoresMatchesComplete(t *testing.T) {
 				if i+1 < len(seq) && tied(seq[i], seq[i+1]) {
 					unique = false
 				}
+			}
+			if truncated && i == len(complete.scores)-1 {
+				unique = false
 			}
 			if unique && complete.ids[i] != pruned.ids[i] {
 				t.Errorf("size=%d rank %d: complete id=%s, top_scores id=%s "+
@@ -239,4 +273,30 @@ func TestWANDTopScoresMatchesCompleteSingleSegment(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestWANDTopScoresMatchesCompleteZapV17 pins the same contract when the index
+// on disk predates this branch's segment format.  A zapx v17 segment has no §20
+// norm column and no §14 MaxTFNorm sidecar, and its Dictionary/PostingsList
+// implement neither optional MaxTFNorm interface, so no per-term bound can be
+// computed for it at all.
+//
+// That case has to be distinguished from a bound of zero.  A zero bound means
+// "this term can contribute nothing", which is a licence to prune every
+// candidate; before maxTFNormUnavailable existed, this test failed hard —
+// top_scores returned the wrong documents and Total collapsed to size+1 (e.g.
+// Total=2 against complete's 1495).  The equivalent v18 tests could not catch
+// it, since every v18 segment supplies a real bound.
+//
+// This is not a hypothetical migration: an index written by an earlier bleve is
+// read in place, not rewritten, so any deployment that upgrades binaries lands
+// here until every segment has been merged forward.  Mixed v17/v18 snapshots are
+// covered by the same mechanism, the cross-segment max being poisoned by any one
+// segment that cannot supply a bound.
+func TestWANDTopScoresMatchesCompleteZapV17(t *testing.T) {
+	idx, terms := buildWANDEquivIndexWithConfig(t, 5, 400, map[string]interface{}{
+		"forceSegmentType":    "zap",
+		"forceSegmentVersion": 17,
+	})
+	assertTopScoresMatchesComplete(t, idx, terms, 1, 5, 10, 50, 200)
 }
