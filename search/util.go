@@ -47,6 +47,9 @@ func MergeTermLocationMaps(rv, other TermLocationMap) TermLocationMap {
 	return rv
 }
 
+// MergeFieldTermLocations merges FieldTermLocations from matches into dest.
+// The fast path (no constituent has any locations) is inlinable; all other
+// work is in mergeFieldTermLocationsGrow so the hot path stays cheap.
 func MergeFieldTermLocations(dest []FieldTermLocation, matches []*DocumentMatch) []FieldTermLocation {
 	n := len(dest)
 	for _, dm := range matches {
@@ -55,18 +58,23 @@ func MergeFieldTermLocations(dest []FieldTermLocation, matches []*DocumentMatch)
 		}
 	}
 	if n == len(dest) {
-		return dest // fast path: no constituent has field term locations to merge
+		return dest
 	}
+	return mergeFieldTermLocationsGrow(dest, matches, n)
+}
+
+// mergeFieldTermLocationsGrow handles the slow path when at least one match
+// has FieldTermLocations. Kept out of MergeFieldTermLocations so the fast
+// path stays inlinable (cost < 80).
+func mergeFieldTermLocationsGrow(dest []FieldTermLocation, matches []*DocumentMatch, n int) []FieldTermLocation {
 	if cap(dest) < n {
 		dest = append(make([]FieldTermLocation, 0, n), dest...)
 	}
-
 	for _, dm := range matches {
 		if dm != nil {
 			dest = mergeFieldTermLocationFromMatch(dest, dm)
 		}
 	}
-
 	return dest
 }
 
