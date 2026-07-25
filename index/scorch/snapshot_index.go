@@ -749,12 +749,34 @@ func (is *IndexSnapshot) getFieldTFRCacheThreshold() int {
 	return DefaultFieldTFRCacheThreshold
 }
 
+// releasableIterator is implemented by zapx.PostingsIterator. Releasing hands the
+// iterator's chunk decoders — each holding ~6KB of PFOR scratch buffers — back to
+// a shared pool. Only meaningful for a TFR being discarded: a recycled TFR keeps
+// its iterators so they are reused directly.
+type releasableIterator interface {
+	Release()
+}
+
+// releaseIterators is called on the paths where a TFR is dropped instead of
+// cached. Its iterators are immediate garbage there, so without this their
+// decoder buffers are re-allocated by whichever query next allocates a fresh
+// TFR — which, for a query holding more concurrent term readers on one field
+// than getFieldTFRCacheThreshold() allows, is every query.
+func releaseIterators(tfr *IndexSnapshotTermFieldReader) {
+	for _, itr := range tfr.iterators {
+		if r, ok := itr.(releasableIterator); ok {
+			r.Release()
+		}
+	}
+}
+
 func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReader) {
 	if !tfr.recycle {
 		// Do not recycle an optimized unadorned term field reader (used for
 		// ConjunctionUnadorned or DisjunctionUnadorned), during when a fresh
 		// roaring.Bitmap is built by AND-ing or OR-ing individual bitmaps,
 		// and we'll need to release them for GC. (See MB-40916)
+		releaseIterators(tfr)
 		return
 	}
 
@@ -763,6 +785,7 @@ func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReade
 	is.parent.rootLock.RUnlock()
 	if obsolete {
 		// if we're not the current root (mutations happened), don't bother recycling
+		releaseIterators(tfr)
 		return
 	}
 
@@ -770,11 +793,19 @@ func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReade
 	if is.fieldTFRs == nil {
 		is.fieldTFRs = make(map[string][]*IndexSnapshotTermFieldReader)
 	}
+	cached := false
 	if len(is.fieldTFRs[tfr.field]) < is.getFieldTFRCacheThreshold() {
 		tfr.bytesRead = 0
 		is.fieldTFRs[tfr.field] = append(is.fieldTFRs[tfr.field], tfr)
+		cached = true
 	}
 	is.m2.Unlock()
+
+	if !cached {
+		// Over the per-field cap: this TFR is garbage, so hand its decoder
+		// buffers back rather than letting the next fresh TFR re-allocate them.
+		releaseIterators(tfr)
+	}
 }
 
 func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
