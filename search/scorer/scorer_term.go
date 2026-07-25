@@ -108,7 +108,7 @@ type TermQueryScorer struct {
 	queryWeight            float64
 	queryWeightExplanation *search.Explanation
 	fieldNormTable         *bm25FieldNormTable // nil for TF-IDF scoring
-	idfQueryWeight         float64             // idf * queryWeight; updated in SetQueryNorm
+	idfQueryWeight         float64             // idf * queryWeight; set in the ctor, updated in SetQueryNorm
 }
 
 func (s *TermQueryScorer) Size() int {
@@ -163,6 +163,12 @@ func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64,
 	}
 
 	rv.idf = rv.computeIDF(avgDocLength, docTotal, docTerm)
+	// idfQueryWeight must be valid before any SetQueryNorm call: a top-level term
+	// query is scored without one, and the §25 fast path multiplies by this field
+	// unconditionally. Leaving it zero made every such BM25 score exactly 0.
+	// Mirrors the slow path, which multiplies by s.idf and then by s.queryWeight
+	// only when it differs from 1.
+	rv.idfQueryWeight = rv.idf * rv.queryWeight
 	if options.Explain {
 		rv.idfExplanation = &search.Explanation{
 			Value:   rv.idf,
