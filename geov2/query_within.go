@@ -69,12 +69,12 @@ func (wq *withinQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	// if all of the index cells are contained within the query inner cells,
 	// then we have a guaranteed hit. Only consider documents with non zero
 	// total scores as hits
-	for i := 0; i < numDocs; i++ {
-		if innerScores[i]+crossScores[i] == docScoresInner[i]+docScoresCross[i] &&
-			innerScores[i]+crossScores[i] != 0 {
-			hits.Add(i)
+	forEachScoredDoc(innerScores, crossScores, func(id uint32, inner, cross uint64) {
+		total := inner + cross
+		if total == docScoresInner[id]+docScoresCross[id] && total != 0 {
+			hits.Add(int(id))
 		}
-	}
+	})
 
 	// scan and score the overlap of query cross cells with all index cells
 	evaluator.rangeScanCross(innerScores, crossScores)
@@ -84,12 +84,13 @@ func (wq *withinQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	// may not always be possible due to the nature of region coverer being
 	// non exhaustive in the sense that the boundaries are not always only
 	// covered by the smallest possible cells.
-	for i := 0; i < numDocs; i++ {
-		if !hits.Contains(i) && innerScores[i]+crossScores[i] >= docScoresInner[i] &&
-			innerScores[i]+crossScores[i] != 0 {
-			maybeHits.Add(i)
+	forEachScoredDoc(innerScores, crossScores, func(id uint32, inner, cross uint64) {
+		docNum := int(id)
+		total := inner + cross
+		if !hits.Contains(docNum) && total >= docScoresInner[id] && total != 0 {
+			maybeHits.Add(docNum)
 		}
-	}
+	})
 
 	var reader *bytes.Reader
 

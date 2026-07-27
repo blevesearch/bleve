@@ -78,13 +78,14 @@ func (cq *containsQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	// if all of the query cells are contained within the inner index cells
 	// then we have a guaranteed hit, if they are contained within both the inner
 	// and cross index cells then we have a maybe hit, otherwise we have no hit
-	for i := 0; i < numDocs; i++ {
-		if innerScores[i] == cq.score {
-			hits.Add(i)
-		} else if innerScores[i]+crossScores[i] == cq.score {
-			maybeHits.Add(i)
+	forEachScoredDoc(innerScores, crossScores, func(id uint32, inner, cross uint64) {
+		docNum := int(id)
+		if inner == cq.score {
+			hits.Add(docNum)
+		} else if inner+cross == cq.score {
+			maybeHits.Add(docNum)
 		}
-	}
+	})
 
 	var reader *bytes.Reader
 

@@ -65,15 +65,15 @@ func (iq *intersectsQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset
 	evaluator.rangeScanInner(innerScores, crossScores)
 
 	// if there is any overlap of query inner cells with any of the index cells
-	// then we have a guaranteed hit. Reset scores to reuse score arrays for the
+	// then we have a guaranteed hit. Reset scores to reuse score maps for the
 	// next step
-	for i := 0; i < numDocs; i++ {
-		if innerScores[i] > 0 || crossScores[i] > 0 {
-			hits.Add(i)
-			innerScores[i] = 0
-			crossScores[i] = 0
+	forEachScoredDoc(innerScores, crossScores, func(id uint32, inner, cross uint64) {
+		if inner > 0 || cross > 0 {
+			hits.Add(int(id))
 		}
-	}
+	})
+	clear(innerScores)
+	clear(crossScores)
 
 	// scan and score the overlap of query cross cells with all index cells
 	evaluator.rangeScanCross(innerScores, crossScores)
@@ -82,13 +82,14 @@ func (iq *intersectsQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset
 	// cells then we have a guaranteed hit, if there is any overlap of query cross
 	// cells with any of the index cross cells then we have a maybe hit, otherwise
 	// we have no hit.
-	for i := 0; i < numDocs; i++ {
-		if innerScores[i] > 0 && !hits.Contains(i) {
-			hits.Add(i)
-		} else if crossScores[i] > 0 && !hits.Contains(i) {
-			maybeHits.Add(i)
+	forEachScoredDoc(innerScores, crossScores, func(id uint32, inner, cross uint64) {
+		docNum := int(id)
+		if inner > 0 && !hits.Contains(docNum) {
+			hits.Add(docNum)
+		} else if cross > 0 && !hits.Contains(docNum) {
+			maybeHits.Add(docNum)
 		}
-	}
+	})
 
 	var reader *bytes.Reader
 

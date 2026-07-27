@@ -53,8 +53,23 @@ func binarySearchLeftmostGreaterOrEqual(arr []uint64, target uint64) int {
 	return lo
 }
 
+// forEachScoredDoc invokes fn exactly once for every docID present in either
+// score map, passing that doc's inner and cross scores (0 when the doc is
+// absent from the corresponding map).
+func forEachScoredDoc(innerScores, crossScores map[uint32]uint64,
+	fn func(id uint32, inner, cross uint64)) {
+	for id, inner := range innerScores {
+		fn(id, inner, crossScores[id])
+	}
+	for id, cross := range crossScores {
+		if _, ok := innerScores[id]; !ok {
+			fn(id, 0, cross)
+		}
+	}
+}
+
 // scan and score the overlap of query inner cells with all index cells
-func (qe *queryEvaluator) rangeScanInner(innerScores []uint64, crossScores []uint64) {
+func (qe *queryEvaluator) rangeScanInner(innerScores, crossScores map[uint32]uint64) {
 	for _, cell := range qe.queryInnerCells {
 		minVal, maxVal := getCellSearchBounds(cell)
 		cellLevel := getCellLevel(cell)
@@ -64,7 +79,7 @@ func (qe *queryEvaluator) rangeScanInner(innerScores []uint64, crossScores []uin
 }
 
 // scan and score the overlap of query cross cells with all index cells
-func (qe *queryEvaluator) rangeScanCross(innerScores, crossScores []uint64) {
+func (qe *queryEvaluator) rangeScanCross(innerScores, crossScores map[uint32]uint64) {
 	for _, cell := range qe.queryCrossCells {
 		minVal, maxVal := getCellSearchBounds(cell)
 		cellLevel := getCellLevel(cell)
@@ -75,7 +90,7 @@ func (qe *queryEvaluator) rangeScanCross(innerScores, crossScores []uint64) {
 
 // scan and score the overlap of a single query cell with the given index cells
 func rangeScanOne(queryCell uint64, minVal, maxVal, cellLevel uint64,
-	indexCells []uint64, docIds []uint32, scores []uint64) {
+	indexCells []uint64, docIds []uint32, scores map[uint32]uint64) {
 	// find the range of index cells within the min/max bounds of the query cell
 	// end will be < start if there are no index cells within the bounds
 	start := binarySearchLeftmostGreaterOrEqual(indexCells, minVal)

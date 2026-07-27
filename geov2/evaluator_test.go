@@ -82,7 +82,7 @@ func TestRangeScanOne(t *testing.T) {
 		docIds[i] = e.docID
 	}
 
-	scores := make([]uint64, len(entries))
+	scores := make(map[uint32]uint64)
 	minVal, maxVal := getCellSearchBounds(queryCell)
 	rangeScanOne(queryCell, minVal, maxVal, queryLevel, indexCells, docIds, scores)
 
@@ -117,14 +117,12 @@ func TestRangeScanOneNoMatches(t *testing.T) {
 		uint64(s2.CellIDFromFace(5).ChildBeginAtLevel(queryLevel).Next()),
 	}
 	docIds := []uint32{0, 1}
-	scores := make([]uint64, 2)
+	scores := make(map[uint32]uint64)
 
 	minVal, maxVal := getCellSearchBounds(queryCell)
 	rangeScanOne(queryCell, minVal, maxVal, queryLevel, indexCells, docIds, scores)
 
-	for i, s := range scores {
-		if s != 0 {
-			t.Errorf("expected no score for doc %d, got %d", i, s)
-		}
+	if len(scores) != 0 {
+		t.Errorf("expected no scores, got %d entries: %v", len(scores), scores)
 	}
 }
