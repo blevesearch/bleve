@@ -786,13 +786,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		return nil, err
 	}
 
-	// Early-stop (bounded scan): for score="none" + Size, the request means
-	// "return any Size+From matching docs", so the collector can stop pulling
-	// from the searcher once that many hits are in hand instead of draining the
-	// full result set. Valid only when result identity does not depend on unseen
-	// docs: no facets (need every match counted), no KNN (separate hit set), no
-	// pagination cursor, no nested rollup, and sort-by-score only (degrades to
-	// insertion order under score="none"; a field sort would need all docs).
+	// score="none" + Size means "return any Size+From matching docs", so the
+	// collector may stop scanning early — provided nothing below depends on
+	// unseen matches (facets, KNN, pagination cursor, nested rollup, field sort).
 	if req.Score == ScoreNone && req.Size > 0 &&
 		len(req.Facets) == 0 &&
 		!requestHasKNN(req) &&
@@ -1055,8 +1051,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	totalRelation := TotalRelationEq
 	if coll.EarlyStopped() {
-		// Total is a lower bound: the early-stop bounded scan stopped before
-		// draining all matches.
 		totalRelation = TotalRelationGte
 	}
 	rv := &SearchResult{

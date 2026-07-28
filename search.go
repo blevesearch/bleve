@@ -686,7 +686,6 @@ func (sr *SearchResult) Merge(other *SearchResult) {
 	sr.Hits = append(sr.Hits, other.Hits...)
 	sr.Total += other.Total
 	if other.TotalRelation == TotalRelationGte {
-		// Any constituent whose Total is a lower bound makes the merged Total one.
 		sr.TotalRelation = TotalRelationGte
 	}
 	sr.Cost += other.Cost

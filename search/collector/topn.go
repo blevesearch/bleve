@@ -85,14 +85,8 @@ type TopNCollector struct {
 
 	fastPrepare bool
 
-	// earlyStopN, when > 0, bounds the scan: once this many root hits have been
-	// collected, Collect() stops pulling from the searcher. Valid only when result
-	// identity does not depend on unseen docs (score="none", no facets, no field
-	// sort, no KNN, no nested, no SearchAfter). Set via SetEarlyStop before Collect.
-	earlyStopN int
-	// earlyStopped is set when Collect() actually broke out via earlyStopN, so the
-	// caller can report TotalRelation="gte" (Total is then a lower bound).
-	earlyStopped bool
+	earlyStopN   int  // when > 0, Collect() stops after this many hits (see SetEarlyStop)
+	earlyStopped bool // set when Collect() stopped early; Total is then a lower bound
 }
 
 // CheckDoneEvery controls how frequently we check the context deadline
@@ -405,11 +399,6 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			if err != nil {
 				break
 			}
-			// Early-stop (bounded scan): once earlyStopN root hits are collected,
-			// stop pulling. Valid because the store keeps the earliest size+skip
-			// hits (insertion order) and, with all scores equal, no later doc can
-			// displace them — so unseen docs cannot change the result. Breaking the
-			// pull loop is the entire early exit; the searcher stack is lazy.
 			if hc.earlyStopN > 0 && hc.total >= uint64(hc.earlyStopN) {
 				hc.earlyStopped = true
 				break
@@ -710,18 +699,15 @@ func (hc *TopNCollector) Total() uint64 {
 	return hc.total
 }
 
-// SetEarlyStop bounds the scan: Collect() stops pulling from the searcher once n
-// root hits have been collected (n is typically Size+From). Must be called before
-// Collect(), and only when the result is order-independent of unseen docs —
-// score="none", no facets, no field sort, no KNN, no nested, no SearchAfter.
-// n <= 0 disables (the default), preserving the full-scan behavior.
+// SetEarlyStop makes Collect() stop pulling from the searcher once n hits have
+// been collected; n <= 0 disables. Callers must ensure unseen docs cannot
+// change the result.
 func (hc *TopNCollector) SetEarlyStop(n int) {
 	hc.earlyStopN = n
 }
 
-// EarlyStopped reports whether Collect() stopped before draining the searcher
-// because the early-stop bound was reached. When true, Total() is a lower bound
-// (the caller should report TotalRelation="gte").
+// EarlyStopped reports whether Collect() stopped early; if true, Total() is a
+// lower bound.
 func (hc *TopNCollector) EarlyStopped() bool {
 	return hc.earlyStopped
 }
