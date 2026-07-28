@@ -1450,11 +1450,7 @@ func (g *IndexSnapshotGeoShapeV2Reader) Advance(ID index.IndexInternalID,
 		rv = &index.GeoShapeV2FieldDoc{}
 	}
 
-	num, err := ID.Value()
-	if err != nil {
-		return nil, fmt.Errorf("error converting IndexInternalID to doc "+
-			"number ID - %v, err: %w", ID, err)
-	}
+	num := ID.Value()
 
 	segIdx, localDocNum := g.snapshot.segmentIndexAndLocalDocNumFromGlobal(num)
 	if segIdx >= len(g.iterators) {
