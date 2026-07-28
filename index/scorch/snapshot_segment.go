@@ -38,11 +38,6 @@ type SegmentSnapshot struct {
 	creator string
 	stats   *fieldStats
 
-	// if this segment is in-memory then we'll try to undo the internal values
-	// in the indexSnapshot internal map before updating the bolt, since its
-	// supposed to be reflective of the on-disk data.
-	internal map[string][]byte
-
 	updatedFields map[string]*index.UpdateFieldInfo
 
 	cachedMeta *cachedMeta
@@ -96,6 +91,27 @@ func (s *SegmentSnapshot) FileSize() int64 {
 	}
 
 	return fi.Size()
+}
+
+func (s *SegmentSnapshot) LiveFileSize() int64 {
+	fullSize := float64(s.FullSize())
+	if fullSize <= 0 {
+		return 0
+	}
+
+	liveSize := float64(s.LiveSize())
+	if liveSize <= 0 {
+		return 0
+	}
+
+	fileSize := float64(s.FileSize())
+	if fileSize <= 0 {
+		return 0
+	}
+
+	liveRatio := liveSize / fullSize
+
+	return int64(fileSize * liveRatio)
 }
 
 func (s *SegmentSnapshot) Close() error {

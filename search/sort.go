@@ -274,6 +274,24 @@ func (so SortOrder) Compare(cachedScoring, cachedDesc []bool, i, j *DocumentMatc
 	return -1
 }
 
+func CompareScoreDescending(i, j *DocumentMatch) int {
+	// first try to sort the two hits based on their score value
+	if i.Score < j.Score {
+		return 1
+	}
+	if i.Score > j.Score {
+		return -1
+	}
+	// tie-break on natural index order: earlier hit sorts first
+	if i.HitNumber > j.HitNumber {
+		return 1
+	}
+	if i.HitNumber < j.HitNumber {
+		return -1
+	}
+	return 0
+}
+
 func (so SortOrder) RequiresScore() bool {
 	for _, soi := range so {
 		if soi.RequiresScoring() {

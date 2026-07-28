@@ -40,29 +40,75 @@ import (
 
 const persister = "persister"
 
-// DefaultPersisterNapTimeMSec is kept to zero as this helps in direct
-// persistence of segments with the default safe batch option.
-// If the default safe batch option results in high number of
-// files on disk, then users may initialise this configuration parameter
-// with higher values so that the persister will nap a bit within it's
-// work loop to favour better in-memory merging of segments to result
-// in fewer segment files on disk. But that may come with an indexing
-// performance overhead.
-// Unsafe batch users are advised to override this to higher value
-// for better performance especially with high data density.
-var DefaultPersisterNapTimeMSec int = 0 // ms
+var (
+	// DefaultPersisterNapTimeMSec is kept to zero as this helps in direct
+	// persistence of segments with the default safe batch option.
+	// If the default safe batch option results in high number of
+	// files on disk, then users may initialise this configuration parameter
+	// with higher values so that the persister will nap a bit within it's
+	// work loop to favour better in-memory merging of segments to result
+	// in fewer segment files on disk. But that may come with an indexing
+	// performance overhead.
+	// Unsafe batch users are advised to override this to higher value
+	// for better performance especially with high data density.
+	DefaultPersisterNapTimeMSec int = 0 // ms
 
-// DefaultPersisterNapUnderNumFiles helps in controlling the pace of
-// persister. At times of a slow merger progress with heavy file merging
-// operations, its better to pace down the persister for letting the merger
-// to catch up within a range defined by this parameter.
-// Fewer files on disk (as per the merge plan) would result in keeping the
-// file handle usage under limit, faster disk merger and a healthier index.
-// Its been observed that such a loosely sync'ed introducer-persister-merger
-// trio results in better overall performance.
-var DefaultPersisterNapUnderNumFiles int = 1000
+	// DefaultPersisterNapUnderNumFiles helps in controlling the pace of
+	// persister. At times of a slow merger progress with heavy file merging
+	// operations, its better to pace down the persister for letting the merger
+	// to catch up within a range defined by this parameter.
+	// Fewer files on disk (as per the merge plan) would result in keeping the
+	// file handle usage under limit, faster disk merger and a healthier index.
+	// Its been observed that such a loosely sync'ed introducer-persister-merger
+	// trio results in better overall performance.
+	DefaultPersisterNapUnderNumFiles int = 1000
 
-var DefaultMemoryPressurePauseThreshold uint64 = math.MaxUint64
+	// MemoryPressurePauseThreshold lets persister to have a better leeway
+	// for prudently performing the memory merge of segments on a memory
+	// pressure situation. Here the config value is an upper threshold
+	// for the number of paused application threads. The default value would
+	// be a very high number to always favour the merging of memory segments.
+	DefaultMemoryPressurePauseThreshold uint64 = math.MaxUint64
+
+	// DefaultMinSegmentsForInMemoryMerge represents the default number of
+	// in-memory zap segments that persistSnapshotMaybeMerge() needs to
+	// see in an IndexSnapshot before it decides to merge and persist
+	// those segments
+	DefaultMinSegmentsForInMemoryMerge int = 2
+
+	// number workers which parallely perform an in-memory merge of the segments
+	// followed by a flush operation.
+	DefaultNumPersisterWorkers int = 1
+
+	// maximum size of data that a single worker is allowed to perform the in-memory
+	// merge operation.
+	DefaultMaxSizeInMemoryMergePerWorker int = 0
+
+	// NumSnapshotsToKeep represents how many recent, old snapshots to
+	// keep around per Scorch instance.  Useful for apps that require
+	// rollback'ability.
+	NumSnapshotsToKeep int = 1
+
+	// RollbackSamplingInterval controls how far back we are looking
+	// in the history to get the rollback points.
+	// If we have to keep N snapshots ( = NumSnapshotsToKeep ), then upon
+	// including the very latest snapshot there should be N snapshots.
+	// If the timestamp of the latest snapshot is T, and the
+	// RollbackSamplingInterval is D, then the very last one would be T - (N - 1) * D
+	// A value of 0 means we will not sample, and will keep the very latest N snapshots.
+	// Example:
+	//  - For N = 3, and the below timing diagram:
+	//  	a     b     c     d
+	//  	|-----|-----|-----| --> time
+	//  	|  D  |  D  |  D  |
+	//  	X     Y     Z     T
+	// - The rollback points would be b, c, and d. a would be too old.
+	RollbackSamplingInterval time.Duration = 0
+
+	// Controls what portion of the earlier rollback points to retain during
+	// a infrequent/sparse mutation scenario
+	RollbackRetentionFactor float64 = 0.5
+)
 
 type persisterOptions struct {
 	// PersisterNapTimeMSec controls the wait/delay injected into
@@ -76,11 +122,10 @@ type persisterOptions struct {
 	// a healthier and heavier in-memory merging
 	PersisterNapUnderNumFiles int
 
-	// MemoryPressurePauseThreshold let persister to have a better leeway
+	// MemoryPressurePauseThreshold lets persister to have a better leeway
 	// for prudently performing the memory merge of segments on a memory
 	// pressure situation. Here the config value is an upper threshold
-	// for the number of paused application threads. The default value would
-	// be a very high number to always favour the merging of memory segments.
+	// for the number of paused application threads.
 	MemoryPressurePauseThreshold uint64
 
 	// NumPersisterWorkers decides the number of parallel workers that will
@@ -113,16 +158,6 @@ func (s *Scorch) persisterLoop() {
 
 	var unpersistedCallbacks []index.BatchCallback
 
-	po, err := s.parsePersisterOptions()
-	if err != nil {
-		s.fireAsyncError(NewScorchError(
-			persister,
-			fmt.Sprintf("persisterOptions json parsing err: %v", err),
-			ErrOptionsParse,
-		))
-		return
-	}
-
 OUTER:
 	for {
 		atomic.AddUint64(&s.stats.TotPersistLoopBeg, 1)
@@ -138,7 +173,7 @@ OUTER:
 			lastMergedEpoch = ew.epoch
 		}
 		lastMergedEpoch, persistWatchers = s.pausePersisterForMergerCatchUp(lastPersistedEpoch,
-			lastMergedEpoch, persistWatchers, po)
+			lastMergedEpoch, persistWatchers, s.persisterOptions)
 
 		var ourSnapshot *IndexSnapshot
 		var ourPersisted []chan error
@@ -161,7 +196,7 @@ OUTER:
 		if ourSnapshot != nil {
 			startTime := time.Now()
 
-			err := s.persistSnapshot(ourSnapshot, po)
+			err := s.persistSnapshot(ourSnapshot, s.persisterOptions)
 			for _, ch := range ourPersisted {
 				if err != nil {
 					ch <- err
@@ -362,12 +397,29 @@ func (s *Scorch) parsePersisterOptions() (*persisterOptions, error) {
 			return &po, err
 		}
 	}
+	if err := validatePersisterOptions(&po); err != nil {
+		return nil, err
+	}
 	return &po, nil
 }
 
-func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot,
-	po *persisterOptions,
-) error {
+// validatePersisterOptions validates the persister options
+func validatePersisterOptions(options *persisterOptions) error {
+	// P < 1 is an invalid case
+	if options.NumPersisterWorkers <= 0 {
+		return fmt.Errorf("NumPersisterWorkers must be greater than 0")
+	}
+	// P = 1 and M > 0 is a valid case where one worker will serially flush all batches
+	// P = 1 and M = 0 is a special case which preserves the legacy one-shot in-memory merge + flush behaviour
+	// P > 1 and M > 0 is a valid case where multiple workers will flush batches in parallel
+	// P > 1 and M = 0 is an invalid case
+	if options.NumPersisterWorkers > 1 && options.MaxSizeInMemoryMergePerWorker == 0 {
+		return fmt.Errorf("MaxSizeInMemoryMergePerWorker must be greater than 0 when NumPersisterWorkers > 1")
+	}
+	return nil
+}
+
+func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot, po *persisterOptions) error {
 	// Perform in-memory segment merging only when the memory pressure is
 	// below the configured threshold, else the persister performs the
 	// direct persistence of segments.
@@ -381,29 +433,14 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot,
 		}
 	}
 
-	return s.persistSnapshotDirect(snapshot, nil)
+	return s.persistSnapshotDirect(snapshot)
 }
-
-// DefaultMinSegmentsForInMemoryMerge represents the default number of
-// in-memory zap segments that persistSnapshotMaybeMerge() needs to
-// see in an IndexSnapshot before it decides to merge and persist
-// those segments
-var DefaultMinSegmentsForInMemoryMerge = 2
 
 type flushable struct {
-	segments []segment.Segment
-	drops    []*roaring.Bitmap
-	sbIdxs   []int
-	totDocs  uint64
+	sbsBatch          []segment.Segment
+	sbsBatchDrops     []*roaring.Bitmap
+	sbsBatchSnapshots []*SegmentSnapshot
 }
-
-// number workers which parallelly perform an in-memory merge of the segments
-// followed by a flush operation.
-var DefaultNumPersisterWorkers = 1
-
-// maximum size of data that a single worker is allowed to perform the in-memory
-// merge operation.
-var DefaultMaxSizeInMemoryMergePerWorker = 0
 
 func legacyFlushBehaviour(maxSizeInMemoryMergePerWorker, numPersisterWorkers int) bool {
 	// DefaultMaxSizeInMemoryMergePerWorker = 0 is a special value to preserve the legacy
@@ -415,154 +452,118 @@ func legacyFlushBehaviour(maxSizeInMemoryMergePerWorker, numPersisterWorkers int
 // persist the in-memory zap segments if there are enough of them
 func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persisterOptions) (
 	bool, error) {
-	// collect the in-memory zap segments (SegmentBase instances)
-	var sbs []segment.Segment
-	var sbsDrops []*roaring.Bitmap
-	var sbsIndexes []int
-	var oldSegIdxs []int
+	// split our segment snapshots into unpersisted and persisted segments
+	var persistedSegments []*SegmentSnapshot
+	var unpersistedSegments []*SegmentSnapshot
+	numSegments := len(snapshot.segment)
 
-	flushSet := make([]*flushable, 0)
-	var totSize int
-	var numSegsToFlushOut int
-	var totDocs uint64
-	// legacy behaviour of merge + flush of all in-memory segments in one-shot
-	if legacyFlushBehaviour(po.MaxSizeInMemoryMergePerWorker, po.NumPersisterWorkers) {
-		val := &flushable{
-			segments: make([]segment.Segment, 0),
-			drops:    make([]*roaring.Bitmap, 0),
-			sbIdxs:   make([]int, 0),
-			totDocs:  totDocs,
-		}
-		for i, snapshot := range snapshot.segment {
-			if _, ok := snapshot.segment.(segment.PersistedSegment); !ok {
-				val.segments = append(val.segments, snapshot.segment)
-				val.drops = append(val.drops, snapshot.deleted)
-				val.sbIdxs = append(val.sbIdxs, i)
-				oldSegIdxs = append(oldSegIdxs, i)
-				val.totDocs += snapshot.segment.Count()
-				numSegsToFlushOut++
-			}
-		}
-
-		flushSet = append(flushSet, val)
-	} else {
-		// constructs a flushSet where each flushable object contains a set of segments
-		// to be merged and flushed out to disk.
-		for i, snapshot := range snapshot.segment {
-			if totSize >= po.MaxSizeInMemoryMergePerWorker &&
-				len(sbs) >= DefaultMinSegmentsForInMemoryMerge {
-				numSegsToFlushOut += len(sbs)
-				val := &flushable{
-					segments: slices.Clone(sbs),
-					drops:    slices.Clone(sbsDrops),
-					sbIdxs:   slices.Clone(sbsIndexes),
-					totDocs:  totDocs,
-				}
-				flushSet = append(flushSet, val)
-				oldSegIdxs = append(oldSegIdxs, sbsIndexes...)
-
-				sbs, sbsDrops, sbsIndexes = sbs[:0], sbsDrops[:0], sbsIndexes[:0]
-				totSize, totDocs = 0, 0
-			}
-
-			if len(flushSet) >= int(po.NumPersisterWorkers) {
-				break
-			}
-
-			if _, ok := snapshot.segment.(segment.PersistedSegment); !ok {
-				sbs = append(sbs, snapshot.segment)
-				sbsDrops = append(sbsDrops, snapshot.deleted)
-				sbsIndexes = append(sbsIndexes, i)
-				totDocs += snapshot.segment.Count()
-				totSize += snapshot.segment.Size()
-			}
-		}
-		// if there were too few segments just merge them all as part of a single worker
-		if len(flushSet) < po.NumPersisterWorkers {
-			numSegsToFlushOut += len(sbs)
-			val := &flushable{
-				segments: slices.Clone(sbs),
-				drops:    slices.Clone(sbsDrops),
-				sbIdxs:   slices.Clone(sbsIndexes),
-				totDocs:  totDocs,
-			}
-			flushSet = append(flushSet, val)
-			oldSegIdxs = append(oldSegIdxs, sbsIndexes...)
+	// collect details of the unpersisted segments
+	sbs := make([]segment.Segment, 0, numSegments)
+	sbsDrops := make([]*roaring.Bitmap, 0, numSegments)
+	sbsSizes := make([]int, 0, numSegments)
+	for _, segmentSnapshot := range snapshot.segment {
+		if _, ok := segmentSnapshot.segment.(segment.PersistedSegment); ok {
+			persistedSegments = append(persistedSegments, segmentSnapshot)
+		} else {
+			unpersistedSegments = append(unpersistedSegments, segmentSnapshot)
+			sbs = append(sbs, segmentSnapshot.segment)
+			sbsDrops = append(sbsDrops, segmentSnapshot.deleted)
+			sbsSizes = append(sbsSizes, segmentSnapshot.Size())
 		}
 	}
+	numPersistedSegments := len(persistedSegments)
+	numUnpersistedSegments := len(unpersistedSegments)
 
-	if numSegsToFlushOut < DefaultMinSegmentsForInMemoryMerge {
+	// if we don't have enough segments to persist, then just return
+	if numUnpersistedSegments < DefaultMinSegmentsForInMemoryMerge {
 		return false, nil
 	}
 
-	// the newSnapshot at this point would contain the newly created file segments
-	// and updated with the root.
-	newSnapshot, newSegmentIDs, err := s.mergeAndPersistInMemorySegments(snapshot, flushSet)
+	// create our flushSet, which will be an array of flushable objects,
+	// each of which will be a batch of segments to merge and persist.
+	// We are guaranteed that at least one flushable object will be created,
+	// since we have already ensured that at least one unpersisted segment is present.
+	var flushSet []*flushable
+	if legacyFlushBehaviour(po.MaxSizeInMemoryMergePerWorker, po.NumPersisterWorkers) {
+		val := &flushable{
+			sbsBatch:          slices.Clone(sbs),
+			sbsBatchDrops:     slices.Clone(sbsDrops),
+			sbsBatchSnapshots: slices.Clone(unpersistedSegments),
+		}
+		flushSet = append(flushSet, val)
+	} else {
+		sbsBatch := make([]segment.Segment, 0, numUnpersistedSegments)
+		sbsBatchDrops := make([]*roaring.Bitmap, 0, numUnpersistedSegments)
+		sbsBatchSnapshots := make([]*SegmentSnapshot, 0, numUnpersistedSegments)
+		runningSize := 0
+		for i := 0; i < numUnpersistedSegments; i++ {
+			sbsBatch = append(sbsBatch, sbs[i])
+			sbsBatchDrops = append(sbsBatchDrops, sbsDrops[i])
+			sbsBatchSnapshots = append(sbsBatchSnapshots, unpersistedSegments[i])
+			runningSize += sbsSizes[i]
+			if runningSize >= po.MaxSizeInMemoryMergePerWorker && len(sbsBatch) >= DefaultMinSegmentsForInMemoryMerge {
+				flushSet = append(flushSet, &flushable{
+					sbsBatch:          slices.Clone(sbsBatch),
+					sbsBatchDrops:     slices.Clone(sbsBatchDrops),
+					sbsBatchSnapshots: slices.Clone(sbsBatchSnapshots),
+				})
+				sbsBatch, sbsBatchDrops, sbsBatchSnapshots = sbsBatch[:0], sbsBatchDrops[:0], sbsBatchSnapshots[:0]
+				runningSize = 0
+			}
+		}
+		if len(sbsBatch) > 0 {
+			flushSet = append(flushSet, &flushable{
+				sbsBatch:          slices.Clone(sbsBatch),
+				sbsBatchDrops:     slices.Clone(sbsBatchDrops),
+				sbsBatchSnapshots: slices.Clone(sbsBatchSnapshots),
+			})
+		}
+	}
+
+	// now merge each batch into a new segment, and persist all of them to disk,
+	// and construct a new snapshot with the merged segments
+	newSnapshot, newSegmentIDs, err := s.mergeAndPersistInMemorySegments(flushSet, po)
 	if err != nil {
 		return false, err
 	}
-
 	if newSnapshot == nil {
 		return false, nil
 	}
-
 	defer func() {
 		_ = newSnapshot.DecRef()
 	}()
-
-	mergedSegmentIDs := map[uint64]struct{}{}
-	for _, idx := range oldSegIdxs {
-		mergedSegmentIDs[snapshot.segment[idx].id] = struct{}{}
-	}
-
-	newMergedSegmentIDs := make(map[uint64]struct{}, len(newSegmentIDs))
-	for _, id := range newSegmentIDs {
-		newMergedSegmentIDs[id] = struct{}{}
-	}
 
 	// construct a snapshot that's logically equivalent to the input
 	// snapshot, but with merged segments replaced by the new segment
 	equiv := &IndexSnapshot{
 		parent:   snapshot.parent,
-		segment:  make([]*SegmentSnapshot, 0, len(snapshot.segment)),
+		segment:  make([]*SegmentSnapshot, 0, numPersistedSegments+len(newSegmentIDs)),
 		internal: snapshot.internal,
 		epoch:    snapshot.epoch,
 		creator:  "persistSnapshotMaybeMerge",
 	}
 
-	// to track which segments haven't participated in the in-memory merge
-	// they won't be flushed out to the disk yet, but in the next cycle will be
-	// merged in-memory and then flushed out - this is to keep the number of
-	// on-disk files in limit.
-	exclude := make(map[uint64]struct{})
-
-	// copy to the equiv the segments that weren't replaced
-	for _, ss := range snapshot.segment {
-		if _, wasMerged := mergedSegmentIDs[ss.id]; !wasMerged {
-			equiv.segment = append(equiv.segment, ss)
-			// this can be either in-memory or persisted segment, but while
-			// preparing the bolt snapshot we avoid the in-memory segments to be
-			// flushed out
-			if _, ok := ss.segment.(segment.PersistedSegment); !ok {
-				exclude[ss.id] = struct{}{}
-			}
-		}
+	// first add all the segments that were already persisted
+	// and did not participate in the merge
+	for _, segment := range persistedSegments {
+		equiv.segment = append(equiv.segment, segment)
 	}
 
-	// append to the equiv the newly merged segments
+	// next, add all the segments that were unpersisted and hence
+	// participated in the merge, from the merged snapshot
 	for _, segment := range newSnapshot.segment {
-		if _, ok := newMergedSegmentIDs[segment.id]; ok {
+		if _, ok := newSegmentIDs[segment.id]; ok {
 			equiv.segment = append(equiv.segment, &SegmentSnapshot{
-				id:       segment.id,
-				segment:  segment.segment,
-				deleted:  nil, // nil since merging handled deletions
-				stats:    nil,
-				internal: nil, // segment is persisted and equiv is already updated
+				id:      segment.id,
+				segment: segment.segment,
+				deleted: nil, // nil since merging handled deletions
+				stats:   segment.stats,
 			})
 		}
 	}
 
-	err = s.persistSnapshotDirect(equiv, exclude)
+	// finally, persist the equivalent snapshot to disk
+	err = s.persistSnapshotDirect(equiv)
 	if err != nil {
 		return false, err
 	}
@@ -626,8 +627,7 @@ func persistToDirectory(seg segment.UnpersistedSegment, d index.Directory,
 	return err
 }
 
-func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *util.BoltTxImpl, path string, segPlugin SegmentPlugin,
-	exclude map[uint64]struct{}, d index.Directory) ([]string, map[uint64]string, error) {
+func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *util.BoltTxImpl, path string, segPlugin SegmentPlugin, d index.Directory) ([]string, map[uint64]string, error) {
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(util.BoltSnapshotsBucket)
 	if err != nil {
 		return nil, nil, err
@@ -689,12 +689,11 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *util.BoltTxImpl, path stri
 	if err != nil {
 		return nil, nil, err
 	}
-
-	// deep copy the internal map since we'll be keeping only the persisted info
-	// in bolt and some of the information might be deleted
-	internal := make(map[string][]byte, len(snapshot.internal))
 	for k, v := range snapshot.internal {
-		internal[k] = v
+		err = internalBucket.Put([]byte(k), v, writer)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	if snapshot.parent != nil {
@@ -712,15 +711,13 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *util.BoltTxImpl, path stri
 
 	// first ensure that each segment in this snapshot has been persisted
 	for _, segmentSnapshot := range snapshot.segment {
-		var persistedSeg bool
-		var snapshotSegmentBucket *util.BoltBucketImpl
+		snapshotSegmentKey := encodeUvarintAscending(nil, segmentSnapshot.id)
+		snapshotSegmentBucket, err := snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
+		if err != nil {
+			return nil, nil, err
+		}
 		switch seg := segmentSnapshot.segment.(type) {
 		case segment.PersistedSegment:
-			snapshotSegmentKey := encodeUvarintAscending(nil, segmentSnapshot.id)
-			snapshotSegmentBucket, err = snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
-			if err != nil {
-				return nil, nil, err
-			}
 			segPath := seg.Path()
 			_, err = copyToDirectory(segPath, d)
 			if err != nil {
@@ -732,99 +729,67 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *util.BoltTxImpl, path stri
 				return nil, nil, err
 			}
 			filenames = append(filenames, filename)
-			persistedSeg = true
 		case segment.UnpersistedSegment:
-			// need to persist this to disk if its not part of exclude list (which
-			// restricts which in-memory segment to be persisted to disk)
-			if _, ok := exclude[segmentSnapshot.id]; !ok {
-				snapshotSegmentKey := encodeUvarintAscending(nil, segmentSnapshot.id)
-				snapshotSegmentBucket, err = snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
-				if err != nil {
-					return nil, nil, err
-				}
-				filename := zapFileName(segmentSnapshot.id)
-				path := filepath.Join(path, filename)
-				err = persistToDirectory(seg, d, path)
-				if err != nil {
-					return nil, nil, fmt.Errorf("segment: %s persist err: %v", path, err)
-				}
-				newSegmentPaths[segmentSnapshot.id] = path
-				err = snapshotSegmentBucket.Put(util.BoltPathKey, []byte(filename), nil)
-				if err != nil {
-					return nil, nil, err
-				}
-				filenames = append(filenames, filename)
-				persistedSeg = true
-			} else {
-				// this segment is not going to be persisted in this cycle, so any
-				// of the corresponding internal values need to be removed since
-				// on recovery they shouldn't be loaded as part of the indexSnapshot
-				for k, v := range segmentSnapshot.internal {
-					if v != nil {
-						delete(internal, k)
-					}
-				}
+			// need to persist this to disk
+			filename := zapFileName(segmentSnapshot.id)
+			path := filepath.Join(path, filename)
+			err := persistToDirectory(seg, d, path)
+			if err != nil {
+				return nil, nil, fmt.Errorf("segment: %s persist err: %v", path, err)
 			}
+			newSegmentPaths[segmentSnapshot.id] = path
+			err = snapshotSegmentBucket.Put(util.BoltPathKey, []byte(filename), nil)
+			if err != nil {
+				return nil, nil, err
+			}
+			filenames = append(filenames, filename)
 		default:
 			return nil, nil, fmt.Errorf("unknown segment type: %T", seg)
 		}
 
-		// if the segment was excluded from persistence, then skip updating the metadata
-		// or helper data corresponding to it - we need to keep things in-line with
-		// the on-disk information
-		if persistedSeg {
-			// store current deleted bits
-			var roaringBuf bytes.Buffer
-			if segmentSnapshot.deleted != nil {
-				_, err = segmentSnapshot.deleted.WriteTo(&roaringBuf)
-				if err != nil {
-					return nil, nil, fmt.Errorf("error persisting roaring bytes: %v", err)
-				}
-				err = snapshotSegmentBucket.Put(util.BoltDeletedKey, roaringBuf.Bytes(), writer)
-				if err != nil {
-					return nil, nil, err
-				}
+		// store current deleted bits
+		var roaringBuf bytes.Buffer
+		if segmentSnapshot.deleted != nil {
+			_, err = segmentSnapshot.deleted.WriteTo(&roaringBuf)
+			if err != nil {
+				return nil, nil, fmt.Errorf("error persisting roaring bytes: %v", err)
 			}
-
-			// store segment stats
-			if segmentSnapshot.stats != nil {
-				statsBytes, err := json.Marshal(segmentSnapshot.stats.Fetch())
-				if err != nil {
-					return nil, nil, err
-				}
-				err = snapshotSegmentBucket.Put(util.BoltStatsKey, statsBytes, writer)
-				if err != nil {
-					return nil, nil, err
-				}
-			}
-
-			// store updated field info
-			if segmentSnapshot.updatedFields != nil {
-				updatedFieldsBytes, err := json.Marshal(segmentSnapshot.updatedFields)
-				if err != nil {
-					return nil, nil, err
-				}
-				err = snapshotSegmentBucket.Put(
-					util.BoltUpdatedFieldsKey, updatedFieldsBytes, writer)
-				if err != nil {
-					return nil, nil, err
-				}
+			err = snapshotSegmentBucket.Put(util.BoltDeletedKey, roaringBuf.Bytes(), writer)
+			if err != nil {
+				return nil, nil, err
 			}
 		}
-	}
 
-	// now the internal values are reflective of the on-disk data, update in bolt
-	for k, v := range internal {
-		err = internalBucket.Put([]byte(k), v, writer)
-		if err != nil {
-			return nil, nil, err
+		// store segment stats
+		if segmentSnapshot.stats != nil {
+			statsBytes, err := json.Marshal(segmentSnapshot.stats.Fetch())
+			if err != nil {
+				return nil, nil, err
+			}
+			err = snapshotSegmentBucket.Put(util.BoltStatsKey, statsBytes, writer)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+
+		// store updated field info
+		if segmentSnapshot.updatedFields != nil {
+			updatedFieldsBytes, err := json.Marshal(segmentSnapshot.updatedFields)
+			if err != nil {
+				return nil, nil, err
+			}
+			err = snapshotSegmentBucket.Put(
+				util.BoltUpdatedFieldsKey, updatedFieldsBytes, writer)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 
 	return filenames, newSegmentPaths, nil
 }
 
-func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot, exclude map[uint64]struct{}) (err error) {
+func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 	// start a write transaction
 	tx, err := s.rootBolt.Begin(true)
 	if err != nil {
@@ -837,7 +802,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot, exclude map[uint
 		}
 	}()
 
-	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin, exclude, nil)
+	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin, nil)
 	if err != nil {
 		return err
 	}
@@ -879,11 +844,8 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot, exclude map[uint
 		case s.persists <- persist:
 		}
 
-		select {
-		case <-s.closeCh:
-			return segment.ErrClosed
-		case <-persist.applied:
-		}
+		// blockingly wait until the persist has been applied
+		<-persist.applied
 	}
 
 	err = tx.Commit()
@@ -977,7 +939,9 @@ func (s *Scorch) loadFromBolt() error {
 	if err != nil {
 		return err
 	}
-
+	// we initialize the checkPoints from all the persisted snapshots,
+	// because if we have state to load, the previous process was already
+	// maintaining checkpoints, whatever survives in the bucket now is that state.
 	persistedSnapshots, err := s.rootBoltSnapshotMetaData()
 	if err != nil {
 		return err
@@ -1332,97 +1296,68 @@ func (s *Scorch) removeOldData() {
 	}
 }
 
-// NumSnapshotsToKeep represents how many recent, old snapshots to
-// keep around per Scorch instance.  Useful for apps that require
-// rollback'ability.
-var NumSnapshotsToKeep = 1
-
-// RollbackSamplingInterval controls how far back we are looking
-// in the history to get the rollback points.
-// For example, a value of 10 minutes ensures that the
-// protected snapshots (NumSnapshotsToKeep = 3) are:
-//
-//	the very latest snapshot(ie the current one),
-//	the snapshot that was persisted 10 minutes before the current one,
-//	the snapshot that was persisted 20 minutes before the current one
-//
-// By default however, the timeseries way of protecting snapshots is
-// disabled, and we protect the latest three contiguous snapshots
-var RollbackSamplingInterval = 0 * time.Minute
-
-// Controls what portion of the earlier rollback points to retain during
-// a infrequent/sparse mutation scenario
-var RollbackRetentionFactor = float64(0.5)
-
 func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
-	snapshots []*snapshotMetaData,
-) (int, map[uint64]time.Time) {
-	if interval == 0 {
-		return len(snapshots), map[uint64]time.Time{}
+	snapshots []*snapshotMetaData) map[uint64]time.Time {
+	if interval == 0 || len(snapshots) == 0 || maxDataPoints <= 0 {
+		return map[uint64]time.Time{}
 	}
 	// the map containing the time series snapshots, i.e the timeseries of snapshots
 	// each of which is separated by rollbackSamplingInterval
-	rv := make(map[uint64]time.Time)
+	rv := make(map[uint64]time.Time, maxDataPoints)
 	// the last point in the "time series", i.e. the timeseries of snapshots
 	// each of which is separated by rollbackSamplingInterval
 	ptr := len(snapshots) - 1
 	rv[snapshots[ptr].epoch] = snapshots[ptr].timeStamp
 	numSnapshotsProtected := 1
-
 	// traverse the list in reverse order, older timestamps to newer ones.
-	for i := ptr - 1; i >= 0; i-- {
-		// If we find a timeStamp which is the next datapoint in our
-		// timeseries of snapshots, and newer by RollbackSamplingInterval duration
-		// (comparison in terms of minutes), which is the interval of our time
-		// series. In this case, add the epoch rv
-		if snapshots[i].timeStamp.Sub(snapshots[ptr].timeStamp).Minutes() >
-			interval.Minutes() {
-			if _, ok := rv[snapshots[i+1].epoch]; !ok {
-				rv[snapshots[i+1].epoch] = snapshots[i+1].timeStamp
-				ptr = i + 1
+	for i := ptr - 1; i >= 0 && numSnapshotsProtected < maxDataPoints; i-- {
+		sinceLast := snapshots[i].timeStamp.Sub(snapshots[ptr].timeStamp)
+		if sinceLast >= interval {
+			// capture the snapshot at the interval boundary: the exact match
+			// if there is one, otherwise the older neighbour (i+1), which was
+			// the last snapshot seen before the interval was crossed
+			idx := i
+			if sinceLast > interval {
+				idx = i + 1
+			}
+			if _, ok := rv[snapshots[idx].epoch]; !ok {
+				rv[snapshots[idx].epoch] = snapshots[idx].timeStamp
+				ptr = idx
 				numSnapshotsProtected++
 			}
-		} else if snapshots[i].timeStamp.Sub(snapshots[ptr].timeStamp).Minutes() ==
-			interval.Minutes() {
-			if _, ok := rv[snapshots[i].epoch]; !ok {
-				rv[snapshots[i].epoch] = snapshots[i].timeStamp
-				ptr = i
-				numSnapshotsProtected++
-			}
-		}
-
-		if numSnapshotsProtected >= maxDataPoints {
-			break
 		}
 	}
-	return ptr, rv
+	return rv
 }
 
 // getProtectedSnapshots aims to fetch the epochs keep based on a timestamp basis.
 // It tries to get NumSnapshotsToKeep snapshots, each of which are separated
 // by a time duration of RollbackSamplingInterval.
-func getProtectedSnapshots(rollbackSamplingInterval time.Duration,
-	numSnapshotsToKeep int,
-	persistedSnapshots []*snapshotMetaData,
-) map[uint64]time.Time {
+func (s *Scorch) getProtectedSnapshots(liveSnapshots []*snapshotMetaData) map[uint64]time.Time {
 	// keep numSnapshotsToKeep - 1 worth of time series snapshots, because we always
 	// must preserve the very latest snapshot in bolt as well to avoid accidental
 	// deletes of bolt entries and cleanups by the purger code.
-	lastPoint, protectedEpochs := getTimeSeriesSnapshots(numSnapshotsToKeep-1,
-		rollbackSamplingInterval, persistedSnapshots)
-	if len(protectedEpochs) < numSnapshotsToKeep {
-		numSnapshotsNeeded := numSnapshotsToKeep - len(protectedEpochs)
-		// we protected the contiguous snapshots from the last point in time series
-		for i := 0; i < numSnapshotsNeeded && i < lastPoint; i++ {
-			protectedEpochs[persistedSnapshots[i].epoch] = persistedSnapshots[i].timeStamp
+	protectedEpochs := getTimeSeriesSnapshots(s.numSnapshotsToKeep-1,
+		s.rollbackSamplingInterval, liveSnapshots)
+	numProtected := len(protectedEpochs)
+	// always protect the latest snapshot
+	latestSnapshot := liveSnapshots[0]
+	if _, ok := protectedEpochs[latestSnapshot.epoch]; !ok {
+		protectedEpochs[latestSnapshot.epoch] = latestSnapshot.timeStamp
+		numProtected++
+	}
+	// if we still have not protected enough snapshots, then protect the next most recent snapshots
+	for i := 1; i < len(liveSnapshots) && numProtected < s.numSnapshotsToKeep; i++ {
+		if _, ok := protectedEpochs[liveSnapshots[i].epoch]; !ok {
+			protectedEpochs[liveSnapshots[i].epoch] = liveSnapshots[i].timeStamp
+			numProtected++
 		}
 	}
-
 	return protectedEpochs
 }
 
 func newCheckPoints(snapshots map[uint64]time.Time) []*snapshotMetaData {
-	rv := make([]*snapshotMetaData, 0)
+	rv := make([]*snapshotMetaData, 0, len(snapshots))
 
 	keys := make([]uint64, 0, len(snapshots))
 	for k := range snapshots {
@@ -1430,7 +1365,7 @@ func newCheckPoints(snapshots map[uint64]time.Time) []*snapshotMetaData {
 	}
 
 	sort.SliceStable(keys, func(i, j int) bool {
-		return snapshots[keys[i]].Sub(snapshots[keys[j]]) > 0
+		return snapshots[keys[i]].After(snapshots[keys[j]])
 	})
 
 	for _, key := range keys {
@@ -1443,21 +1378,20 @@ func newCheckPoints(snapshots map[uint64]time.Time) []*snapshotMetaData {
 	return rv
 }
 
-// Removes enough snapshots from the rootBolt so that the
-// s.eligibleForRemoval stays under the NumSnapshotsToKeep policy.
 func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
-	persistedSnapshots, err := s.rootBoltSnapshotMetaData()
+	// first get the set of live snapshots
+	liveSnapshots, err := s.getLiveSnapshots()
 	if err != nil {
 		return 0, err
 	}
 
-	if len(persistedSnapshots) <= s.numSnapshotsToKeep {
-		// we need to keep everything
+	// if no live snapshots, then nothing to do
+	if len(liveSnapshots) == 0 {
 		return 0, nil
 	}
 
-	protectedSnapshots := getProtectedSnapshots(s.rollbackSamplingInterval,
-		s.numSnapshotsToKeep, persistedSnapshots)
+	// then get the set of protected snapshots, which are the ones we want to keep
+	protectedSnapshots := s.getProtectedSnapshots(liveSnapshots)
 
 	var epochsToRemove []uint64
 	var newEligible []uint64
@@ -1566,26 +1500,19 @@ func (s *Scorch) removeOldZapFiles() error {
 	return nil
 }
 
-// In sparse mutation scenario, it can so happen that all protected
-// snapshots are older than the numSnapshotsToKeep * rollbackSamplingInterval
-// duration. This results in all of them being purged from the boltDB
-// and the next iteration of the removeOldData() would end up protecting
-// latest contiguous snapshot which is a poor pattern in the rollback checkpoints.
-// Hence we try to retain at most retentionFactor portion worth of old snapshots
-// in such a scenario using the following function
-func getBoundaryCheckPoint(retentionFactor float64,
-	checkPoints []*snapshotMetaData, timeStamp time.Time,
-) time.Time {
-	if checkPoints != nil {
-		boundary := checkPoints[int(math.Floor(float64(len(checkPoints))*
-			retentionFactor))]
-		if timeStamp.Sub(boundary.timeStamp) > 0 {
-			// return the extended boundary which will dictate the older snapshots
-			// to be retained
-			return boundary.timeStamp
-		}
+func (s *Scorch) getBoundaryCheckPoint(timeStamp time.Time) time.Time {
+	numCheckpoints := float64(len(s.checkPoints))
+	if numCheckpoints == 0 {
+		return timeStamp
 	}
-
+	checkpointIdx := int(math.Floor(numCheckpoints * s.rollbackRetentionFactor))
+	if checkpointIdx >= len(s.checkPoints) {
+		checkpointIdx = len(s.checkPoints) - 1
+	}
+	boundary := s.checkPoints[checkpointIdx]
+	if boundary.timeStamp.Before(timeStamp) {
+		return boundary.timeStamp
+	}
 	return timeStamp
 }
 
@@ -1594,35 +1521,21 @@ type snapshotMetaData struct {
 	timeStamp time.Time
 }
 
+// returns all the snapshots that are currently persisted
+// in the rootBolt, sorted by latest to oldest epoch.
 func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 	var rv []*snapshotMetaData
-	currTime := time.Now()
-	// including the very latest snapshot there should be n snapshots, so the
-	// very last one would be tc - (n-1) * d
-	// for eg for n = 3 the checkpoints preserved should be tc, tc - d, tc - 2d
-	expirationDuration := time.Duration(s.numSnapshotsToKeep-1) * s.rollbackSamplingInterval
-
 	err := s.rootBolt.View(func(tx *util.BoltTxImpl) error {
 		snapshots := tx.Bucket(util.BoltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
 		}
 		sc := snapshots.Cursor()
-		var found bool
-		// traversal order - latest -> oldest epoch
 		for sk, _ := sc.Last(); sk != nil; sk, _ = sc.Prev() {
 			_, snapshotEpoch, err := decodeUvarintAscending(sk)
 			if err != nil {
 				continue
 			}
-
-			if expirationDuration == 0 {
-				rv = append(rv, &snapshotMetaData{
-					epoch: snapshotEpoch,
-				})
-				continue
-			}
-
 			snapshot := snapshots.GetBucket(sk)
 			if snapshot == nil {
 				continue
@@ -1640,32 +1553,71 @@ func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 			if err != nil {
 				continue
 			}
-			// Don't keep snapshots older than
-			// expiration duration (numSnapshotsToKeep *
-			// rollbackSamplingInterval, by default)
-			if currTime.Sub(timeStamp) <= expirationDuration {
-				rv = append(rv, &snapshotMetaData{
-					epoch:     snapshotEpoch,
-					timeStamp: timeStamp,
-				})
-			} else {
-				if !found {
-					found = true
-					boundary := getBoundaryCheckPoint(s.rollbackRetentionFactor,
-						s.checkPoints, timeStamp)
-					expirationDuration = currTime.Sub(boundary)
-					continue
-				}
-				k := encodeUvarintAscending(nil, snapshotEpoch)
-				err = snapshots.DeleteBucket(k)
-				if err == bolt.ErrBucketNotFound {
-					err = nil
-				}
+			meta := &snapshotMetaData{
+				epoch:     snapshotEpoch,
+				timeStamp: timeStamp,
 			}
+			rv = append(rv, meta)
 		}
 		return nil
 	})
-	return rv, err
+	if err != nil {
+		return nil, err
+	}
+	return rv, nil
+}
+
+func (s *Scorch) getLiveSnapshots() ([]*snapshotMetaData, error) {
+	// get all the snapshots that are currently persisted
+	meta, err := s.rootBoltSnapshotMetaData()
+	if err != nil {
+		return nil, err
+	}
+	// if none persisted, then nothing to do
+	if len(meta) == 0 {
+		return nil, nil
+	}
+	// check if we have a rollback sampling interval, if not,
+	// then we will just return the latest numSnapshotsToKeep snapshots
+	if s.rollbackSamplingInterval <= 0 {
+		if len(meta) <= s.numSnapshotsToKeep {
+			return meta, nil
+		}
+		return meta[:s.numSnapshotsToKeep], nil
+	}
+	// we consider a snapshot to be live if:
+	// 1. it is the latest snapshot
+	// 2. it is within our expiration duration
+	var liveSnapshots []*snapshotMetaData
+	// always keep the latest snapshot
+	liveSnapshots = append(liveSnapshots, meta[0])
+	extraSnapshots := s.numSnapshotsToKeep - 1
+	if extraSnapshots <= 0 {
+		return liveSnapshots, nil
+	}
+	// if we need extra snapshots, compute an expiration duration
+	// beyond which we will not consider snapshots to be live
+	currTime := time.Now()
+	expirationDuration := time.Duration(extraSnapshots) * s.rollbackSamplingInterval
+	cutoffTime := currTime.Add(-expirationDuration)
+	// if we have previous checkpoints, then we can extend
+	// the cutoff time based on the boundary checkpoint
+	for _, snapshot := range meta[1:] {
+		if snapshot.timeStamp.Before(cutoffTime) {
+			boundary := s.getBoundaryCheckPoint(snapshot.timeStamp)
+			if boundary.Before(snapshot.timeStamp) {
+				cutoffTime = boundary
+			}
+			break
+		}
+	}
+	// add all snapshots that are newer than the cutoff time
+	for _, snapshot := range meta[1:] {
+		if !snapshot.timeStamp.Before(cutoffTime) {
+			liveSnapshots = append(liveSnapshots, snapshot)
+		}
+	}
+	return liveSnapshots, nil
 }
 
 func (s *Scorch) RootBoltSnapshotEpochs() ([]uint64, error) {

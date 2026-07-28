@@ -114,6 +114,11 @@ func openIndexMeta(path string) (*indexMeta, error) {
 		if err != nil {
 			return nil, ErrorIndexMetaCorrupt
 		}
+	} else {
+		fileReader, err = util.NewFileReader("", []byte(indexMetaPath))
+		if err != nil {
+			return nil, err
+		}
 	}
 	im.fileReader = fileReader
 

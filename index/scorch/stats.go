@@ -64,8 +64,6 @@ type Stats struct {
 	TotIntroducePersistEnd uint64
 	TotIntroduceMergeBeg   uint64
 	TotIntroduceMergeEnd   uint64
-	TotIntroduceRevertBeg  uint64
-	TotIntroduceRevertEnd  uint64
 
 	TotIntroducedItems         uint64
 	TotIntroducedSegmentsBatch uint64
@@ -127,14 +125,23 @@ type Stats struct {
 	CurFilesIneligibleForRemoval     uint64
 	TotSnapshotsRemovedFromMetaStore uint64
 
-	TotMemMergeBeg          uint64
-	TotMemMergeErr          uint64
-	TotMemMergeDone         uint64
-	TotMemMergeZapBeg       uint64
-	TotMemMergeZapEnd       uint64
-	TotMemMergeZapTime      uint64
-	MaxMemMergeZapTime      uint64
-	TotMemMergeSegments     uint64
+	TotMemMergeBeg      uint64
+	TotMemMergeErr      uint64
+	TotMemMergeDone     uint64
+	TotMemMergeSegments uint64
+
+	TotMemMergeZapBeg              uint64
+	TotMemMergeZapEnd              uint64
+	TotMemMergeZapTime             uint64
+	MaxMemMergeZapTime             uint64
+	TotMemMergeZapIntroductionTime uint64
+	MaxMemMergeZapIntroductionTime uint64
+
+	TotMemMergeIntroductions          uint64
+	TotMemMergeIntroductionsDone      uint64
+	TotMemMergeIntroductionsSkipped   uint64
+	TotMemMergeIntroductionsObsoleted uint64
+
 	TotMemorySegmentsAtRoot uint64
 
 	TotTrainedSamples uint64

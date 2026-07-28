@@ -308,24 +308,6 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 		return nil, nil
 	}
 
-	for i := range o.snapshot.segment {
-		var cMax uint64
-
-		for _, tfr := range o.tfrs {
-			itr, ok := tfr.iterators[i].(segment.OptimizablePostingsIterator)
-			if !ok {
-				return nil, nil
-			}
-
-			if itr.ActualBitmap() != nil {
-				c := itr.ActualBitmap().GetCardinality()
-				if cMax < c {
-					cMax = c
-				}
-			}
-		}
-	}
-
 	// We use an artificial term and field because the optimized
 	// termFieldReader can represent multiple terms and fields.
 	oTFR := o.snapshot.unadornedTermFieldReader(
@@ -362,10 +344,18 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 			bm = roaring.Or(actualBMs[0], actualBMs[1])
 		} else if len(actualBMs) == 1 {
 			bm = actualBMs[0].Clone()
-		}
-
-		if bm == nil {
-			bm = roaring.New()
+		} else {
+			if len(docNums) == 0 {
+				// no hits, reuse the zero-alloc empty sentinel
+				oTFR.iterators[i] = anEmptyPostingsIterator
+				continue
+			} else if len(docNums) == 1 {
+				// 1-hit optimized
+				oTFR.iterators[i] = newUnadornedPostingsIteratorFrom1Hit(uint64(docNums[0]))
+				continue
+			} else {
+				bm = roaring.New()
+			}
 		}
 
 		bm.AddMany(docNums)

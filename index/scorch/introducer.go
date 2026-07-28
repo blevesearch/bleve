@@ -32,7 +32,6 @@ type segmentIntroduction struct {
 	obsoletes map[uint64]*roaring.Bitmap
 	ids       []string
 	internal  map[string][]byte
-	stats     *fieldStats
 
 	applied           chan error
 	persisted         chan error
@@ -154,7 +153,6 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			cachedDocs: root.segment[i].cachedDocs,
 			cachedMeta: root.segment[i].cachedMeta,
 			creator:    root.segment[i].creator,
-			internal:   root.segment[i].internal,
 		}
 
 		// apply new obsoletions
@@ -197,13 +195,16 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 
 	// append new segment, if any, to end of the new index snapshot
 	if next.data != nil {
+		stats := newFieldStats()
+		if fsr, ok := next.data.(segment.FieldStatsReporter); ok {
+			fsr.UpdateFieldStats(stats)
+		}
 		newSegmentSnapshot := &SegmentSnapshot{
 			id:         next.id,
 			segment:    next.data, // take ownership of next.data's ref-count
-			stats:      next.stats,
+			stats:      stats,
 			cachedDocs: &cachedDocs{cache: nil},
 			cachedMeta: newCachedMeta(),
-			internal:   make(map[string][]byte),
 			creator:    "introduceSegment",
 		}
 		newSnapshot.segment = append(newSnapshot.segment, newSegmentSnapshot)
@@ -213,12 +214,6 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		// queued for persistence.
 		atomic.AddUint64(&s.stats.TotIntroducedItems, newSegmentSnapshot.Count())
 		atomic.AddUint64(&s.stats.TotIntroducedSegmentsBatch, 1)
-
-		// track the internal values of this segment so that when we update the
-		// bolt we keep the internal values in sync with the segments on disk, and
-		// if this segment didn't get persisted we need to undo that info from the
-		// indexSnapshot's internal map as part of the bolt update.
-		newSegmentSnapshot.internal = next.internal
 	}
 	// copy old values
 	for key, oldVal := range root.internal {
@@ -366,29 +361,29 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 
 	var running, docsToPersistCount, memSegments, fileSegments uint64
 	var droppedSegmentFiles []string
-	newSegmentDeleted := make([]*roaring.Bitmap, len(nextMerge.new))
-	for i := range newSegmentDeleted {
+	newSegmentsDeleted := make([]*roaring.Bitmap, len(nextMerge.newSegments))
+	for i := range newSegmentsDeleted {
 		// create a bitmaps to track the obsoletes per newly merged segments
-		newSegmentDeleted[i] = roaring.NewBitmap()
+		newSegmentsDeleted[i] = roaring.NewBitmap()
 	}
 
 	// iterate through current segments
 	for i := range root.segment {
 		segmentID := root.segment[i].id
-		if segSnapAtMerge, ok := nextMerge.mergedSegHistory[segmentID]; ok {
+		if history, ok := nextMerge.mergedSegHistory[segmentID]; ok {
 			// this segment is going away, see if anything else was deleted since we started the merge
-			if segSnapAtMerge != nil && root.segment[i].deleted != nil {
+			if history != nil && root.segment[i].deleted != nil {
 				// assume all these deletes are new
 				deletedSince := root.segment[i].deleted
 				// if we already knew about some of them, remove
-				if segSnapAtMerge.oldSegment.deleted != nil {
-					deletedSince = roaring.AndNot(root.segment[i].deleted, segSnapAtMerge.oldSegment.deleted)
+				if history.oldSegment.deleted != nil {
+					deletedSince = roaring.AndNot(root.segment[i].deleted, history.oldSegment.deleted)
 				}
 				deletedSinceItr := deletedSince.Iterator()
 				for deletedSinceItr.HasNext() {
 					oldDocNum := deletedSinceItr.Next()
-					newDocNum := segSnapAtMerge.oldNewDocIDs[oldDocNum]
-					newSegmentDeleted[segSnapAtMerge.workerID].Add(uint32(newDocNum))
+					newDocNum := history.oldNewDocIDs[oldDocNum]
+					newSegmentsDeleted[history.batchID].Add(uint32(newDocNum))
 				}
 			}
 
@@ -407,7 +402,6 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 				cachedDocs: root.segment[i].cachedDocs,
 				cachedMeta: root.segment[i].cachedMeta,
 				creator:    root.segment[i].creator,
-				internal:   root.segment[i].internal,
 			})
 			root.segment[i].segment.AddRef()
 			newSnapshot.offsets = append(newSnapshot.offsets, running)
@@ -436,18 +430,26 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			for obsoletedIter.HasNext() {
 				oldDocNum := obsoletedIter.Next()
 				newDocNum := ss.oldNewDocIDs[oldDocNum]
-				newSegmentDeleted[ss.workerID].Add(uint32(newDocNum))
+				newSegmentsDeleted[ss.batchID].Add(uint32(newDocNum))
 			}
 		}
 	}
 
-	skipped := true
+	skipped := make([]bool, len(nextMerge.newSegments))
 	// make the newly merged segments part of the newSnapshot being constructed
-	for i, newMergedSegment := range nextMerge.new {
+	for i, newMergedSegment := range nextMerge.newSegments {
+		if newMergedSegment == nil {
+			if nextMerge.fileMerge {
+				atomic.AddUint64(&s.stats.TotFileMergeIntroductionsSkipped, 1)
+			} else {
+				atomic.AddUint64(&s.stats.TotMemMergeIntroductionsSkipped, 1)
+			}
+			skipped[i] = true
+			continue
+		}
 		// checking if this newly merged segment is worth keeping based on
 		// obsoleted doc count since the merge intro started
-		if newMergedSegment != nil &&
-			newMergedSegment.Count() > newSegmentDeleted[i].GetCardinality() {
+		if newMergedSegment.Count() > newSegmentsDeleted[i].GetCardinality() {
 			stats := newFieldStats()
 			if fsr, ok := newMergedSegment.(segment.FieldStatsReporter); ok {
 				fsr.UpdateFieldStats(stats)
@@ -455,9 +457,9 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 
 			// put the merged segment at the end of newSnapshot
 			newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
-				id:         nextMerge.id[i],
-				segment:    newMergedSegment, // take ownership for nextMerge.new's ref-count
-				deleted:    newSegmentDeleted[i],
+				id:         nextMerge.newSegmentIDs[i],
+				segment:    newMergedSegment, // take ownership for newMergedSegment's ref-count
+				deleted:    newSegmentsDeleted[i],
 				stats:      stats,
 				cachedDocs: &cachedDocs{cache: nil},
 				cachedMeta: newCachedMeta(),
@@ -471,17 +473,19 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			case segment.PersistedSegment:
 				fileSegments++
 			default:
-				docsToPersistCount += newMergedSegment.Count() - newSegmentDeleted[i].GetCardinality()
+				docsToPersistCount += newMergedSegment.Count() - newSegmentsDeleted[i].GetCardinality()
 				memSegments++
 			}
-			skipped = false
+			atomic.AddUint64(&s.stats.TotIntroducedSegmentsMerge, 1)
+			skipped[i] = false
+		} else {
+			if nextMerge.fileMerge {
+				atomic.AddUint64(&s.stats.TotFileMergeIntroductionsObsoleted, 1)
+			} else {
+				atomic.AddUint64(&s.stats.TotMemMergeIntroductionsObsoleted, 1)
+			}
+			skipped[i] = true
 		}
-	}
-
-	if skipped {
-		atomic.AddUint64(&s.stats.TotFileMergeIntroductionsObsoleted, 1)
-	} else {
-		atomic.AddUint64(&s.stats.TotIntroducedSegmentsMerge, uint64(len(nextMerge.new)))
 	}
 
 	atomic.StoreUint64(&s.stats.TotItemsToPersist, docsToPersistCount)

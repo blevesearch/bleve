@@ -42,11 +42,11 @@ The configs are set via the `kvConfig` parameter in the `NewUsing()` or `OpenUsi
 // setting the persister and merger configs
 kvConfig := map[string]interface{}{
     "scorchPersisterOptions": map[string]interface{}{
-        "NumPersisterWorkers":           4,
-        "MaxSizeInMemoryMergePerWorker": 20000000,
+        "numPersisterWorkers":           4,
+        "maxSizeInMemoryMergePerWorker": 20000000,
     },
     "scorchMergePlanOptions": map[string]interface{}{
-        "FloorSegmentFileSize": 10000000,
+        "floorSegmentFileSize": 10000000,
     },
 }
 // passing the config to the index

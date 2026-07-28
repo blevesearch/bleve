@@ -124,10 +124,7 @@ func (i *IndexSnapshotVectorReader) Advance(ID index.IndexInternalID,
 		*i = *(i2.(*IndexSnapshotVectorReader))
 	}
 
-	num, err := ID.Value()
-	if err != nil {
-		return nil, fmt.Errorf("error converting to doc number % x - %v", ID, err)
-	}
+	num := ID.Value()
 	segIndex, ldocNum := i.snapshot.segmentIndexAndLocalDocNumFromGlobal(num)
 	if segIndex >= len(i.snapshot.segment) {
 		return nil, fmt.Errorf("computed segment index %d out of bounds %d",

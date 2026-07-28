@@ -20,6 +20,7 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
+	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -40,6 +41,24 @@ func (s *segment) FullSize() int64 { return s.MyFullSize }
 func (s *segment) LiveSize() int64 { return s.MyLiveSize }
 func (s *segment) HasVector() bool { return s.MyHasVector }
 func (s *segment) FileSize() int64 { return s.MyFileSize }
+func (s *segment) LiveFileSize() int64 {
+	// LiveFileSize is an estimate of the live portion of the file size,
+	// based on the ratio of live to full size.
+	fullSize := float64(s.MyFullSize)
+	if fullSize <= 0 {
+		return 0
+	}
+	liveSize := float64(s.MyLiveSize)
+	if liveSize <= 0 {
+		return 0
+	}
+	fileSize := float64(s.MyFileSize)
+	if fileSize <= 0 {
+		return 0
+	}
+	liveRatio := liveSize / fullSize
+	return int64(fileSize * liveRatio)
+}
 
 func makeLinearSegments(n int) (rv []Segment) {
 	for i := 0; i < n; i++ {
@@ -538,6 +557,8 @@ type testCyclesSpec struct {
 	n int // Number of cycles to run.
 	o *MergePlanOptions
 
+	converge bool
+
 	beforePlan func(*testCyclesSpec)
 	afterPlan  func(*testCyclesSpec, *MergePlan)
 
@@ -575,31 +596,74 @@ func (spec *testCyclesSpec) runCycles(t *testing.T) {
 			emit(spec.descrip, spec.cycle, 2, spec.segments, plan)
 		}
 
-		if plan != nil {
-			if len(plan.Tasks) > 0 {
-				numPlansWithTasks++
+		if plan == nil || len(plan.Tasks) == 0 {
+			if spec.converge {
+				return
+			}
+			spec.cycle++
+			continue
+		}
+
+		numPlansWithTasks++
+		before := len(spec.segments)
+
+		var beforeFullSize int64
+		for _, s := range spec.segments {
+			beforeFullSize += s.FullSize()
+		}
+
+		for _, task := range plan.Tasks {
+			spec.segments = removeSegments(spec.segments, task.Segments)
+
+			var totLiveSize int64
+			var totLiveFileSize int64
+			var hasVector bool
+			for _, segment := range task.Segments {
+				totLiveSize += segment.LiveSize()
+				totLiveFileSize += segment.LiveFileSize()
+				if segment.HasVector() {
+					hasVector = true
+				}
 			}
 
-			for _, task := range plan.Tasks {
-				spec.segments = removeSegments(spec.segments, task.Segments)
-
-				var totLiveSize int64
-				for _, segment := range task.Segments {
-					totLiveSize += segment.LiveSize()
-				}
-
-				if totLiveSize > 0 {
-					spec.segments = append(spec.segments, &segment{
-						MyId:       spec.nextSegmentId,
-						MyFullSize: totLiveSize,
-						MyLiveSize: totLiveSize,
-					})
-					spec.nextSegmentId++
-				}
+			if totLiveSize > 0 {
+				spec.segments = append(spec.segments, &segment{
+					MyId:        spec.nextSegmentId,
+					MyFullSize:  totLiveSize,
+					MyLiveSize:  totLiveSize,
+					MyFileSize:  totLiveFileSize,
+					MyHasVector: hasVector,
+				})
+				spec.nextSegmentId++
 			}
 		}
 
+		after := len(spec.segments)
+
+		var afterFullSize int64
+		for _, s := range spec.segments {
+			afterFullSize += s.FullSize()
+		}
+
+		if after > before {
+			t.Errorf("cycle %d: plan produced %d task(s) but increased segment count (%d segs -> %d segs)",
+				spec.cycle, len(plan.Tasks), before, after)
+		}
+
+		if after == before && afterFullSize >= beforeFullSize {
+			t.Errorf("cycle %d: plan produced %d task(s) but made no progress "+
+				"(%d segs / %d bytes -> %d segs / %d bytes)",
+				spec.cycle, len(plan.Tasks), before, beforeFullSize,
+				len(spec.segments), afterFullSize)
+		}
+
 		spec.cycle++
+	}
+
+	if spec.converge {
+		t.Errorf("index did not converge within %d cycles (%d segments remain); "+
+			"the planner keeps producing tasks, likely an infinite loop",
+			spec.n, len(spec.segments))
 	}
 
 	if numPlansWithTasks <= 0 {
@@ -621,15 +685,13 @@ func emit(descrip string, cycle int, step int, segments []Segment, plan *MergePl
 	fmt.Printf("%s\n", ToBarChart(descrip, 100, segments, plan))
 }
 
-// -----------------------------------------------------------------------------
-// Test Vector Segment Merging
+// ----------------------------------------
 
 func TestPlanMaxSegmentFileSize(t *testing.T) {
 	tests := []struct {
-		segments []Segment
-		o        *MergePlanOptions
-
-		expectedTasks [][]uint64
+		segments              []Segment
+		o                     *MergePlanOptions
+		expectedFinalSegments []Segment
 	}{
 		{
 			[]Segment{
@@ -639,7 +701,7 @@ func TestPlanMaxSegmentFileSize(t *testing.T) {
 					MyLiveSize: 3900,
 
 					MyHasVector: true,
-					MyFileSize:  3900 * 1000 * 4, // > 2MB
+					MyFileSize:  4000 * 1000 * 4, // > 2MB
 				},
 				&segment{ // ineligible
 					MyId:       2,
@@ -647,7 +709,7 @@ func TestPlanMaxSegmentFileSize(t *testing.T) {
 					MyLiveSize: 5500, // > 5000
 
 					MyHasVector: true,
-					MyFileSize:  5500 * 1000 * 4, // > 2MB
+					MyFileSize:  6000 * 1000 * 4, // > 2MB
 				},
 				&segment{ // eligible
 					MyId:       3,
@@ -655,7 +717,7 @@ func TestPlanMaxSegmentFileSize(t *testing.T) {
 					MyLiveSize: 490,
 
 					MyHasVector: true,
-					MyFileSize:  490 * 1000 * 4,
+					MyFileSize:  500 * 1000 * 4,
 				},
 				&segment{ // eligible
 					MyId:       4,
@@ -663,7 +725,7 @@ func TestPlanMaxSegmentFileSize(t *testing.T) {
 					MyLiveSize: 480,
 
 					MyHasVector: true,
-					MyFileSize:  480 * 1000 * 4,
+					MyFileSize:  500 * 1000 * 4,
 				},
 				&segment{ // eligible
 					MyId:       5,
@@ -671,7 +733,7 @@ func TestPlanMaxSegmentFileSize(t *testing.T) {
 					MyLiveSize: 300,
 
 					MyHasVector: true,
-					MyFileSize:  300 * 1000 * 4,
+					MyFileSize:  500 * 1000 * 4,
 				},
 				&segment{ // eligible
 					MyId:       6,
@@ -679,7 +741,7 @@ func TestPlanMaxSegmentFileSize(t *testing.T) {
 					MyLiveSize: 400,
 
 					MyHasVector: true,
-					MyFileSize:  400 * 1000 * 4,
+					MyFileSize:  500 * 1000 * 4,
 				},
 			},
 			&MergePlanOptions{
@@ -691,52 +753,92 @@ func TestPlanMaxSegmentFileSize(t *testing.T) {
 				MaxSegmentsPerTier:   1,
 				SegmentsPerMergeTask: 2,
 				TierGrowth:           2.0,
+				ReclaimDeletesWeight: 2,
 				FloorSegmentSize:     1,
 			},
-			[][]uint64{
-				{3, 4},
+			[]Segment{
+				&segment{
+					MyId:       1,
+					MyFullSize: 4000,
+					MyLiveSize: 3900,
+
+					MyHasVector: true,
+					MyFileSize:  4000 * 1000 * 4,
+				},
+				&segment{
+					MyId:       2,
+					MyFullSize: 6000,
+					MyLiveSize: 5500,
+
+					MyHasVector: true,
+					MyFileSize:  6000 * 1000 * 4,
+				},
+				&segment{
+					MyId:       3,
+					MyFullSize: 500,
+					MyLiveSize: 490,
+
+					MyHasVector: true,
+					MyFileSize:  500 * 1000 * 4,
+				},
+				&segment{
+					MyId:       4,
+					MyFullSize: 500,
+					MyLiveSize: 480,
+
+					MyHasVector: true,
+					MyFileSize:  500 * 1000 * 4,
+				},
+				&segment{
+					MyId:       7,
+					MyFullSize: 700,
+					MyLiveSize: 700,
+
+					MyHasVector: true,
+					MyFileSize:  700 * 1000 * 4,
+				},
 			},
 		},
 	}
 
 	for testi, test := range tests {
 		t.Run(fmt.Sprintf("Test-%d", testi), func(t *testing.T) {
-			plans, err := Plan(test.segments, test.o)
-			if err != nil {
-				t.Fatalf("Plan failed, err: %v", err)
+			var nextID uint64
+			for _, seg := range test.segments {
+				if seg.Id() >= nextID {
+					nextID = seg.Id() + 1
+				}
 			}
 
-			for i, task := range plans.Tasks {
-				var segIDs []uint64
-				for _, seg := range task.Segments {
-					segIDs = append(segIDs, seg.Id())
-				}
+			spec := testCyclesSpec{
+				descrip:       fmt.Sprintf("pmsfs-%d", testi),
+				verbose:       os.Getenv("VERBOSE") == "pmsfs" || os.Getenv("VERBOSE") == "y",
+				n:             10,
+				o:             test.o,
+				converge:      true,
+				segments:      slices.Clone(test.segments),
+				nextSegmentId: nextID,
+			}
 
-				if !reflect.DeepEqual(segIDs, test.expectedTasks[0]) {
-					t.Errorf("expected task segments: %v, got: %v", test.expectedTasks[i], segIDs)
-				}
+			spec.runCycles(t)
+
+			if !reflect.DeepEqual(spec.segments, test.expectedFinalSegments) {
+				t.Fatalf("final layout mismatch, got: %+v", spec.segments)
 			}
 		})
 	}
 }
 
-func TestSingleTaskMergePlan(t *testing.T) {
-	o := &DefaultMergePlanOptions
+func TestSingleSegmentTaskMergePlan(t *testing.T) {
+	o := DefaultMergePlanOptions
 	o.FloorSegmentFileSize = 209715200
 
-	// borrowing the spec values from MB-66112
-	//
-	// both segments are eligible, but the roster with a single segment is scored
-	// higher than the roster with two segments
-	// in this case the merge plan returns task with a single segment non-empty
-	// segment which when introduced into the scorch system doesn't cause any change
-	// and you'd be stuck in an infinite loop where the plan keeps generating the
-	// same task with the same single segment, which doesn't converge the index to
-	// a steady state
 	spec := testCyclesSpec{
-		descrip: "mssswdbm",
-		verbose: os.Getenv("VERBOSE") == "mssswdbm" || os.Getenv("VERBOSE") == "y",
-		o:       o,
+		descrip:  "stmp",
+		verbose:  os.Getenv("VERBOSE") == "stmp" || os.Getenv("VERBOSE") == "y",
+		n:        10,
+		o:        &o,
+		converge: true,
 		segments: []Segment{
 			&segment{
 				MyId:       2,
@@ -751,14 +853,275 @@ func TestSingleTaskMergePlan(t *testing.T) {
 				MyFileSize: 24805725,
 			},
 		},
+		nextSegmentId: 3,
 	}
 
-	plan, err := Plan(spec.segments, spec.o)
-	if err != nil {
-		t.Fatalf("Plan failed, err: %v", err)
+	spec.runCycles(t)
+
+	expectedSegments := []Segment{
+		&segment{
+			MyId:       3,
+			MyFullSize: 78059 + 3959,
+			MyLiveSize: 78059 + 3959,
+			MyFileSize: 129475914 + 24805725,
+		},
 	}
 
-	if len(plan.Tasks) > 0 {
-		t.Fatalf("expected 0 tasks, got: %d", len(plan.Tasks))
+	if !reflect.DeepEqual(spec.segments, expectedSegments) {
+		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
+	}
+}
+
+func TestPlanLiveFileSizeEligibility(t *testing.T) {
+	o := &MergePlanOptions{
+		MaxSegmentFileSize:   4 * 1000 * 1000,
+		MaxSegmentSize:       100 * 1000,
+		SegmentsPerMergeTask: 2,
+		TierGrowth:           2.0,
+		FloorSegmentSize:     2000,
+	}
+
+	segments := []Segment{
+		&segment{
+			MyId:        1,
+			MyFullSize:  1000,
+			MyLiveSize:  500,
+			MyHasVector: true,
+			MyFileSize:  3 * 1000 * 1000,
+		},
+		&segment{
+			MyId:        2,
+			MyFullSize:  1000,
+			MyLiveSize:  500,
+			MyHasVector: true,
+			MyFileSize:  3 * 1000 * 1000,
+		},
+		&segment{
+			MyId:        3,
+			MyFullSize:  1000,
+			MyLiveSize:  1000,
+			MyHasVector: true,
+			MyFileSize:  3 * 1000 * 1000,
+		},
+	}
+
+	spec := testCyclesSpec{
+		descrip:       "plfse",
+		verbose:       os.Getenv("VERBOSE") == "plfse" || os.Getenv("VERBOSE") == "y",
+		n:             10,
+		o:             o,
+		converge:      true,
+		segments:      slices.Clone(segments),
+		nextSegmentId: 4,
+	}
+
+	spec.runCycles(t)
+
+	expectedSegments := []Segment{
+		&segment{
+			MyId:        3,
+			MyFullSize:  1000,
+			MyLiveSize:  1000,
+			MyHasVector: true,
+			MyFileSize:  3 * 1000 * 1000,
+		},
+		&segment{
+			MyId:        4,
+			MyFullSize:  1000,
+			MyLiveSize:  1000,
+			MyHasVector: true,
+			MyFileSize:  3 * 1000 * 1000,
+		},
+	}
+
+	if !reflect.DeepEqual(spec.segments, expectedSegments) {
+		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
+	}
+}
+
+func TestPlanLiveFileSizeBudget(t *testing.T) {
+	o := &MergePlanOptions{
+		MaxSegmentsPerTier:   1,
+		SegmentsPerMergeTask: 2,
+		TierGrowth:           2.0,
+		FloorSegmentSize:     1,
+		FloorSegmentFileSize: 10 * 1000 * 1000,
+		MaxSegmentSize:       100 * 1000,
+		MaxSegmentFileSize:   4 * 1000 * 1000 * 1000,
+	}
+
+	segments := []Segment{
+		&segment{
+			MyId:       1,
+			MyFullSize: 1000,
+			MyLiveSize: 100,
+			MyFileSize: 10 * 1000 * 1000,
+		},
+		&segment{
+			MyId:       2,
+			MyFullSize: 1000,
+			MyLiveSize: 100,
+			MyFileSize: 10 * 1000 * 1000,
+		},
+	}
+
+	spec := testCyclesSpec{
+		descrip:       "plfsb",
+		verbose:       os.Getenv("VERBOSE") == "plfsb" || os.Getenv("VERBOSE") == "y",
+		n:             10,
+		o:             o,
+		converge:      true,
+		segments:      slices.Clone(segments),
+		nextSegmentId: 3,
+	}
+
+	spec.runCycles(t)
+
+	expectedSegments := []Segment{
+		&segment{
+			MyId:       3,
+			MyFullSize: 200,
+			MyLiveSize: 200,
+			MyFileSize: 2 * 1000 * 1000,
+		},
+	}
+
+	if !reflect.DeepEqual(spec.segments, expectedSegments) {
+		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
+	}
+}
+
+func TestEmptySegmentsDoNotForceOverMerge(t *testing.T) {
+	o := &MergePlanOptions{
+		MaxSegmentsPerTier:   10,
+		MaxSegmentSize:       1000000,
+		SegmentsPerMergeTask: 10,
+		FloorSegmentSize:     1,
+		CalcBudget: func(totalSize, firstTierSize int64, o *MergePlanOptions) int {
+			return 2
+		},
+	}
+
+	spec := testCyclesSpec{
+		descrip:  "esdnfom",
+		verbose:  os.Getenv("VERBOSE") == "esdnfom" || os.Getenv("VERBOSE") == "y",
+		n:        10,
+		o:        o,
+		converge: true,
+		segments: []Segment{
+			&segment{MyId: 1, MyFullSize: 100, MyLiveSize: 100},
+			&segment{MyId: 2, MyFullSize: 100, MyLiveSize: 100},
+			&segment{MyId: 3, MyFullSize: 100, MyLiveSize: 0},
+		},
+		nextSegmentId: 4,
+	}
+
+	spec.runCycles(t)
+
+	expectedSegments := []Segment{
+		&segment{MyId: 1, MyFullSize: 100, MyLiveSize: 100},
+		&segment{MyId: 2, MyFullSize: 100, MyLiveSize: 100},
+	}
+
+	if !reflect.DeepEqual(spec.segments, expectedSegments) {
+		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
+	}
+}
+
+func TestOnlyEmptySegments(t *testing.T) {
+	o := &MergePlanOptions{
+		MaxSegmentsPerTier:   10,
+		MaxSegmentSize:       1000000,
+		SegmentsPerMergeTask: 10,
+		FloorSegmentSize:     1,
+	}
+
+	spec := testCyclesSpec{
+		descrip:  "oes",
+		verbose:  os.Getenv("VERBOSE") == "oes" || os.Getenv("VERBOSE") == "y",
+		n:        10,
+		o:        o,
+		converge: true,
+		segments: []Segment{
+			&segment{MyId: 1, MyFullSize: 100, MyLiveSize: 0},
+			&segment{MyId: 2, MyFullSize: 100, MyLiveSize: 0},
+			&segment{MyId: 3, MyFullSize: 100, MyLiveSize: 0},
+		},
+		nextSegmentId: 4,
+	}
+
+	spec.runCycles(t)
+
+	expectedSegments := []Segment{}
+
+	if !reflect.DeepEqual(spec.segments, expectedSegments) {
+		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
+	}
+}
+
+func TestEligibleAndFilteredSegments(t *testing.T) {
+	o := &MergePlanOptions{
+		MaxSegmentsPerTier:   10,
+		MaxSegmentSize:       1000000,
+		MaxSegmentFileSize:   1000,
+		SegmentsPerMergeTask: 10,
+		FloorSegmentSize:     1,
+		FloorSegmentFileSize: 2000,
+	}
+
+	spec := testCyclesSpec{
+		descrip:  "eafs",
+		verbose:  os.Getenv("VERBOSE") == "eafs" || os.Getenv("VERBOSE") == "y",
+		n:        10,
+		o:        o,
+		converge: true,
+		segments: []Segment{
+			&segment{MyId: 1, MyFullSize: 100, MyLiveSize: 100, MyFileSize: 400, MyHasVector: true},
+			&segment{MyId: 2, MyFullSize: 100, MyLiveSize: 100, MyFileSize: 400, MyHasVector: true},
+			&segment{MyId: 3, MyFullSize: 100, MyLiveSize: 100, MyFileSize: 400, MyHasVector: true},
+			&segment{MyId: 4, MyFullSize: 100, MyLiveSize: 100, MyFileSize: 400, MyHasVector: true},
+		},
+		nextSegmentId: 5,
+	}
+
+	spec.runCycles(t)
+
+	expectedSegments := []Segment{
+		&segment{MyId: 5, MyFullSize: 200, MyLiveSize: 200, MyFileSize: 800, MyHasVector: true},
+		&segment{MyId: 6, MyFullSize: 200, MyLiveSize: 200, MyFileSize: 800, MyHasVector: true},
+	}
+
+	if !reflect.DeepEqual(spec.segments, expectedSegments) {
+		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
+	}
+}
+
+func TestPlanWithNoBestRoster(t *testing.T) {
+	o := DefaultMergePlanOptions
+	o.SegmentsPerMergeTask = 0
+
+	spec := testCyclesSpec{
+		descrip:  "pwnbr",
+		verbose:  os.Getenv("VERBOSE") == "pwnbr" || os.Getenv("VERBOSE") == "y",
+		n:        10,
+		o:        &o,
+		converge: true,
+		segments: []Segment{
+			&segment{MyId: 1, MyFullSize: 100, MyLiveSize: 0, MyFileSize: 400},
+			&segment{MyId: 2, MyFullSize: 100, MyLiveSize: 100, MyFileSize: 400},
+			&segment{MyId: 3, MyFullSize: 100, MyLiveSize: 50, MyFileSize: 4000},
+		},
+		nextSegmentId: 5,
+	}
+
+	spec.runCycles(t)
+
+	expectedSegments := []Segment{
+		&segment{MyId: 2, MyFullSize: 100, MyLiveSize: 100, MyFileSize: 400},
+		&segment{MyId: 3, MyFullSize: 100, MyLiveSize: 50, MyFileSize: 4000},
+	}
+
+	if !reflect.DeepEqual(spec.segments, expectedSegments) {
+		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
 	}
 }

@@ -5279,6 +5279,121 @@ func TestCustomScoreQueryWildcardFields(t *testing.T) {
 	}
 }
 
+// newCustomQueryFieldLeakTestIndex builds an index where "name" is stored (so
+// it can be returned via SearchRequest.Fields) and "price" is a doc-value-only
+// field used as UDF input. It is the fixture for the field-leak regression
+// tests below.
+func newCustomQueryFieldLeakTestIndex(t *testing.T) Index {
+	t.Helper()
+
+	imap := mapping.NewIndexMapping()
+
+	nameMapping := mapping.NewTextFieldMapping()
+	nameMapping.Analyzer = keyword.Name
+	nameMapping.Store = true
+	imap.DefaultMapping.AddFieldMappingsAt("name", nameMapping)
+
+	priceMapping := mapping.NewNumericFieldMapping()
+	imap.DefaultMapping.AddFieldMappingsAt("price", priceMapping)
+
+	tmpIndexPath := createTmpIndexPath(t)
+	t.Cleanup(func() { cleanupTmpIndexPath(t, tmpIndexPath) })
+
+	idx, err := NewUsing(tmpIndexPath, imap, scorch.Name, Config.DefaultKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b := idx.NewBatch()
+	if err := b.Index("h1", map[string]interface{}{"name": "hotel paris", "price": 150.0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Batch(b); err != nil {
+		t.Fatal(err)
+	}
+
+	return idx
+}
+
+// TestCustomFilterQueryFieldsDoNotLeakIntoResponse is a regression test: a
+// custom_filter's fields list is UDF input only and must not override
+// SearchRequest.Fields. Before the fix the UDF-internal field ("price") leaked
+// into the response and the client's requested field ("name") went missing.
+func TestCustomFilterQueryFieldsDoNotLeakIntoResponse(t *testing.T) {
+	idx := newCustomQueryFieldLeakTestIndex(t)
+	defer func() {
+		if err := idx.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	nameQuery := NewTermQuery("hotel paris")
+	nameQuery.SetField("name")
+
+	q := query.NewCustomFilterQueryWithFilter(nameQuery, func(ctx context.Context, d *search.DocumentMatch) (bool, error) {
+		price, ok := d.Fields["price"].(float64)
+		return ok && price >= 100, nil
+	}, []string{"price"}, nil)
+
+	req := NewSearchRequest(q)
+	req.Size = 10
+	req.Fields = []string{"name"} // client asks only for "name"
+
+	res, err := idx.SearchInContext(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	hit := res.Hits[0]
+	if _, ok := hit.Fields["name"]; !ok {
+		t.Fatalf("expected requested field \"name\" in response, got fields: %v", hit.Fields)
+	}
+	if _, ok := hit.Fields["price"]; ok {
+		t.Fatalf("UDF-internal field \"price\" leaked into response fields: %v", hit.Fields)
+	}
+}
+
+// TestCustomScoreQueryFieldsDoNotLeakIntoResponse is the custom_score counterpart.
+func TestCustomScoreQueryFieldsDoNotLeakIntoResponse(t *testing.T) {
+	idx := newCustomQueryFieldLeakTestIndex(t)
+	defer func() {
+		if err := idx.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	nameQuery := NewTermQuery("hotel paris")
+	nameQuery.SetField("name")
+
+	q := query.NewCustomScoreQueryWithScorer(nameQuery, func(ctx context.Context, d *search.DocumentMatch) (float64, error) {
+		if price, ok := d.Fields["price"].(float64); ok && price >= 100 {
+			return d.Score + 1, nil
+		}
+		return d.Score, nil
+	}, []string{"price"}, nil)
+
+	req := NewSearchRequest(q)
+	req.Size = 10
+	req.Fields = []string{"name"}
+
+	res, err := idx.SearchInContext(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+	}
+	hit := res.Hits[0]
+	if _, ok := hit.Fields["name"]; !ok {
+		t.Fatalf("expected requested field \"name\" in response, got fields: %v", hit.Fields)
+	}
+	if _, ok := hit.Fields["price"]; ok {
+		t.Fatalf("UDF-internal field \"price\" leaked into response fields: %v", hit.Fields)
+	}
+}
+
 func TestGeoDistanceInSortAlias(t *testing.T) {
 	tmpIndexPath1 := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath1)

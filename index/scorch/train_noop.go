@@ -53,3 +53,11 @@ func (t *noopTrainer) copyFileLOCKED(file string, d index.IndexDirectory) error 
 func (t *noopTrainer) updateBolt(snapshotsBucket *util.BoltBucketImpl, key []byte, value []byte) error {
 	return nil
 }
+
+func (t *noopTrainer) dropFileWriterIDs(ids map[string]struct{}) error {
+	return nil
+}
+
+func (t *noopTrainer) fileWriterIDsInUse() (map[string]struct{}, error) {
+	return nil, nil
+}
