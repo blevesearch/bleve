@@ -84,6 +84,9 @@ type TopNCollector struct {
 	nestedStore *collectStoreNested
 
 	fastPrepare bool
+
+	earlyStopN   int
+	earlyStopped bool
 }
 
 // CheckDoneEvery controls how frequently we check the context deadline
@@ -396,6 +399,10 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			if err != nil {
 				break
 			}
+			if hc.earlyStopN > 0 && hc.total >= uint64(hc.earlyStopN) {
+				hc.earlyStopped = true
+				break
+			}
 		}
 		next, err = searcher.Next(searchContext)
 	}
@@ -690,6 +697,19 @@ func (hc *TopNCollector) Results() search.DocumentMatchCollection {
 // Total returns the total number of hits
 func (hc *TopNCollector) Total() uint64 {
 	return hc.total
+}
+
+// SetEarlyStop makes Collect() stop pulling from the searcher once n hits have
+// been collected; n <= 0 disables. Callers must ensure unseen docs cannot
+// change the result.
+func (hc *TopNCollector) SetEarlyStop(n int) {
+	hc.earlyStopN = n
+}
+
+// EarlyStopped reports whether Collect() stopped early; if true, Total() is a
+// lower bound.
+func (hc *TopNCollector) EarlyStopped() bool {
+	return hc.earlyStopped
 }
 
 // MaxScore returns the maximum score seen across all the hits

@@ -525,6 +525,15 @@ func (ss *SearchStatus) Merge(other *SearchStatus) {
 	}
 }
 
+// TotalRelation constants describe the accuracy of SearchResult.Total.
+const (
+	// TotalRelationEq means Total is an exact count of all matching documents.
+	TotalRelationEq = "eq"
+	// TotalRelationGte means Total is a lower bound: collection stopped before
+	// draining every match, so the true match count is >= Total.
+	TotalRelationGte = "gte"
+)
+
 // A SearchResult describes the results of executing
 // a SearchRequest.
 //
@@ -540,14 +549,15 @@ func (ss *SearchStatus) Merge(other *SearchStatus) {
 // Took - The time taken to execute the search.
 // Facets - The facet results for the search.
 type SearchResult struct {
-	Status   *SearchStatus                  `json:"status"`
-	Request  *SearchRequest                 `json:"request,omitempty"`
-	Hits     search.DocumentMatchCollection `json:"hits"`
-	Total    uint64                         `json:"total_hits"`
-	Cost     uint64                         `json:"cost"`
-	MaxScore float64                        `json:"max_score"`
-	Took     time.Duration                  `json:"took"`
-	Facets   search.FacetResults            `json:"facets"`
+	Status        *SearchStatus                  `json:"status"`
+	Request       *SearchRequest                 `json:"request,omitempty"`
+	Hits          search.DocumentMatchCollection `json:"hits"`
+	Total         uint64                         `json:"total_hits"`
+	TotalRelation string                         `json:"total_relation"`
+	Cost          uint64                         `json:"cost"`
+	MaxScore      float64                        `json:"max_score"`
+	Took          time.Duration                  `json:"took"`
+	Facets        search.FacetResults            `json:"facets"`
 	// special fields that are applicable only for search
 	// results that are obtained from a presearch
 	SynonymResult search.FieldTermSynonymMap `json:"synonym_result,omitempty"`
@@ -675,6 +685,9 @@ func (sr *SearchResult) Merge(other *SearchResult) {
 	sr.Status.Merge(other.Status)
 	sr.Hits = append(sr.Hits, other.Hits...)
 	sr.Total += other.Total
+	if other.TotalRelation == TotalRelationGte {
+		sr.TotalRelation = TotalRelationGte
+	}
 	sr.Cost += other.Cost
 	if other.MaxScore > sr.MaxScore {
 		sr.MaxScore = other.MaxScore
