@@ -85,8 +85,8 @@ type TopNCollector struct {
 
 	fastPrepare bool
 
-	earlyStopN   int  // when > 0, Collect() stops after this many hits (see SetEarlyStop)
-	earlyStopped bool // set when Collect() stopped early; Total is then a lower bound
+	earlyStopN   int
+	earlyStopped bool
 }
 
 // CheckDoneEvery controls how frequently we check the context deadline
