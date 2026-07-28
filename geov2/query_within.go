@@ -53,10 +53,10 @@ func (wq *withinQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 
 	// obtain zeroed score arrays from the segment-level pool and return
 	// them once the evaluation is done
-	innerScores := geoData.GetScoreArray()
-	crossScores := geoData.GetScoreArray()
-	defer geoData.PutScoreArray(innerScores)
-	defer geoData.PutScoreArray(crossScores)
+	innerScores := geoData.GetScoreMap()
+	crossScores := geoData.GetScoreMap()
+	defer geoData.PutScoreMap(innerScores)
+	defer geoData.PutScoreMap(crossScores)
 
 	docScoresInner, docScoresCross := geoData.DocScores()
 
