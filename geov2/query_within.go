@@ -97,7 +97,7 @@ func (wq *withinQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	// filter out any maybeHits that do not have a bounding box that
 	// is within the query bounding box
 	boxFilter := func(docNum int) {
-		docBBoxBytes, err := geoData.BoundingBox(uint64(docNum))
+		docBBoxBytes, err := geoData.BoundingBox(uint32(docNum))
 		if docBBoxBytes == nil || err != nil {
 			return
 		}
@@ -117,7 +117,7 @@ func (wq *withinQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset {
 	// filter out any maybeHits that do not have a shape that
 	// is within the query shape
 	shapeFilter := func(docNum int) {
-		docShapeBytes, err := geoData.Shape(uint64(docNum))
+		docShapeBytes, err := geoData.Shape(uint32(docNum))
 		if docShapeBytes == nil || err != nil {
 			return
 		}
