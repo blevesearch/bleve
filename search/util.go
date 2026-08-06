@@ -176,6 +176,16 @@ const (
 	// NestedSearchKey is used to communicate whether the search is performed
 	// in an index with nested documents
 	NestedSearchKey ContextKey = "_nested_search_key"
+
+	// MaxTermSearchersKey carries an application-set int limit on the total
+	// number of leaf term searchers created for a single search; <= 0 disables
+	// the check. Unlike DisjunctionMaxClauseCount, which is per fan-out node,
+	// this bounds the count across the whole query tree.
+	MaxTermSearchersKey ContextKey = "_max_term_searchers_key"
+
+	// termSearchersCounterKey carries the per-search counter installed by
+	// ContextWithTermSearchersCounter.
+	termSearchersCounterKey ContextKey = "_term_searchers_counter_key"
 )
 
 func RecordSearchCost(ctx context.Context,

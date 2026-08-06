@@ -115,6 +115,12 @@ func bm25ScoreMetrics(ctx context.Context, field string,
 func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReader,
 	reader index.TermFieldReader, term []byte, field string, boost float64,
 	options search.SearcherOptions) (*TermSearcher, error) {
+	// Every leaf term searcher is built here, so this is where we count against
+	// the limit. Close the reader on failure since the caller won't get it back.
+	if err := search.RecordTermSearcher(ctx); err != nil {
+		_ = reader.Close()
+		return nil, err
+	}
 	var count uint64
 	var avgDocLength float64
 	var err error

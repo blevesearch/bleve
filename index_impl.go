@@ -752,6 +752,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			ctx = context.WithValue(ctx, search.NestedSearchKey, true)
 		}
 	}
+	// Install here, before presearch and the knn collector, so the counter also
+	// covers presearch and KNN filter searchers, not just the main query's.
+	ctx = search.ContextWithTermSearchersCounter(ctx)
 	// ------------------------------------------------------------------------------------------
 
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
