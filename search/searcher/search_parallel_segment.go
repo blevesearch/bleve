@@ -32,8 +32,10 @@ package searcher
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"runtime"
+	"runtime/debug"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -433,8 +435,18 @@ func runParallelSegmentSearch(
 		wg.Add(1)
 		go func(g int, dss *DisjunctionSliceSearcher) {
 			defer wg.Done()
+			// A panic on this goroutine would bypass every recover() up the
+			// caller's stack (net/http's included) and kill the process —
+			// convert it to a per-shard error instead.
+			defer func() {
+				if r := recover(); r != nil {
+					results[g] = shardResult{err: fmt.Errorf(
+						"parallel segment search: shard %d panicked: %v\n%s",
+						g, r, debug.Stack())}
+				}
+			}()
+			defer func() { _ = dss.Close() }()
 			matches, wandPruned, err := runShardSearch(ctx, dss, &shared, shardK, canWAND)
-			_ = dss.Close()
 			results[g] = shardResult{matches: matches, wandPruned: wandPruned, err: err}
 		}(g, shards[g].dss)
 	}
@@ -476,7 +488,22 @@ func runShardSearch(
 
 	var h dmMinHeap
 
+	var iters uint64
 	for {
+		// Honor query cancellation/timeouts: without this a cancelled query's
+		// shards run to completion, holding cores after the client is gone.
+		if iters%1024 == 0 {
+			select {
+			case <-ctx.Done():
+				for _, dm := range h {
+					searchCtx.DocumentMatchPool.Put(dm)
+				}
+				return nil, false, ctx.Err()
+			default:
+			}
+		}
+		iters++
+
 		// Sync threshold from other goroutines before each Next() call.
 		if st := shared.Get(); st > searchCtx.ScoreThreshold {
 			searchCtx.ScoreThreshold = st
