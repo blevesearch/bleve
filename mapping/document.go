@@ -104,7 +104,7 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache,
 
 func validateFieldType(field *FieldMapping) error {
 	switch field.Type {
-	case "text", "datetime", "number", "boolean", "geopoint", "geoshape", "IP":
+	case "text", "datetime", "number", "boolean", "geopoint", "geoshape", "geoshape_v2", "IP":
 		return nil
 	default:
 		return fmt.Errorf("field: '%s', unknown field type: '%s'",
@@ -557,6 +557,8 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
 				case "vector_base64":
 					fieldMapping.processVectorBase64(property, pathString, path, indexes, context)
+				case "geoshape_v2":
+					fieldMapping.processGeoShapeV2(property, pathString, path, context)
 				default:
 					fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
 				}
@@ -641,6 +643,8 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 						fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
 					case "geoshape":
 						fieldMapping.processGeoShape(property, pathString, path, indexes, context)
+					case "geoshape_v2":
+						fieldMapping.processGeoShapeV2(property, pathString, path, context)
 					}
 				}
 			}
@@ -665,6 +669,9 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 					walkDocument = true
 				case "geoshape":
 					fieldMapping.processGeoShape(property, pathString, path, indexes, context)
+					walkDocument = true
+				case "geoshape_v2":
+					fieldMapping.processGeoShapeV2(property, pathString, path, context)
 					walkDocument = true
 				default:
 					walkDocument = true

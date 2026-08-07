@@ -95,7 +95,7 @@ func (s *ConstantScorer) Score(ctx *search.SearchContext, id index.IndexInternal
 	var scoreExplanation *search.Explanation
 
 	rv := ctx.DocumentMatchPool.Get()
-	rv.IndexInternalID = id
+	rv.IndexInternalID = index.NewIndexInternalIDFrom(rv.IndexInternalID, id)
 
 	if s.includeScore {
 		score := s.constant

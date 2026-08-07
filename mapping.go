@@ -88,6 +88,10 @@ func NewGeoShapeFieldMapping() *mapping.FieldMapping {
 	return mapping.NewGeoShapeFieldMapping()
 }
 
+func NewGeoShapeV2FieldMapping() *mapping.FieldMapping {
+	return mapping.NewGeoShapeV2FieldMapping()
+}
+
 func NewIPFieldMapping() *mapping.FieldMapping {
 	return mapping.NewIPFieldMapping()
 }
