@@ -15,7 +15,6 @@
 package searcher
 
 import (
-	"container/heap"
 	"context"
 	"math"
 	"reflect"
@@ -41,6 +40,14 @@ type SearcherCurr struct {
 	searcher    search.Searcher
 	curr        *search.DocumentMatch
 	matchingIdx int
+
+	// key is curr's internal ID decoded as a uint64, and keyed records
+	// whether that decoding was possible (scorch IDs are always 8 bytes).
+	// Decoding once per heap push, rather than on each of the O(log n)
+	// comparisons a push or pop performs, keeps the merge inner loop down to
+	// integer comparisons.
+	key   uint64
+	keyed bool
 }
 
 type DisjunctionHeapSearcher struct {
@@ -58,6 +65,9 @@ type DisjunctionHeapSearcher struct {
 	matching      []*search.DocumentMatch
 	matchingIdxs  []int
 	matchingCurrs []*SearcherCurr
+
+	// lazily built accumulator used by the block path
+	blockDisj *blockDisjunction
 
 	bytesRead uint64
 }
@@ -142,7 +152,7 @@ func (s *DisjunctionHeapSearcher) initSearchers(ctx *search.SearchContext) error
 			block[i].searcher = searcher
 			block[i].curr = curr
 			block[i].matchingIdx = i
-			heap.Push(s, &block[i])
+			s.heapPush(&block[i])
 		}
 	}
 
@@ -162,14 +172,14 @@ func (s *DisjunctionHeapSearcher) updateMatches() error {
 	if len(s.heap) > 0 {
 
 		// top of the heap is our next hit
-		next := heap.Pop(s).(*SearcherCurr)
+		next := s.heapPop()
 		matching = append(matching, next.curr)
 		matchingCurrs = append(matchingCurrs, next)
 		matchingIdxs = append(matchingIdxs, next.matchingIdx)
 
 		// now as long as top of heap matches, keep popping
-		for len(s.heap) > 0 && next.curr.IndexInternalID.Equals(s.heap[0].curr.IndexInternalID) {
-			next = heap.Pop(s).(*SearcherCurr)
+		for len(s.heap) > 0 && s.heapSameDoc(next, s.heap[0]) {
+			next = s.heapPop()
 			matching = append(matching, next.curr)
 			matchingCurrs = append(matchingCurrs, next)
 			matchingIdxs = append(matchingIdxs, next.matchingIdx)
@@ -232,7 +242,7 @@ func (s *DisjunctionHeapSearcher) Next(ctx *search.SearchContext) (
 			}
 			if curr != nil {
 				matchingCurr.curr = curr
-				heap.Push(s, matchingCurr)
+				s.heapPush(matchingCurr)
 			}
 		}
 
@@ -256,15 +266,15 @@ func (s *DisjunctionHeapSearcher) Advance(ctx *search.SearchContext,
 
 	// if there is anything in matching, toss it back onto the heap
 	for _, matchingCurr := range s.matchingCurrs {
-		heap.Push(s, matchingCurr)
+		s.heapPush(matchingCurr)
 	}
 	s.matching = s.matching[:0]
 	s.matchingCurrs = s.matchingCurrs[:0]
 
 	// find all searchers that actually need to be advanced
 	// advance them, using s.matchingCurrs as temp storage
-	for len(s.heap) > 0 && s.heap[0].curr.IndexInternalID.Compare(ID) < 0 {
-		searcherCurr := heap.Pop(s).(*SearcherCurr)
+	for len(s.heap) > 0 && compareIDs(s.heap[0].curr.IndexInternalID, ID) < 0 {
+		searcherCurr := s.heapPop()
 		ctx.DocumentMatchPool.Put(searcherCurr.curr)
 		curr, err := searcherCurr.searcher.Advance(ctx, ID)
 		if err != nil {
@@ -277,7 +287,7 @@ func (s *DisjunctionHeapSearcher) Advance(ctx *search.SearchContext,
 	}
 	// now all of the searchers that we advanced have to be pushed back
 	for _, matchingCurr := range s.matchingCurrs {
-		heap.Push(s, matchingCurr)
+		s.heapPush(matchingCurr)
 	}
 	// reset our temp space
 	s.matchingCurrs = s.matchingCurrs[:0]
@@ -337,30 +347,73 @@ func (s *DisjunctionHeapSearcher) Optimize(kind string, octx index.OptimizableCo
 }
 
 // heap impl
+//
+// This is a plain binary min-heap over []*SearcherCurr rather than a
+// container/heap.Interface implementation. A disjunction over many clauses
+// (a wildcard or prefix query can expand to hundreds of terms) does O(log n)
+// comparisons and swaps for every clause of every hit, and routing each of
+// those through interface dispatch dominated the query. The sift order here
+// is identical to container/heap's, so pop order is unchanged.
 
-func (s *DisjunctionHeapSearcher) Len() int { return len(s.heap) }
-
-func (s *DisjunctionHeapSearcher) Less(i, j int) bool {
-	if s.heap[i].curr == nil {
+func (s *DisjunctionHeapSearcher) heapLess(a, b *SearcherCurr) bool {
+	if a.keyed && b.keyed {
+		return a.key < b.key
+	}
+	if a.curr == nil {
 		return true
-	} else if s.heap[j].curr == nil {
+	} else if b.curr == nil {
 		return false
 	}
-	return s.heap[i].curr.IndexInternalID.Compare(s.heap[j].curr.IndexInternalID) < 0
+	return compareIDs(a.curr.IndexInternalID, b.curr.IndexInternalID) < 0
 }
 
-func (s *DisjunctionHeapSearcher) Swap(i, j int) {
-	s.heap[i], s.heap[j] = s.heap[j], s.heap[i]
+// heapSameDoc reports whether two heap entries sit on the same document.
+func (s *DisjunctionHeapSearcher) heapSameDoc(a, b *SearcherCurr) bool {
+	if a.keyed && b.keyed {
+		return a.key == b.key
+	}
+	return equalIDs(a.curr.IndexInternalID, b.curr.IndexInternalID)
 }
 
-func (s *DisjunctionHeapSearcher) Push(x interface{}) {
-	s.heap = append(s.heap, x.(*SearcherCurr))
+func (s *DisjunctionHeapSearcher) heapPush(x *SearcherCurr) {
+	x.key, x.keyed = idKey(x.curr)
+	s.heap = append(s.heap, x)
+	h := s.heap
+	j := len(h) - 1
+	for j > 0 {
+		i := (j - 1) / 2
+		if !s.heapLess(h[j], h[i]) {
+			break
+		}
+		h[i], h[j] = h[j], h[i]
+		j = i
+	}
 }
 
-func (s *DisjunctionHeapSearcher) Pop() interface{} {
-	old := s.heap
-	n := len(old)
-	x := old[n-1]
-	s.heap = old[0 : n-1]
-	return x
+func (s *DisjunctionHeapSearcher) heapPop() *SearcherCurr {
+	h := s.heap
+	n := len(h) - 1
+	rv := h[0]
+	h[0] = h[n]
+	h[n] = nil // don't pin the popped entry
+	h = h[:n]
+	s.heap = h
+
+	i := 0
+	for {
+		l := 2*i + 1
+		if l >= n {
+			break
+		}
+		j := l
+		if r := l + 1; r < n && s.heapLess(h[r], h[l]) {
+			j = r
+		}
+		if !s.heapLess(h[j], h[i]) {
+			break
+		}
+		h[i], h[j] = h[j], h[i]
+		i = j
+	}
+	return rv
 }

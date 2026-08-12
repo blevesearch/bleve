@@ -33,13 +33,102 @@ func init() {
 	reflectStaticSizeIndexSnapshotTermFieldReader = int(reflect.TypeOf(istfr).Size())
 }
 
+// termFieldDocFiller is an optional fast path a segment's postings iterator may
+// implement: fill a TermFieldDoc directly instead of returning a boxed
+// segment.Posting that the caller then interrogates via Number/Frequency/Norm.
+// Those four virtual calls plus the Posting struct clear measured at roughly a
+// quarter of the term-scan inner loop.
+//
+// It is only usable when term vectors are not requested — implementations are
+// not required to decode locations.
+type termFieldDocFiller interface {
+	FillTermFieldDoc(rv *index.TermFieldDoc, globalOffset, atOrAfter uint64,
+		includeFreq, includeNorm bool) (bool, error)
+}
+
+// blockFiller is the bulk form of the same idea: hand back a whole block of
+// postings as flat arrays so the caller can score them without a per-document
+// object. Implementations do not decode locations.
+type blockFiller interface {
+	NextBlock(docNums []uint64, freqs []uint64, norms []float64,
+		globalOffset uint64) (int, error)
+}
+
+// NextBlock fills the caller's arrays with the next block of postings, walking
+// across segments as needed. It returns 0 when the reader is exhausted.
+//
+// This exists so a searcher can pull postings in bulk instead of one
+// TermFieldDoc at a time; profiling put roughly half of a term scan in the
+// per-document plumbing between here and the collector.
+func (i *IndexSnapshotTermFieldReader) NextBlock(docNums []uint64, freqs []uint64,
+	norms []float64) (int, error) {
+	n := 0
+	for n < len(docNums) && i.segmentOffset < len(i.iterators) {
+		// asserted here rather than precomputed per reader: multi-term queries
+		// build hundreds of readers and would pay for a capability they never
+		// use, while here the cost is amortised over a whole block
+		bf, _ := i.iterators[i.segmentOffset].(blockFiller)
+		if bf == nil {
+			return n, nil // segment can't bulk-fill; caller falls back
+		}
+		curItr := i.iterators[i.segmentOffset]
+		var prevBytesRead uint64
+		if i.updateBytesRead {
+			prevBytesRead = curItr.BytesRead()
+		}
+		got, err := bf.NextBlock(docNums[n:], freqs[n:], norms[n:],
+			i.snapshot.offsets[i.segmentOffset])
+		if err != nil {
+			return n, err
+		}
+		if i.updateBytesRead {
+			if bytesRead := curItr.BytesRead(); bytesRead > prevBytesRead {
+				i.incrementBytesRead(bytesRead - prevBytesRead)
+			}
+		}
+		n += got
+		if got == 0 || n == len(docNums) {
+			if got == 0 {
+				i.segmentOffset++
+				continue
+			}
+			break
+		}
+		// the segment is drained but there is room left in the block
+		i.segmentOffset++
+	}
+	if n > 0 {
+		i.currID = index.NewIndexInternalID(i.currID, docNums[n-1])
+		i.currPosting = nil
+	}
+	return n, nil
+}
+
+// supportsBlocks reports whether every segment can bulk-fill, which is what
+// lets a caller commit to the block path for the whole reader.
+func (i *IndexSnapshotTermFieldReader) SupportsBlocks() bool {
+	if i.includeTermVectors || len(i.iterators) == 0 {
+		return false
+	}
+	for _, it := range i.iterators {
+		if _, ok := it.(blockFiller); !ok {
+			return false
+		}
+	}
+	return true
+}
+
 type IndexSnapshotTermFieldReader struct {
-	term               []byte
-	field              string
-	snapshot           *IndexSnapshot
-	dicts              []segment.TermDictionary
-	postings           []segment.PostingsList
-	iterators          []segment.PostingsIterator
+	term      []byte
+	field     string
+	snapshot  *IndexSnapshot
+	dicts     []segment.TermDictionary
+	postings  []segment.PostingsList
+	iterators []segment.PostingsIterator
+	// fillers[i] is iterators[i] if it supports the direct-fill fast path and
+	// that path is applicable, else nil. Resolved once per reader so the hot
+	// loop doesn't repeat the type assertion.
+	fillers            []termFieldDocFiller
 	segmentOffset      int
 	includeFreq        bool
 	includeNorm        bool
@@ -94,6 +183,37 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 		if i.updateBytesRead {
 			prevBytesRead = curItr.BytesRead()
 		}
+
+		// Fast path: let the segment write straight into rv, skipping the
+		// per-document Posting boxing and its accessor calls.
+		//
+		// fillers is bounds-checked rather than indexed directly: the unadorned
+		// and optimized readers build a TFR without it, so it may be shorter
+		// than iterators (or nil).
+		var filler termFieldDocFiller
+		if i.segmentOffset < len(i.fillers) {
+			filler = i.fillers[i.segmentOffset]
+		}
+		if filler != nil {
+			globalOffset := i.snapshot.offsets[i.segmentOffset]
+			found, err := filler.FillTermFieldDoc(rv, globalOffset, 0, i.includeFreq, i.includeNorm)
+			if err != nil {
+				return nil, err
+			}
+			if found {
+				i.currID = rv.ID
+				i.currPosting = nil // the fast path produces no Posting
+				if i.updateBytesRead {
+					if bytesRead := curItr.BytesRead(); bytesRead > prevBytesRead {
+						i.incrementBytesRead(bytesRead - prevBytesRead)
+					}
+				}
+				return rv, nil
+			}
+			i.segmentOffset++
+			continue
+		}
+
 		next, err := curItr.Next()
 		if err != nil {
 			return nil, err
@@ -156,7 +276,10 @@ func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Postin
 func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
 	// FIXME do something better
 	// for now, if we need to seek backwards, then restart from the beginning
-	if i.currPosting != nil && i.currID.Compare(ID) >= 0 {
+	// currID is non-empty exactly when this reader has already returned a hit.
+	// currPosting cannot be used for that test: the direct-fill fast path in
+	// Next never populates it.
+	if len(i.currID) > 0 && i.currID.Compare(ID) >= 0 {
 		// Check if the TFR is a special unadorned composite optimization.
 		// Such a TFR will NOT have a valid `term` or `field` set, making it
 		// impossible for the TFR to replace itself with a new one.
@@ -189,6 +312,32 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 	}
 	// skip directly to the target segment
 	i.segmentOffset = segIndex
+
+	// Same direct-fill fast path as Next, which matters here because
+	// conjunctions drive their non-leading clauses entirely through Advance.
+	var filler termFieldDocFiller
+	if i.segmentOffset < len(i.fillers) {
+		filler = i.fillers[i.segmentOffset]
+	}
+	if filler != nil {
+		if preAlloced == nil {
+			preAlloced = &index.TermFieldDoc{}
+		}
+		found, err := filler.FillTermFieldDoc(preAlloced, i.snapshot.offsets[segIndex],
+			ldocNum, i.includeFreq, i.includeNorm)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			// nothing at or after the target in this segment; Next picks up
+			// from the following segment (segmentOffset already moved)
+			return i.Next(preAlloced)
+		}
+		i.currID = preAlloced.ID
+		i.currPosting = nil
+		return preAlloced, nil
+	}
+
 	next, err := i.iterators[i.segmentOffset].Advance(ldocNum)
 	if err != nil {
 		return nil, err

@@ -43,6 +43,16 @@ type PhraseSearcher struct {
 	initialized  bool
 	// map a term to a list of fuzzy terms that match it
 	fuzzyTermMatches map[string][]string
+	// locationsMap is handed to Complete for every candidate document and
+	// recycled in between, so the location maps are allocated once per
+	// searcher rather than once per candidate.
+	locationsMap search.FieldTermLocationMap
+	// expandedTlm is the equivalent reused scratch map for the fuzzy-phrase
+	// expansion below.
+	expandedTlm search.TermLocationMap
+	// ftlScratch receives matched field-term locations while the incoming ones
+	// are still being read; it is swapped with the match's own buffer on a hit.
+	ftlScratch []search.FieldTermLocation
 }
 
 func (s *PhraseSearcher) Size() int {
@@ -300,29 +310,108 @@ func (s *PhraseSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch,
 // also satisfies the phrase constraints.  if so, it returns a DocumentMatch
 // for this document, otherwise nil
 func (s *PhraseSearcher) checkCurrMustMatch(ctx *search.SearchContext) *search.DocumentMatch {
-	s.locations = s.currMust.Complete(s.locations)
+	in := s.currMust.FieldTermLocations
 
-	locations := s.currMust.Locations
-	s.currMust.Locations = nil
+	// Build the field/term index findPhrasePaths needs by pointing straight
+	// into the flat FieldTermLocations the conjunction produced, rather than
+	// going through Complete.
+	//
+	// Complete copies every occurrence into a second []Location and clears the
+	// source entry as it goes — per candidate document, not per result — which
+	// profiling put at ~16% of a phrase query. Nothing here needs those copies:
+	// the map only holds pointers, and the matched output is written to a
+	// separate buffer so `in` stays intact while it is being read. Complete is
+	// still what produces the public Locations map, but the collector calls it
+	// only for the handful of hits that survive into the results.
+	if s.locationsMap == nil {
+		s.locationsMap = make(search.FieldTermLocationMap)
+	} else {
+		s.locationsMap.Recycle()
+	}
 
-	ftls := s.currMust.FieldTermLocations
+	// `in` arrives grouped by field and, within a field, by term, so the map
+	// lookups are hoisted out of the per-occurrence loop.
+	var lastField, lastTerm string
+	var tlm search.TermLocationMap
+	var locs search.Locations
+	var haveTerm, needsDedupe bool
+
+	for i := range in {
+		ftl := &in[i]
+
+		if tlm == nil || lastField != ftl.Field {
+			if haveTerm {
+				tlm[lastTerm] = locs
+				haveTerm = false
+			}
+			lastField = ftl.Field
+			tlm = s.locationsMap[ftl.Field]
+			if tlm == nil {
+				tlm = make(search.TermLocationMap)
+				s.locationsMap[ftl.Field] = tlm
+			}
+		}
+
+		if !haveTerm || lastTerm != ftl.Term {
+			if haveTerm {
+				tlm[lastTerm] = locs
+			}
+			lastTerm = ftl.Term
+			locs = tlm[ftl.Term]
+			haveTerm = true
+		}
+
+		loc := &ftl.Location
+
+		// same duplicate detection Complete performs: a location at or before
+		// the previous one means the same occurrence can appear twice (a phrase
+		// repeating a term merges that term's postings more than once)
+		if !needsDedupe && len(locs) > 0 {
+			last := locs[len(locs)-1]
+			cmp := loc.ArrayPositions.Compare(last.ArrayPositions)
+			if cmp < 0 || (cmp == 0 && loc.Pos <= last.Pos) {
+				needsDedupe = true
+			}
+		}
+
+		locs = append(locs, loc)
+	}
+	if haveTerm {
+		tlm[lastTerm] = locs
+	}
+
+	if needsDedupe {
+		for _, tlm := range s.locationsMap {
+			for term, locs := range tlm {
+				tlm[term] = locs.Dedupe()
+			}
+		}
+	}
+
+	// Matched locations go to a scratch buffer: `in` is still live above, so it
+	// cannot double as the output the way it could when Complete had already
+	// copied everything out of it.
+	out := s.ftlScratch[:0]
 
 	// typically we would expect there to only actually be results in
 	// one field, but we allow for this to not be the case
 	// but, we note that phrase constraints can only be satisfied within
 	// a single field, so we can check them each independently
-	for field, tlm := range locations {
-		ftls = s.checkCurrMustMatchField(ctx, field, tlm, ftls)
+	for field, tlm := range s.locationsMap {
+		out = s.checkCurrMustMatchField(ctx, field, tlm, out)
 	}
 
-	if len(ftls) > 0 {
-		// return match
+	if len(out) > 0 {
+		// return match; the match takes ownership of the output buffer and the
+		// searcher keeps the match's old array as the next scratch
 		rv := s.currMust
 		s.currMust = nil
-		rv.FieldTermLocations = ftls
+		s.ftlScratch = rv.FieldTermLocations[:0]
+		rv.FieldTermLocations = out
 		return rv
 	}
 
+	s.ftlScratch = out[:0]
 	return nil
 }
 
@@ -347,9 +436,13 @@ func (s *PhraseSearcher) checkCurrMustMatchField(ctx *search.SearchContext,
 		//	food -> Locations[food]
 		// the expanded tlm will be:
 		//   foo -> [Locations[foo], Locations[fool], Locations[food]]
-		expandedTlm := make(search.TermLocationMap)
-		s.expandFuzzyMatches(tlm, expandedTlm)
-		tlmPtr = &expandedTlm
+		if s.expandedTlm == nil {
+			s.expandedTlm = make(search.TermLocationMap)
+		} else {
+			clear(s.expandedTlm)
+		}
+		s.expandFuzzyMatches(tlm, s.expandedTlm)
+		tlmPtr = &s.expandedTlm
 	}
 	s.paths = findPhrasePaths(0, nil, s.terms, *tlmPtr, s.path[:0], 0, s.paths[:0])
 	for _, p := range s.paths {
