@@ -274,3 +274,33 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 	}
 	return rv
 }
+
+// CanScoreBulk reports whether this scorer can score a block of documents from
+// flat freq/norm arrays. Explanations and query-time boosts that need the
+// per-document object keep the scalar path.
+func (s *TermQueryScorer) CanScoreBulk() bool {
+	return s.includeScore && !s.options.Explain
+}
+
+// ScoreBulk scores a block of documents into out. It is the same arithmetic as
+// docScore, hoisted out of the per-document call so the loop is flat.
+func (s *TermQueryScorer) ScoreBulk(freqs []uint64, norms []float64, out []float64) {
+	bm25 := s.avgDocLength > 0
+	for i := range out {
+		var tf float64
+		if freqs[i] < MaxSqrtCache {
+			tf = SqrtCache[int(freqs[i])]
+		} else {
+			tf = math.Sqrt(float64(freqs[i]))
+		}
+		var score float64
+		if bm25 {
+			fieldLength := 1 / (norms[i] * norms[i])
+			score = s.idf * (tf * search.BM25_k1) /
+				(tf + search.BM25_k1*(1-search.BM25_b+(search.BM25_b*fieldLength/s.avgDocLength)))
+		} else {
+			score = tf * norms[i] * s.idf
+		}
+		out[i] = score * s.queryWeight
+	}
+}

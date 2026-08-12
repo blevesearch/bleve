@@ -637,6 +637,9 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 	if rv.iterators == nil {
 		rv.iterators = make([]segment.PostingsIterator, len(is.segment))
 	}
+	if rv.fillers == nil {
+		rv.fillers = make([]termFieldDocFiller, len(is.segment))
+	}
 	rv.segmentOffset = 0
 	rv.includeFreq = includeFreq
 	rv.includeNorm = includeNorm
@@ -696,6 +699,16 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 			prevBytesReadItr = rv.iterators[i].BytesRead()
 		}
 		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, rv.iterators[i])
+
+		// Resolve the direct-fill fast path once, here, rather than type
+		// asserting on every document. It cannot be used when term vectors are
+		// wanted, since fillers do not decode locations.
+		rv.fillers[i] = nil
+		if !includeTermVectors {
+			if f, ok := rv.iterators[i].(termFieldDocFiller); ok {
+				rv.fillers[i] = f
+			}
+		}
 
 		if bytesRead := rv.postings[i].BytesRead(); prevBytesReadPL < bytesRead {
 			rv.incrementBytesRead(bytesRead - prevBytesReadPL)

@@ -47,6 +47,9 @@ type DisjunctionSliceSearcher struct {
 	matchingIdxs           []int
 	initialized            bool
 	bytesRead              uint64
+
+	// lazily built accumulator used by the block path
+	blockDisj *blockDisjunction
 }
 
 func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexReader,

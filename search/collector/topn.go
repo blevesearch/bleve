@@ -346,6 +346,19 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	// score sort value (see canFastPrepare). Applies only to score-sorted queries
 	//  with no field-loading needs.
 	hc.fastPrepare = hc.canFastPrepare()
+
+	// Bulk path: when the searcher can hand back scored documents a block at a
+	// time and none of the collector's optional features are in play, run the
+	// scan over flat arrays and build a DocumentMatch only for documents that
+	// actually enter the top-N. On a term query returning ten hits out of
+	// 142k, the generic path materialises and recycles an object for every one
+	// of the 142k.
+	if hc.canBulkCollect() {
+		if bs, ok := searcher.(search.BulkSearcher); ok && bs.CanScoreBlock() {
+			return hc.collectBulk(ctx, bs, searchContext, dmHandler)
+		}
+	}
+
 	select {
 	case <-ctx.Done():
 		search.RecordSearchCost(ctx, search.AbortM, 0)
@@ -736,4 +749,63 @@ func (hc *TopNCollector) SetKNNHits(knnHits search.DocumentMatchCollection, hybr
 		hc.knnHits[hit.ID] = hit
 	}
 	hc.hybridMergeCallback = hybridMergeCallback
+}
+
+// canBulkCollect reports whether this collector's configuration permits the
+// block path: score-only sorting, no facets, no KNN, no nested documents, no
+// search-after, and no field loading.
+func (hc *TopNCollector) canBulkCollect() bool {
+	return hc.fastPrepare && hc.facetsBuilder == nil && hc.knnHits == nil &&
+		hc.nestedStore == nil && hc.searchAfter == nil && !hc.needDocIds &&
+		hc.earlyStopN == 0
+}
+
+// collectBulk drives a BulkSearcher over flat blocks. A DocumentMatch is taken
+// from the pool only when a document actually beats the current cutoff, which
+// on a selective top-N is a handful of documents out of the whole postings
+// list rather than all of them.
+func (hc *TopNCollector) collectBulk(ctx context.Context, bs search.BulkSearcher,
+	searchContext *search.SearchContext, dmHandler search.DocumentMatchHandler) error {
+	blk := search.NewDocScoreBlock()
+
+	for {
+		select {
+		case <-ctx.Done():
+			search.RecordSearchCost(ctx, search.AbortM, 0)
+			return ctx.Err()
+		default:
+		}
+
+		n, err := bs.ScoreBlock(blk)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			break
+		}
+
+		ids, scores := blk.IDs[:n], blk.Scores[:n]
+		for i := 0; i < n; i++ {
+			// the same bookkeeping basicPrepare does on the scalar path
+			hc.total++
+			if scores[i] > hc.maxScore {
+				hc.maxScore = scores[i]
+			}
+			// cutoff check happens before anything is allocated
+			if hc.lowestMatchOutsideResults != nil &&
+				scores[i] <= hc.lowestMatchOutsideResults.Score {
+				continue
+			}
+			dm := searchContext.DocumentMatchPool.Get()
+			dm.IndexInternalID = index.NewIndexInternalID(dm.IndexInternalID, ids[i])
+			dm.Score = scores[i]
+			dm.HitNumber = hc.total
+			dm.Sort = sortByScoreOpt
+			if err := dmHandler(dm); err != nil {
+				return err
+			}
+		}
+	}
+
+	return hc.finalizeResults(searchContext.IndexReader)
 }
