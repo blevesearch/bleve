@@ -68,7 +68,7 @@ func (s *SegmentSnapshot) LiveSize() int64 {
 	return int64(s.Count())
 }
 
-func (s *SegmentSnapshot) HasVector() bool {
+func (s *SegmentSnapshot) FileSizeSensitive() bool {
 	// number of vectors, for each vector field in the segment
 	numVecs := s.stats.Fetch()["num_vectors"]
 	return len(numVecs) > 0

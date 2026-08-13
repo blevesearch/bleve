@@ -250,6 +250,12 @@ func (s *Scorch) parseMergePlannerOptions(po *persisterOptions) (*mergeplan.Merg
 			return nil, err
 		}
 	}
+
+	if v, ok := s.config[IndexTrainedWithFastMerge]; ok {
+		if v, ok := v.(bool); ok && v {
+			mergePlannerOptions.FileSizeBasedMerge = true
+		}
+	}
 	return &mergePlannerOptions, nil
 }
 

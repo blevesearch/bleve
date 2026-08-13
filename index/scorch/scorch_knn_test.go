@@ -123,8 +123,8 @@ func TestFieldStatPersistence(t *testing.T) {
 	if len(snapshot.segment) != 1 {
 		t.Fatalf("expected 1 segment after introduce, got %d", len(snapshot.segment))
 	}
-	if !snapshot.segment[0].HasVector() {
-		t.Fatalf("expected HasVector() == true after index persist")
+	if !snapshot.segment[0].FileSizeSensitive() {
+		t.Fatalf("expected FileSizeSensitive() == true after index persist")
 	}
 	scorchStats := s.StatsMap()
 	numVecs := scorchStats[statName].(uint64)
@@ -150,8 +150,8 @@ func TestFieldStatPersistence(t *testing.T) {
 	if len(snapshot.segment) != 1 {
 		t.Fatalf("expected 1 segment after reopen, got %d", len(snapshot.segment))
 	}
-	if !snapshot.segment[0].HasVector() {
-		t.Fatalf("reopened segment: expected HasVector() == true after index reopen")
+	if !snapshot.segment[0].FileSizeSensitive() {
+		t.Fatalf("reopened segment: expected FileSizeSensitive() == true after index reopen")
 	}
 	scorchStats = s.StatsMap()
 	numVecs = scorchStats[statName].(uint64)
