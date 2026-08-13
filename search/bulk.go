@@ -14,6 +14,8 @@
 
 package search
 
+import "sync"
+
 // BlockSize is how many postings a bulk scorer produces per call. Large enough
 // to amortise the call across the block, small enough that the arrays stay in
 // cache.
@@ -37,6 +39,42 @@ func NewDocScoreBlock() *DocScoreBlock {
 		Freqs:  make([]uint64, BlockSize),
 		Norms:  make([]float64, BlockSize),
 	}
+}
+
+// docScoreBlockPool recycles blocks across queries.
+//
+// A block is 4 arrays of BlockSize, so 8KB, and a disjunction takes one per
+// clause. A wildcard that expands to ~890 terms therefore allocated ~7MB per
+// query and threw it away — 29% of that query's allocation, feeding a GC and
+// scavenger cost measured at roughly 39% of its runtime.
+//
+// This is safe to pool in a way that recycling a TermFieldReader is not (see
+// MB-64669): a block holds only plain uint64/float64 scratch and no reference
+// into a memory-mapped segment, so there is nothing here that can be unmapped
+// or paged out underneath a later user. Producers also fill [0:n) and consumers
+// only ever read [0:n), so stale contents are never observed.
+var docScoreBlockPool = sync.Pool{
+	New: func() interface{} { return NewDocScoreBlock() },
+}
+
+// GetDocScoreBlock takes a block from the pool.
+func GetDocScoreBlock() *DocScoreBlock {
+	return docScoreBlockPool.Get().(*DocScoreBlock)
+}
+
+// PutDocScoreBlock returns a block to the pool. The caller must not touch it
+// afterwards; callers null out their reference to make that a nil dereference
+// rather than silent sharing.
+func PutDocScoreBlock(blk *DocScoreBlock) {
+	if blk == nil {
+		return
+	}
+	// A block whose arrays were replaced is not reusable at the expected size.
+	if len(blk.IDs) != BlockSize || len(blk.Scores) != BlockSize ||
+		len(blk.Freqs) != BlockSize || len(blk.Norms) != BlockSize {
+		return
+	}
+	docScoreBlockPool.Put(blk)
 }
 
 // BulkSearcher is implemented by searchers that can produce scored documents a

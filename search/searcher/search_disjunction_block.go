@@ -145,9 +145,23 @@ func newBlockDisjunction(searchers []search.Searcher, min, total int) *blockDisj
 		if !ok {
 			return nil
 		}
-		bd.children = append(bd.children, &bulkChild{bs: bs, blk: search.NewDocScoreBlock()})
+		bd.children = append(bd.children, &bulkChild{bs: bs, blk: search.GetDocScoreBlock()})
 	}
 	return bd
+}
+
+// release returns every child's block to the pool. Called from the owning
+// searcher's Close; nothing may use the blockDisjunction afterwards, and the
+// nil-ing makes a violation a panic rather than two queries quietly sharing a
+// block.
+func (bd *blockDisjunction) release() {
+	if bd == nil {
+		return
+	}
+	for _, c := range bd.children {
+		search.PutDocScoreBlock(c.blk)
+		c.blk = nil
+	}
 }
 
 // canBlockDisjunct reports whether every clause can produce blocks.

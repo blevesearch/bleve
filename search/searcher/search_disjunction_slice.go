@@ -299,6 +299,10 @@ func (s *DisjunctionSliceSearcher) Count() uint64 {
 }
 
 func (s *DisjunctionSliceSearcher) Close() (rv error) {
+	// hand back the per-clause scratch blocks before releasing the clauses
+	s.blockDisj.release()
+	s.blockDisj = nil
+
 	for _, searcher := range s.searchers {
 		err := searcher.Close()
 		if err != nil && rv == nil {
