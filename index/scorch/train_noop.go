@@ -24,6 +24,8 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
+const IndexTrainedWithFastMerge = "vector_index_fast_merge"
+
 func initTrainer(s *Scorch, config map[string]interface{}) *noopTrainer {
 	return nil
 }

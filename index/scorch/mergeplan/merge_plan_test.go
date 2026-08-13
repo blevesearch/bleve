@@ -36,11 +36,11 @@ type segment struct {
 	MyFileSize  int64
 }
 
-func (s *segment) Id() uint64      { return s.MyId }
-func (s *segment) FullSize() int64 { return s.MyFullSize }
-func (s *segment) LiveSize() int64 { return s.MyLiveSize }
-func (s *segment) HasVector() bool { return s.MyHasVector }
-func (s *segment) FileSize() int64 { return s.MyFileSize }
+func (s *segment) Id() uint64              { return s.MyId }
+func (s *segment) FullSize() int64         { return s.MyFullSize }
+func (s *segment) LiveSize() int64         { return s.MyLiveSize }
+func (s *segment) FileSizeSensitive() bool { return s.MyHasVector }
+func (s *segment) FileSize() int64         { return s.MyFileSize }
 func (s *segment) LiveFileSize() int64 {
 	// LiveFileSize is an estimate of the live portion of the file size,
 	// based on the ratio of live to full size.
@@ -621,7 +621,7 @@ func (spec *testCyclesSpec) runCycles(t *testing.T) {
 			for _, segment := range task.Segments {
 				totLiveSize += segment.LiveSize()
 				totLiveFileSize += segment.LiveFileSize()
-				if segment.HasVector() {
+				if segment.FileSizeSensitive() {
 					hasVector = true
 				}
 			}

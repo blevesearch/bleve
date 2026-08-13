@@ -38,7 +38,7 @@ type Segment interface {
 	// any logical deletions.
 	LiveSize() int64
 
-	HasVector() bool
+	FileSizeSensitive() bool
 
 	// Size of the persisted segment file.
 	FileSize() int64
@@ -115,6 +115,8 @@ type MergePlanOptions struct {
 	// impact merge selection.
 	ReclaimDeletesWeight float64
 
+	FileSizeBasedMerge bool
+
 	// Optional, defaults to mergeplan.CalcBudget().
 	CalcBudget func(totalSize int64, firstTierSize int64,
 		o *MergePlanOptions) (budgetNumSegments int)
@@ -146,6 +148,10 @@ func (o *MergePlanOptions) BudgetCurrency() BudgetCurrency {
 		return FileSizeBudget
 	}
 	return LiveSizeBudget
+}
+
+func (o *MergePlanOptions) PerformFileSizeBasedMerge() bool {
+	return o.FileSizeBasedMerge
 }
 
 // MaxSegmentSizeLimit represents the maximum size of a segment,
@@ -272,7 +278,7 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		// and thus need a stricter check based on the file size.
 		// This is particularly important for segments that contain
 		// vectors.
-		if segment.HasVector() {
+		if segment.FileSizeSensitive() {
 			isEligible = isEligible && liveFileSize < o.MaxSegmentFileSize/2
 		}
 
@@ -344,7 +350,7 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 					continue
 				}
 
-				if eligible.HasVector() {
+				if o.PerformFileSizeBasedMerge() && eligible.FileSizeSensitive() {
 					liveFileSize := eligible.LiveFileSize()
 
 					if rosterLiveFileSize+liveFileSize >= o.MaxSegmentFileSize {
