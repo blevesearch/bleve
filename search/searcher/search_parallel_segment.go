@@ -48,7 +48,9 @@ import (
 // latency-focused workloads where per-query goroutine overhead pays off.
 // When true, §33 adaptive guards (concurrency gate + DF-based shard guard)
 // still apply unless the caller sets ParallelSegmentSearchKey explicitly.
-var EnableParallelSegmentSearch = false
+// Atomic so it can be toggled at runtime (e.g. via a manager option) while
+// queries are in flight.
+var EnableParallelSegmentSearch atomic.Bool
 
 // ParallelSegmentSearchMinSegs is the minimum number of index segments required
 // to activate parallel search. Below this the goroutine overhead dominates.
@@ -259,7 +261,7 @@ func shouldRunParallel(s *DisjunctionSliceSearcher, sctx *search.SearchContext) 
 		}
 		shardK = v
 		explicitOverride = true
-	} else if !EnableParallelSegmentSearch {
+	} else if !EnableParallelSegmentSearch.Load() {
 		return false, 0
 	}
 

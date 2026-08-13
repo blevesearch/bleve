@@ -144,12 +144,12 @@ func TestParallelSegmentSearchUnadornedConjunction(t *testing.T) {
 
 	// Enable §7 parallel segment search and lower the minimum segment threshold
 	// so it fires on our 3-segment test index.
-	origParallel := EnableParallelSegmentSearch
+	origParallel := EnableParallelSegmentSearch.Load()
 	origMinSegs := ParallelSegmentSearchMinSegs
-	EnableParallelSegmentSearch = true
+	EnableParallelSegmentSearch.Store(true)
 	ParallelSegmentSearchMinSegs = 2
 	defer func() {
-		EnableParallelSegmentSearch = origParallel
+		EnableParallelSegmentSearch.Store(origParallel)
 		ParallelSegmentSearchMinSegs = origMinSegs
 	}()
 
@@ -222,12 +222,12 @@ func TestParallelSegmentSearchCorrectness(t *testing.T) {
 	scorch.OptimizeDisjunctionUnadorned = false
 	defer func() { scorch.OptimizeDisjunctionUnadorned = origDisjOpt }()
 
-	origParallel := EnableParallelSegmentSearch
+	origParallel := EnableParallelSegmentSearch.Load()
 	origMinSegs := ParallelSegmentSearchMinSegs
-	EnableParallelSegmentSearch = true
+	EnableParallelSegmentSearch.Store(true)
 	ParallelSegmentSearchMinSegs = 2
 	defer func() {
-		EnableParallelSegmentSearch = origParallel
+		EnableParallelSegmentSearch.Store(origParallel)
 		ParallelSegmentSearchMinSegs = origMinSegs
 	}()
 
@@ -344,10 +344,10 @@ func strSlicesEqual(a, b []string) bool {
 // Full end-to-end coverage of the ctx-enable path (ctx shardK>0 + global=false)
 // is provided by TestParallelSegmentSearchCorrectness.
 func TestShouldRunParallelCtxOverride(t *testing.T) {
-	origParallel := EnableParallelSegmentSearch
+	origParallel := EnableParallelSegmentSearch.Load()
 	origShardK := ParallelSegmentSearchShardK
 	defer func() {
-		EnableParallelSegmentSearch = origParallel
+		EnableParallelSegmentSearch.Store(origParallel)
 		ParallelSegmentSearchShardK = origShardK
 	}()
 
@@ -357,7 +357,7 @@ func TestShouldRunParallelCtxOverride(t *testing.T) {
 
 	// Case 1: ctx shardK=0 disables via early return before any other check,
 	// even when the global flag is on.
-	EnableParallelSegmentSearch = true
+	EnableParallelSegmentSearch.Store(true)
 	ParallelSegmentSearchShardK = 5
 	ctx1 := context.WithValue(context.Background(), search.ParallelSegmentSearchKey, 0)
 	noWAND := &search.SearchContext{}
@@ -367,7 +367,7 @@ func TestShouldRunParallelCtxOverride(t *testing.T) {
 	}
 
 	// Case 2: no ctx + global=false → disabled via global early return.
-	EnableParallelSegmentSearch = false
+	EnableParallelSegmentSearch.Store(false)
 	ok, _ = shouldRunParallel(makeS(context.Background()), noWAND)
 	if ok {
 		t.Error("case 2: global=false with no ctx should disable parallel")
@@ -387,17 +387,17 @@ func TestParallelSegmentSearchAdaptiveGuards(t *testing.T) {
 	idx := buildMultiBatchScorchIndex(t, dir)
 	defer func() { _ = idx.Close() }()
 
-	origParallel := EnableParallelSegmentSearch
+	origParallel := EnableParallelSegmentSearch.Load()
 	origMinDF := ParallelSegmentSearchMinDFPerSeg
 	origMinSegs := ParallelSegmentSearchMinSegs
 	defer func() {
-		EnableParallelSegmentSearch = origParallel
+		EnableParallelSegmentSearch.Store(origParallel)
 		ParallelSegmentSearchMinDFPerSeg = origMinDF
 		ParallelSegmentSearchMinSegs = origMinSegs
 		parallelSearchesActive.Store(0)
 	}()
 
-	EnableParallelSegmentSearch = true
+	EnableParallelSegmentSearch.Store(true)
 	ParallelSegmentSearchMinSegs = 2 // test index has 3 segments from 3 batches
 
 	ir, err := idx.Reader()
