@@ -766,7 +766,11 @@ func (hc *TopNCollector) canBulkCollect() bool {
 // list rather than all of them.
 func (hc *TopNCollector) collectBulk(ctx context.Context, bs search.BulkSearcher,
 	searchContext *search.SearchContext, dmHandler search.DocumentMatchHandler) error {
-	blk := search.NewDocScoreBlock()
+	blk := search.GetDocScoreBlock()
+	defer func() {
+		search.PutDocScoreBlock(blk)
+		blk = nil
+	}()
 
 	for {
 		select {
