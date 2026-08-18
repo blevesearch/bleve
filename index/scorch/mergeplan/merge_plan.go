@@ -278,7 +278,7 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		// and thus need a stricter check based on the file size.
 		// This is particularly important for segments that contain
 		// vectors.
-		if segment.FileSizeSensitive() {
+		if o.PerformFileSizeBasedMerge() && segment.FileSizeSensitive() {
 			isEligible = isEligible && liveFileSize < o.MaxSegmentFileSize/2
 		}
 
