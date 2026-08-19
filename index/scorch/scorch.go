@@ -44,6 +44,7 @@ var ErrClosed = fmt.Errorf("scorch closed")
 type Scorch struct {
 	nextSegmentID uint64
 	stats         Stats
+	zapStats      segment.Stats
 	iStats        internalStats
 
 	readOnly      bool
@@ -212,6 +213,9 @@ func NewScorch(storeName string,
 	if ok {
 		rv.segmentConfig = segConfig
 	}
+
+	// NOTE: always register the stats handler in the config map to track zap layer stats
+	rv.segmentConfig[segment.StatsKey] = &rv.zapStats
 
 	typ, ok := config["spatialPlugin"].(string)
 	if ok {
@@ -854,9 +858,8 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 		}
 	}
 
-	// these stats are the segment level stats captured throughout the index lifecycle
-	zapStats := s.segPlugin.StatsMap()
-	m["segment_stats"] = zapStats
+	// zap layer stats that are continously updated throughout the index lifecycle
+	m[segment.StatsKey] = s.zapStats.StatsMap()
 	return m
 }
 

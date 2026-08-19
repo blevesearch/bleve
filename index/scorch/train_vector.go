@@ -69,7 +69,7 @@ func initTrainer(s *Scorch, config map[string]interface{}) *vectorTrainer {
 		if ok && feature {
 			trainer := vectorTrainer{
 				parent:  s,
-				config:  maps.Clone(s.config),
+				config:  maps.Clone(s.segmentConfig),
 				trainCh: make(chan *trainRequest, 1),
 				doneCh:  make(chan struct{}),
 			}
@@ -398,6 +398,9 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	//
 	// todo: updates/deletes -> data drift detection
 	if len(trainData) > 0 {
+		if _, ok := config[segment.StatsKey]; !ok {
+			fmt.Println("missing stats in config")
+		}
 		trainReq.sample, _, err = t.parent.segPlugin.NewUsing(trainData, config)
 		if err != nil {
 			return err
