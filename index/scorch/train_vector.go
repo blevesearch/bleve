@@ -69,7 +69,7 @@ func initTrainer(s *Scorch, config map[string]interface{}) *vectorTrainer {
 		if ok && feature {
 			trainer := vectorTrainer{
 				parent:  s,
-				config:  maps.Clone(s.config),
+				config:  maps.Clone(s.segmentConfig),
 				trainCh: make(chan *trainRequest, 1),
 				doneCh:  make(chan struct{}),
 			}
@@ -340,7 +340,10 @@ func (t *vectorTrainer) loadTrainedData(bucket *util.BoltBucketImpl) error {
 
 func (t *vectorTrainer) train(batch *index.Batch) error {
 	// regulate the Train function
+	start := time.Now()
 	t.parent.FireIndexEvent()
+	atomic.AddUint64(&t.parent.stats.TotTrainFireIndexEventTime, uint64(time.Since(start)))
+	atomic.AddUint64(&t.parent.stats.TotTrainFireIndexEvents, 1)
 	if t.trainingComplete.Load() {
 		return fmt.Errorf("training is already complete, cannot accept more training data")
 	}
@@ -393,7 +396,6 @@ func (t *vectorTrainer) train(batch *index.Batch) error {
 	// is complete, the template will be used for other operations down the line
 	// like merge and search.
 	//
-	// note: this might index text data too, how to handle this? s.segmentConfig?
 	// todo: updates/deletes -> data drift detection
 	if len(trainData) > 0 {
 		trainReq.sample, _, err = t.parent.segPlugin.NewUsing(trainData, config)
