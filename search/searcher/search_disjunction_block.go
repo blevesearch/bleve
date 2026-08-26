@@ -74,6 +74,36 @@ func (c *bulkChild) peek() (uint64, float64, bool, error) {
 
 func (c *bulkChild) advance() { c.pos++ }
 
+// accWindow is how many documents the accumulator sweeps at a time.
+//
+// Deliberately independent of search.BlockSize. Each window costs one pass over
+// every clause to pick the base plus another to drain it, so a many-clause
+// disjunction pays O(clauses) per window whether or not those clauses have
+// anything in range: at 256 an 894-term wildcard over 200k documents spends
+// ~1.4M peeks on that bookkeeping against ~950k that do real work. Widening the
+// window divides the bookkeeping by the same factor.
+//
+// It cannot simply be search.BlockSize raised, because that also sizes the
+// per-clause DocScoreBlock buffers - 894 clauses x 1024 x 4 arrays x 8 bytes
+// would be 29MB. Lucene's BooleanScorer and tantivy's BufferedUnionScorer both
+// keep one bucket array per scorer rather than per clause, which is what this
+// split reproduces.
+//
+// 1024 rather than the 4096 those two use. A balanced sweep (5 ascending + 5
+// descending repeats over 256..16384) put the workload total at 143.5ms at 256,
+// 136.1 at 1024 and 133.5 at 16384, so 1024 takes three quarters of the win for
+// a quarter of the footprint: 8KB acc + 4KB cnt + 128B matched, against 48.5KB
+// at 4096.
+//
+// Past 4096 the curve also turns over on every accumulator shape except the
+// 894-term wildcard - at 16384, numrange +8%, or-5-mid +5%, match-4 +3% - as
+// acc/cnt stop sitting comfortably alongside the clause buffers. Only wildcard
+// keeps improving, and it is 42% of the workload total, so optimising the total
+// alone picks a window that is worse for everything else.
+//
+// Must be a power of two: the base is aligned with base &^= accWindow-1.
+const accWindow = 1024
+
 // blockDisjunction accumulates child contributions over a sliding window.
 type blockDisjunction struct {
 	children []*bulkChild
@@ -88,13 +118,22 @@ type blockDisjunction struct {
 	matched []uint64
 	min     int
 	total   int
+
+	// Resumable sweep state. A window is wider than the caller's output block,
+	// so a dense window can produce more documents than fit. Rather than
+	// shrinking the window we hand back a full block and resume the sweep on
+	// the next call: base is the window in progress, sweepWord the next word of
+	// matched to drain, and sweeping says whether a window is still open.
+	base      uint64
+	sweepWord int
+	sweeping  bool
 }
 
 func newBlockDisjunction(searchers []search.Searcher, min, total int) *blockDisjunction {
 	bd := &blockDisjunction{
-		acc:     make([]float64, search.BlockSize),
-		cnt:     make([]int32, search.BlockSize),
-		matched: make([]uint64, (search.BlockSize+63)/64),
+		acc:     make([]float64, accWindow),
+		cnt:     make([]int32, accWindow),
+		matched: make([]uint64, accWindow/64),
 		min:     min,
 		total:   total,
 	}
@@ -126,43 +165,52 @@ func canBlockDisjunct(searchers []search.Searcher) bool {
 }
 
 func (bd *blockDisjunction) scoreBlock(out *search.DocScoreBlock) (int, error) {
-	const w = search.BlockSize
+	capOut := len(out.IDs)
+	if capOut == 0 {
+		return 0, nil
+	}
 
 	for {
-		// jump the window to the lowest pending document so empty stretches of
-		// the doc space cost nothing
-		var base uint64
-		found := false
-		for _, c := range bd.children {
-			d, _, ok, err := c.peek()
-			if err != nil {
-				return 0, err
-			}
-			if ok && (!found || d < base) {
-				base, found = d, true
-			}
-		}
-		if !found {
-			return 0, nil
-		}
-		base &^= uint64(w - 1)
-		end := base + w
-
-		for _, c := range bd.children {
-			for {
-				d, sc, ok, err := c.peek()
+		if !bd.sweeping {
+			// jump the window to the lowest pending document so empty stretches
+			// of the doc space cost nothing
+			var base uint64
+			found := false
+			for _, c := range bd.children {
+				d, _, ok, err := c.peek()
 				if err != nil {
 					return 0, err
 				}
-				if !ok || d >= end {
-					break
+				if ok && (!found || d < base) {
+					base, found = d, true
 				}
-				off := int(d - base)
-				bd.acc[off] += sc
-				bd.cnt[off]++
-				bd.matched[off>>6] |= 1 << uint(off&63)
-				c.advance()
 			}
+			if !found {
+				return 0, nil
+			}
+			base &^= uint64(accWindow - 1)
+			end := base + accWindow
+
+			for _, c := range bd.children {
+				for {
+					d, sc, ok, err := c.peek()
+					if err != nil {
+						return 0, err
+					}
+					if !ok || d >= end {
+						break
+					}
+					off := int(d - base)
+					bd.acc[off] += sc
+					bd.cnt[off]++
+					bd.matched[off>>6] |= 1 << uint(off&63)
+					c.advance()
+				}
+			}
+
+			bd.base = base
+			bd.sweepWord = 0
+			bd.sweeping = true
 		}
 
 		// Emit by draining the matched bitset. Words ascend and
@@ -170,17 +218,20 @@ func (bd *blockDisjunction) scoreBlock(out *search.DocScoreBlock) (int, error) {
 		// out in ascending order; empty runs of up to 64 slots are skipped by a
 		// single zero-word test.
 		n := 0
-		for wi := range bd.matched {
-			word := bd.matched[wi]
-			if word == 0 {
-				continue
-			}
+		for bd.sweepWord < len(bd.matched) {
+			word := bd.matched[bd.sweepWord]
 			for word != 0 {
+				if n == capOut {
+					// output full mid-window: stash the bits still to drain and
+					// resume here next call, leaving bd.sweeping set
+					bd.matched[bd.sweepWord] = word
+					return n, nil
+				}
 				tz := bits.TrailingZeros64(word)
-				off := wi<<6 | tz
+				off := bd.sweepWord<<6 | tz
 				c := bd.cnt[off]
 				if int(c) >= bd.min {
-					out.IDs[n] = base + uint64(off)
+					out.IDs[n] = bd.base + uint64(off)
 					// same coord factor the scalar scorer applies
 					out.Scores[n] = bd.acc[off] * float64(c) / float64(bd.total)
 					n++
@@ -189,11 +240,15 @@ func (bd *blockDisjunction) scoreBlock(out *search.DocScoreBlock) (int, error) {
 				bd.cnt[off] = 0
 				word &^= 1 << uint(tz)
 			}
-			bd.matched[wi] = 0
+			bd.matched[bd.sweepWord] = 0
+			bd.sweepWord++
 		}
+		bd.sweeping = false
+
 		if n > 0 {
 			return n, nil
 		}
+		// the whole window fell below min: pick the next one
 	}
 }
 
