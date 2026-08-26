@@ -15,6 +15,8 @@
 package searcher
 
 import (
+	"math/bits"
+
 	"github.com/blevesearch/bleve/v2/search"
 )
 
@@ -77,16 +79,24 @@ type blockDisjunction struct {
 	children []*bulkChild
 	acc      []float64
 	cnt      []int32
-	min      int
-	total    int
+	// matched has one bit per window slot, set when a clause contributes to it.
+	// The emit sweep walks these words and pops set bits, so it costs O(matches)
+	// rather than O(span between the lowest and highest match) — a window with
+	// three documents 200 slots apart visits three slots, not 200. Lucene's
+	// BooleanScorer (FixedBitSet matching + Long.numberOfTrailingZeros) and
+	// tantivy's BufferedUnionScorer (TinySet bitsets + pop_lowest) both do this.
+	matched []uint64
+	min     int
+	total   int
 }
 
 func newBlockDisjunction(searchers []search.Searcher, min, total int) *blockDisjunction {
 	bd := &blockDisjunction{
-		acc:   make([]float64, search.BlockSize),
-		cnt:   make([]int32, search.BlockSize),
-		min:   min,
-		total: total,
+		acc:     make([]float64, search.BlockSize),
+		cnt:     make([]int32, search.BlockSize),
+		matched: make([]uint64, (search.BlockSize+63)/64),
+		min:     min,
+		total:   total,
 	}
 	if bd.min < 1 {
 		bd.min = 1
@@ -138,7 +148,6 @@ func (bd *blockDisjunction) scoreBlock(out *search.DocScoreBlock) (int, error) {
 		base &^= uint64(w - 1)
 		end := base + w
 
-		lo, hi := w, -1
 		for _, c := range bd.children {
 			for {
 				d, sc, ok, err := c.peek()
@@ -151,30 +160,36 @@ func (bd *blockDisjunction) scoreBlock(out *search.DocScoreBlock) (int, error) {
 				off := int(d - base)
 				bd.acc[off] += sc
 				bd.cnt[off]++
-				if off < lo {
-					lo = off
-				}
-				if off > hi {
-					hi = off
-				}
+				bd.matched[off>>6] |= 1 << uint(off&63)
 				c.advance()
 			}
 		}
 
+		// Emit by draining the matched bitset. Words ascend and
+		// TrailingZeros64 pops the lowest set bit first, so documents still come
+		// out in ascending order; empty runs of up to 64 slots are skipped by a
+		// single zero-word test.
 		n := 0
-		for off := lo; off <= hi; off++ {
-			c := bd.cnt[off]
-			if c == 0 {
+		for wi := range bd.matched {
+			word := bd.matched[wi]
+			if word == 0 {
 				continue
 			}
-			if int(c) >= bd.min {
-				out.IDs[n] = base + uint64(off)
-				// same coord factor the scalar scorer applies
-				out.Scores[n] = bd.acc[off] * float64(c) / float64(bd.total)
-				n++
+			for word != 0 {
+				tz := bits.TrailingZeros64(word)
+				off := wi<<6 | tz
+				c := bd.cnt[off]
+				if int(c) >= bd.min {
+					out.IDs[n] = base + uint64(off)
+					// same coord factor the scalar scorer applies
+					out.Scores[n] = bd.acc[off] * float64(c) / float64(bd.total)
+					n++
+				}
+				bd.acc[off] = 0
+				bd.cnt[off] = 0
+				word &^= 1 << uint(tz)
 			}
-			bd.acc[off] = 0
-			bd.cnt[off] = 0
+			bd.matched[wi] = 0
 		}
 		if n > 0 {
 			return n, nil
