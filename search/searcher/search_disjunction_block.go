@@ -143,6 +143,11 @@ func newBlockDisjunction(searchers []search.Searcher, min, total int) *blockDisj
 	for _, s := range searchers {
 		bs, ok := s.(search.BulkSearcher)
 		if !ok {
+			// Callers reach this only by skipping CanScoreBlock, which has
+			// already vetted every clause. Hand back what we took anyway
+			// rather than leave the pool to drain on a path whose safety
+			// depends on that discipline never lapsing.
+			bd.release()
 			return nil
 		}
 		bd.children = append(bd.children, &bulkChild{bs: bs, blk: search.GetDocScoreBlock()})
