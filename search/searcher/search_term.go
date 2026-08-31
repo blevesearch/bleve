@@ -64,7 +64,12 @@ func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader,
 	if err != nil {
 		return nil, err
 	}
-	return newTermSearcherFromReader(ctx, indexReader, reader, term, field, boost, options)
+	termSearcher, err := newTermSearcherFromReader(ctx, indexReader, reader, term, field, boost, options)
+	if err != nil || termSearcher == nil {
+		return nil, err
+	}
+
+	return termSearcher, err
 }
 
 func tfIDFScoreMetrics(indexReader index.IndexReader) (uint64, error) {
@@ -164,7 +169,12 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader, term
 		if err != nil {
 			return nil, err
 		}
-		return newTermSearcherFromReader(ctx, indexReader, reader, term, field, boostVal, options)
+		termSearcher, err := newTermSearcherFromReader(ctx, indexReader, reader, term, field, boostVal, options)
+		if err != nil || termSearcher == nil {
+			return nil, err
+		}
+
+		return termSearcher, err
 	}
 	// create a searcher for the term itself
 	termSearcher, err := createTermSearcher(term, boost)
