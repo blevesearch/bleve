@@ -1192,6 +1192,42 @@ func TestQueryStringEmptyConjunctionSearcher(t *testing.T) {
 	_, _ = index.Search(searchReq)
 }
 
+func TestQueryStringSearchEscapedSlashPath(t *testing.T) {
+	mapping := NewIndexMapping()
+	pathFieldMapping := NewTextFieldMapping()
+	pathFieldMapping.Analyzer = keyword.Name
+	mapping.DefaultMapping.AddFieldMappingsAt("path", pathFieldMapping)
+
+	index, err := NewMemOnly(mapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = index.Close()
+	}()
+
+	if err := index.Index("root", map[string]interface{}{"path": "/"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := index.Index("tmp", map[string]interface{}{"path": "/tmp"}); err != nil {
+		t.Fatal(err)
+	}
+
+	query := NewQueryStringQuery(`path:\/`)
+	searchReq := NewSearchRequest(query)
+
+	res, err := index.Search(searchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 1 {
+		t.Fatalf("expected 1 hit for escaped slash path, got %d", res.Total)
+	}
+	if res.Hits[0].ID != "root" {
+		t.Fatalf("expected root hit, got %s", res.Hits[0].ID)
+	}
+}
+
 func TestDisjunctionQueryIncorrectMin(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
