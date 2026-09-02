@@ -336,3 +336,47 @@ func TestParseSearchSortObj(t *testing.T) {
 		})
 	}
 }
+
+func TestSortOrderCustomCompare(t *testing.T) {
+	// standard sort should evaluate "b" > "a", returning 1 for "b" vs "a"
+	// but with custom comparator, we can reverse it or change it
+
+	so := SortOrder{
+		&SortField{
+			Field: "title",
+			CustomCompareString: func(i, j string) int {
+				// reverse alphabetical
+				if i < j {
+					return 1
+				} else if i > j {
+					return -1
+				}
+				return 0
+			},
+		},
+	}
+
+	docA := &DocumentMatch{
+		Sort: []string{"a"},
+	}
+	docB := &DocumentMatch{
+		Sort: []string{"b"},
+	}
+
+	// Without custom comparator, docA < docB -> -1
+	// With custom comparator (reverse), docA "a" vs docB "b" -> returns 1
+	cmp := so.Compare([]bool{false}, []bool{false}, docA, docB)
+	if cmp != 1 {
+		t.Errorf("Expected custom compare to return 1, got %d", cmp)
+	}
+
+	cmpRev := so.Compare([]bool{false}, []bool{false}, docB, docA)
+	if cmpRev != -1 {
+		t.Errorf("Expected custom compare to return -1, got %d", cmpRev)
+	}
+
+	cmpEq := so.Compare([]bool{false}, []bool{false}, docA, docA)
+	if cmpEq != 0 {
+		t.Errorf("Expected custom compare to return 0, got %d", cmpEq)
+	}
+}
