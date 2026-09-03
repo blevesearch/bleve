@@ -117,6 +117,14 @@ type MergePlanOptions struct {
 
 	FileSizeBasedMerge bool
 
+	// NumMergerWorkers is the number of workers that merge the tasks of a
+	// single plan, one task each. It is read from the index level
+	// "scorchMergePlanOptions" config and not from the options handed to a
+	// one-off ForceMerge, so that an index has a single merger worker pool.
+	// It is honoured only for an index trained with fast merge, where a task
+	// is cheap enough for the tasks to be worth overlapping.
+	NumMergerWorkers int
+
 	// Optional, defaults to mergeplan.CalcBudget().
 	CalcBudget func(totalSize int64, firstTierSize int64,
 		o *MergePlanOptions) (budgetNumSegments int)
@@ -162,6 +170,10 @@ const MaxSegmentSizeLimit = 1<<31 - 1
 // exceeds the MaxSegmentSizeLimit
 var ErrMaxSegmentSizeTooLarge = errors.New("MaxSegmentSize exceeds the size limit")
 
+// DefaultNumMergerWorkers is the number of workers which parallelly merge the
+// tasks of a single merge plan. One worker merges the tasks one after another.
+const DefaultNumMergerWorkers int = 1
+
 // DefaultMergePlanOptions suggests the default options.
 var DefaultMergePlanOptions = MergePlanOptions{
 	MaxSegmentsPerTier:   10,
@@ -171,6 +183,7 @@ var DefaultMergePlanOptions = MergePlanOptions{
 	SegmentsPerMergeTask: 10,
 	FloorSegmentSize:     2000,
 	ReclaimDeletesWeight: 2.0,
+	NumMergerWorkers:     DefaultNumMergerWorkers,
 }
 
 // SingleSegmentMergePlanOptions helps in creating a
