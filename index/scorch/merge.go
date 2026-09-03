@@ -251,12 +251,29 @@ func (s *Scorch) parseMergePlannerOptions(po *persisterOptions) (*mergeplan.Merg
 		}
 	}
 
-	if v, ok := s.config[IndexTrainedWithFastMerge]; ok {
-		if v, ok := v.(bool); ok && v {
-			mergePlannerOptions.FileSizeBasedMerge = false
-		}
+	if mergePlannerOptions.NumMergerWorkers <= 0 {
+		return nil, fmt.Errorf("NumMergerWorkers must be greater than 0")
+	}
+
+	if fastMergeEnabled(s.config) {
+		mergePlannerOptions.FileSizeBasedMerge = false
+		mergePlannerOptions.NumMergerWorkers = 4
+	} else {
+		// without fast merge a task rebuilds its vector index out of the
+		// vectors being merged, which is too heavy to be worth overlapping the
+		// tasks of a plan, so the merger stays serial no matter what the config
+		// asked for.
+		mergePlannerOptions.NumMergerWorkers = 1
 	}
 	return &mergePlannerOptions, nil
+}
+
+// fastMergeEnabled reports whether this index was trained for the fast merge
+// path, where a merge reuses the trained centroid layout instead of rebuilding
+// the vector index out of the vectors being merged.
+func fastMergeEnabled(config map[string]interface{}) bool {
+	v, ok := config[IndexTrainedWithFastMerge].(bool)
+	return ok && v
 }
 
 type closeChWrapper struct {
@@ -434,33 +451,13 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 
 		numMergedSegments += len(batch.snapshots)
 		s.markIneligibleForRemoval(batch.newFilename)
-		path := s.path + string(os.PathSeparator) + batch.newFilename
+	}
 
-		prevBytesReadTotal := cumulateBytesRead(batch.segments)
-		fileMergeZapStartTime := time.Now()
-		atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
-		batch.newDocNums, _, err = s.segPlugin.MergeUsing(batch.segments, batch.drops, path,
-			cw.cancelCh, s, s.segmentConfig)
-		atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
-		batch.newTime = uint64(time.Since(fileMergeZapStartTime))
-		atomic.AddUint64(&s.stats.TotFileMergeZapTime, batch.newTime)
-		if atomic.LoadUint64(&s.stats.MaxFileMergeZapTime) < batch.newTime {
-			atomic.StoreUint64(&s.stats.MaxFileMergeZapTime, batch.newTime)
-		}
-		if err != nil {
-			atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
-			return err
-		}
-
-		batch.new, err = s.segPlugin.OpenUsing(path, s.segmentConfig)
-		if err != nil {
-			atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
-			return err
-		}
-
-		totalBytesRead := batch.new.BytesRead() + prevBytesReadTotal
-		batch.new.ResetBytesRead(totalBytesRead)
-		atomic.AddUint64(&s.stats.TotFileMergeSegments, uint64(len(batch.segments)))
+	// every batch merges a disjoint set of segments into a file of its own, so
+	// the batches of a plan can be merged concurrently.
+	err = s.performFileMerges(mergeBatches, cw)
+	if err != nil {
+		return err
 	}
 
 	newSegmentIDs := make([]uint64, numBatches)
@@ -522,6 +519,111 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 
 	atomic.AddUint64(&s.stats.TotFileMergePlanTasksDone, uint64(numBatches))
 	s.fireEvent(EventKindMergeTaskIntroduction, 0)
+	return nil
+}
+
+// performFileMerges merges every non-empty batch of the plan into a new segment
+// file, running up to NumMergerWorkers of them at a time. The batches share no
+// state beyond the stats counters and the error accumulator, so the only
+// serialization left is the worker limit itself.
+func (s *Scorch) performFileMerges(mergeBatches []*mergeBatch, cw *closeChWrapper) error {
+	var wg sync.WaitGroup
+	var errM sync.Mutex
+	var errs []error
+	// a single failed batch abandons the whole plan, so the batches still
+	// waiting on a worker need not pay for a merge whose output gets discarded.
+	var failed atomic.Bool
+
+	sem := make(chan struct{}, s.mergePlannerOptions.NumMergerWorkers)
+	for batchID := 0; batchID < len(mergeBatches); batchID++ {
+		batch := mergeBatches[batchID]
+		if len(batch.segments) == 0 {
+			continue
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(batch *mergeBatch) {
+			var err error
+			defer func() {
+				if err != nil {
+					atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
+					failed.Store(true)
+					errM.Lock()
+					errs = append(errs, err)
+					errM.Unlock()
+				}
+				<-sem
+				wg.Done()
+			}()
+
+			if failed.Load() {
+				return
+			}
+			err = s.performFileMerge(batch, cw)
+		}(batch)
+	}
+	wg.Wait()
+	close(sem)
+
+	// the slowest batch of the plan is recorded only once the batches have all
+	// finished, so that the workers don't race on a read-modify-write of the max.
+	var maxZapTime uint64
+	for _, batch := range mergeBatches {
+		if batch.newTime > maxZapTime {
+			maxZapTime = batch.newTime
+		}
+	}
+	if maxZapTime > atomic.LoadUint64(&s.stats.MaxFileMergeZapTime) {
+		atomic.StoreUint64(&s.stats.MaxFileMergeZapTime, maxZapTime)
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	var errf error
+	numClosed := 0
+	for _, e := range errs {
+		if e == segment.ErrClosed {
+			numClosed++
+		}
+		errf = errors.Join(errf, e)
+	}
+	// the merger loop compares the returned error against ErrClosed to decide
+	// whether the index is going away, so a plan that failed only because of
+	// the closure has to report that error and not a join of copies of it.
+	if numClosed == len(errs) {
+		return segment.ErrClosed
+	}
+	return errf
+}
+
+// performFileMerge merges the segments of a single batch into a new segment
+// file and opens it. It is safe to run concurrently for distinct batches.
+func (s *Scorch) performFileMerge(batch *mergeBatch, cw *closeChWrapper) error {
+	path := s.path + string(os.PathSeparator) + batch.newFilename
+
+	prevBytesReadTotal := cumulateBytesRead(batch.segments)
+	fileMergeZapStartTime := time.Now()
+	atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
+	newDocNums, _, err := s.segPlugin.MergeUsing(batch.segments, batch.drops, path,
+		cw.cancelCh, s, s.segmentConfig)
+	atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
+	batch.newDocNums = newDocNums
+	batch.newTime = uint64(time.Since(fileMergeZapStartTime))
+	atomic.AddUint64(&s.stats.TotFileMergeZapTime, batch.newTime)
+	if err != nil {
+		return err
+	}
+
+	batch.new, err = s.segPlugin.OpenUsing(path, s.segmentConfig)
+	if err != nil {
+		return err
+	}
+
+	totalBytesRead := batch.new.BytesRead() + prevBytesReadTotal
+	batch.new.ResetBytesRead(totalBytesRead)
+	atomic.AddUint64(&s.stats.TotFileMergeSegments, uint64(len(batch.segments)))
 	return nil
 }
 
