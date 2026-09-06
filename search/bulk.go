@@ -88,3 +88,30 @@ type BulkSearcher interface {
 	// once the searcher is exhausted.
 	ScoreBlock(blk *DocScoreBlock) (int, error)
 }
+
+// CompetitiveScorer is implemented by searchers that can use a lower bound on
+// the score a document needs to enter the current top-K, to skip documents --
+// or, for a segment whose postings expose a per-block score bound, whole
+// blocks of documents at a time -- that cannot possibly reach it.
+//
+// A collector calls SetMinCompetitiveScore with a non-decreasing sequence of
+// values as its top-K threshold tightens (it never needs to loosen: once a
+// document is displaced from a fixed-size top-K, nothing softer than that can
+// ever re-enter). A searcher may use whatever value it was most recently
+// given, or ignore the call entirely -- skipping is an optimization, not a
+// correctness requirement, so a searcher with nothing useful to do about a
+// threshold is free to do nothing.
+type CompetitiveScorer interface {
+	SetMinCompetitiveScore(minScore float64)
+}
+
+// SkippedForCompetitiveScore is implemented by a CompetitiveScorer that can
+// report exactly how many documents it has bypassed entirely because of a
+// threshold, as opposed to merely being given one and finding nothing worth
+// skipping. Every skipped document is still a real match of the query -- it
+// is, after all, in the searcher's own postings -- so a collector can fold
+// this count back into its own total and keep it exact, rather than only a
+// lower bound.
+type SkippedForCompetitiveScore interface {
+	SkippedDocCount() uint64
+}

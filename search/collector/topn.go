@@ -78,6 +78,10 @@ type TopNCollector struct {
 	dvReader                  index.DocValueReader
 	searchAfter               *search.DocumentMatch
 
+	// searcher is the query tree's root, kept only to offer it a tightened
+	// top-K threshold (see propagateMinCompetitiveScore) if it can use one.
+	searcher search.Searcher
+
 	knnHits             map[string]*search.DocumentMatch
 	hybridMergeCallback search.HybridMergeCallbackFn
 
@@ -303,6 +307,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	startTime := time.Now()
 	var err error
 	var next *search.DocumentMatch
+	hc.searcher = searcher
 
 	// pre-allocate enough space in the DocumentMatchPool
 	// unless the size + skip is too large, then cap it
@@ -613,12 +618,14 @@ func MakeTopNDocumentMatchHandler(
 			if removed != nil {
 				if hc.lowestMatchOutsideResults == nil {
 					hc.lowestMatchOutsideResults = removed
+					hc.propagateMinCompetitiveScore()
 				} else {
 					cmp := hc.cmp(removed, hc.lowestMatchOutsideResults)
 					if cmp < 0 {
 						tmp := hc.lowestMatchOutsideResults
 						hc.lowestMatchOutsideResults = removed
 						ctx.DocumentMatchPool.Put(tmp)
+						hc.propagateMinCompetitiveScore()
 					}
 				}
 			}
@@ -685,6 +692,18 @@ func (hc *TopNCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
 // it now throws away the results to be skipped
 // and does final doc id lookup (if necessary)
 func (hc *TopNCollector) finalizeResults(r index.IndexReader) error {
+	// A searcher that skipped documents via a competitive-score threshold
+	// bypassed them entirely rather than counting and then discarding them.
+	// Every one of them is still a real match (block-max WAND only ever skips
+	// within a term's own postings), so folding the exact count back in here
+	// keeps Total() exact rather than degrading it to a lower bound. Checked
+	// once here rather than at every skip because it is only ever needed
+	// once, and both Collect's scalar loop and collectBulk reach this same
+	// function on their way out.
+	if sd, ok := hc.searcher.(search.SkippedForCompetitiveScore); ok {
+		hc.total += sd.SkippedDocCount()
+	}
+
 	var err error
 	hc.results, err = hc.store.Final(hc.skip, func(doc *search.DocumentMatch) error {
 		if doc.ID == "" {
@@ -758,6 +777,26 @@ func (hc *TopNCollector) canBulkCollect() bool {
 	return hc.fastPrepare && hc.facetsBuilder == nil && hc.knnHits == nil &&
 		hc.nestedStore == nil && hc.searchAfter == nil && !hc.needDocIds &&
 		hc.earlyStopN == 0
+}
+
+// propagateMinCompetitiveScore offers the query tree's root searcher the
+// current top-K threshold, so a searcher that can use one (block-max WAND;
+// see search.CompetitiveScorer) can start skipping documents -- or whole
+// blocks of them -- that can no longer possibly enter the result set.
+//
+// Reuses canBulkCollect's gate rather than a bespoke one: it is exactly
+// "score-only sort, nothing else needs every candidate visited," which is
+// also exactly what letting a searcher skip candidates requires. In
+// particular this is why facets, KNN merging and nested-document assembly are
+// excluded here too -- those all need to see every match, not just the
+// eventual top-K survivors, same as they already do for the bulk path.
+func (hc *TopNCollector) propagateMinCompetitiveScore() {
+	if hc.lowestMatchOutsideResults == nil || hc.searcher == nil || !hc.canBulkCollect() {
+		return
+	}
+	if cs, ok := hc.searcher.(search.CompetitiveScorer); ok {
+		cs.SetMinCompetitiveScore(hc.lowestMatchOutsideResults.Score)
+	}
 }
 
 // collectBulk drives a BulkSearcher over flat blocks. A DocumentMatch is taken

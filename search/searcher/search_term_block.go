@@ -35,6 +35,9 @@ func (s *TermSearcher) ScoreBlock(blk *search.DocScoreBlock) (int, error) {
 	if !ok {
 		return 0, nil
 	}
+	if err := s.skipUncompetitiveBlocks(); err != nil {
+		return 0, err
+	}
 	n, err := br.NextBlock(blk.IDs, blk.Freqs, blk.Norms)
 	if err != nil || n == 0 {
 		return n, err

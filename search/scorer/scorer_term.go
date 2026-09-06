@@ -282,6 +282,25 @@ func (s *TermQueryScorer) CanScoreBulk() bool {
 	return s.includeScore && !s.options.Explain
 }
 
+// MaxScore returns an upper bound on the score any document with at most
+// maxTF occurrences of the term and at least maxNorm as its normalization
+// factor could receive from this scorer -- the two inputs a block-max bound
+// reports (see index/scorch's blockMaxIterator). docScore is monotonically
+// increasing in both tf and norm (a higher norm means a shorter field, which
+// only raises a BM25 score), so passing each one's most favorable value gives
+// a true upper bound over any set of documents that shares it, without
+// scoring any of them.
+func (s *TermQueryScorer) MaxScore(maxTF uint64, maxNorm float64) float64 {
+	var tf float64
+	if maxTF < MaxSqrtCache {
+		tf = SqrtCache[int(maxTF)]
+	} else {
+		tf = math.Sqrt(float64(maxTF))
+	}
+	score, _ := s.docScore(tf, maxNorm)
+	return score * s.queryWeight
+}
+
 // ScoreBulk scores a block of documents into out. It is the same arithmetic as
 // docScore, hoisted out of the per-document call so the loop is flat.
 func (s *TermQueryScorer) ScoreBulk(freqs []uint64, norms []float64, out []float64) {

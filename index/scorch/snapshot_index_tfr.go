@@ -118,6 +118,72 @@ func (i *IndexSnapshotTermFieldReader) SupportsBlocks() bool {
 	return true
 }
 
+// blockMaxIterator is an optional capability a segment's postings iterator
+// may implement: an upper bound on its scoring contribution -- highest term
+// frequency, most favorable (shortest-field) norm factor -- for every
+// document up to and including lastDoc, without decoding anything. This is
+// the raw material for block-max WAND: a caller holding a score threshold can
+// compare it against its own upper-bound formula evaluated at (maxTF,
+// maxNormFactor) and skip the whole span via shallowAdvancer if it can't
+// possibly clear it.
+type blockMaxIterator interface {
+	BlockMax() (maxTF uint64, maxNormFactor float64, lastDoc uint64, docCount int, ok bool)
+}
+
+// shallowAdvancer moves a postings iterator to the block that could contain a
+// target document without decoding any block's payload -- the building block
+// block-max WAND uses to skip a span its own BlockMax said isn't competitive.
+type shallowAdvancer interface {
+	ShallowAdvance(target uint64) error
+}
+
+// BlockMax reports blockMaxIterator's bound for whichever segment this reader
+// is currently positioned at, translated to a global document number. docCount
+// is the number of documents that span covers -- letting a caller that skips
+// it keep an exact hit count without knowing anything about the segment's
+// block size. ok is false whenever there's nothing useful to report -- the
+// reader is exhausted, or the current segment's iterator doesn't support it
+// (a 1-hit term, a conjunction-narrowed iterator, live deletions, or a segment
+// implementation that simply doesn't have this capability) -- in which case
+// the caller should just proceed with a normal fetch.
+func (i *IndexSnapshotTermFieldReader) BlockMax() (maxTF uint64, maxNormFactor float64, lastDoc uint64, docCount int, ok bool) {
+	if i.segmentOffset >= len(i.iterators) {
+		return 0, 0, 0, 0, false
+	}
+	bm, ok := i.iterators[i.segmentOffset].(blockMaxIterator)
+	if !ok {
+		return 0, 0, 0, 0, false
+	}
+	maxTF, maxNormFactor, segLastDoc, docCount, ok := bm.BlockMax()
+	if !ok {
+		return 0, 0, 0, 0, false
+	}
+	return maxTF, maxNormFactor, segLastDoc + i.snapshot.offsets[i.segmentOffset], docCount, true
+}
+
+// ShallowAdvance moves this reader to the block that could contain the given
+// global document number, without decoding any payload. Call BlockMax again
+// afterward for the new position's bound before deciding whether to fetch it
+// for real.
+//
+// Like Advance, target must be strictly greater than any document number this
+// reader has already produced or shallow-advanced past. Unlike Advance, there
+// is no backward-seek recovery: ShallowAdvance is meant to be driven by a
+// BlockMax bound this same reader just reported, which is inherently
+// forward-only, so callers don't need it.
+func (i *IndexSnapshotTermFieldReader) ShallowAdvance(target uint64) error {
+	segIndex, ldocNum := i.snapshot.segmentIndexAndLocalDocNumFromGlobal(target)
+	if segIndex >= len(i.snapshot.segment) {
+		i.segmentOffset = len(i.iterators)
+		return nil
+	}
+	i.segmentOffset = segIndex
+	if sa, ok := i.iterators[i.segmentOffset].(shallowAdvancer); ok {
+		return sa.ShallowAdvance(ldocNum)
+	}
+	return nil
+}
+
 type IndexSnapshotTermFieldReader struct {
 	term      []byte
 	field     string
