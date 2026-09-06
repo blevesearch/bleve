@@ -26,6 +26,7 @@ require (
 	github.com/blevesearch/zapx/v15 v15.4.3
 	github.com/blevesearch/zapx/v16 v16.3.4
 	github.com/blevesearch/zapx/v17 v17.2.3
+	github.com/blevesearch/zapx/v18 v18.0.0
 	github.com/couchbase/moss v0.2.0
 	github.com/spf13/cobra v1.10.2
 	go.etcd.io/bbolt v1.4.0
@@ -44,3 +45,6 @@ require (
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 )
+
+// Local development against the block-format zapx. Drop once v18 is published.
+replace github.com/blevesearch/zapx/v18 => /Users/gautham.k/projects/zapx
