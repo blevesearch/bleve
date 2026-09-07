@@ -282,6 +282,19 @@ func (s *TermQueryScorer) CanScoreBulk() bool {
 	return s.includeScore && !s.options.Explain
 }
 
+// UsesBM25 reports whether this scorer is actually running BM25 (avgDocLength
+// was known at construction) rather than falling back to plain tf-idf.
+//
+// This matters specifically for block-max WAND: zapx writes each block's
+// score-bound pair as the single document that scores highest under a BM25
+// estimate computed at index time (see zapx's postings_format.go). That pair
+// carries no such guarantee under tf-idf scoring -- a different, unrelated
+// formula -- so a WAND consumer must check this before trusting the bound at
+// all, not just before scoring with it.
+func (s *TermQueryScorer) UsesBM25() bool {
+	return s.avgDocLength > 0
+}
+
 // MaxScore returns an upper bound on the score any document with at most
 // maxTF occurrences of the term and at least maxNorm as its normalization
 // factor could receive from this scorer -- the two inputs a block-max bound
