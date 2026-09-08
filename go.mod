@@ -48,3 +48,9 @@ require (
 
 // Local development against the block-format zapx. Drop once v18 is published.
 replace github.com/blevesearch/zapx/v18 => /Users/gautham.k/projects/zapx
+
+// perf/tantivy-inspired: FST traversal/allocation fixes. zapx's own replace
+// directive for this does NOT propagate here (replace directives aren't
+// transitive across module boundaries) -- needed directly in every module
+// that actually builds the binary.
+replace github.com/blevesearch/vellum => /Users/gautham.k/projects/vellum

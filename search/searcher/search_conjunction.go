@@ -43,6 +43,15 @@ type ConjunctionSearcher struct {
 	initialized bool
 	options     search.SearcherOptions
 	bytesRead   uint64
+
+	// wandEligible is decided once, at construction, before the push-down
+	// optimization below has a chance to narrow any clause's reader (see
+	// canBlockConjunct). CanScoreBlock trusts this rather than re-checking,
+	// since a narrowed reader still satisfies the same interfaces while
+	// silently reporting no block-max bound at all.
+	wandEligible bool
+	// lazily built block-max WAND engine used by the block path
+	blockConj *blockConjunction
 }
 
 func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
@@ -65,18 +74,31 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 		}
 	}
 
+	// Decide block-max WAND eligibility before anything below has a chance
+	// to narrow the clauses' readers: the push-down optimization replaces
+	// each clause's ActualBitmap (segment.OptimizablePostingsIterator.
+	// ReplaceActual), which silently disables block-max reporting from then
+	// on even though the reader keeps satisfying the same interfaces --
+	// so this has to be decided now, once, and trusted for the searcher's
+	// lifetime (see canBlockConjunct's doc comment).
+	wandEligible := canBlockConjunct(searchers)
+
 	// build our searcher
 	rv := ConjunctionSearcher{
-		indexReader: indexReader,
-		options:     options,
-		searchers:   searchers,
-		currs:       make([]*search.DocumentMatch, len(searchers)),
-		scorer:      scorer.NewConjunctionQueryScorer(options),
+		indexReader:  indexReader,
+		options:      options,
+		searchers:    searchers,
+		currs:        make([]*search.DocumentMatch, len(searchers)),
+		scorer:       scorer.NewConjunctionQueryScorer(options),
+		wandEligible: wandEligible,
 	}
 	rv.computeQueryNorm()
 
-	// attempt push-down conjunction optimization when there's >1 searchers
-	if len(searchers) > 1 {
+	// attempt push-down conjunction optimization when there's >1 searchers.
+	// Skipped when the clauses qualify for block-max WAND: that path (see
+	// search_conjunction_block.go) needs each clause's own, un-narrowed
+	// reader to keep reporting real block-max bounds.
+	if len(searchers) > 1 && !wandEligible {
 		rv, err := optimizeCompositeSearcher(ctx, "conjunction",
 			indexReader, searchers, options)
 		if err != nil || rv != nil {
@@ -263,6 +285,8 @@ func (s *ConjunctionSearcher) Count() uint64 {
 }
 
 func (s *ConjunctionSearcher) Close() (rv error) {
+	s.blockConj = nil
+
 	for _, searcher := range s.searchers {
 		err := searcher.Close()
 		if err != nil && rv == nil {

@@ -115,3 +115,18 @@ type CompetitiveScorer interface {
 type SkippedForCompetitiveScore interface {
 	SkippedDocCount() uint64
 }
+
+// ApproximateTotal is implemented by a CompetitiveScorer whose skips cannot
+// be attributed the way SkippedForCompetitiveScore requires: a skipped span
+// covers candidates that were never checked for real membership at all, so
+// there is no exact count of genuine matches within it to fold back in --
+// unlike a single term's postings, where every entry a block-max skip
+// bypasses is, by construction, a real match. A collector checks this once,
+// at the end, and treats it the same way it already treats its own
+// early-stop feature: Total() is reported as a lower bound rather than an
+// exact count from that point on.
+type ApproximateTotal interface {
+	// TotalIsApproximate reports whether this searcher's pruning means
+	// Total() should be treated as a lower bound.
+	TotalIsApproximate() bool
+}

@@ -91,6 +91,13 @@ type TopNCollector struct {
 
 	earlyStopN   int
 	earlyStopped bool
+	// totalApproximate records that some searcher in the tree pruned
+	// candidates it never determined were real matches or not (see
+	// search.ApproximateTotal), so Total() is a lower bound even though
+	// SetEarlyStop was never involved. Folded into EarlyStopped()'s result
+	// rather than tracked separately, since index_impl.go's only use of
+	// either is "should TotalRelation say Total is exact."
+	totalApproximate bool
 }
 
 // CheckDoneEvery controls how frequently we check the context deadline
@@ -704,6 +711,15 @@ func (hc *TopNCollector) finalizeResults(r index.IndexReader) error {
 		hc.total += sd.SkippedDocCount()
 	}
 
+	// Unlike SkippedForCompetitiveScore, a searcher whose skips can't be
+	// attributed to real matches (see search.ApproximateTotal) has no count
+	// to fold back in -- Total() just stays short. Record that so
+	// EarlyStopped() reports it as a lower bound rather than claiming an
+	// exact count it doesn't have.
+	if at, ok := hc.searcher.(search.ApproximateTotal); ok && at.TotalIsApproximate() {
+		hc.totalApproximate = true
+	}
+
 	var err error
 	hc.results, err = hc.store.Final(hc.skip, func(doc *search.DocumentMatch) error {
 		if doc.ID == "" {
@@ -738,10 +754,12 @@ func (hc *TopNCollector) SetEarlyStop(n int) {
 	hc.earlyStopN = n
 }
 
-// EarlyStopped reports whether Collect() stopped early; if true, Total() is a
-// lower bound.
+// EarlyStopped reports whether Collect() stopped early, or a searcher in the
+// tree pruned candidates without determining whether they were real matches
+// (see search.ApproximateTotal); if true, Total() is a lower bound rather
+// than an exact count.
 func (hc *TopNCollector) EarlyStopped() bool {
-	return hc.earlyStopped
+	return hc.earlyStopped || hc.totalApproximate
 }
 
 // MaxScore returns the maximum score seen across all the hits
