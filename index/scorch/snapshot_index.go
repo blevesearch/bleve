@@ -28,6 +28,7 @@ import (
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/document"
 	geov2 "github.com/blevesearch/bleve/v2/geov2"
+	"github.com/blevesearch/bleve/v2/numericv2"
 	"github.com/blevesearch/bleve/v2/size"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
@@ -53,6 +54,8 @@ type asynchSegmentResult struct {
 
 var reflectStaticSizeIndexSnapshot int
 var reflectStaticSizeIndexSnapshotGeoShapeV2Reader int
+var reflectStaticSizeIndexSnapshotNumericV2Reader int
+var reflectStaticSizeBitsetIterator int
 var reflectStaticSizeRoaringIntIterator int
 
 func init() {
@@ -69,6 +72,10 @@ func init() {
 	}
 	var gcr IndexSnapshotGeoShapeV2Reader
 	reflectStaticSizeIndexSnapshotGeoShapeV2Reader = int(reflect.TypeOf(gcr).Size())
+	var ncr IndexSnapshotNumericV2Reader
+	reflectStaticSizeIndexSnapshotNumericV2Reader = int(reflect.TypeOf(ncr).Size())
+	var bsi util.BitsetIterator
+	reflectStaticSizeBitsetIterator = int(reflect.TypeOf(bsi).Size())
 	var rip roaring.IntIterator
 	reflectStaticSizeRoaringIntIterator = int(reflect.TypeOf(rip).Size())
 }
@@ -556,6 +563,8 @@ func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 			rvd.AddField(document.NewGeoPointFieldFromBytes(name, arrayPos, value))
 		case 's':
 			rvd.AddField(document.NewGeoShapeFieldFromBytes(name, arrayPos, value))
+		case 'm':
+			rvd.AddField(document.NewNumericV2FieldFromBytes(name, arrayPos, value))
 		}
 
 		return true
@@ -1499,6 +1508,204 @@ func (g *IndexSnapshotGeoShapeV2Reader) Size() int {
 	}
 
 	rv += (reflectStaticSizeRoaringIntIterator + size.SizeOfPtr) * len(g.iterators)
+
+	return rv
+}
+
+func (i *IndexSnapshot) NumericV2FieldReader(ctx context.Context, field string) (
+	index.NumericV2FieldReader, error) {
+
+	rv := &IndexSnapshotNumericV2Reader{
+		field: field,
+		hits:  make([]*util.Bitset, len(i.segment)),
+		// the zero value of BitsetIterator is a valid empty iterator, so a
+		// segment with no data for the field needs no special casing below
+		iterators: make([]util.BitsetIterator, len(i.segment)),
+		counts:    make([]uint64, len(i.segment)),
+		snapshot:  i,
+	}
+
+	return rv, nil
+}
+
+type IndexSnapshotNumericV2Reader struct {
+	field string
+
+	// hits holds the per-segment result bitsets; iterators alias their words,
+	// so neither survives Close.
+	hits      []*util.Bitset
+	iterators []util.BitsetIterator
+	// counts caches each segment's cardinality, computed once during Search so
+	// that Count is not a repeated scan.
+	counts []uint64
+
+	segmentOffset int
+
+	snapshot *IndexSnapshot
+}
+
+// Search evaluates the numeric range across all segments in the index snapshot.
+//
+// Every hit is materialised up front rather than streamed, because the segment
+// stores values in value order while a searcher must emit document order; there
+// is no streaming formulation.
+func (n *IndexSnapshotNumericV2Reader) Search(min, max *float64,
+	inclusiveMin, inclusiveMax *bool) error {
+
+	numSegments := len(n.snapshot.segment)
+	// the query holds only the encoded bounds, so it is safe to share
+	// across the per-segment goroutines
+	query := numericv2.NewRangeQuery(min, max, inclusiveMin, inclusiveMax)
+
+	var wg sync.WaitGroup
+	wg.Add(numSegments)
+
+	var errm sync.Mutex
+	var err error
+	// search each segment concurrently
+	for i := 0; i < numSegments; i++ {
+		go func(segID int) {
+			defer wg.Done()
+			err2 := n.searchSeg(segID, query)
+			if err2 != nil {
+				errm.Lock()
+				if err == nil {
+					err = err2
+				}
+				errm.Unlock()
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	return err
+}
+
+// searchSeg evaluates the range against a single segment in the snapshot.
+func (n *IndexSnapshotNumericV2Reader) searchSeg(segID int,
+	query *numericv2.Query) error {
+
+	snapshot := n.snapshot.segment[segID]
+	numSeg, ok := snapshot.segment.(segment.NumericV2Segment)
+	if !ok {
+		return nil
+	}
+
+	data, err := numSeg.NumericV2Data(n.field)
+	if err != nil {
+		return err
+	}
+	// return if the segment has no numeric data for the field
+	if data == nil {
+		return nil
+	}
+	// release the reference on the segment's cached arrays once the evaluation
+	// is done, so that the cache is free to evict them
+	defer data.Close()
+
+	// the stored doc numbers are already in segment space, so the snapshot's
+	// deleted bitmap applies directly with no translation
+	hits := query.Evaluate(data, snapshot.deleted, snapshot.segment.Count())
+
+	// the bitset is already the ideal representation for a dense result: it is
+	// iterated in place rather than converted into a roaring bitmap first,
+	// which would cost a rebuild and then an interface-dispatched container
+	// walk per hit to recover what the words already hold.
+	n.hits[segID] = hits
+	n.iterators[segID] = hits.Iterator()
+	n.counts[segID] = uint64(hits.Count())
+
+	return nil
+}
+
+// Next returns the next hit across all segments in the index snapshot.
+func (n *IndexSnapshotNumericV2Reader) Next(preAlloced *index.NumericV2FieldDoc) (
+	*index.NumericV2FieldDoc, error) {
+	rv := preAlloced
+	if rv == nil {
+		rv = &index.NumericV2FieldDoc{}
+	}
+
+	for n.segmentOffset < len(n.iterators) {
+		docNum, ok := n.iterators[n.segmentOffset].Next()
+		if !ok {
+			n.segmentOffset++
+			continue
+		}
+
+		rv.ID = index.NewIndexInternalID(rv.ID,
+			uint64(docNum)+n.snapshot.offsets[n.segmentOffset])
+		return rv, nil
+	}
+
+	return nil, nil
+}
+
+// Advance moves the reader to the first hit at or beyond the specified document.
+func (n *IndexSnapshotNumericV2Reader) Advance(ID index.IndexInternalID,
+	preAlloced *index.NumericV2FieldDoc) (*index.NumericV2FieldDoc, error) {
+	rv := preAlloced
+	if rv == nil {
+		rv = &index.NumericV2FieldDoc{}
+	}
+
+	num := ID.Value()
+
+	segIdx, localDocNum := n.snapshot.segmentIndexAndLocalDocNumFromGlobal(num)
+	if segIdx >= len(n.iterators) {
+		return nil, fmt.Errorf("error advancing to doc number %d, segment "+
+			"index %d out of bounds", num, segIdx)
+	}
+
+	if n.segmentOffset > segIdx {
+		return nil, fmt.Errorf("error advancing to doc number %d, segment "+
+			"index %d is less than current segment offset %d", num, segIdx, n.segmentOffset)
+	}
+
+	n.segmentOffset = segIdx
+	n.iterators[n.segmentOffset].AdvanceTo(int(localDocNum))
+
+	return n.Next(rv)
+}
+
+// Close drops the reader's per-segment results. The segment-level arrays the
+// search read from are not touched: those are owned and evicted by the
+// segment's own cache, and were already released at the end of searchSeg.
+func (n *IndexSnapshotNumericV2Reader) Close() error {
+	// the iterators alias the bitsets' words, so the pooled memory can only go
+	// back once iteration is finished -- which is exactly what Close means here
+	for _, hits := range n.hits {
+		if hits != nil {
+			hits.Release()
+		}
+	}
+	// drop the references so a stray call after Close cannot read them
+	n.hits = nil
+	n.iterators = nil
+	return nil
+}
+
+// Count returns the total number of matching documents across all segments.
+func (n *IndexSnapshotNumericV2Reader) Count() uint64 {
+	var rv uint64
+	for _, count := range n.counts {
+		rv += count
+	}
+	return rv
+}
+
+// Size returns the estimated size in bytes of the
+// IndexSnapshotNumericV2Reader, including its postings and iterators.
+func (n *IndexSnapshotNumericV2Reader) Size() int {
+	rv := reflectStaticSizeIndexSnapshotNumericV2Reader + size.SizeOfPtr +
+		len(n.field) + size.SizeOfInt
+
+	for _, hits := range n.hits {
+		rv += hits.SizeInBytes()
+	}
+
+	rv += reflectStaticSizeBitsetIterator * len(n.iterators)
+	rv += size.SizeOfUint64 * len(n.counts)
 
 	return rv
 }

@@ -233,6 +233,17 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
+	// checked ahead of the top-level min/max branches below: a number_v2 range
+	// is nested under its own key precisely because those are already taken
+	_, hasRangeV2 := tmp["range_v2"]
+	if hasRangeV2 {
+		var rv NumericRangeV2Query
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
 	_, hasMin := tmp["min"].(float64)
 	_, hasMax := tmp["max"].(float64)
 	if hasMin || hasMax {

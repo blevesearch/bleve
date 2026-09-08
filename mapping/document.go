@@ -104,7 +104,15 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache,
 
 func validateFieldType(field *FieldMapping) error {
 	switch field.Type {
-	case "text", "datetime", "number", "boolean", "geopoint", "geoshape", "geoshape_v2", "IP":
+	case "text", "datetime", "number", "number_v2", "boolean", "geopoint",
+		"geoshape", "geoshape_v2", "IP":
+		if field.Type == "number_v2" && field.IncludeInAll {
+			// a number_v2 field produces no tokens, so it can never take part
+			// in the _all composite field; reject at index-definition time
+			// rather than silently matching nothing at query time
+			return fmt.Errorf("field: '%s', type 'number_v2' cannot be included in _all",
+				field.Name)
+		}
 		return nil
 	default:
 		return fmt.Errorf("field: '%s', unknown field type: '%s'",

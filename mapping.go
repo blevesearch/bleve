@@ -92,6 +92,10 @@ func NewGeoShapeV2FieldMapping() *mapping.FieldMapping {
 	return mapping.NewGeoShapeV2FieldMapping()
 }
 
+func NewNumberV2FieldMapping() *mapping.FieldMapping {
+	return mapping.NewNumberV2FieldMapping()
+}
+
 func NewIPFieldMapping() *mapping.FieldMapping {
 	return mapping.NewIPFieldMapping()
 }
