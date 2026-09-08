@@ -20,6 +20,7 @@ import (
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/scorer/simd"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -38,6 +39,7 @@ type TermQueryScorer struct {
 	docTerm                uint64 // number of documents containing the term
 	docTotal               uint64 // total number of documents in the index
 	avgDocLength           float64
+	invAvgDocLength        float64 // 1/avgDocLength, precomputed once: turns a per-document divide into a multiply
 	idf                    float64
 	options                search.SearcherOptions
 	idfExplanation         *search.Explanation
@@ -97,6 +99,9 @@ func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64,
 		queryWeight:  1.0,
 		includeScore: options.Score != "none",
 	}
+	if avgDocLength > 0 {
+		rv.invAvgDocLength = 1 / avgDocLength
+	}
 
 	rv.idf = rv.computeIDF(avgDocLength, docTotal, docTerm)
 	if options.Explain {
@@ -146,7 +151,7 @@ func (s *TermQueryScorer) docScore(tf, norm float64) (score float64, model strin
 		fieldLength := 1 / (norm * norm)
 
 		score = s.idf * (tf * search.BM25_k1) /
-			(tf + search.BM25_k1*(1-search.BM25_b+(search.BM25_b*fieldLength/s.avgDocLength)))
+			(tf + search.BM25_k1*(1-search.BM25_b+(search.BM25_b*fieldLength*s.invAvgDocLength)))
 		model = index.BM25Scoring
 	} else {
 		// tf-idf scoring by default
@@ -160,7 +165,7 @@ func (s *TermQueryScorer) scoreExplanation(tf float64, termMatch *index.TermFiel
 	var rv []*search.Explanation
 	if s.avgDocLength > 0 {
 		fieldLength := 1 / (termMatch.Norm * termMatch.Norm)
-		fieldNormVal := 1 - search.BM25_b + (search.BM25_b * fieldLength / s.avgDocLength)
+		fieldNormVal := 1 - search.BM25_b + (search.BM25_b * fieldLength * s.invAvgDocLength)
 		fieldNormalizeExplanation := &search.Explanation{
 			Value: fieldNormVal,
 			Message: fmt.Sprintf("fieldNorm(field=%s), b=%f, fieldLength=%f, avgFieldLength=%f)",
@@ -314,25 +319,35 @@ func (s *TermQueryScorer) MaxScore(maxTF uint64, maxNorm float64) float64 {
 	return score * s.queryWeight
 }
 
-// ScoreBulk scores a block of documents into out. It is the same arithmetic as
-// docScore, hoisted out of the per-document call so the loop is flat.
+// ScoreBulk scores a block of documents into out. Both the freq-to-tf sqrt
+// and the rest of docScore's arithmetic (the field-length reciprocal and the
+// BM25 division chain, or tf-idf's plain multiply) run two documents at a
+// time in package simd, straight off the raw freqs -- no scalar prep loop.
+// Its formula is written to match docScore's own operand order and grouping
+// exactly, which is what makes this bit-identical to scoring the same
+// documents one at a time (see simd's package doc comment).
+//
+// simd.BM25/TFIDF require an even element count, so an odd n's last document
+// is scored separately afterward through docScore itself -- the same
+// function, not a hand-copied formula, so there is only one place a future
+// change to the scoring formula has to happen.
 func (s *TermQueryScorer) ScoreBulk(freqs []uint64, norms []float64, out []float64) {
+	n := len(out)
+	n2 := n &^ 1 // largest even count <= n
 	bm25 := s.avgDocLength > 0
-	for i := range out {
+	if bm25 {
+		simd.BM25(freqs, norms, s.idf, search.BM25_k1, 1-search.BM25_b, search.BM25_b, s.invAvgDocLength, s.queryWeight, out, n2)
+	} else {
+		simd.TFIDF(freqs, norms, s.idf, s.queryWeight, out, n2)
+	}
+	if n2 != n {
 		var tf float64
-		if freqs[i] < MaxSqrtCache {
-			tf = SqrtCache[int(freqs[i])]
+		if freqs[n2] < MaxSqrtCache {
+			tf = SqrtCache[int(freqs[n2])]
 		} else {
-			tf = math.Sqrt(float64(freqs[i]))
+			tf = math.Sqrt(float64(freqs[n2]))
 		}
-		var score float64
-		if bm25 {
-			fieldLength := 1 / (norms[i] * norms[i])
-			score = s.idf * (tf * search.BM25_k1) /
-				(tf + search.BM25_k1*(1-search.BM25_b+(search.BM25_b*fieldLength/s.avgDocLength)))
-		} else {
-			score = tf * norms[i] * s.idf
-		}
-		out[i] = score * s.queryWeight
+		score, _ := s.docScore(tf, norms[n2])
+		out[n2] = score * s.queryWeight
 	}
 }
