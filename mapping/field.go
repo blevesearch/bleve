@@ -213,6 +213,20 @@ func NewGeoShapeV2FieldMapping() *FieldMapping {
 	}
 }
 
+// NewNumberV2FieldMapping returns a default field mapping for numbers indexed
+// into the number_v2 section. The defaults match NewNumericFieldMapping, except
+// that IncludeInAll is false and cannot be enabled: the field produces no
+// tokens, so it could never contribute to the _all composite field.
+func NewNumberV2FieldMapping() *FieldMapping {
+	return &FieldMapping{
+		Type:         "number_v2",
+		Store:        true,
+		Index:        true,
+		IncludeInAll: false,
+		DocValues:    true,
+	}
+}
+
 // NewIPFieldMapping returns a default field mapping for IP points
 func NewIPFieldMapping() *FieldMapping {
 	return &FieldMapping{
@@ -282,14 +296,21 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 
 func (fm *FieldMapping) processFloat64(propertyValFloat float64, pathString string, path []string, indexes []uint64, context *walkContext) {
 	fieldName := getFieldName(pathString, path, fm)
-	if fm.Type == "number" {
-		options := fm.Options()
-		field := document.NewNumericFieldWithIndexingOptions(fieldName, indexes, propertyValFloat, options)
-		context.doc.AddField(field)
+	var field document.Field
+	switch fm.Type {
+	case "number":
+		field = document.NewNumericFieldWithIndexingOptions(fieldName, indexes,
+			propertyValFloat, fm.Options())
+	case "number_v2":
+		field = document.NewNumericV2FieldWithIndexingOptions(fieldName, indexes,
+			propertyValFloat, fm.Options())
+	default:
+		return
+	}
+	context.doc.AddField(field)
 
-		if !fm.IncludeInAll {
-			context.excludedFromAll = append(context.excludedFromAll, fieldName)
-		}
+	if !fm.IncludeInAll {
+		context.excludedFromAll = append(context.excludedFromAll, fieldName)
 	}
 }
 
