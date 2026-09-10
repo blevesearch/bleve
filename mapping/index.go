@@ -395,6 +395,10 @@ func (im *IndexMappingImpl) MapSynonymDocument(doc *document.Document, collectio
 			if analyzer == nil {
 				return fmt.Errorf("unknown analyzer named: %s", item.Analyzer())
 			}
+			if err := document.ValidateSynonymTerms(analyzer, input, synonyms); err != nil {
+				return fmt.Errorf("synonym source '%s' (analyzer '%s'): %v",
+					name, item.Analyzer(), err)
+			}
 			field := document.NewSynonymField(name, analyzer, input, synonyms)
 			doc.AddField(field)
 		}

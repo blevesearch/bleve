@@ -15,7 +15,9 @@
 package document
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/size"
@@ -146,4 +148,27 @@ func analyzeSynonymTerm(term string, analyzer analysis.Analyzer) string {
 		return string(tokenStream[0].Term)
 	}
 	return ""
+}
+
+// ValidateSynonymTerms checks that every input and synonym term analyzes
+// to exactly one token with the given analyzer, since only single-token
+// synonym terms are supported. Terms that fail this check would otherwise
+// be silently dropped at analysis time.
+func ValidateSynonymTerms(analyzer analysis.Analyzer, input, synonyms []string) error {
+	var invalid []string
+	collectInvalid := func(terms []string) {
+		for _, term := range terms {
+			if tokenStream := analyzer.Analyze([]byte(term)); len(tokenStream) != 1 {
+				invalid = append(invalid,
+					fmt.Sprintf("%q (%d tokens)", term, len(tokenStream)))
+			}
+		}
+	}
+	collectInvalid(input)
+	collectInvalid(synonyms)
+	if len(invalid) > 0 {
+		return fmt.Errorf("synonym terms must analyze to exactly one token, "+
+			"invalid terms: %s", strings.Join(invalid, ", "))
+	}
+	return nil
 }

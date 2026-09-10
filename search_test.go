@@ -3995,6 +3995,94 @@ func TestThesaurusTermReader(t *testing.T) {
 	}
 }
 
+func TestSynonymTermValidation(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	synonymCollection := "collection1"
+	synonymSourceName := "english"
+
+	synonymSourceConfig := map[string]interface{}{
+		"collection": synonymCollection,
+		"analyzer":   simple.Name,
+	}
+
+	textField := mapping.NewTextFieldMapping()
+	textField.Analyzer = simple.Name
+	textField.SynonymSource = synonymSourceName
+
+	imap := mapping.NewIndexMapping()
+	imap.DefaultMapping.AddFieldMappingsAt("text", textField)
+	err := imap.AddSynonymSource(synonymSourceName, synonymSourceConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	tests := []struct {
+		about       string
+		def         *SynonymDefinition
+		wantErrTerm string
+	}{
+		{
+			about: "single-token terms are accepted",
+			def: &SynonymDefinition{
+				Synonyms: []string{"quick", "fast", "speedy"},
+			},
+		},
+		{
+			about: "multi-word synonym is rejected",
+			def: &SynonymDefinition{
+				Synonyms: []string{"nyc", "new york", "gotham"},
+			},
+			wantErrTerm: `"new york" (2 tokens)`,
+		},
+		{
+			about: "multi-word input is rejected",
+			def: &SynonymDefinition{
+				Input:    []string{"big apple"},
+				Synonyms: []string{"nyc"},
+			},
+			wantErrTerm: `"big apple" (2 tokens)`,
+		},
+		{
+			about: "term split by the analyzer is rejected",
+			def: &SynonymDefinition{
+				Synonyms: []string{"wifi", "wi-fi"},
+			},
+			wantErrTerm: `"wi-fi" (2 tokens)`,
+		},
+	}
+
+	for _, test := range tests {
+		batch := idx.NewBatch()
+		err := batch.IndexSynonym("synDoc", synonymCollection, test.def)
+		if test.wantErrTerm == "" {
+			if err != nil {
+				t.Fatalf("%s: expected no error, got: %v", test.about, err)
+			}
+			continue
+		}
+		if err == nil {
+			t.Fatalf("%s: expected an error, got none", test.about)
+		}
+		if !strings.Contains(err.Error(), test.wantErrTerm) {
+			t.Fatalf("%s: expected error naming %s, got: %v",
+				test.about, test.wantErrTerm, err)
+		}
+	}
+}
+
 func TestSynonymSearchQueries(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
