@@ -622,6 +622,18 @@ func (is *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err er
 	return next.ID, nil
 }
 
+// releasePostings returns v to its implementation's internal pool if it
+// opts into segment.Releasable. This is an optional capability, the same
+// idiom as segment.OptimizablePostingsIterator: most segment.PostingsList/
+// PostingsIterator values built by query optimization (e.g. the unadorned
+// iterators in unadorned.go) don't back onto pooled memory and this is a
+// no-op for them.
+func releasePostings(v interface{}) {
+	if rel, ok := v.(segment.Releasable); ok {
+		rel.Release()
+	}
+}
+
 func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field string, includeFreq,
 	includeNorm, includeTermVectors bool,
 ) (index.TermFieldReader, error) {
@@ -684,8 +696,9 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 		var prevBytesReadPL uint64
 		if rv.postings[i] != nil {
 			prevBytesReadPL = rv.postings[i].BytesRead()
+			releasePostings(rv.postings[i])
 		}
-		pl, err := rv.dicts[i].PostingsList(term, s.deleted, rv.postings[i])
+		pl, err := rv.dicts[i].PostingsList(term, s.deleted, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -694,8 +707,9 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 		var prevBytesReadItr uint64
 		if rv.iterators[i] != nil {
 			prevBytesReadItr = rv.iterators[i].BytesRead()
+			releasePostings(rv.iterators[i])
 		}
-		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, rv.iterators[i])
+		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, nil)
 
 		if bytesRead := rv.postings[i].BytesRead(); prevBytesReadPL < bytesRead {
 			rv.incrementBytesRead(bytesRead - prevBytesReadPL)

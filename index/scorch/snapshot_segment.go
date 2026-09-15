@@ -243,14 +243,20 @@ func (cfd *cachedFieldDocs) prepareField(field string, ss *SegmentSnapshot) {
 	next, err := dictItr.Next()
 	for err == nil && next != nil {
 		var err1 error
-		postings, err1 = dict.PostingsList([]byte(next.Term), nil, postings)
+		if postings != nil {
+			releasePostings(postings)
+		}
+		postings, err1 = dict.PostingsList([]byte(next.Term), nil, nil)
 		if err1 != nil {
 			cfd.err = err1
 			return
 		}
 
 		cfd.size += uint64(size.SizeOfUint64) /* map key */
-		postingsItr = postings.Iterator(false, false, false, postingsItr)
+		if postingsItr != nil {
+			releasePostings(postingsItr)
+		}
+		postingsItr = postings.Iterator(false, false, false, nil)
 		nextPosting, err2 := postingsItr.Next()
 		for err2 == nil && nextPosting != nil {
 			docNum := nextPosting.Number()
