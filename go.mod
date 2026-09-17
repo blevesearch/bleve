@@ -47,7 +47,7 @@ require (
 )
 
 // Local development against the block-format zapx. Drop once v18 is published.
-replace github.com/blevesearch/zapx/v18 => /Users/gautham.k/projects/zapx
+replace github.com/blevesearch/zapx/v18 => /Users/gautham.k/projects/zapx-bulk-scan
 
 // perf/tantivy-inspired: FST traversal/allocation fixes. zapx's own replace
 // directive for this does NOT propagate here (replace directives aren't
