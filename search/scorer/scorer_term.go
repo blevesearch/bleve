@@ -309,13 +309,22 @@ func (s *TermQueryScorer) UsesBM25() bool {
 // a true upper bound over any set of documents that shares it, without
 // scoring any of them.
 func (s *TermQueryScorer) MaxScore(maxTF uint64, maxNorm float64) float64 {
+	return s.scoreOne(maxTF, maxNorm)
+}
+
+// scoreOne computes a single document's score from its raw term frequency
+// and norm factor -- the non-batched equivalent of one ScoreBulk element.
+// Shared by MaxScore and by ScoreBulk's own single-document paths (its
+// n==1 fast path and its odd-length remainder), so there is exactly one
+// place this arithmetic is written.
+func (s *TermQueryScorer) scoreOne(freq uint64, norm float64) float64 {
 	var tf float64
-	if maxTF < MaxSqrtCache {
-		tf = SqrtCache[int(maxTF)]
+	if freq < MaxSqrtCache {
+		tf = SqrtCache[int(freq)]
 	} else {
-		tf = math.Sqrt(float64(maxTF))
+		tf = math.Sqrt(float64(freq))
 	}
-	score, _ := s.docScore(tf, maxNorm)
+	score, _ := s.docScore(tf, norm)
 	return score * s.queryWeight
 }
 
@@ -328,11 +337,24 @@ func (s *TermQueryScorer) MaxScore(maxTF uint64, maxNorm float64) float64 {
 // documents one at a time (see simd's package doc comment).
 //
 // simd.BM25/TFIDF require an even element count, so an odd n's last document
-// is scored separately afterward through docScore itself -- the same
+// is scored separately afterward through scoreOne itself -- the same
 // function, not a hand-copied formula, so there is only one place a future
 // change to the scoring formula has to happen.
+//
+// n==1 skips the batch call entirely rather than dispatching simd.BM25/TFIDF
+// with a zero-length slice and then scoring the sole document through the
+// scalar remainder anyway: a batch of one gains nothing from simd's
+// paired-lane dispatch and still pays the scalar path regardless, so calling
+// it at all is pure overhead. This is the common case for a block-WAND
+// conjunction's per-candidate secondary score (see
+// blockConjunction.scoreCandidates), which scores exactly one document at a
+// time.
 func (s *TermQueryScorer) ScoreBulk(freqs []uint64, norms []float64, out []float64) {
 	n := len(out)
+	if n == 1 {
+		out[0] = s.scoreOne(freqs[0], norms[0])
+		return
+	}
 	n2 := n &^ 1 // largest even count <= n
 	bm25 := s.avgDocLength > 0
 	if bm25 {
@@ -341,13 +363,6 @@ func (s *TermQueryScorer) ScoreBulk(freqs []uint64, norms []float64, out []float
 		simd.TFIDF(freqs, norms, s.idf, s.queryWeight, out, n2)
 	}
 	if n2 != n {
-		var tf float64
-		if freqs[n2] < MaxSqrtCache {
-			tf = SqrtCache[int(freqs[n2])]
-		} else {
-			tf = math.Sqrt(float64(freqs[n2]))
-		}
-		score, _ := s.docScore(tf, norms[n2])
-		out[n2] = score * s.queryWeight
+		out[n2] = s.scoreOne(freqs[n2], norms[n2])
 	}
 }
