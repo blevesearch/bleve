@@ -175,8 +175,13 @@ type IndexSnapshotTermFieldReader struct {
 	includeTermVectors bool
 	currPosting        segment.Posting
 	currID             index.IndexInternalID
-	recycle            bool
-	bytesRead          uint64
+	// advanceScratch is AdvanceDocNum's private scratch TermFieldDoc: it
+	// never leaves the method as a pointer, only as the raw values a caller
+	// asked for, so reusing one instance across calls is safe the same way
+	// currID's own buffer reuse already is.
+	advanceScratch index.TermFieldDoc
+	recycle        bool
+	bytesRead      uint64
 	ctx                context.Context
 	unadorned          bool
 	// flag to indicate whether to increment our bytesRead
@@ -344,8 +349,25 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 			}
 		}
 	}
-	num := ID.Value()
-	segIndex, ldocNum := i.snapshot.segmentIndexAndLocalDocNumFromGlobal(num)
+	if preAlloced == nil {
+		preAlloced = &index.TermFieldDoc{}
+	}
+	return i.advanceNum(ID.Value(), preAlloced)
+}
+
+// advanceNum is Advance's core logic, taking the target as a raw uint64
+// rather than an encoded index.IndexInternalID -- shared by Advance (which
+// decodes ID into this form before calling in) and AdvanceDocNum (which
+// deals in raw document numbers to begin with, so has nothing to decode).
+//
+// Does not implement Advance's backward-seek recovery (rebuilding the whole
+// reader when the target is at or before whatever this reader last
+// produced): that check needs the actual index.IndexInternalID, which
+// AdvanceDocNum's caller does not have and does not need, since it
+// guarantees forward-only targets some other way. Advance performs that
+// check itself, before calling in here.
+func (i *IndexSnapshotTermFieldReader) advanceNum(target uint64, rv *index.TermFieldDoc) (*index.TermFieldDoc, error) {
+	segIndex, ldocNum := i.snapshot.segmentIndexAndLocalDocNumFromGlobal(target)
 	if segIndex >= len(i.snapshot.segment) {
 		return nil, fmt.Errorf("computed segment index %d out of bounds %d",
 			segIndex, len(i.snapshot.segment))
@@ -360,10 +382,7 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 		filler = i.fillers[i.segmentOffset]
 	}
 	if filler != nil {
-		if preAlloced == nil {
-			preAlloced = &index.TermFieldDoc{}
-		}
-		found, err := filler.FillTermFieldDoc(preAlloced, i.snapshot.offsets[segIndex],
+		found, err := filler.FillTermFieldDoc(rv, i.snapshot.offsets[segIndex],
 			ldocNum, i.includeFreq, i.includeNorm)
 		if err != nil {
 			return nil, err
@@ -371,11 +390,11 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 		if !found {
 			// nothing at or after the target in this segment; Next picks up
 			// from the following segment (segmentOffset already moved)
-			return i.Next(preAlloced)
+			return i.Next(rv)
 		}
-		i.currID = preAlloced.ID
+		i.currID = rv.ID
 		i.currPosting = nil
-		return preAlloced, nil
+		return rv, nil
 	}
 
 	next, err := i.iterators[i.segmentOffset].Advance(ldocNum)
@@ -386,18 +405,41 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 		// we jumped directly to the segment that should have contained it
 		// but it wasn't there, so reuse Next() which should correctly
 		// get the next hit after it (we moved i.segmentOffset)
-		return i.Next(preAlloced)
+		return i.Next(rv)
 	}
 
-	if preAlloced == nil {
-		preAlloced = &index.TermFieldDoc{}
-	}
-	preAlloced.ID = index.NewIndexInternalID(preAlloced.ID, next.Number()+
-		i.snapshot.offsets[segIndex])
-	i.postingToTermFieldDoc(next, preAlloced)
-	i.currID = preAlloced.ID
+	rv.ID = index.NewIndexInternalID(rv.ID, next.Number()+i.snapshot.offsets[segIndex])
+	i.postingToTermFieldDoc(next, rv)
+	i.currID = rv.ID
 	i.currPosting = next
-	return preAlloced, nil
+	return rv, nil
+}
+
+// AdvanceDocNum is Advance's counterpart for a caller that already tracks
+// document numbers as plain uint64s and has no other use for the generic
+// index.IndexInternalID encoding -- block-conjunction WAND's per-candidate
+// secondary membership check (search_conjunction_block.go's
+// blockConjunction.scoreCandidates) is the motivating case. Encoding a
+// target into ID bytes only for Advance to immediately decode it straight
+// back via ID.Value(), then decoding the *index.TermFieldDoc it returns back
+// into a uint64 again, is pure round-trip cost paid on every single
+// candidate x secondary pair -- this skips both encode and both decodes,
+// keeping only the one encode this reader's own currID bookkeeping always
+// needs regardless of which entry point is used.
+//
+// Like Advance, target must be strictly greater than any document number
+// this reader has already produced or advanced past. Advance recovers from
+// a backward seek by rebuilding the reader from scratch; this method does
+// not attempt to detect one at all, since block-conjunction WAND already
+// guarantees forward-only targets by construction (candidates are visited
+// in ascending doc order) and paying for that check here would defeat the
+// point of avoiding the encode it needs in the first place.
+func (i *IndexSnapshotTermFieldReader) AdvanceDocNum(target uint64) (docNum uint64, freq uint64, norm float64, exists bool, err error) {
+	rv, err := i.advanceNum(target, &i.advanceScratch)
+	if err != nil || rv == nil {
+		return 0, 0, 0, false, err
+	}
+	return rv.ID.Value(), rv.Freq, rv.Norm, true, nil
 }
 
 func (i *IndexSnapshotTermFieldReader) Count() uint64 {

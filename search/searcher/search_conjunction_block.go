@@ -218,6 +218,21 @@ type conjLeg struct {
 	ts  *TermSearcher
 	bmr blockMaxReader
 	nb  blockTermFieldReader
+	// dn is an optional fast path for a secondary's per-candidate membership
+	// check (see scoreCandidates): nil means the reader does not support it,
+	// and scoreCandidates falls back to the generic byte-encoded Advance.
+	dn docNumAdvancer
+}
+
+// docNumAdvancer is Advance's raw-uint64 counterpart: scorch implements it
+// on IndexSnapshotTermFieldReader. scoreCandidates already tracks every
+// candidate as a plain uint64, so encoding one into an index.IndexInternalID
+// only for the generic Advance to immediately decode it straight back --
+// and then decoding the *index.TermFieldDoc it returns back into a uint64
+// again -- is pure round-trip cost this skips, on every candidate x
+// secondary pair.
+type docNumAdvancer interface {
+	AdvanceDocNum(target uint64) (docNum uint64, freq uint64, norm float64, exists bool, err error)
 }
 
 // canBlockConjunct reports whether every clause is eligible for the
@@ -269,7 +284,8 @@ func newBlockConjunction(searchers []search.Searcher) *blockConjunction {
 		if !ok {
 			return nil
 		}
-		legs[i] = conjLeg{ts: ts, bmr: bmr, nb: nb}
+		dn, _ := ts.reader.(docNumAdvancer) // optional; nil is handled by scoreCandidates
+		legs[i] = conjLeg{ts: ts, bmr: bmr, nb: nb, dn: dn}
 	}
 	numSec := len(legs) - 1
 	return &blockConjunction{
@@ -498,7 +514,6 @@ func (bc *blockConjunction) scoreCandidates(from, to int, degraded bool, secSum 
 	for ci := 0; ci < m; ci++ {
 		doc := bc.candDocs[ci]
 		total := bc.candScores[ci]
-		bc.idBuf = index.NewIndexInternalID(bc.idBuf, doc)
 
 		matched := true
 		for si := range bc.secondaries {
@@ -524,21 +539,38 @@ func (bc *blockConjunction) scoreCandidates(from, to int, degraded bool, secSum 
 			default:
 				// secCursor[si] < doc, or the reader has never been
 				// positioned: a genuine forward seek.
-				tfd, err := sec.ts.reader.Advance(bc.idBuf, &bc.tfdScratch)
-				if err != nil {
-					return err
+				var cursorDoc, sfreq uint64
+				var snorm float64
+				var found bool
+				if sec.dn != nil {
+					// See docNumAdvancer's doc comment: no ID bytes in
+					// either direction.
+					var derr error
+					cursorDoc, sfreq, snorm, found, derr = sec.dn.AdvanceDocNum(doc)
+					if derr != nil {
+						return derr
+					}
+				} else {
+					bc.idBuf = index.NewIndexInternalID(bc.idBuf, doc)
+					tfd, err := sec.ts.reader.Advance(bc.idBuf, &bc.tfdScratch)
+					if err != nil {
+						return err
+					}
+					if tfd != nil {
+						cursorDoc, sfreq, snorm, found = tfd.ID.Value(), tfd.Freq, tfd.Norm, true
+					}
 				}
-				if tfd == nil {
+				if !found {
 					bc.done = true
 					matched = false
 				} else {
-					bc.secCursor[si] = tfd.ID.Value()
+					bc.secCursor[si] = cursorDoc
 					bc.secValid[si] = true
-					bc.secFreq[si], bc.secNorm[si] = tfd.Freq, tfd.Norm
-					if tfd.ID.Value() != doc {
+					bc.secFreq[si], bc.secNorm[si] = sfreq, snorm
+					if cursorDoc != doc {
 						matched = false
 					} else {
-						freq, norm = tfd.Freq, tfd.Norm
+						freq, norm = sfreq, snorm
 					}
 				}
 			}
