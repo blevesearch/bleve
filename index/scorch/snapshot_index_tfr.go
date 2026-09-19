@@ -46,14 +46,6 @@ type termFieldDocFiller interface {
 		includeFreq, includeNorm bool) (bool, error)
 }
 
-// blockFiller is the bulk form of the same idea: hand back a whole block of
-// postings as flat arrays so the caller can score them without a per-document
-// object. Implementations do not decode locations.
-type blockFiller interface {
-	NextBlock(docNums []uint64, freqs []uint64, norms []float64,
-		globalOffset uint64) (int, error)
-}
-
 // NextBlock fills the caller's arrays with the next block of postings, walking
 // across segments as needed. It returns 0 when the reader is exhausted.
 //
@@ -67,8 +59,8 @@ func (i *IndexSnapshotTermFieldReader) NextBlock(docNums []uint64, freqs []uint6
 		// asserted here rather than precomputed per reader: multi-term queries
 		// build hundreds of readers and would pay for a capability they never
 		// use, while here the cost is amortised over a whole block
-		bf, _ := i.iterators[i.segmentOffset].(blockFiller)
-		if bf == nil {
+		bf, ok := i.iterators[i.segmentOffset].(segment.BlockMaxPostingsIterator)
+		if !ok {
 			return n, nil // segment can't bulk-fill; caller falls back
 		}
 		curItr := i.iterators[i.segmentOffset]
@@ -111,46 +103,28 @@ func (i *IndexSnapshotTermFieldReader) SupportsBlocks() bool {
 		return false
 	}
 	for _, it := range i.iterators {
-		if _, ok := it.(blockFiller); !ok {
+		if _, ok := it.(segment.BlockMaxPostingsIterator); !ok {
 			return false
 		}
 	}
 	return true
 }
 
-// blockMaxIterator is an optional capability a segment's postings iterator
-// may implement: an upper bound on its scoring contribution -- highest term
-// frequency, most favorable (shortest-field) norm factor -- for every
-// document up to and including lastDoc, without decoding anything. This is
-// the raw material for block-max WAND: a caller holding a score threshold can
-// compare it against its own upper-bound formula evaluated at (maxTF,
-// maxNormFactor) and skip the whole span via shallowAdvancer if it can't
-// possibly clear it.
-type blockMaxIterator interface {
-	BlockMax() (maxTF uint64, maxNormFactor float64, lastDoc uint64, docCount int, ok bool)
-}
-
-// shallowAdvancer moves a postings iterator to the block that could contain a
-// target document without decoding any block's payload -- the building block
-// block-max WAND uses to skip a span its own BlockMax said isn't competitive.
-type shallowAdvancer interface {
-	ShallowAdvance(target uint64) error
-}
-
-// BlockMax reports blockMaxIterator's bound for whichever segment this reader
-// is currently positioned at, translated to a global document number. docCount
-// is the number of documents that span covers -- letting a caller that skips
-// it keep an exact hit count without knowing anything about the segment's
-// block size. ok is false whenever there's nothing useful to report -- the
-// reader is exhausted, or the current segment's iterator doesn't support it
-// (a 1-hit term, a conjunction-narrowed iterator, live deletions, or a segment
-// implementation that simply doesn't have this capability) -- in which case
-// the caller should just proceed with a normal fetch.
+// BlockMax reports segment.BlockMaxPostingsIterator's bound for whichever
+// segment this reader is currently positioned at, translated to a global
+// document number. docCount is the number of documents that span covers --
+// letting a caller that skips it keep an exact hit count without knowing
+// anything about the segment's block size. ok is false whenever there's
+// nothing useful to report -- the reader is exhausted, or the current
+// segment's iterator doesn't support it (a 1-hit term, a conjunction-narrowed
+// iterator, live deletions, or a segment implementation that simply doesn't
+// have this capability) -- in which case the caller should just proceed with
+// a normal fetch.
 func (i *IndexSnapshotTermFieldReader) BlockMax() (maxTF uint64, maxNormFactor float64, lastDoc uint64, docCount int, ok bool) {
 	if i.segmentOffset >= len(i.iterators) {
 		return 0, 0, 0, 0, false
 	}
-	bm, ok := i.iterators[i.segmentOffset].(blockMaxIterator)
+	bm, ok := i.iterators[i.segmentOffset].(segment.BlockMaxPostingsIterator)
 	if !ok {
 		return 0, 0, 0, 0, false
 	}
@@ -178,7 +152,7 @@ func (i *IndexSnapshotTermFieldReader) ShallowAdvance(target uint64) error {
 		return nil
 	}
 	i.segmentOffset = segIndex
-	if sa, ok := i.iterators[i.segmentOffset].(shallowAdvancer); ok {
+	if sa, ok := i.iterators[i.segmentOffset].(segment.BlockMaxPostingsIterator); ok {
 		return sa.ShallowAdvance(ldocNum)
 	}
 	return nil
