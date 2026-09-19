@@ -143,7 +143,59 @@ type blockConjunction struct {
 	survDocs   []uint64
 	survScores []float64
 	survPos    int
+
+	// noBenefitStreak/skipPrefilter: adaptive bailout for when phase 1's
+	// score pre-filter isn't earning its keep. Two similarly-frequent,
+	// similarly-scored clauses (e.g. two mid-frequency terms) give the
+	// pre-filter almost nothing to reject -- profiling found ~98.7% of
+	// candidates surviving it for such a pair -- yet every call still pays
+	// for the filtering loop itself, the phase-2 suffix-sum bookkeeping it
+	// exists to feed, and idBuf/cursor-switch overhead on candidates that
+	// were never going to be rejected anyway: a CPU profile attributed
+	// ~32% of scoreCandidates' own time to this bookkeeping for exactly
+	// such a pair, on top of the ~56% that is the genuine, unavoidable
+	// cost of a real secondary Advance() call.
+	//
+	// noBenefitStreak counts consecutive WINDOWS whose phase-1 pass
+	// rejected zero candidates (see scoreCandidates). Once that streak
+	// crosses conjNoBenefitBailoutStreak, skipPrefilter permanently skips
+	// the phase-1 filtering comparison and the phase-2 suffix-sum early
+	// exit for the rest of this query -- both cheap arithmetic that isn't
+	// paying for itself -- while leaving every correctness-relevant piece
+	// untouched: the real Advance()-based membership check, the
+	// secCursor/secValid overshoot cache (a genuine efficiency win
+	// unrelated to score-based pruning), and advanceWindow's whole-window
+	// skip check (already cheap at ~1.76% of profiled time, and still
+	// occasionally useful even when per-candidate filtering isn't).
+	//
+	// A streak over WINDOWS rather than individual candidates, unlike the
+	// disjunction path's equivalent bailout: a window batches up to
+	// conjBlockCap (128) candidate-level pass/fail outcomes, so "this
+	// whole window rejected nothing" is already a much rarer coincidence
+	// for a clause pair where the pre-filter is genuinely earning its
+	// keep. At a real per-candidate rejection rate of even 5%, a window
+	// rejecting nothing by pure chance has probability roughly
+	// (0.95)^128 =~ 0.14%; at and-mid-mid's measured ~1.3% rejection rate
+	// it's close to 19%, so a handful of consecutive clean windows
+	// reliably separates "not helping at all" from "helping, just not on
+	// this one window" without needing the much larger streak the
+	// disjunction bailout needs to survive many more, much cheaper,
+	// individual-document trials.
+	//
+	// One-way for the lifetime of this blockConjunction (one per query,
+	// spanning every segment): a clause pair's relative frequency/idf is
+	// fixed for the whole query, so there is nothing to react to by
+	// re-enabling filtering later.
+	noBenefitStreak int
+	skipPrefilter   bool
 }
+
+// conjNoBenefitBailoutStreak is how many consecutive windows must each
+// reject zero phase-1 candidates before scoreCandidates concludes the
+// pre-filter isn't earning its keep for this clause pair and permanently
+// skips it -- see blockConjunction.noBenefitStreak's doc comment for the
+// probability reasoning behind this specific value.
+const conjNoBenefitBailoutStreak = 4
 
 // EnableConjunctionBlockMaxWAND gates the whole feature: when false,
 // canBlockConjunct always reports ineligible, so NewConjunctionSearcher
@@ -397,23 +449,45 @@ func (bc *blockConjunction) advanceWindow() (bool, error) {
 // could possibly contribute, then a real membership check (score-first) for
 // survivors only, appending matches to bc.survDocs/survScores.
 func (bc *blockConjunction) scoreCandidates(from, to int, degraded bool, secSum float64) error {
-	scoreThreshold := math.Inf(-1)
-	if !degraded {
-		scoreThreshold = bc.threshold - secSum
-	}
 	m := 0
-	for i := from; i < to; i++ {
-		if bc.leaderScores[i] > scoreThreshold {
-			bc.candDocs[m] = bc.leaderDocs[i]
-			bc.candScores[m] = bc.leaderScores[i]
-			m++
+	if bc.skipPrefilter {
+		// Bailed out: every leader entry in range is a candidate, copied
+		// over unconditionally rather than compared against scoreThreshold
+		// -- see noBenefitStreak's doc comment for why this comparison
+		// stopped earning its keep for this clause pair.
+		m = to - from
+		copy(bc.candDocs[:m], bc.leaderDocs[from:to])
+		copy(bc.candScores[:m], bc.leaderScores[from:to])
+	} else {
+		scoreThreshold := math.Inf(-1)
+		if !degraded {
+			scoreThreshold = bc.threshold - secSum
+		}
+		for i := from; i < to; i++ {
+			if bc.leaderScores[i] > scoreThreshold {
+				bc.candDocs[m] = bc.leaderDocs[i]
+				bc.candScores[m] = bc.leaderScores[i]
+				m++
+			}
+		}
+		// Track whether this window's pass rejected anything at all --
+		// see noBenefitStreak's doc comment for the probability reasoning
+		// behind treating a run of totally-unproductive windows as a
+		// signal to stop paying for this check.
+		if m == to-from {
+			bc.noBenefitStreak++
+			if bc.noBenefitStreak >= conjNoBenefitBailoutStreak {
+				bc.skipPrefilter = true
+			}
+		} else {
+			bc.noBenefitStreak = 0
 		}
 	}
 	if m == 0 {
 		return nil
 	}
 
-	if !degraded {
+	if !degraded && !bc.skipPrefilter {
 		running := 0.0
 		for i := len(bc.secondaries) - 1; i >= 0; i-- {
 			bc.secSuffix[i] = running
@@ -479,7 +553,7 @@ func (bc *blockConjunction) scoreCandidates(from, to int, degraded bool, secSum 
 			sec.ts.scorer.ScoreBulk(bc.freq1[:], bc.norm1[:], bc.score1[:])
 			total += bc.score1[0]
 
-			if !degraded && total+bc.secSuffix[si] <= bc.threshold {
+			if !degraded && !bc.skipPrefilter && total+bc.secSuffix[si] <= bc.threshold {
 				matched = false
 				break
 			}
