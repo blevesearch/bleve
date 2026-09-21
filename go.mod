@@ -6,6 +6,7 @@ require (
 	github.com/RoaringBitmap/roaring/v2 v2.14.5
 	github.com/bits-and-blooms/bitset v1.24.2
 	github.com/blevesearch/bleve_index_api v1.4.1
+	github.com/blevesearch/freeway v0.0.0-20260910051309-0770e11c32cd
 	github.com/blevesearch/geo v0.2.7-0.20260831141219-9c3e3a4d84bc
 	github.com/blevesearch/go-faiss v1.1.5
 	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475
@@ -26,6 +27,7 @@ require (
 	github.com/blevesearch/zapx/v15 v15.4.3
 	github.com/blevesearch/zapx/v16 v16.3.4
 	github.com/blevesearch/zapx/v17 v17.2.3
+	github.com/blevesearch/zapx/v18 v18.0.0
 	github.com/couchbase/moss v0.2.0
 	github.com/spf13/cobra v1.10.2
 	go.etcd.io/bbolt v1.4.0
@@ -44,3 +46,23 @@ require (
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 )
+
+// Local development against the block-format zapx, built on bitpack-simd
+// (the team-reviewed foundation) rather than an independent fork. Drop once
+// v18 is published.
+replace github.com/blevesearch/zapx/v18 => /Users/gautham.k/projects/zapx
+
+// Local development against the matching BlockMaxPostingsIterator shape
+// zapx's wand/block-max branch above implements. Drop once a release
+// carrying it is published.
+replace github.com/blevesearch/scorch_segment_api/v2 => /Users/gautham.k/projects/scorch_segment_api
+
+// Shared SIMD scoring kernels -- see search/scorer/scorer_term.go's ScoreBulk.
+// Local until freeway has a release; not yet published anywhere.
+replace github.com/blevesearch/freeway => /Users/gautham.k/projects/freeway
+
+// perf/tantivy-inspired: FST traversal/allocation fixes. zapx's own replace
+// directive for this does NOT propagate here (replace directives aren't
+// transitive across module boundaries) -- needed directly in every module
+// that actually builds the binary.
+replace github.com/blevesearch/vellum => /Users/gautham.k/projects/vellum

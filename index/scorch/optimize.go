@@ -80,40 +80,216 @@ func (o *OptimizeTFRConjunction) Finish() (index.Optimized, error) {
 	}
 
 	for i := range o.snapshot.segment {
-		itr0, ok := o.tfrs[0].iterators[i].(segment.OptimizablePostingsIterator)
-		if !ok || itr0.ActualBitmap() == nil {
-			continue
-		}
-
-		itr1, ok := o.tfrs[1].iterators[i].(segment.OptimizablePostingsIterator)
-		if !ok || itr1.ActualBitmap() == nil {
-			continue
-		}
-
-		bm := roaring.And(itr0.ActualBitmap(), itr1.ActualBitmap())
-
-		for _, tfr := range o.tfrs[2:] {
+		// All clauses have to support being narrowed for this segment to be
+		// worth touching at all -- ReplaceActual is what makes the narrowed
+		// set stick for the scoring pass that runs after Finish returns.
+		itrs := make([]segment.OptimizablePostingsIterator, len(o.tfrs))
+		allOptimizable := true
+		for ti, tfr := range o.tfrs {
 			itr, ok := tfr.iterators[i].(segment.OptimizablePostingsIterator)
-			if !ok || itr.ActualBitmap() == nil {
-				continue
+			if !ok {
+				allOptimizable = false
+				break
 			}
+			itrs[ti] = itr
+		}
+		if !allOptimizable {
+			continue
+		}
 
-			bm.And(itr.ActualBitmap())
+		bm, err := intersectPostingsForSegment(o.tfrs, itrs, i)
+		if err != nil {
+			return nil, err
+		}
+		if bm == nil {
+			continue
 		}
 
 		// in this conjunction optimization, the postings iterators
-		// will all share the same AND'ed together actual bitmap.  The
+		// will all share the same intersected actual bitmap.  The
 		// regular conjunction searcher machinery will still be used,
 		// but the underlying bitmap will be smaller.
-		for _, tfr := range o.tfrs {
-			itr, ok := tfr.iterators[i].(segment.OptimizablePostingsIterator)
-			if ok && itr.ActualBitmap() != nil {
-				itr.ReplaceActual(bm)
-			}
+		for _, itr := range itrs {
+			itr.ReplaceActual(bm)
 		}
 	}
 
 	return nil, nil
+}
+
+// leapfrogOverheadFactor governs the choice between the two ways of
+// computing a conjunction's intersection, below. Materializing touches
+// sum(counts) documents; leapfrogging touches roughly minCount*(K-1). Those
+// two estimates alone say leapfrog should win whenever clauses aren't
+// perfectly equal in size -- but they cost different amounts *per document
+// touched*: materializing decodes whole blocks in a tight sequential SIMD
+// loop, while leapfrogging pays a published-interface Advance() call (virtual
+// dispatch, general seek bookkeeping meant to serve every caller of
+// PostingsIterator, not just this one) for every probe. Measured on roughly
+// equal-sized clauses -- where the two document-count estimates come out
+// equal and so say "doesn't matter either way" -- leapfrog measured ~40%
+// slower net of that gap, and on two ~140k-document clauses (a case the raw
+// estimates would also call "close") it was slower still. This factor is a
+// blunt way of saying "only leapfrog when the size skew clearly outweighs its
+// higher per-document cost," not a claim that the ratio is exactly 4 -- it
+// hasn't been tuned finely, just enough to stop misclassifying the two
+// measured near-equal-size cases while still firing on the 127x-skewed one.
+const leapfrogOverheadFactor = 4
+
+// intersectPostingsForSegment computes the exact set of documents that match
+// every one of tfrs' postings lists in segment segIdx, picking whichever of
+// two strategies is cheaper for this particular set of clause sizes.
+//
+// Returns a nil bitmap (not an error) when nothing should change for this
+// segment -- the caller then leaves its iterators alone rather than
+// replacing them with an equivalent-but-freshly-built set.
+func intersectPostingsForSegment(tfrs []*IndexSnapshotTermFieldReader,
+	itrs []segment.OptimizablePostingsIterator, segIdx int) (*roaring.Bitmap, error) {
+	var sumCounts, minCount uint64
+	for i, tfr := range tfrs {
+		pl := tfr.postings[segIdx]
+		if pl == nil {
+			return roaring.New(), nil // a clause has nothing in this segment
+		}
+		// NOTE: Count() is O(1) for a segment with no deletions on this
+		// term, but can cost as much as a full decode when there are --
+		// see zapx's PostingsList.Count(). That's an existing, separate gap:
+		// a docFreq upper bound would suffice here and never need one, but
+		// no such estimator is in the published segment API today.
+		c := pl.Count()
+		sumCounts += c
+		if i == 0 || c < minCount {
+			minCount = c
+		}
+	}
+
+	if minCount*uint64(len(tfrs)-1)*leapfrogOverheadFactor < sumCounts {
+		return leapfrogIntersect(tfrs, segIdx, minCount)
+	}
+	return materializeIntersect(itrs)
+}
+
+// materializeIntersect is the original strategy: ask every clause for its
+// full doc set and roaring.And them together. Cheapest when clauses are
+// comparably sized, because a bulk block decode beats leapfrog's per-document
+// overhead by more than the two ever differ in document count.
+func materializeIntersect(itrs []segment.OptimizablePostingsIterator) (*roaring.Bitmap, error) {
+	bm0 := itrs[0].ActualBitmap()
+	if bm0 == nil {
+		return nil, nil
+	}
+	bm1 := itrs[1].ActualBitmap()
+	if bm1 == nil {
+		return nil, nil
+	}
+	bm := roaring.And(bm0, bm1)
+
+	for _, itr := range itrs[2:] {
+		bmN := itr.ActualBitmap()
+		if bmN == nil {
+			return nil, nil
+		}
+		bm.And(bmN)
+	}
+
+	return bm, nil
+}
+
+// leapfrogIntersect is a zig-zag merge driven directly by each clause's own
+// Advance(), for when one clause is far smaller than the rest. Materializing
+// every clause first -- what used to be free when a segment's on-disk
+// postings representation already *was* a roaring bitmap sitting in memory --
+// costs a full decode of the *largest* clause under a format under no
+// obligation to keep one of those around (zapx v18's bitpacked blocks, for
+// one). Decoding a 140,000-document postings list just to discover it
+// intersects a 1,000-document one down to 934 hits is exactly the waste this
+// avoids: cost here is bounded by the smallest clause, not the largest.
+//
+// Only Next()/Advance() from the published segment.PostingsIterator interface
+// are used, so this helps every segment implementation, not only ones with an
+// expensive ActualBitmap().
+func leapfrogIntersect(tfrs []*IndexSnapshotTermFieldReader, segIdx int,
+	minCount uint64) (*roaring.Bitmap, error) {
+	itrs := make([]segment.PostingsIterator, len(tfrs))
+	for i, tfr := range tfrs {
+		// A throwaway, freq/norm/loc-free iterator: narrowing only needs doc
+		// numbers. Reusing tfr.iterators[segIdx] here would consume the
+		// position the real scoring pass still needs to start from -- this
+		// runs before any scoring has happened, and must leave those
+		// iterators exactly as it found them.
+		itrs[i] = tfr.postings[segIdx].Iterator(false, false, false, nil)
+	}
+
+	cur := make([]uint64, len(itrs))
+	for i, itr := range itrs {
+		p, err := itr.Next()
+		if err != nil {
+			return nil, err
+		}
+		if p == nil {
+			return roaring.New(), nil // a clause is empty in this segment
+		}
+		cur[i] = p.Number()
+	}
+
+	// The intersection can never exceed the smallest clause, so its count
+	// bounds how large `matched` will grow -- without this, appending a
+	// large result one element at a time re-grows and re-copies the slice
+	// through every capacity doubling, which can dwarf the cost of the merge
+	// itself.
+	matched := make([]uint32, 0, minCount)
+	for {
+		var maxDoc uint64
+		for _, c := range cur {
+			if c > maxDoc {
+				maxDoc = c
+			}
+		}
+
+		allEqual := true
+		for i, itr := range itrs {
+			if cur[i] < maxDoc {
+				p, err := itr.Advance(maxDoc)
+				if err != nil {
+					return nil, err
+				}
+				if p == nil {
+					bm := roaring.New()
+					bm.AddMany(matched)
+					return bm, nil
+				}
+				cur[i] = p.Number()
+			}
+			if cur[i] != maxDoc {
+				allEqual = false
+			}
+		}
+		if !allEqual {
+			continue
+		}
+
+		matched = append(matched, uint32(maxDoc))
+
+		exhausted := false
+		for i, itr := range itrs {
+			p, err := itr.Advance(maxDoc + 1)
+			if err != nil {
+				return nil, err
+			}
+			if p == nil {
+				exhausted = true
+				break
+			}
+			cur[i] = p.Number()
+		}
+		if exhausted {
+			break
+		}
+	}
+
+	bm := roaring.New()
+	bm.AddMany(matched)
+	return bm, nil
 }
 
 // ----------------------------------------------------------------

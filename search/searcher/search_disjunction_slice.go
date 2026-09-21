@@ -47,6 +47,9 @@ type DisjunctionSliceSearcher struct {
 	matchingIdxs           []int
 	initialized            bool
 	bytesRead              uint64
+
+	// lazily built accumulator used by the block path
+	blockDisj *blockDisjunction
 }
 
 func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexReader,
@@ -296,6 +299,10 @@ func (s *DisjunctionSliceSearcher) Count() uint64 {
 }
 
 func (s *DisjunctionSliceSearcher) Close() (rv error) {
+	// hand back the per-clause scratch blocks before releasing the clauses
+	s.blockDisj.release()
+	s.blockDisj = nil
+
 	for _, searcher := range s.searchers {
 		err := searcher.Close()
 		if err != nil && rv == nil {

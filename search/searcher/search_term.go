@@ -38,6 +38,20 @@ type TermSearcher struct {
 	reader      index.TermFieldReader
 	scorer      *scorer.TermQueryScorer
 	tfd         index.TermFieldDoc
+
+	minCompetitiveScore    float64
+	hasMinCompetitiveScore bool
+	// skippedDocCount accumulates the exact number of documents
+	// skipUncompetitiveBlocks has bypassed entirely (not merely left
+	// unscored). Every one of them is a real match of the query -- it is, after
+	// all, in this term's postings -- so a collector relying on an exact total
+	// hit count needs to fold this back in; see search.SkippedForCompetitiveScore.
+	skippedDocCount uint64
+}
+
+// SkippedDocCount implements search.SkippedForCompetitiveScore.
+func (s *TermSearcher) SkippedDocCount() uint64 {
+	return s.skippedDocCount
 }
 
 func NewTermSearcher(ctx context.Context, indexReader index.IndexReader,
@@ -230,7 +244,19 @@ func (s *TermSearcher) SetQueryNorm(qnorm float64) {
 	s.scorer.SetQueryNorm(qnorm)
 }
 
+// SetMinCompetitiveScore implements search.CompetitiveScorer: documents
+// scoring at or below minScore cannot enter the collector's current top-K, so
+// Next may use it to skip whole blocks of them via the reader's block-max
+// bound (see skipUncompetitiveBlocks).
+func (s *TermSearcher) SetMinCompetitiveScore(minScore float64) {
+	s.minCompetitiveScore = minScore
+	s.hasMinCompetitiveScore = true
+}
+
 func (s *TermSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+	if err := s.skipUncompetitiveBlocks(); err != nil {
+		return nil, err
+	}
 	termMatch, err := s.reader.Next(s.tfd.Reset())
 	if err != nil {
 		return nil, err
@@ -247,6 +273,11 @@ func (s *TermSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, e
 
 }
 
+// Advance does not attempt block-max skipping: it seeks to a caller-supplied
+// target (a conjunction or disjunction driving this searcher as a clause),
+// and that target already wins over anything a threshold-based skip could
+// suggest. A standalone top-K term query -- the case skipUncompetitiveBlocks
+// is for -- never calls Advance; TopNCollector only ever calls Next.
 func (s *TermSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
 	termMatch, err := s.reader.Advance(ID, s.tfd.Reset())
 	if err != nil {

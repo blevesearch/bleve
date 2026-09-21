@@ -130,6 +130,20 @@ func (t TermLocationMap) AddLocation(term string, location *Location) {
 
 type FieldTermLocationMap map[string]TermLocationMap
 
+// Recycle truncates every per-term location list in the map while keeping the
+// maps themselves and the backing arrays of those lists. A caller that
+// rebuilds locations for each candidate document — the phrase searcher does
+// this once per document coming out of its conjunction — can hand the recycled
+// map to Complete instead of letting it allocate two maps and a set of slices
+// per document.
+func (m FieldTermLocationMap) Recycle() {
+	for _, tlm := range m {
+		for term, locs := range tlm {
+			tlm[term] = locs[:0]
+		}
+	}
+}
+
 type FieldTermLocation struct {
 	Field    string
 	Term     string
@@ -322,8 +336,25 @@ func (dm *DocumentMatch) Complete(prealloc []Location) []Location {
 		var tlm TermLocationMap
 		var needsDedupe bool
 
+		// FieldTermLocations arrives grouped by field and, within a field, by
+		// term — each contributing searcher appends all of its locations for
+		// one term contiguously. Both the field and the term lookup are
+		// therefore hoisted out of the per-location work and only redone when
+		// the run changes; hashing every term string for every single location
+		// was the dominant cost of phrase search. A term that does recur
+		// non-contiguously still reads back its accumulated list below, so the
+		// result is identical to a per-location lookup.
+		var lastTerm string
+		var locs Locations
+		var haveTerm bool
+
 		for i, ftl := range dm.FieldTermLocations {
 			if i == 0 || lastField != ftl.Field {
+				if haveTerm {
+					tlm[lastTerm] = locs
+					haveTerm = false
+				}
+
 				lastField = ftl.Field
 
 				if dm.Locations == nil {
@@ -337,14 +368,21 @@ func (dm *DocumentMatch) Complete(prealloc []Location) []Location {
 				}
 			}
 
+			if !haveTerm || lastTerm != ftl.Term {
+				if haveTerm {
+					tlm[lastTerm] = locs
+				}
+				lastTerm = ftl.Term
+				locs = tlm[ftl.Term]
+				haveTerm = true
+			}
+
 			loc := &prealloc[i]
 			*loc = ftl.Location
 
 			if len(loc.ArrayPositions) > 0 { // copy
 				loc.ArrayPositions = append(ArrayPositions(nil), loc.ArrayPositions...)
 			}
-
-			locs := tlm[ftl.Term]
 
 			// if the loc is before or at the last location, then there
 			// might be duplicates that need to be deduplicated
@@ -356,13 +394,17 @@ func (dm *DocumentMatch) Complete(prealloc []Location) []Location {
 				}
 			}
 
-			tlm[ftl.Term] = append(locs, loc)
+			locs = append(locs, loc)
 
 			dm.FieldTermLocations[i] = FieldTermLocation{ // recycle
 				Location: Location{
 					ArrayPositions: ftl.Location.ArrayPositions[:0],
 				},
 			}
+		}
+
+		if haveTerm {
+			tlm[lastTerm] = locs
 		}
 
 		if needsDedupe {

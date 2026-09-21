@@ -258,3 +258,65 @@ func TestTermScorerWithQueryNorm(t *testing.T) {
 	}
 
 }
+
+// TestScoreBulkMatchesDocScore is the end-to-end guarantee the simd package's
+// own bit-exactness only proxies for: block-max WAND's MaxScore() bound has
+// to hold against whatever ScoreBulk actually computes, so ScoreBulk's
+// vectorized output must match scoring the same documents one at a time
+// through docScore/Score exactly, not just approximately. Covers both BM25
+// (avgDocLength > 0) and plain tf-idf (avgDocLength == 0), and both even and
+// odd document counts (the odd tail goes through docScore directly, so an
+// off-by-one there would otherwise slip past the simd package's own tests).
+func TestScoreBulkMatchesDocScore(t *testing.T) {
+	var docTotal uint64 = 5000
+	var docTerm uint64 = 137
+	queryTerm := []byte("beer")
+	queryField := "desc"
+
+	for _, avgDocLength := range []float64{0, 812.4} {
+		mode := "tf-idf"
+		if avgDocLength > 0 {
+			mode = "bm25"
+		}
+		t.Run(mode, func(t *testing.T) {
+			scorer := NewTermQueryScorer(queryTerm, queryField, 1.75, docTotal, docTerm, avgDocLength, search.SearcherOptions{})
+			scorer.SetQueryNorm(1.3)
+
+			for _, n := range []int{0, 1, 2, 3, 8, 9, 64, 65} {
+				freqs := make([]uint64, n)
+				norms := make([]float64, n)
+				for i := 0; i < n; i++ {
+					switch i % 4 {
+					case 0:
+						freqs[i] = uint64(i % 20)
+					case 1:
+						freqs[i] = uint64(5000 + i)
+					case 2:
+						freqs[i] = 0
+					default:
+						freqs[i] = uint64(1 + i*7)
+					}
+					norms[i] = 0.05 + float64(i%37)*0.1
+				}
+
+				got := make([]float64, n)
+				scorer.ScoreBulk(freqs, norms, got)
+
+				for i := 0; i < n; i++ {
+					var tf float64
+					if freqs[i] < MaxSqrtCache {
+						tf = SqrtCache[int(freqs[i])]
+					} else {
+						tf = math.Sqrt(float64(freqs[i]))
+					}
+					score, _ := scorer.docScore(tf, norms[i])
+					want := score * scorer.queryWeight
+					if got[i] != want {
+						t.Fatalf("n=%d i=%d: ScoreBulk %v != docScore*queryWeight %v (freq=%d norm=%v)",
+							n, i, got[i], want, freqs[i], norms[i])
+					}
+				}
+			}
+		})
+	}
+}

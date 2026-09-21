@@ -22,6 +22,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/freeway/simd"
 )
 
 var reflectStaticSizeTermQueryScorer int
@@ -38,6 +39,7 @@ type TermQueryScorer struct {
 	docTerm                uint64 // number of documents containing the term
 	docTotal               uint64 // total number of documents in the index
 	avgDocLength           float64
+	invAvgDocLength        float64 // 1/avgDocLength, precomputed once: turns a per-document divide into a multiply
 	idf                    float64
 	options                search.SearcherOptions
 	idfExplanation         *search.Explanation
@@ -97,6 +99,9 @@ func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64,
 		queryWeight:  1.0,
 		includeScore: options.Score != "none",
 	}
+	if avgDocLength > 0 {
+		rv.invAvgDocLength = 1 / avgDocLength
+	}
 
 	rv.idf = rv.computeIDF(avgDocLength, docTotal, docTerm)
 	if options.Explain {
@@ -146,7 +151,7 @@ func (s *TermQueryScorer) docScore(tf, norm float64) (score float64, model strin
 		fieldLength := 1 / (norm * norm)
 
 		score = s.idf * (tf * search.BM25_k1) /
-			(tf + search.BM25_k1*(1-search.BM25_b+(search.BM25_b*fieldLength/s.avgDocLength)))
+			(tf + search.BM25_k1*(1-search.BM25_b+(search.BM25_b*fieldLength*s.invAvgDocLength)))
 		model = index.BM25Scoring
 	} else {
 		// tf-idf scoring by default
@@ -160,7 +165,7 @@ func (s *TermQueryScorer) scoreExplanation(tf float64, termMatch *index.TermFiel
 	var rv []*search.Explanation
 	if s.avgDocLength > 0 {
 		fieldLength := 1 / (termMatch.Norm * termMatch.Norm)
-		fieldNormVal := 1 - search.BM25_b + (search.BM25_b * fieldLength / s.avgDocLength)
+		fieldNormVal := 1 - search.BM25_b + (search.BM25_b * fieldLength * s.invAvgDocLength)
 		fieldNormalizeExplanation := &search.Explanation{
 			Value: fieldNormVal,
 			Message: fmt.Sprintf("fieldNorm(field=%s), b=%f, fieldLength=%f, avgFieldLength=%f)",
@@ -273,4 +278,91 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 		}
 	}
 	return rv
+}
+
+// CanScoreBulk reports whether this scorer can score a block of documents from
+// flat freq/norm arrays. Explanations and query-time boosts that need the
+// per-document object keep the scalar path.
+func (s *TermQueryScorer) CanScoreBulk() bool {
+	return s.includeScore && !s.options.Explain
+}
+
+// UsesBM25 reports whether this scorer is actually running BM25 (avgDocLength
+// was known at construction) rather than falling back to plain tf-idf.
+//
+// This matters specifically for block-max WAND: zapx writes each block's
+// score-bound pair as the single document that scores highest under a BM25
+// estimate computed at index time (see zapx's postings_format.go). That pair
+// carries no such guarantee under tf-idf scoring -- a different, unrelated
+// formula -- so a WAND consumer must check this before trusting the bound at
+// all, not just before scoring with it.
+func (s *TermQueryScorer) UsesBM25() bool {
+	return s.avgDocLength > 0
+}
+
+// MaxScore returns an upper bound on the score any document with at most
+// maxTF occurrences of the term and at least maxNorm as its normalization
+// factor could receive from this scorer -- the two inputs a block-max bound
+// reports (see index/scorch's blockMaxIterator). docScore is monotonically
+// increasing in both tf and norm (a higher norm means a shorter field, which
+// only raises a BM25 score), so passing each one's most favorable value gives
+// a true upper bound over any set of documents that shares it, without
+// scoring any of them.
+func (s *TermQueryScorer) MaxScore(maxTF uint64, maxNorm float64) float64 {
+	return s.scoreOne(maxTF, maxNorm)
+}
+
+// scoreOne computes a single document's score from its raw term frequency
+// and norm factor -- the non-batched equivalent of one ScoreBulk element.
+// Shared by MaxScore and by ScoreBulk's own single-document paths (its
+// n==1 fast path and its odd-length remainder), so there is exactly one
+// place this arithmetic is written.
+func (s *TermQueryScorer) scoreOne(freq uint64, norm float64) float64 {
+	var tf float64
+	if freq < MaxSqrtCache {
+		tf = SqrtCache[int(freq)]
+	} else {
+		tf = math.Sqrt(float64(freq))
+	}
+	score, _ := s.docScore(tf, norm)
+	return score * s.queryWeight
+}
+
+// ScoreBulk scores a block of documents into out. Both the freq-to-tf sqrt
+// and the rest of docScore's arithmetic (the field-length reciprocal and the
+// BM25 division chain, or tf-idf's plain multiply) run two documents at a
+// time in package simd, straight off the raw freqs -- no scalar prep loop.
+// Its formula is written to match docScore's own operand order and grouping
+// exactly, which is what makes this bit-identical to scoring the same
+// documents one at a time (see simd's package doc comment).
+//
+// simd.BM25/TFIDF require an even element count, so an odd n's last document
+// is scored separately afterward through scoreOne itself -- the same
+// function, not a hand-copied formula, so there is only one place a future
+// change to the scoring formula has to happen.
+//
+// n==1 skips the batch call entirely rather than dispatching simd.BM25/TFIDF
+// with a zero-length slice and then scoring the sole document through the
+// scalar remainder anyway: a batch of one gains nothing from simd's
+// paired-lane dispatch and still pays the scalar path regardless, so calling
+// it at all is pure overhead. This is the common case for a block-WAND
+// conjunction's per-candidate secondary score (see
+// blockConjunction.scoreCandidates), which scores exactly one document at a
+// time.
+func (s *TermQueryScorer) ScoreBulk(freqs []uint64, norms []float64, out []float64) {
+	n := len(out)
+	if n == 1 {
+		out[0] = s.scoreOne(freqs[0], norms[0])
+		return
+	}
+	n2 := n &^ 1 // largest even count <= n
+	bm25 := s.avgDocLength > 0
+	if bm25 {
+		simd.BM25(freqs, norms, s.idf, search.BM25_k1, 1-search.BM25_b, search.BM25_b, s.invAvgDocLength, s.queryWeight, out, n2)
+	} else {
+		simd.TFIDF(freqs, norms, s.idf, s.queryWeight, out, n2)
+	}
+	if n2 != n {
+		out[n2] = s.scoreOne(freqs[n2], norms[n2])
+	}
 }
