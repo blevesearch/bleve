@@ -162,14 +162,18 @@ func (i *indexMeta) Save(path string) (err error) {
 		return err
 	}
 
-	_, err = indexMetaFile.Write([]byte(i.fileWriter.Id()))
-	if err != nil {
-		return err
-	}
+	// write only when the fileWriter is registered
+	// with a proper ID
+	if i.fileWriter.Id() != "" {
+		_, err = indexMetaFile.Write([]byte(i.fileWriter.Id()))
+		if err != nil {
+			return err
+		}
 
-	err = binary.Write(indexMetaFile, binary.BigEndian, uint32(len(i.fileWriter.Id())))
-	if err != nil {
-		return err
+		err = binary.Write(indexMetaFile, binary.BigEndian, uint32(len(i.fileWriter.Id())))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -225,15 +229,18 @@ func (i *indexMeta) UpdateWriter(path string) error {
 	if err != nil {
 		return err
 	}
-	// write the file callback id
-	_, err = tempMetaFile.Write([]byte(i.fileWriter.Id()))
-	if err != nil {
-		return err
-	}
-	// write the length of the file callback id
-	err = binary.Write(tempMetaFile, binary.BigEndian, uint32(len(i.fileWriter.Id())))
-	if err != nil {
-		return err
+
+	// update only when fileWriter is registered with a 
+	// proper ID
+	if i.fileWriter.Id() != "" {
+		_, err = tempMetaFile.Write([]byte(i.fileWriter.Id()))
+		if err != nil {
+			return err
+		}
+		err = binary.Write(tempMetaFile, binary.BigEndian, uint32(len(i.fileWriter.Id())))
+		if err != nil {
+			return err
+		}
 	}
 	// close file before renaming
 	err = tempMetaFile.Close()
