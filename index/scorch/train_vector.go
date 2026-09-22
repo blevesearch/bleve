@@ -61,8 +61,6 @@ type vectorTrainer struct {
 	doneCh chan struct{}
 }
 
-const IndexTrainedWithFastMerge = "vector_index_fast_merge"
-
 func initTrainer(s *Scorch, config map[string]interface{}) *vectorTrainer {
 	if f, ok := config[IndexTrainedWithFastMerge]; ok {
 		feature, ok := f.(bool)
