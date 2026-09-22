@@ -162,13 +162,6 @@ func (i *indexMeta) Save(path string) (err error) {
 		return err
 	}
 
-	// Only append the file callback id (and its length) when a callback is
-	// actually in use. Writing this trailer unconditionally - even when the
-	// id is empty, i.e. no callback is registered - breaks readers on older
-	// bleve versions that predate this trailer format, since they parse
-	// index_meta.json with a plain, strict JSON unmarshal and have no
-	// knowledge of it. Omitting the trailer in the no-callback case keeps
-	// the file byte-for-byte identical to the pre-existing format.
 	if i.fileWriter.Id() != "" {
 		_, err = indexMetaFile.Write([]byte(i.fileWriter.Id()))
 		if err != nil {
