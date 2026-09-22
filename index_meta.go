@@ -162,6 +162,8 @@ func (i *indexMeta) Save(path string) (err error) {
 		return err
 	}
 
+	// write only when the fileWriter is registered
+	// with a proper ID
 	if i.fileWriter.Id() != "" {
 		_, err = indexMetaFile.Write([]byte(i.fileWriter.Id()))
 		if err != nil {
@@ -227,8 +229,9 @@ func (i *indexMeta) UpdateWriter(path string) error {
 	if err != nil {
 		return err
 	}
-	// write the file callback id and its length, but only when a callback
-	// is actually in use (see the matching comment in Save() above).
+
+	// update only when fileWriter is registered with a 
+	// proper ID
 	if i.fileWriter.Id() != "" {
 		_, err = tempMetaFile.Write([]byte(i.fileWriter.Id()))
 		if err != nil {
