@@ -31,6 +31,7 @@ import (
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
 
 // newMinimalScorchForTrainer returns a *Scorch with just the fields required by
@@ -181,11 +182,20 @@ func TestGetTrainedIndexNotTrainedSegment(t *testing.T) {
 type mockTrainedSeg struct {
 	mockSegmentBase
 	coarseQuantizerFn func(string) (interface{}, error)
+	searchCentroidsFn func(string, []float32) (*segment.PreassignedCentroids, error)
 }
 
 func (m *mockTrainedSeg) GetCoarseQuantizer(field string) (interface{}, error) {
 	if m.coarseQuantizerFn != nil {
 		return m.coarseQuantizerFn(field)
+	}
+	return nil, nil
+}
+
+func (m *mockTrainedSeg) SearchCentroids(field string, qVector []float32) (
+	*segment.PreassignedCentroids, error) {
+	if m.searchCentroidsFn != nil {
+		return m.searchCentroidsFn(field, qVector)
 	}
 	return nil, nil
 }

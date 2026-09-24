@@ -624,3 +624,37 @@ func (t *vectorTrainer) fileWriterIDsInUse() (map[string]struct{}, error) {
 
 	return writerIDs, nil
 }
+
+// centroidRanker is implemented by a trainer that holds a trained vector index
+// whose centroid layout the data segments were built to share. It is the
+// phase one half of the two phase kNN search; see OptimizeVR.rankCentroids.
+//
+// It is kept separate from the trainer interface because it deals in
+// vector-only types, and trainer has to compile in builds without the vectors
+// tag.
+type centroidRanker interface {
+	searchCentroids(field string, qVector []float32) (*segment.PreassignedCentroids, error)
+}
+
+// searchCentroids ranks every centroid of the trained index for field by its
+// distance from qVector. A nil result with a nil error means there is nothing
+// trained to rank against, and callers should search each segment the ordinary
+// way.
+//
+// The read lock is held for the duration of the search rather than just long
+// enough to read the pointer: it is what keeps publishTrainedIndex or
+// removeFileWriterIDs from closing the segment out from under faiss mid-search.
+func (t *vectorTrainer) searchCentroids(field string, qVector []float32) (
+	*segment.PreassignedCentroids, error) {
+	t.m.RLock()
+	defer t.m.RUnlock()
+
+	if t.trainedIndex == nil || t.trainedIndex.segment == nil {
+		return nil, nil
+	}
+	trainedSegment, ok := t.trainedIndex.segment.(segment.TrainedSegment)
+	if !ok {
+		return nil, nil
+	}
+	return trainedSegment.SearchCentroids(field, qVector)
+}

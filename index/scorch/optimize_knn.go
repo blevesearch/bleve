@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
@@ -33,6 +34,96 @@ type OptimizeVR struct {
 	totalCost uint64
 	// maps field to vector readers
 	vrs map[string][]*IndexSnapshotVectorReader
+
+	// preassigned holds the phase one centroid ranking for each vector reader
+	// that has one. Populated once by rankCentroids before any segment is
+	// searched, and read only afterwards, so the per-segment goroutines can
+	// share it without synchronisation.
+	preassigned map[*IndexSnapshotVectorReader]*segment_api.PreassignedCentroids
+}
+
+// rankCentroids runs phase one of the two phase kNN search: for every query
+// vector, one coarse quantizer search against the trained index, ranking its
+// centroids by distance from that vector.
+//
+// Phase two then hands the ranking to each segment, which probes exactly those
+// inverted lists instead of working out which clusters to probe itself. That is
+// sound because every segment written by the fast merge path carries a clone of
+// the trained index's coarse quantizer, so cluster numbering is shared; each
+// segment still verifies this before trusting the ranking, and the ones that
+// cannot - typically small segments that never went through fast merge - simply
+// search as before.
+//
+// This is best effort. Anything that goes wrong here leaves the reader without
+// a ranking, which costs recall nothing: that reader's segments each fall back
+// to their own coarse quantizer search.
+func (o *OptimizeVR) rankCentroids() {
+	if o.snapshot == nil || o.snapshot.parent == nil {
+		return
+	}
+	ranker, ok := o.snapshot.parent.trainer.(centroidRanker)
+	if !ok {
+		// no trainer, or one with no trained index to rank against.
+		return
+	}
+	for field, vrs := range o.vrs {
+		// skip fields whose index data is gone; the per-segment loop below
+		// skips them too.
+		if info, ok := o.snapshot.updatedFields[field]; ok && (info.Deleted || info.Index) {
+			continue
+		}
+		for _, vr := range vrs {
+			pre, err := ranker.searchCentroids(field, vr.vector)
+			if err != nil || !pre.Valid() {
+				continue
+			}
+			if o.preassigned == nil {
+				o.preassigned = make(map[*IndexSnapshotVectorReader]*segment_api.PreassignedCentroids)
+			}
+			o.preassigned[vr] = pre
+			atomic.AddUint64(&o.snapshot.parent.stats.TotKNNCentroidRankings, 1)
+		}
+	}
+}
+
+// searchSegment runs vr's kNN search against one segment's vector index, taking
+// the pre-assigned centroid path when phase one produced a ranking and the
+// index can use it.
+func (o *OptimizeVR) searchSegment(vecIndex segment_api.VectorIndex, segID int,
+	vr *IndexSnapshotVectorReader) (segment_api.VecPostingsList, error) {
+	// check if the vector reader is configured to use a pre-filter to filter
+	// out ineligible documents before performing kNN search.
+	var eligible index.EligibleDocumentList
+	if vr.eligibleSelector != nil {
+		eligible = vr.eligibleSelector.SegmentEligibleDocuments(segID)
+	}
+
+	pre := o.preassigned[vr]
+	pvi, canPreassign := vecIndex.(segment_api.PreassignedVectorIndex)
+	if pre != nil && canPreassign {
+		// The Preassigned calls below verify the layout themselves and fall
+		// back silently when it does not match, so asking first is not needed
+		// for correctness. We ask anyway so the counters record which path was
+		// actually taken; the answer is memoized per cached index, so this
+		// costs a map lookup after the first query against a segment.
+		shared, err := pvi.SharesCentroidLayout(pre)
+		if err != nil {
+			return nil, err
+		}
+		if shared {
+			atomic.AddUint64(&o.snapshot.parent.stats.TotKNNPreassignedSegmentSearches, 1)
+			if eligible != nil {
+				return pvi.SearchWithFilterPreassigned(vr.vector, vr.k, eligible, pre, vr.searchParams)
+			}
+			return pvi.SearchPreassigned(vr.vector, vr.k, pre, vr.searchParams)
+		}
+	}
+
+	atomic.AddUint64(&o.snapshot.parent.stats.TotKNNUnassignedSegmentSearches, 1)
+	if eligible != nil {
+		return vecIndex.SearchWithFilter(vr.vector, vr.k, eligible, vr.searchParams)
+	}
+	return vecIndex.Search(vr.vector, vr.k, vr.searchParams)
 }
 
 func (o *OptimizeVR) invokeSearcherEndCallback() {
@@ -79,28 +170,9 @@ func (o *OptimizeVR) search(segID int) error {
 			meta.store(field, vecIndex.Size())
 		}
 		for _, vr := range vrs {
-			var pl segment_api.VecPostingsList
-			var err error
 			// for each VR, populate postings list and iterators
 			// by passing the obtained vector index and getting similar vectors.
-
-			// check if the vector reader is configured to use a pre-filter
-			// to filter out ineligible documents before performing
-			// kNN search.
-			if vr.eligibleSelector != nil {
-				pl, err = vecIndex.SearchWithFilter(
-					vr.vector,
-					vr.k,
-					vr.eligibleSelector.SegmentEligibleDocuments(segID),
-					vr.searchParams,
-				)
-			} else {
-				pl, err = vecIndex.Search(
-					vr.vector,
-					vr.k,
-					vr.searchParams,
-				)
-			}
+			pl, err := o.searchSegment(vecIndex, segID, vr)
 			if err != nil {
 				vecIndex.Close()
 				return err
@@ -118,6 +190,11 @@ func (o *OptimizeVR) search(segID int) error {
 
 func (o *OptimizeVR) Finish() error {
 	defer o.invokeSearcherEndCallback()
+
+	// Phase one: rank the centroids once per query vector, against the trained
+	// index, so the per-segment searches below do not each repeat it.
+	o.rankCentroids()
+
 	numSegments := len(o.snapshot.segment)
 
 	var wg sync.WaitGroup
