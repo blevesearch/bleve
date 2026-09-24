@@ -54,6 +54,17 @@ type Stats struct {
 	TotKNNSearches     uint64
 	TotSynonymSearches uint64
 
+	// Two phase kNN search: how many per-segment searches were able to reuse a
+	// centroid ranking computed once against the trained index, versus how many
+	// had to run their own coarse quantizer search because the segment's
+	// centroid layout did not match the trained one.
+	TotKNNPreassignedSegmentSearches uint64
+	TotKNNUnassignedSegmentSearches  uint64
+	// How many phase one coarse quantizer searches were run against the
+	// trained index, i.e. one per query vector that had a trained index to
+	// consult.
+	TotKNNCentroidRankings uint64
+
 	TotEventTriggerStarted   uint64
 	TotEventTriggerCompleted uint64
 
