@@ -50,6 +50,10 @@ type SearchSort interface {
 	Copy() SearchSort
 }
 
+type SearchSortStringComparator interface {
+	CompareString(i, j string) int
+}
+
 func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 	descending, ok := input["desc"].(bool)
 	if !ok {
@@ -250,10 +254,14 @@ func (so SortOrder) Compare(cachedScoring, cachedDesc []bool, i, j *DocumentMatc
 		} else {
 			iVal := i.Sort[x]
 			jVal := j.Sort[x]
-			if iVal < jVal {
-				c = -1
-			} else if iVal > jVal {
-				c = 1
+			if cmp, ok := so[x].(SearchSortStringComparator); ok {
+				c = cmp.CompareString(iVal, jVal)
+			} else {
+				if iVal < jVal {
+					c = -1
+				} else if iVal > jVal {
+					c = 1
+				}
 			}
 		}
 
@@ -386,13 +394,14 @@ const (
 //	Mode controls behavior for multi-values fields (default first)
 //	Missing controls behavior of missing values (default last)
 type SortField struct {
-	Field   string
-	Desc    bool
-	Type    SortFieldType
-	Mode    SortFieldMode
-	Missing SortFieldMissing
-	values  [][]byte
-	tmp     [][]byte
+	Field               string
+	Desc                bool
+	Type                SortFieldType
+	Mode                SortFieldMode
+	Missing             SortFieldMissing
+	CustomCompareString func(string, string) int `json:"-"`
+	values              [][]byte
+	tmp                 [][]byte
 }
 
 // UpdateVisitor notifies this sort field that in this document
@@ -435,6 +444,18 @@ func (s *SortField) DecodeValue(value string) string {
 // Descending determines the order of the sort
 func (s *SortField) Descending() bool {
 	return s.Desc
+}
+
+func (s *SortField) CompareString(i, j string) int {
+	if s.CustomCompareString != nil {
+		return s.CustomCompareString(i, j)
+	}
+	if i < j {
+		return -1
+	} else if i > j {
+		return 1
+	}
+	return 0
 }
 
 func (s *SortField) filterTermsByMode(terms [][]byte) string {
