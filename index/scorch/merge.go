@@ -452,6 +452,18 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 			return err
 		}
 
+		// verify the merge result is readable before introducing it
+		if verr := verifyMergeResult(batch.new); verr != nil {
+			_ = batch.new.Close()
+			batch.new = nil
+			os.Remove(path)
+			s.unmarkIneligibleForRemoval(batch.newFilename)
+			atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
+			// do not return error — the merger should continue with the
+			// next plan cycle. Source segments are preserved.
+			continue
+		}
+
 		totalBytesRead := batch.new.BytesRead() + prevBytesReadTotal
 		batch.new.ResetBytesRead(totalBytesRead)
 		atomic.AddUint64(&s.stats.TotFileMergeSegments, uint64(len(batch.segments)))
@@ -622,6 +634,18 @@ func (s *Scorch) mergeAndPersistInMemorySegments(flushes []*flushable, po *persi
 			if err != nil {
 				return
 			}
+
+			// verify the merge result is readable before introducing it
+			if verr := verifyMergeResult(batch.new); verr != nil {
+				_ = batch.new.Close()
+				batch.new = nil
+				os.Remove(path)
+				s.unmarkIneligibleForRemoval(batch.newFilename)
+				// do not set err — source segments are preserved,
+				// the merger can retry in the next cycle
+				return
+			}
+
 			atomic.AddUint64(&numMergedSegments, uint64(len(batch.segments)))
 		}(batchID)
 	}
