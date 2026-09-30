@@ -73,7 +73,9 @@ func init() {
 	var gcr IndexSnapshotGeoShapeV2Reader
 	reflectStaticSizeIndexSnapshotGeoShapeV2Reader = int(reflect.TypeOf(gcr).Size())
 	var ncr IndexSnapshotNumericV2Reader
-	reflectStaticSizeIndexSnapshotNumericV2Reader = int(reflect.TypeOf(ncr).Size())
+	// via a pointer: the struct holds a sync.Once, and taking its type by value
+	// would copy a lock
+	reflectStaticSizeIndexSnapshotNumericV2Reader = int(reflect.TypeOf(&ncr).Elem().Size())
 	var bsi util.BitsetIterator
 	reflectStaticSizeBitsetIterator = int(reflect.TypeOf(bsi).Size())
 	var rip roaring.IntIterator
@@ -1514,14 +1516,10 @@ func (g *IndexSnapshotGeoShapeV2Reader) Size() int {
 
 func (i *IndexSnapshot) NumericV2FieldReader(ctx context.Context, field string) (
 	index.NumericV2FieldReader, error) {
-
 	rv := &IndexSnapshotNumericV2Reader{
-		field: field,
-		hits:  make([]*util.Bitset, len(i.segment)),
-		// the zero value of BitsetIterator is a valid empty iterator, so a
-		// segment with no data for the field needs no special casing below
+		field:     field,
+		hits:      make([]*util.Bitset, len(i.segment)),
 		iterators: make([]util.BitsetIterator, len(i.segment)),
-		counts:    make([]uint64, len(i.segment)),
 		snapshot:  i,
 	}
 
@@ -1531,13 +1529,13 @@ func (i *IndexSnapshot) NumericV2FieldReader(ctx context.Context, field string) 
 type IndexSnapshotNumericV2Reader struct {
 	field string
 
-	// hits holds the per-segment result bitsets; iterators alias their words,
-	// so neither survives Close.
+	// hits holds the per-segment result bitsets
 	hits      []*util.Bitset
 	iterators []util.BitsetIterator
-	// counts caches each segment's cardinality, computed once during Search so
-	// that Count is not a repeated scan.
-	counts []uint64
+
+	// count is the total cardinality, computed on the first call and cached.
+	countOnce sync.Once
+	count     uint64
 
 	segmentOffset int
 
@@ -1545,16 +1543,10 @@ type IndexSnapshotNumericV2Reader struct {
 }
 
 // Search evaluates the numeric range across all segments in the index snapshot.
-//
-// Every hit is materialised up front rather than streamed, because the segment
-// stores values in value order while a searcher must emit document order; there
-// is no streaming formulation.
 func (n *IndexSnapshotNumericV2Reader) Search(min, max *float64,
 	inclusiveMin, inclusiveMax *bool) error {
 
 	numSegments := len(n.snapshot.segment)
-	// the query holds only the encoded bounds, so it is safe to share
-	// across the per-segment goroutines
 	query := numericv2.NewRangeQuery(min, max, inclusiveMin, inclusiveMax)
 
 	var wg sync.WaitGroup
@@ -1595,25 +1587,15 @@ func (n *IndexSnapshotNumericV2Reader) searchSeg(segID int,
 	if err != nil {
 		return err
 	}
-	// return if the segment has no numeric data for the field
 	if data == nil {
 		return nil
 	}
-	// release the reference on the segment's cached arrays once the evaluation
-	// is done, so that the cache is free to evict them
 	defer data.Close()
 
-	// the stored doc numbers are already in segment space, so the snapshot's
-	// deleted bitmap applies directly with no translation
 	hits := query.Evaluate(data, snapshot.deleted, snapshot.segment.Count())
 
-	// the bitset is already the ideal representation for a dense result: it is
-	// iterated in place rather than converted into a roaring bitmap first,
-	// which would cost a rebuild and then an interface-dispatched container
-	// walk per hit to recover what the words already hold.
 	n.hits[segID] = hits
 	n.iterators[segID] = hits.Iterator()
-	n.counts[segID] = uint64(hits.Count())
 
 	return nil
 }
@@ -1668,30 +1650,30 @@ func (n *IndexSnapshotNumericV2Reader) Advance(ID index.IndexInternalID,
 	return n.Next(rv)
 }
 
-// Close drops the reader's per-segment results. The segment-level arrays the
-// search read from are not touched: those are owned and evicted by the
-// segment's own cache, and were already released at the end of searchSeg.
+// Close drops the reader's per-segment results
 func (n *IndexSnapshotNumericV2Reader) Close() error {
-	// the iterators alias the bitsets' words, so the pooled memory can only go
-	// back once iteration is finished -- which is exactly what Close means here
 	for _, hits := range n.hits {
 		if hits != nil {
 			hits.Release()
 		}
 	}
-	// drop the references so a stray call after Close cannot read them
+
 	n.hits = nil
 	n.iterators = nil
 	return nil
 }
 
 // Count returns the total number of matching documents across all segments.
+// The value is computed on the first call and cached for subsequent calls.
 func (n *IndexSnapshotNumericV2Reader) Count() uint64 {
-	var rv uint64
-	for _, count := range n.counts {
-		rv += count
-	}
-	return rv
+	n.countOnce.Do(func() {
+		for _, hits := range n.hits {
+			if hits != nil {
+				n.count += uint64(hits.Count())
+			}
+		}
+	})
+	return n.count
 }
 
 // Size returns the estimated size in bytes of the
@@ -1705,7 +1687,6 @@ func (n *IndexSnapshotNumericV2Reader) Size() int {
 	}
 
 	rv += reflectStaticSizeBitsetIterator * len(n.iterators)
-	rv += size.SizeOfUint64 * len(n.counts)
 
 	return rv
 }

@@ -25,9 +25,6 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-// NumericRangeV2 is the range itself. It is nested under a versioned key rather
-// than living at the top level, because ParseQuery already claims top-level
-// min/max for NumericRangeQuery and TermRangeQuery.
 type NumericRangeV2 struct {
 	Min          *float64 `json:"min,omitempty"`
 	Max          *float64 `json:"max,omitempty"`
@@ -44,15 +41,13 @@ type NumericRangeV2Query struct {
 	BoostVal *Boost         `json:"boost,omitempty"`
 }
 
-// NewNumericRangeV2Query creates a new query for ranges of numeric values over
-// a number_v2 field. Either, but not both, endpoints can be nil. The minimum
-// value is inclusive; the maximum value is exclusive.
+// NewNumericRangeV2Query creates a new query for ranges of numeric values.
 func NewNumericRangeV2Query(min, max *float64) *NumericRangeV2Query {
 	return NewNumericRangeV2InclusiveQuery(min, max, nil, nil)
 }
 
 // NewNumericRangeV2InclusiveQuery creates a new query for ranges of numeric
-// values over a number_v2 field, with explicit control over endpoint inclusion.
+// values.
 func NewNumericRangeV2InclusiveQuery(min, max *float64,
 	minInclusive, maxInclusive *bool) *NumericRangeV2Query {
 	return &NumericRangeV2Query{

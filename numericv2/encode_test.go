@@ -42,7 +42,7 @@ func TestEncodeIsMonotone(t *testing.T) {
 	}
 
 	for i := 1; i < len(vals); i++ {
-		prev, cur := Encode(vals[i-1]), Encode(vals[i])
+		prev, cur := encode(vals[i-1]), encode(vals[i])
 		if prev >= cur {
 			t.Fatalf("Encode not monotone at %v -> %v: %d >= %d",
 				vals[i-1], vals[i], prev, cur)
@@ -51,14 +51,14 @@ func TestEncodeIsMonotone(t *testing.T) {
 
 	// -0.0 and +0.0 compare equal as floats but are distinct bit patterns;
 	// what matters is that neither breaks ordering against its neighbours
-	if Encode(math.Copysign(0, -1)) > Encode(0) {
+	if encode(math.Copysign(0, -1)) > encode(0) {
 		t.Fatal("negative zero encodes above positive zero")
 	}
 }
 
 func TestEncodeDecodeRoundTrip(t *testing.T) {
 	for _, f := range []float64{-1e300, -1.5, -1, 0, 0.5, 1, 42, 1e300} {
-		if got := Decode(Encode(f)); got != f {
+		if got := decode(encode(f)); got != f {
 			t.Fatalf("round trip of %v gave %v", f, got)
 		}
 	}
@@ -69,7 +69,7 @@ func b(v bool) *bool         { return &v }
 
 // TestBoundsMatchesInvertedPath is the load-bearing test for the encoding: it
 // recomputes the int64 bounds exactly the way NewNumericRangeSearcher does and
-// requires Bounds to agree after the sign-bit lift. If these ever diverge, the
+// requires bounds to agree after the sign-bit lift. If these ever diverge, the
 // two numeric paths silently return different hits for the same query.
 func TestBoundsMatchesInvertedPath(t *testing.T) {
 	// mirror of the arithmetic at the top of NewNumericRangeSearcher
@@ -110,7 +110,7 @@ func TestBoundsMatchesInvertedPath(t *testing.T) {
 			for _, incMin := range incs {
 				for _, incMax := range incs {
 					wantLo, wantHi := reference(min, max, incMin, incMax)
-					gotLo, gotHi := Bounds(min, max, incMin, incMax)
+					gotLo, gotHi := bounds(min, max, incMin, incMax)
 
 					if gotLo != EncodeInt64(wantLo) {
 						t.Fatalf("lo mismatch for [%v,%v] inc(%v,%v): got %d, want %d",
@@ -129,7 +129,7 @@ func TestBoundsMatchesInvertedPath(t *testing.T) {
 }
 
 // TestBoundsExtremeGuards pins down what the MaxInt64/MinInt64 guards in
-// Bounds actually protect. They are not infinity guards: Float64ToInt64(+Inf)
+// bounds actually protect. They are not infinity guards: Float64ToInt64(+Inf)
 // is 0x7FF0000000000000, comfortably short of MaxInt64, so an exclusive bound
 // at an infinity increments normally -- into a NaN bit pattern, exactly as the
 // inverted-index path does. The int64 extremes correspond to NaN payloads, so
@@ -148,26 +148,26 @@ func TestBoundsExtremeGuards(t *testing.T) {
 	}
 
 	// an exclusive minimum at the top must not wrap to zero
-	lo, _ := Bounds(&maxKey, nil, b(false), nil)
+	lo, _ := bounds(&maxKey, nil, b(false), nil)
 	if lo != EncodeInt64(math.MaxInt64) {
 		t.Fatalf("exclusive min at the int64 max wrapped: got %d, want %d",
 			lo, uint64(EncodeInt64(math.MaxInt64)))
 	}
 
 	// an exclusive maximum at the bottom must not wrap to the top
-	_, hi := Bounds(nil, &minKey, nil, b(false))
+	_, hi := bounds(nil, &minKey, nil, b(false))
 	if hi != EncodeInt64(math.MinInt64) {
 		t.Fatalf("exclusive max at the int64 min wrapped: got %d, want %d",
 			hi, uint64(EncodeInt64(math.MinInt64)))
 	}
 
 	// and the infinities, which do increment, must still move upward
-	loInf, _ := Bounds(f64(math.Inf(1)), nil, b(false), nil)
-	if loInf <= Encode(math.Inf(1)) {
+	loInf, _ := bounds(f64(math.Inf(1)), nil, b(false), nil)
+	if loInf <= encode(math.Inf(1)) {
 		t.Fatalf("exclusive min at +Inf did not move upward: got %d", loInf)
 	}
-	_, hiInf := Bounds(nil, f64(math.Inf(-1)), nil, b(false))
-	if hiInf >= Encode(math.Inf(-1)) {
+	_, hiInf := bounds(nil, f64(math.Inf(-1)), nil, b(false))
+	if hiInf >= encode(math.Inf(-1)) {
 		t.Fatalf("exclusive max at -Inf did not move downward: got %d", hiInf)
 	}
 }
@@ -175,13 +175,13 @@ func TestBoundsExtremeGuards(t *testing.T) {
 // TestBoundsExclusiveIsAdjacentFloat documents that a step in this space moves
 // to the neighbouring representable float64, so exclusive bounds are exact.
 func TestBoundsExclusiveIsAdjacentFloat(t *testing.T) {
-	lo, _ := Bounds(f64(1.0), nil, b(false), nil)
-	if got, want := Decode(lo), math.Nextafter(1.0, math.Inf(1)); got != want {
+	lo, _ := bounds(f64(1.0), nil, b(false), nil)
+	if got, want := decode(lo), math.Nextafter(1.0, math.Inf(1)); got != want {
 		t.Fatalf("exclusive min above 1.0: got %v, want %v", got, want)
 	}
 
-	_, hi := Bounds(nil, f64(1.0), nil, b(false))
-	if got, want := Decode(hi), math.Nextafter(1.0, math.Inf(-1)); got != want {
+	_, hi := bounds(nil, f64(1.0), nil, b(false))
+	if got, want := decode(hi), math.Nextafter(1.0, math.Inf(-1)); got != want {
 		t.Fatalf("exclusive max below 1.0: got %v, want %v", got, want)
 	}
 }
@@ -190,19 +190,19 @@ func TestBoundsExclusiveIsAdjacentFloat(t *testing.T) {
 // which Evaluate relies on to short-circuit.
 func TestBoundsEmptyRange(t *testing.T) {
 	// min == max with both endpoints exclusive is empty
-	lo, hi := Bounds(f64(5), f64(5), b(false), b(false))
+	lo, hi := bounds(f64(5), f64(5), b(false), b(false))
 	if lo <= hi {
 		t.Fatalf("expected an empty range, got lo=%d hi=%d", lo, hi)
 	}
 
 	// an inverted range is empty
-	lo, hi = Bounds(f64(10), f64(1), nil, nil)
+	lo, hi = bounds(f64(10), f64(1), nil, nil)
 	if lo <= hi {
 		t.Fatalf("expected an empty range, got lo=%d hi=%d", lo, hi)
 	}
 
 	// min == max inclusive on both sides matches exactly one value
-	lo, hi = Bounds(f64(5), f64(5), b(true), b(true))
+	lo, hi = bounds(f64(5), f64(5), b(true), b(true))
 	if lo != hi {
 		t.Fatalf("expected a single-value range, got lo=%d hi=%d", lo, hi)
 	}

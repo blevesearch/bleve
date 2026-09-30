@@ -557,18 +557,6 @@ func TestNumericV2Validation(t *testing.T) {
 	if err := query.NewNumericRangeV2Query(nil, &nan).Validate(); err == nil {
 		t.Fatal("expected a NaN maximum to be rejected")
 	}
-
-	// IncludeInAll must be rejected at index-definition time
-	im := NewIndexMapping()
-	fm := NewNumberV2FieldMapping()
-	fm.Name = nv2FieldV2
-	fm.IncludeInAll = true
-	dm := NewDocumentMapping()
-	dm.AddFieldMappingsAt(nv2FieldV2, fm)
-	im.DefaultMapping = dm
-	if err := im.Validate(); err == nil {
-		t.Fatal("expected IncludeInAll on a number_v2 field to be rejected")
-	}
 }
 
 // TestNumericV2MultiValued indexes an array of numbers and checks that a

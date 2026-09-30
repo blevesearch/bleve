@@ -214,9 +214,7 @@ func NewGeoShapeV2FieldMapping() *FieldMapping {
 }
 
 // NewNumberV2FieldMapping returns a default field mapping for numbers indexed
-// into the number_v2 section. The defaults match NewNumericFieldMapping, except
-// that IncludeInAll is false and cannot be enabled: the field produces no
-// tokens, so it could never contribute to the _all composite field.
+// into the number_v2 section.
 func NewNumberV2FieldMapping() *FieldMapping {
 	return &FieldMapping{
 		Type:         "number_v2",

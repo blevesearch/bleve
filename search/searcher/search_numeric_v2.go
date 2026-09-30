@@ -31,9 +31,6 @@ func init() {
 	reflectStaticSizeNumericV2Searcher = int(reflect.TypeOf(nv2s).Size())
 }
 
-// NumericV2Searcher is a filtering searcher over a number_v2 field. Every
-// document the underlying reader returns is a confirmed match, so the searcher
-// contributes a constant score rather than a computed one.
 type NumericV2Searcher struct {
 	numericIndexReader index.NumericV2FieldReader
 	scorer             *scorer.ConstantScorer

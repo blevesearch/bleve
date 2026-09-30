@@ -25,7 +25,7 @@ import (
 
 // signBit lifts an order-preserving int64 into an order-preserving uint64.
 // Because it is addition of 2^63 modulo 2^64, it commutes with the +1 and -1
-// steps Bounds applies for exclusive endpoints.
+// steps bounds applies for exclusive endpoints.
 const signBit = uint64(1) << 63
 
 // EncodeInt64 maps a sortable int64, as produced by numeric.Float64ToInt64, to
@@ -35,27 +35,20 @@ func EncodeInt64(i int64) uint64 {
 	return uint64(i) ^ signBit
 }
 
-// Encode maps a float64 to a uint64 whose unsigned ordering matches the
+// encode maps a float64 to a uint64 whose unsigned ordering matches the
 // float64 ordering of the input.
-func Encode(f float64) uint64 {
+func encode(f float64) uint64 {
 	return EncodeInt64(numeric.Float64ToInt64(f))
 }
 
-// Decode is the inverse of Encode.
-func Decode(v uint64) float64 {
+// decode is the inverse of Encode.
+func decode(v uint64) float64 {
 	return numeric.Int64ToFloat64(int64(v ^ signBit))
 }
 
-// Bounds converts a query range into the inclusive uint64 interval [lo, hi] to
-// scan. It deliberately mirrors searcher.NewNumericRangeSearcher step for step:
-// an absent endpoint becomes the corresponding infinity, min is inclusive by
-// default and max is not, and the adjustments for exclusive endpoints are
-// guarded at the int64 extremes so they cannot wrap.
-//
-// A ±1 step in this space moves to the adjacent representable float64, so
-// exclusive endpoints here are exact rather than approximate. When the range is
-// empty, lo comes back greater than hi.
-func Bounds(min, max *float64, inclusiveMin, inclusiveMax *bool) (lo, hi uint64) {
+// bounds converts a query range into the inclusive uint64 interval [lo, hi] to
+// scan.
+func bounds(min, max *float64, inclusiveMin, inclusiveMax *bool) (lo, hi uint64) {
 	// account for unbounded edges
 	if min == nil {
 		negInf := math.Inf(-1)
@@ -65,22 +58,16 @@ func Bounds(min, max *float64, inclusiveMin, inclusiveMax *bool) (lo, hi uint64)
 		inf := math.Inf(1)
 		max = &inf
 	}
-	if inclusiveMin == nil {
-		defaultInclusiveMin := true
-		inclusiveMin = &defaultInclusiveMin
-	}
-	if inclusiveMax == nil {
-		defaultInclusiveMax := false
-		inclusiveMax = &defaultInclusiveMax
-	}
 
 	minInt64 := numeric.Float64ToInt64(*min)
-	if !*inclusiveMin && minInt64 != math.MaxInt64 {
+	// the minimum is inclusive unless the caller says otherwise
+	if inclusiveMin != nil && !*inclusiveMin && minInt64 != math.MaxInt64 {
 		minInt64++
 	}
 
 	maxInt64 := numeric.Float64ToInt64(*max)
-	if !*inclusiveMax && maxInt64 != math.MinInt64 {
+	// the maximum is exclusive unless the caller says otherwise
+	if (inclusiveMax == nil || !*inclusiveMax) && maxInt64 != math.MinInt64 {
 		maxInt64--
 	}
 

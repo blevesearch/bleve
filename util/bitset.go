@@ -26,29 +26,13 @@ import (
 // that word is non-empty, so iteration can skip 64 empty words at a time
 // instead of loading each one.
 //
-// That matters because a bitset is sized by the document count of the segment
-// it covers, not by the number of bits actually set: without the summary, a
-// query matching 0.1% of a five-million-document segment still walks all 78,000
-// words to find its 5,000 hits.
-//
 // The invariant is exact -- a summary bit is set if and only if the
 // corresponding data word is non-zero -- so every mutating method below has to
 // maintain it. A stale set bit would still be correct, since iteration
 // re-checks the word it names and skips it when empty; exactness is what
 // preserves the performance the summary exists for.
-//
-// Maintaining it inside Add costs one extra store per value, against a region
-// 64x smaller than the data which stays cache-resident. Measured against the
-// same benchmark at four densities on a five-million-document segment, that
-// buys 3x at 0.1% and roughly 1.1x at 1%, breaks even at 10%, and costs about
-// 9% at 50% where nearly every word is occupied and there is nothing to skip.
-// Two alternatives were tried and rejected: making the store conditional on the
-// word having been empty regressed 10% density by 19% on an unpredictable
-// branch, and rebuilding the summary in one pass per iteration regressed 1%
-// density by 27% by paying an O(words) pass on top of the walk.
 type Bitset struct {
-	// backing owns the memory; data and summary are views over it, so that a
-	// pooled bitset is a single allocation.
+	// backing owns the memory; data and summary are views over it
 	backing []uint64
 	data    []uint64
 	summary []uint64
@@ -150,8 +134,6 @@ func (b *Bitset) Invert() {
 		}
 	}
 
-	// every word just changed; Invert is already O(words) so rebuilding here
-	// rather than deferring costs nothing extra
 	b.rebuildSummary()
 }
 
@@ -211,23 +193,15 @@ func (b *Bitset) SizeInBytes() int {
 
 // BitsetIterator walks the set bits of a Bitset in ascending order, using the
 // summary level to skip runs of empty words.
-//
-// It is a value type on purpose: the caller keeps it in a slice and calls
-// through it once per hit, so an interface or a pointer chase per call would
-// cost more than the bit extraction itself. The zero value is a valid, empty
-// iterator, which lets callers leave a slot unset rather than nil-checking on
-// the hot path.
 type BitsetIterator struct {
 	words   []uint64
 	summary []uint64
 
-	// summaryIdx is the summary word being consumed, and summaryWord its bits
-	// that have not been visited yet; each names a non-empty data word.
+	// summaryIdx is the summary word being consumed
 	summaryIdx  int
 	summaryWord uint64
 
-	// wordIdx is the data word being consumed, and word its bits that have not
-	// been returned yet, so the lowest set bit is always the next value.
+	// wordIdx is the data word being consumed
 	wordIdx int
 	word    uint64
 }

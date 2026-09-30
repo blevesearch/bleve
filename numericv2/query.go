@@ -31,7 +31,7 @@ type Query struct {
 // NewRangeQuery builds a query for the given range. A nil endpoint is
 // unbounded; inclusiveMin defaults to true and inclusiveMax to false.
 func NewRangeQuery(min, max *float64, inclusiveMin, inclusiveMax *bool) *Query {
-	lo, hi := Bounds(min, max, inclusiveMin, inclusiveMax)
+	lo, hi := bounds(min, max, inclusiveMin, inclusiveMax)
 	return &Query{lo: lo, hi: hi}
 }
 

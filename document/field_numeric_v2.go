@@ -32,15 +32,11 @@ func init() {
 }
 
 // DefaultNumericV2IndexingOptions mirrors the v1 numeric defaults, minus
-// IncludeInAll: a number_v2 field produces no tokens, so it can never
-// participate in the _all composite field.
+// IncludeInAll
 const DefaultNumericV2IndexingOptions = index.StoreField | index.IndexField | index.DocValues
 
 // NumericV2Field is a numeric field indexed into the number_v2 section rather
-// than as prefix-coded terms in the inverted index. It carries the value in two
-// encodings because its two consumers need different things: the section's
-// sorted search array wants the sortable uint64, while the sort and facet paths
-// visit doc values as prefix-coded terms.
+// than as prefix-coded terms in the inverted index.
 type NumericV2Field struct {
 	name              string
 	arrayPositions    []uint64
@@ -85,19 +81,9 @@ func (n *NumericV2Field) AnalyzedTokenFrequencies() index.TokenFrequencies {
 	return nil
 }
 
-// Value returns the stored-field representation, which is the same
-// prefix-coded encoding a v1 NumericField stores. Keeping the two identical is
-// what lets the stored-field decode path reuse NewNumericFieldFromBytes.
+// Value returns the prefix-coded, zero-shift representation, which is both the
+// stored-field form and the term written to this field's doc values.
 func (n *NumericV2Field) Value() []byte {
-	return n.value
-}
-
-// DocValueTerm returns the prefix-coded, zero-shift term written to this
-// field's doc values. The sort and facet paths validate doc value bytes as
-// prefix-coded and keep only shift-zero terms, so this encoding is required
-// rather than incidental: handing them the raw sortable uint64 would make
-// every document sort and facet as missing.
-func (n *NumericV2Field) DocValueTerm() []byte {
 	return n.value
 }
 
