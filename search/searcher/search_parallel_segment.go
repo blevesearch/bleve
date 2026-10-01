@@ -29,6 +29,12 @@ package searcher
 // Scoring correctness: shard TermSearchers reuse the same TermQueryScorer as
 // the originals (same IDF, same query weights) so scores are comparable across
 // shards and the final merge is correct.
+//
+// Root-only: the fan-out is served through Next() from a score-ordered cache,
+// which cannot honor the parent-driven Advance(ID) protocol that
+// ConjunctionSearcher / BooleanSearcher / PhraseSearcher rely on. §7 therefore
+// only runs for the request's root searcher, which the caller marks with
+// MarkParallelSegmentSearchRoot; every nested DSS takes the serial path.
 
 import (
 	"context"
@@ -54,7 +60,13 @@ var EnableParallelSegmentSearch atomic.Bool
 
 // ParallelSegmentSearchMinSegs is the minimum number of index segments required
 // to activate parallel search. Below this the goroutine overhead dominates.
+// Compiled default; see ParallelSegmentSearchMinSegsOverride for runtime tuning.
 var ParallelSegmentSearchMinSegs = 6
+
+// ParallelSegmentSearchMinSegsOverride, when > 0, replaces
+// ParallelSegmentSearchMinSegs at runtime (safe to Store while queries are in
+// flight). 0 means "use the compiled default".
+var ParallelSegmentSearchMinSegsOverride atomic.Int32
 
 // ParallelSegmentSearchShardK is the minimum (floor) for the per-shard top-K
 // collector limit. §35: the actual shardK is max(TopK, floor) where TopK is
@@ -78,7 +90,113 @@ var ParallelSegmentSearchMaxCount = 100
 // Parallel search is skipped when totalDF/numSegs falls below this value,
 // indicating too few candidates per shard to amortize goroutine overhead.
 // Tune via benchmark: entity queries have ~0–10 DF/seg; text queries ~100–1000.
+// Compiled default; see ParallelSegmentSearchMinDFPerSegOverride for runtime tuning.
 var ParallelSegmentSearchMinDFPerSeg uint64 = 150
+
+// ParallelSegmentSearchMinDFPerSegOverride, when > 0, replaces
+// ParallelSegmentSearchMinDFPerSeg at runtime (safe to Store while queries are
+// in flight). 0 means "use the compiled default", so the effective way to
+// disable the DF floor at runtime is to Store(1), not 0.
+var ParallelSegmentSearchMinDFPerSegOverride atomic.Int64
+
+// ParallelSegmentSearchMaxConcurrentOverride, when > 0, replaces the computed
+// §33 concurrency cap (GOMAXPROCS / p, where p is the shard count the fan-out
+// would use) at runtime (safe to Store while queries are in flight). 0 means
+// "use the computed default". Like the other adaptive guards it is bypassed
+// by an explicit ctx key.
+var ParallelSegmentSearchMaxConcurrentOverride atomic.Int32
+
+// ParallelSegmentSearchCounters counts shouldRunParallel outcomes. Exactly one
+// counter other than Evaluated is incremented per call. When the feature is
+// off (flag off and no ctx key, the default production state) that is
+// DeclinedDisabled alone: a single atomic add. Otherwise Evaluated is also
+// incremented, so the invariant is
+//
+//	Evaluated == Ran + DeclinedNested + DeclinedRequest + DeclinedTopK + DeclinedNoCPU +
+//	             DeclinedNonTerm + DeclinedSegs + DeclinedDF + DeclinedConcurrency
+//
+// with DeclinedDisabled counted separately. Plain atomic adds on the hot
+// path: no allocations, no locks.
+type ParallelSegmentSearchCounters struct {
+	// Evaluated counts evaluations with the feature enabled (flag or ctx key).
+	Evaluated atomic.Uint64
+	// Ran counts decisions to fan out: it is incremented before
+	// runParallelSegmentSearch executes, so a fan-out that then fails (and
+	// surfaces an error from Next) still counts here.
+	Ran                 atomic.Uint64
+	DeclinedDisabled    atomic.Uint64 // ctx key <= 0, or global flag off (Evaluated not incremented)
+	DeclinedNested      atomic.Uint64 // DSS is not the request's root searcher
+	DeclinedRequest     atomic.Uint64 // root, but the request shape is ineligible (non-score sort, facets, search_after/before, knn)
+	DeclinedTopK        atomic.Uint64 // TopK > ParallelSegmentSearchMaxCount
+	DeclinedNoCPU       atomic.Uint64 // GOMAXPROCS < 2
+	DeclinedNonTerm     atomic.Uint64 // no searchers, or a child that is not a *TermSearcher with a term
+	DeclinedSegs        atomic.Uint64 // numSegs < effective min segs
+	DeclinedDF          atomic.Uint64 // totalDF < numSegs * effective min DF/seg
+	DeclinedConcurrency atomic.Uint64 // concurrency gate at capacity
+}
+
+// ParallelSegmentSearchStats is the process-wide instance of
+// ParallelSegmentSearchCounters, exported for stats/metrics plumbing.
+var ParallelSegmentSearchStats ParallelSegmentSearchCounters
+
+// ParallelSegmentSearchEventHook, when non-nil, is called once per
+// shouldRunParallel outcome other than "disabled" (which would be far too
+// noisy with the feature off). event is one of: "ran", "declined_nested",
+// "declined_request", "declined_topk", "declined_nocpu", "declined_nonterm", "declined_segs",
+// "declined_df", "declined_concurrency". "ran" means "decided to fan out":
+// it fires before runParallelSegmentSearch executes, so a fan-out that then
+// fails still reports "ran". numSegs and totalDF are the
+// best-known values at that point and may be 0 when not yet computed; topK
+// is the query's SearcherOptions.TopK.
+//
+// The hook runs synchronously on the query path: it must be cheap and
+// non-blocking (no I/O, no locks that can contend).
+var ParallelSegmentSearchEventHook func(event string, numSegs int, totalDF uint64, topK int)
+
+// MarkParallelSegmentSearchRoot marks s as the request's root searcher,
+// making it eligible for §7 parallel segment search. Returns true when s is a
+// *DisjunctionSliceSearcher and was marked, false otherwise (any other
+// searcher type is left untouched).
+//
+// §7 only fans out for the root searcher: it answers Next() from a
+// score-ordered cache of the merged shard results, which cannot serve the
+// parent-driven Advance(ID) protocol that conjunction/boolean/phrase parents
+// use to align their children. Callers (the request executor) must mark
+// exactly the searcher they will drain with Next() and nothing beneath it.
+func MarkParallelSegmentSearchRoot(s search.Searcher) bool {
+	dss, ok := s.(*DisjunctionSliceSearcher)
+	if !ok {
+		return false
+	}
+	dss.parallelRoot = true
+	return true
+}
+
+// MarkParallelSegmentSearchIneligible marks s as the request's root searcher
+// whose request shape cannot be served by the fan-out (each shard keeps only
+// its top-K by score, so a non-score sort, facets, search_after/before or KNN
+// hybrid ranking would see a truncated candidate set). Such a DSS declines
+// with "declined_request" instead of "declined_nested", so the counters tell
+// the two apart. Returns false for any other searcher type.
+func MarkParallelSegmentSearchIneligible(s search.Searcher) bool {
+	dss, ok := s.(*DisjunctionSliceSearcher)
+	if !ok {
+		return false
+	}
+	dss.parallelRoot = true
+	dss.parallelIneligible = true
+	return true
+}
+
+// declineParallel records a non-"disabled" decline: bumps counter, fires the
+// event hook, and returns the (false, 0) pair shouldRunParallel hands back.
+func declineParallel(counter *atomic.Uint64, event string, numSegs int, totalDF uint64, topK int) (bool, int) {
+	counter.Add(1)
+	if hook := ParallelSegmentSearchEventHook; hook != nil {
+		hook(event, numSegs, totalDF, topK)
+	}
+	return false, 0
+}
 
 // parallelSearchesActive is the §33 concurrency gate counter. It tracks how
 // many parallel segment searches are currently running across all goroutines.
@@ -239,66 +357,101 @@ func msmBinomCoeff(n, k int) float64 {
 // 0 disables, ≥2 enables with that shardK; absent means use global flags.
 // shardK is only meaningful when the bool return is true.
 //
+// The root-only guard (s.parallelRoot, see MarkParallelSegmentSearchRoot)
+// applies unconditionally: the ctx key bypasses only the adaptive guards.
+//
 // When no explicit override is set, two §33 adaptive guards apply:
 //   - DF-based shard guard: skip if totalDF/numSegs < ParallelSegmentSearchMinDFPerSeg
 //     (prevents goroutine overhead from dominating on low-DF entity queries)
 //   - Concurrency gate: skip if too many parallel searches are already active
 //     (prevents goroutine oversubscription at high QPS)
+//
+// Every call increments exactly one outcome counter in
+// ParallelSegmentSearchStats; when the feature is enabled (flag or ctx key)
+// it also increments Evaluated, and fires ParallelSegmentSearchEventHook for
+// every outcome except "disabled". The disabled path costs a single atomic
+// add so the default production state stays cheap.
 func shouldRunParallel(s *DisjunctionSliceSearcher, sctx *search.SearchContext) (bool, int) {
 	// §35: dynamic shardK = max(query.count, floor). Heap fills after TopK docs
 	// → shared threshold rises to the TopK-th best score → §34 global WAND
 	// ceilings prune as aggressively as the serial path. Floor prevents
 	// degenerate heaps for very small counts.
+	topK := s.options.TopK
 	shardK := ParallelSegmentSearchShardK // floor
-	if topK := s.options.TopK; topK > shardK {
+	if topK > shardK {
 		shardK = topK
 	}
 	explicitOverride := false
 
 	if v, ok := s.ctx.Value(search.ParallelSegmentSearchKey).(int); ok {
 		if v <= 0 {
+			ParallelSegmentSearchStats.DeclinedDisabled.Add(1)
 			return false, 0
 		}
 		shardK = v
 		explicitOverride = true
 	} else if !EnableParallelSegmentSearch.Load() {
+		ParallelSegmentSearchStats.DeclinedDisabled.Add(1)
 		return false, 0
+	}
+	ParallelSegmentSearchStats.Evaluated.Add(1)
+
+	// Root-only guard: never bypassed by the ctx key. A nested DSS would be
+	// driven by its parent's Advance(ID), which the score-ordered parallel
+	// cache cannot serve. This also stops the shard DSSes created inside
+	// runParallelSegmentSearch (unmarked, same ctx) from recursing.
+	if !s.parallelRoot {
+		return declineParallel(&ParallelSegmentSearchStats.DeclinedNested, "declined_nested", 0, 0, topK)
+	}
+	// Request-level ineligibility (see MarkParallelSegmentSearchIneligible) is
+	// a correctness condition, so the explicit ctx override does not bypass it.
+	if s.parallelIneligible {
+		return declineParallel(&ParallelSegmentSearchStats.DeclinedRequest, "declined_request", 0, 0, topK)
 	}
 
 	// §35 count cap: for large-K queries WAND pruning is weaker and goroutine
 	// overhead dominates; fall back to serial. Explicit override bypasses this
 	// so BENCH_PARALLEL_SEARCH=N can still force parallel for testing.
 	if !explicitOverride && ParallelSegmentSearchMaxCount > 0 &&
-		s.options.TopK > ParallelSegmentSearchMaxCount {
-		return false, 0
+		topK > ParallelSegmentSearchMaxCount {
+		return declineParallel(&ParallelSegmentSearchStats.DeclinedTopK, "declined_topk", 0, 0, topK)
 	}
 
 	if runtime.GOMAXPROCS(0) < 2 {
-		return false, 0
+		return declineParallel(&ParallelSegmentSearchStats.DeclinedNoCPU, "declined_nocpu", 0, 0, topK)
 	}
 	if len(s.searchers) == 0 {
-		return false, 0
+		return declineParallel(&ParallelSegmentSearchStats.DeclinedNonTerm, "declined_nonterm", 0, 0, topK)
 	}
 	// All sub-searchers must be *TermSearcher with a stored term (set by
 	// newTermSearcherFromReader; nil for synonym/unadorned paths).
 	for _, sr := range s.searchers {
 		ts, ok := sr.(*TermSearcher)
 		if !ok || ts.term == nil {
-			return false, 0
+			return declineParallel(&ParallelSegmentSearchStats.DeclinedNonTerm, "declined_nonterm", 0, 0, topK)
 		}
 	}
 	// Enough segments to justify goroutine overhead.
 	numSegs := s.searchers[0].(*TermSearcher).NumSegments()
-	if numSegs < ParallelSegmentSearchMinSegs {
-		return false, 0
+	minSegs := ParallelSegmentSearchMinSegs
+	if v := ParallelSegmentSearchMinSegsOverride.Load(); v > 0 {
+		minSegs = int(v)
+	}
+	if numSegs < minSegs {
+		return declineParallel(&ParallelSegmentSearchStats.DeclinedSegs, "declined_segs", numSegs, 0, topK)
 	}
 
+	var totalDF uint64
 	if !explicitOverride {
 		// §33 DF-based shard guard: skip when candidates are too sparse to
 		// amortize goroutine setup cost. Checked before the atomic load.
-		totalDF := estimateDF(s)
-		if totalDF < uint64(numSegs)*ParallelSegmentSearchMinDFPerSeg {
-			return false, 0
+		totalDF = estimateDF(s)
+		minDFPerSeg := ParallelSegmentSearchMinDFPerSeg
+		if v := ParallelSegmentSearchMinDFPerSegOverride.Load(); v > 0 {
+			minDFPerSeg = uint64(v)
+		}
+		if totalDF < uint64(numSegs)*minDFPerSeg {
+			return declineParallel(&ParallelSegmentSearchStats.DeclinedDF, "declined_df", numSegs, totalDF, topK)
 		}
 
 		// §33 concurrency gate: prevent oversubscription at high QPS.
@@ -316,9 +469,16 @@ func shouldRunParallel(s *DisjunctionSliceSearcher, sctx *search.SearchContext) 
 		if maxConcurrent < 1 {
 			maxConcurrent = 1
 		}
-		if parallelSearchesActive.Load() >= maxConcurrent {
-			return false, 0
+		if v := ParallelSegmentSearchMaxConcurrentOverride.Load(); v > 0 {
+			maxConcurrent = v
 		}
+		if parallelSearchesActive.Load() >= maxConcurrent {
+			return declineParallel(&ParallelSegmentSearchStats.DeclinedConcurrency, "declined_concurrency", numSegs, totalDF, topK)
+		}
+	}
+	ParallelSegmentSearchStats.Ran.Add(1)
+	if hook := ParallelSegmentSearchEventHook; hook != nil {
+		hook("ran", numSegs, totalDF, topK)
 	}
 	return true, shardK
 }
@@ -326,6 +486,12 @@ func shouldRunParallel(s *DisjunctionSliceSearcher, sctx *search.SearchContext) 
 // runParallelSegmentSearch fans the search across P goroutines, each handling
 // a contiguous range of segments. Returns all collected results merged and
 // sorted by score descending. shardK is the per-shard top-K collector limit.
+//
+// The bool result is true when the merged results are a lower bound on the
+// true match set: either a shard's MAXSCORE path pruned candidates (WAND), or
+// a shard's top-shardK heap evicted one. The caller maps it onto
+// SearchContext.WANDPruned so SearchResult.Total is reported with the right
+// TotalRelation.
 func runParallelSegmentSearch(
 	ctx context.Context,
 	s *DisjunctionSliceSearcher,
@@ -418,6 +584,10 @@ func runParallelSegmentSearch(
 			}
 			return nil, false, err
 		}
+		// Shards never fan out: skip shouldRunParallel entirely so they do
+		// not recurse or pollute ParallelSegmentSearchStats (Evaluated /
+		// DeclinedNested) on every root run.
+		dss.parallelDecided = true
 		if canWAND {
 			dss.injectGlobalWANDCeilings(globalMI)
 		}
@@ -426,7 +596,8 @@ func runParallelSegmentSearch(
 
 	type shardResult struct {
 		matches    []*search.DocumentMatch
-		wandPruned bool
+		wandPruned bool // MAXSCORE skipped candidates
+		truncated  bool // top-shardK heap evicted at least one candidate
 		err        error
 	}
 	results := make([]shardResult, len(shards))
@@ -448,27 +619,34 @@ func runParallelSegmentSearch(
 				}
 			}()
 			defer func() { _ = dss.Close() }()
-			matches, wandPruned, err := runShardSearch(ctx, dss, &shared, shardK, canWAND)
-			results[g] = shardResult{matches: matches, wandPruned: wandPruned, err: err}
+			matches, wandPruned, truncated, err := runShardSearch(ctx, dss, &shared, shardK, canWAND)
+			results[g] = shardResult{matches: matches, wandPruned: wandPruned, truncated: truncated, err: err}
 		}(g, shards[g].dss)
 	}
 	wg.Wait()
 
 	var total int
-	var wandPruned bool
+	var pruned bool
 	for _, r := range results {
 		if r.err != nil {
 			return nil, false, r.err
 		}
 		total += len(r.matches)
-		wandPruned = wandPruned || r.wandPruned
+		pruned = pruned || r.wandPruned || r.truncated
 	}
 	all := make([]*search.DocumentMatch, 0, total)
 	for _, r := range results {
 		all = append(all, r.matches...)
 	}
-	sort.Slice(all, func(i, j int) bool { return all[i].Score > all[j].Score })
-	return all, wandPruned, nil
+	// Score descending, ties broken by docID ascending (the order the serial
+	// path emits them), so the merged order is deterministic across runs.
+	sort.SliceStable(all, func(i, j int) bool {
+		if all[i].Score != all[j].Score {
+			return all[i].Score > all[j].Score
+		}
+		return all[i].IndexInternalID.Compare(all[j].IndexInternalID) < 0
+	})
+	return all, pruned, nil
 }
 
 // runShardSearch runs a full WAND/MAXSCORE search on shardDSS, collecting at
@@ -476,19 +654,24 @@ func runParallelSegmentSearch(
 // the shard's DocumentMatchPool. k=count gives the tightest per-shard WAND threshold.
 // wandEnabled mirrors the caller's canWAND flag: when true the shard SearchContext
 // has WANDEnabled=true so the MAXSCORE path activates using the injected global ceilings.
+//
+// Returns (matches, wandPruned, truncated, err): wandPruned is the shard's
+// SearchContext.WANDPruned; truncated is true when the top-k heap evicted at
+// least one candidate, i.e. the shard matched more than k docs.
 func runShardSearch(
 	ctx context.Context,
 	shardDSS *DisjunctionSliceSearcher,
 	shared *sharedThreshold,
 	k int,
 	wandEnabled bool,
-) ([]*search.DocumentMatch, bool, error) {
+) ([]*search.DocumentMatch, bool, bool, error) {
 	searchCtx := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(shardDSS.DocumentMatchPoolSize()+k+2, 0),
 		WANDEnabled:       wandEnabled,
 	}
 
 	var h dmMinHeap
+	var truncated bool
 
 	var iters uint64
 	for {
@@ -500,7 +683,7 @@ func runShardSearch(
 				for _, dm := range h {
 					searchCtx.DocumentMatchPool.Put(dm)
 				}
-				return nil, false, ctx.Err()
+				return nil, false, false, ctx.Err()
 			default:
 			}
 		}
@@ -513,7 +696,7 @@ func runShardSearch(
 
 		m, err := shardDSS.Next(searchCtx)
 		if err != nil {
-			return nil, false, err
+			return nil, false, false, err
 		}
 		if m == nil {
 			break
@@ -521,6 +704,7 @@ func runShardSearch(
 
 		evicted, minScore := h.pushBounded(m, k)
 		if evicted != nil {
+			truncated = true
 			searchCtx.DocumentMatchPool.Put(evicted)
 		}
 		if minScore > searchCtx.ScoreThreshold {
@@ -538,6 +722,11 @@ func runShardSearch(
 		results[i] = &cp
 		searchCtx.DocumentMatchPool.Put(dm)
 	}
-	sort.Slice(results, func(i, j int) bool { return results[i].Score > results[j].Score })
-	return results, searchCtx.WANDPruned, nil
+	sort.SliceStable(results, func(i, j int) bool {
+		if results[i].Score != results[j].Score {
+			return results[i].Score > results[j].Score
+		}
+		return results[i].IndexInternalID.Compare(results[j].IndexInternalID) < 0
+	})
+	return results, searchCtx.WANDPruned, truncated, nil
 }

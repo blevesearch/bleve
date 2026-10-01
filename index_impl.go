@@ -40,6 +40,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search/facet"
 	"github.com/blevesearch/bleve/v2/search/highlight"
 	"github.com/blevesearch/bleve/v2/search/query"
+	bsearcher "github.com/blevesearch/bleve/v2/search/searcher"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/s2"
@@ -669,6 +670,20 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 
 // SearchInContext executes a search request operation within the provided
 // Context. Returns a SearchResult object or an error.
+// parallelSegmentSearchEligible reports whether §7 parallel segment search
+// may fan out the request's root disjunction. The fan-out keeps only each
+// shard's top-K by score, so it can only serve requests ranked purely by
+// descending score with no facets, no search_after/before pagination and no
+// KNN hybrid ranking. (SearchBefore has already been folded into SearchAfter
+// by the time the searcher is built; both are checked for clarity.)
+func parallelSegmentSearchEligible(req *SearchRequest) bool {
+	if len(req.Facets) != 0 || req.SearchAfter != nil || req.SearchBefore != nil ||
+		requestHasKNN(req) {
+		return false
+	}
+	return len(req.Sort) == 1 && req.Sort[0].RequiresScoring() && req.Sort[0].Descending()
+}
+
 func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr *SearchResult, err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -724,17 +739,20 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	//     accounted by invoking this callback when the TFR is closed.
 	//  2. the docvalues portion (accounted in collector) and the retrieval
 	//     of stored fields bytes (by LoadAndHighlightFields)
+	// totalSearchCost is updated atomically: with §7 parallel segment search
+	// the shard goroutines close their readers (and so report bytes read)
+	// concurrently.
 	var totalSearchCost uint64
 	sendBytesRead := func(bytesRead uint64) {
-		totalSearchCost += bytesRead
+		atomic.AddUint64(&totalSearchCost, bytesRead)
 	}
 	// Ensure IO cost accounting and result cost assignment happen on all return paths
 	defer func() {
 		if sr != nil {
-			sr.Cost = totalSearchCost
+			sr.Cost = atomic.LoadUint64(&totalSearchCost)
 		}
 		if is, ok := indexReader.(*scorch.IndexSnapshot); ok {
-			is.UpdateIOStats(totalSearchCost)
+			is.UpdateIOStats(atomic.LoadUint64(&totalSearchCost))
 		}
 		search.RecordSearchCost(ctx, search.DoneM, 0)
 	}()
@@ -910,6 +928,17 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	if err != nil {
 		return nil, err
 	}
+	// §7: only the root searcher may fan out across segments (the collector
+	// drives it with Next() alone, so the score-ordered cache is safe), and
+	// only for requests whose result the fan-out can serve faithfully: each
+	// shard keeps its top-K by score, so a non-score sort, facets,
+	// search_after/before pagination or KNN hybrid ranking would otherwise
+	// operate on a score-truncated candidate set.
+	if parallelSegmentSearchEligible(req) {
+		bsearcher.MarkParallelSegmentSearchRoot(searcher)
+	} else {
+		bsearcher.MarkParallelSegmentSearchIneligible(searcher)
+	}
 	defer func() {
 		if serr := searcher.Close(); err == nil && serr != nil {
 			err = serr
@@ -1035,7 +1064,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		storedFieldsCost += storedFieldsBytes
 	}
 
-	totalSearchCost += storedFieldsCost
+	atomic.AddUint64(&totalSearchCost, storedFieldsCost)
 	search.RecordSearchCost(ctx, search.AddM, storedFieldsCost)
 
 	if req.PreSearchData == nil {

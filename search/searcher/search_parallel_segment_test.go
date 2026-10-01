@@ -34,8 +34,10 @@ import (
 	"context"
 	"os"
 	"regexp"
+	"runtime"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	regexpTokenizer "github.com/blevesearch/bleve/v2/analysis/tokenizer/regexp"
@@ -61,12 +63,38 @@ func buildMultiBatchScorchIndex(t *testing.T, dir string) index.Index {
 		Tokenizer: regexpTokenizer.NewRegexpTokenizer(regexp.MustCompile(`\w+`)),
 	}
 	aq := index.NewAnalysisQueue(1)
-	idx, err := scorch.NewScorch(scorch.Name, map[string]interface{}{"path": dir}, aq)
+	// Keep one file segment per batch for the whole test: maxSegmentSize=2
+	// makes every 2-doc segment ineligible for file merging (eligibility is
+	// LiveSize < MaxSegmentSize/2), and waiting for each batch to persist
+	// before issuing the next keeps the persister's in-memory merge from
+	// collapsing batches. Without this the background merger could drop the
+	// index below the §7 segment gate between sub-tests (observed flake).
+	cfg := map[string]interface{}{
+		"path": dir,
+		"scorchMergePlanOptions": map[string]interface{}{
+			"maxSegmentSize": 2,
+		},
+	}
+	idx, err := scorch.NewScorch(scorch.Name, cfg, aq)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := idx.Open(); err != nil {
 		t.Fatal(err)
+	}
+
+	waitPersisted := func(wantFileSegs int) {
+		deadline := time.Now().Add(10 * time.Second)
+		for time.Now().Before(deadline) {
+			sm := idx.StatsMap()
+			mem, _ := sm["num_root_memorysegments"].(uint64)
+			file, _ := sm["num_root_filesegments"].(uint64)
+			if mem == 0 && int(file) >= wantFileSegs {
+				return
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		t.Fatalf("timed out waiting for batch to persist (stats=%v)", idx.StatsMap())
 	}
 
 	type docDef struct{ id, terms string }
@@ -75,7 +103,7 @@ func buildMultiBatchScorchIndex(t *testing.T, dir string) index.Index {
 		{{"d3", "beta gamma"}, {"d4", "delta"}},
 		{{"d5", "alpha beta"}, {"d6", "delta"}},
 	}
-	for _, batch := range batches {
+	for i, batch := range batches {
 		b := index.NewBatch()
 		for _, d := range batch {
 			doc := document.NewDocument(d.id)
@@ -88,6 +116,7 @@ func buildMultiBatchScorchIndex(t *testing.T, dir string) index.Index {
 		if err := idx.Batch(b); err != nil {
 			t.Fatal(err)
 		}
+		waitPersisted(i + 1)
 	}
 	return idx
 }
@@ -126,6 +155,9 @@ func collectMatches(t *testing.T, searcher search.Searcher, reader index.IndexRe
 // conjunction:unadorned optimization had already built the AND'd bitmap and
 // left the TFR with postings==nil.
 func TestParallelSegmentSearchUnadornedConjunction(t *testing.T) {
+	if runtime.GOMAXPROCS(0) < 2 {
+		t.Skip("parallel segment search needs GOMAXPROCS >= 2")
+	}
 	dir, err := os.MkdirTemp("", "parallel-seg-test-*")
 	if err != nil {
 		t.Fatal(err)
@@ -142,15 +174,18 @@ func TestParallelSegmentSearchUnadornedConjunction(t *testing.T) {
 	scorch.OptimizeDisjunctionUnadorned = false
 	defer func() { scorch.OptimizeDisjunctionUnadorned = origDisjOpt }()
 
-	// Enable §7 parallel segment search and lower the minimum segment threshold
-	// so it fires on our 3-segment test index.
+	// Enable §7 parallel segment search and lower the minimum segment and
+	// DF-per-segment thresholds so it fires on our tiny 3-segment test index.
 	origParallel := EnableParallelSegmentSearch.Load()
 	origMinSegs := ParallelSegmentSearchMinSegs
+	origMinDF := ParallelSegmentSearchMinDFPerSeg
 	EnableParallelSegmentSearch.Store(true)
 	ParallelSegmentSearchMinSegs = 2
+	ParallelSegmentSearchMinDFPerSeg = 0
 	defer func() {
 		EnableParallelSegmentSearch.Store(origParallel)
 		ParallelSegmentSearchMinSegs = origMinSegs
+		ParallelSegmentSearchMinDFPerSeg = origMinDF
 	}()
 
 	reader, err := idx.Reader()
@@ -195,12 +230,19 @@ func TestParallelSegmentSearchUnadornedConjunction(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer disjSearcher.Close()
+	// §7 only fans out for the request's root searcher (as index_impl marks it).
+	if !MarkParallelSegmentSearchRoot(disjSearcher) {
+		t.Fatalf("expected *DisjunctionSliceSearcher, got %T", disjSearcher)
+	}
 
 	got := collectMatches(t, disjSearcher, reader)
 
 	want := []string{"d1", "d2", "d3", "d5"}
 	if !strSlicesEqual(got, want) {
 		t.Errorf("(alpha AND beta) OR gamma: got %v, want %v", got, want)
+	}
+	if disjSearcher.(*DisjunctionSliceSearcher).parallelResults == nil {
+		t.Error("expected the parallel path to run on the root disjunction")
 	}
 }
 
@@ -209,6 +251,9 @@ func TestParallelSegmentSearchUnadornedConjunction(t *testing.T) {
 // EnableParallelSegmentSearch=true, including cases where one branch is an
 // unadorned conjunction TermSearcher with nil postings.
 func TestParallelSegmentSearchCorrectness(t *testing.T) {
+	if runtime.GOMAXPROCS(0) < 2 {
+		t.Skip("parallel segment search needs GOMAXPROCS >= 2")
+	}
 	dir, err := os.MkdirTemp("", "parallel-seg-correct-*")
 	if err != nil {
 		t.Fatal(err)
@@ -224,17 +269,20 @@ func TestParallelSegmentSearchCorrectness(t *testing.T) {
 
 	origParallel := EnableParallelSegmentSearch.Load()
 	origMinSegs := ParallelSegmentSearchMinSegs
+	origMinDF := ParallelSegmentSearchMinDFPerSeg
 	EnableParallelSegmentSearch.Store(true)
 	ParallelSegmentSearchMinSegs = 2
+	ParallelSegmentSearchMinDFPerSeg = 0 // tiny fixture: DF guard would otherwise decline
 	defer func() {
 		EnableParallelSegmentSearch.Store(origParallel)
 		ParallelSegmentSearchMinSegs = origMinSegs
+		ParallelSegmentSearchMinDFPerSeg = origMinDF
 	}()
 
 	cases := []struct {
-		name         string
+		name          string
 		buildSearcher func(reader index.IndexReader, opts search.SearcherOptions) (search.Searcher, error)
-		want         []string
+		want          []string
 	}{
 		{
 			name: "simple alpha OR beta",
@@ -309,10 +357,17 @@ func TestParallelSegmentSearchCorrectness(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer s.Close()
+			// §7 only fans out for the request's root searcher (as index_impl marks it).
+			if !MarkParallelSegmentSearchRoot(s) {
+				t.Fatalf("expected *DisjunctionSliceSearcher, got %T", s)
+			}
 
 			got := collectMatches(t, s, reader)
 			if !strSlicesEqual(got, tc.want) {
 				t.Errorf("got %v, want %v", got, tc.want)
+			}
+			if s.(*DisjunctionSliceSearcher).parallelResults == nil {
+				t.Error("expected the parallel path to run on the root disjunction")
 			}
 		})
 	}
@@ -338,8 +393,8 @@ func strSlicesEqual(a, b []string) bool {
 //
 // shouldRunParallel has two early-return paths that can be unit-tested without
 // a fully-initialized DSS (which requires real TermSearchers and segments):
-//   1. ctx shardK=0 + global=true  → disabled (ctx wins via early return)
-//   2. no ctx + global=false       → disabled (global wins via early return)
+//  1. ctx shardK=0 + global=true  → disabled (ctx wins via early return)
+//  2. no ctx + global=false       → disabled (global wins via early return)
 //
 // Full end-to-end coverage of the ctx-enable path (ctx shardK>0 + global=false)
 // is provided by TestParallelSegmentSearchCorrectness.
@@ -351,8 +406,9 @@ func TestShouldRunParallelCtxOverride(t *testing.T) {
 		ParallelSegmentSearchShardK = origShardK
 	}()
 
+	// Marked root so the only reason to decline is the ctx key / global flag.
 	makeS := func(ctx context.Context) *DisjunctionSliceSearcher {
-		return &DisjunctionSliceSearcher{ctx: ctx}
+		return &DisjunctionSliceSearcher{ctx: ctx, parallelRoot: true}
 	}
 
 	// Case 1: ctx shardK=0 disables via early return before any other check,
@@ -383,6 +439,9 @@ func TestShouldRunParallelCtxOverride(t *testing.T) {
 // The test uses the real multi-segment index built by buildMultiBatchScorchIndex
 // to exercise shouldRunParallel with actual TermSearchers and real Count() values.
 func TestParallelSegmentSearchAdaptiveGuards(t *testing.T) {
+	if runtime.GOMAXPROCS(0) < 2 {
+		t.Skip("parallel segment search needs GOMAXPROCS >= 2")
+	}
 	dir := t.TempDir()
 	idx := buildMultiBatchScorchIndex(t, dir)
 	defer func() { _ = idx.Close() }()
@@ -419,6 +478,11 @@ func TestParallelSegmentSearchAdaptiveGuards(t *testing.T) {
 	}
 	defer func() { _ = srsExplicit.Close() }()
 	srsExplicit.ctx = ctxExplicit
+
+	// Both are the "root" of their (test) request: §7 declines unmarked DSSes
+	// before any adaptive guard is consulted.
+	srs.parallelRoot = true
+	srsExplicit.parallelRoot = true
 
 	noWAND := &search.SearchContext{}
 

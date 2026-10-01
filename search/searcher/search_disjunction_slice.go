@@ -17,6 +17,7 @@ package searcher
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"reflect"
 	"sort"
@@ -45,14 +46,25 @@ type DisjunctionSliceSearcher struct {
 	// (i.e. len(lazySearchers) == numSearchers). Stored here (offset 81, cache
 	// line 1) rather than computed from len(lazySearchers) (offset 360, cache
 	// line 5, cold) to avoid the cold-line load on every nextMAXSCORE call.
-	// Two bools fit in the 7-byte padding gap between retrieveScoreBreakdown
-	// and currs — struct size stays 384 bytes (§7 later extends to 456).
+	// Three bools fit in the 7-byte padding gap between retrieveScoreBreakdown
+	// and currs (offsets 81–83; currs at 88), so they add no size: the struct
+	// is 488 bytes with or without them.
 	lazyMode bool
 	// parallelDecided marks that shouldRunParallel has been called once for
 	// this DSS. Without it the check would fire on every Next() call when §7
 	// is disabled (parallelResults stays nil), adding O(NumCandidates) overhead.
 	parallelDecided bool
-	currs           []*search.DocumentMatch
+	// parallelRoot is set (via MarkParallelSegmentSearchRoot) only on the
+	// request's root searcher. §7 fans out and serves a score-ordered cache
+	// through Next(), which cannot honor a parent's Advance(ID) protocol, so a
+	// DSS nested under a conjunction/boolean/etc. must never take that path.
+	// Packed in the same padding gap as lazyMode/parallelDecided (offset 83).
+	parallelRoot bool
+	// parallelIneligible (set via MarkParallelSegmentSearchIneligible) marks a
+	// root DSS whose request shape the fan-out cannot serve faithfully; it
+	// declines with "declined_request". Offset 84, still inside the padding.
+	parallelIneligible bool
+	currs              []*search.DocumentMatch
 	// currIDs caches the decoded big-endian uint64 docID for each currs[i].
 	// math.MaxUint64 signals nil or exhausted (len(IndexInternalID) != 8).
 	// Updated after every s.currs[i] assignment so the hot nextMAXSCORE loops
@@ -545,13 +557,15 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 	if !s.parallelDecided {
 		s.parallelDecided = true
 		if ok, shardK := shouldRunParallel(s, ctx); ok {
-			var wandPruned2 bool
+			var pruned bool
 			var err error
-			s.parallelResults, wandPruned2, err = runParallelSegmentSearch(s.ctx, s, shardK, ctx.WANDEnabled)
+			s.parallelResults, pruned, err = runParallelSegmentSearch(s.ctx, s, shardK, ctx.WANDEnabled)
 			if err != nil {
 				return nil, err
 			}
-			if wandPruned2 {
+			// pruned covers both MAXSCORE pruning and per-shard top-shardK
+			// truncation: either way Total is a lower bound.
+			if pruned {
 				ctx.WANDPruned = true
 			}
 			// Ensure non-nil sentinel so the "not yet run" check above stays false.
@@ -877,6 +891,13 @@ func (s *DisjunctionSliceSearcher) nextMAXSCORE(ctx *search.SearchContext) (
 func (s *DisjunctionSliceSearcher) Advance(ctx *search.SearchContext,
 	ID index.IndexInternalID,
 ) (*search.DocumentMatch, error) {
+	// §7 safety net: the parallel cache is score-ordered and cannot be sought
+	// by ID. The root-only guard in shouldRunParallel makes this unreachable
+	// (only the request's root searcher fans out, and nothing calls Advance on
+	// the root); fail loudly rather than silently return the next cached doc.
+	if s.parallelResults != nil {
+		return nil, fmt.Errorf("parallel segment search: Advance is not supported on a parallelized disjunction")
+	}
 	if !s.initialized {
 		err := s.initSearchers(ctx)
 		if err != nil {
