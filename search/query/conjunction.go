@@ -100,6 +100,21 @@ func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		return searcher.NewMatchNoneSearcher(i)
 	}
 
+	// the per segment path, if the caller has opted in
+	if perSegment, _ := ctx.Value(search.PerSegmentSearchKey).(bool); perSegment && !nestedMode {
+		switch searcher.CountPerSegmentSearchers(ss) {
+		case len(ss):
+			return searcher.NewPerSegmentConjunctionSearcher(ss, options), nil
+		case 0:
+			// the index can't search per segment: the searchers are regular
+			// ones, and what comes next is as it always was
+		default:
+			// some clauses are, some are not: do it the regular way throughout
+			cleanup()
+			return q.Searcher(context.WithValue(ctx, search.PerSegmentSearchKey, false), i, m, options)
+		}
+	}
+
 	if nestedMode {
 		// first determine the nested depth info for the query fields
 		commonDepth, maxDepth := nm.NestedDepth(qfs)

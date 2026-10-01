@@ -563,7 +563,7 @@ func init() {
 // needed to execute a search request.
 func memNeededForSearch(req *SearchRequest,
 	searcher search.Searcher,
-	topnCollector *collector.TopNCollector,
+	topnCollector interface{ Size() int },
 ) uint64 {
 	backingSize := req.Size + req.From + 1
 	if req.Size+req.From > collector.PreAllocSizeSkipCap {
@@ -784,24 +784,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		req.SearchBefore = nil
 	}
 
-	coll, err := i.buildTopNCollector(ctx, req, indexReader)
-	if err != nil {
-		return nil, err
-	}
-
-	// score="none" + Size means "return any Size+From matching docs", so the
-	// collector may stop scanning early — provided nothing below depends on
-	// unseen matches (facets, KNN, pagination cursor, nested rollup, field sort).
-	if req.Score == ScoreNone && req.Size > 0 &&
-		len(req.Facets) == 0 &&
-		!requestHasKNN(req) &&
-		req.SearchAfter == nil && !reverseQueryExecution &&
-		len(req.Sort) == 1 && req.Sort[0].RequiresScoring() {
-		if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); !ok || !nestedMode {
-			coll.SetEarlyStop(req.Size + req.From)
-		}
-	}
-
 	var knnHits []*search.DocumentMatch
 	var skipKNNCollector bool
 
@@ -871,12 +853,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}
 
-	// if score fusion, no faceting for knn hits is done
-	// hence we can skip setting the knn hits in the collector
-	if !contextScoreFusionKeyExists {
-		setKnnHitsInCollector(knnHits, coll)
-	}
-
 	if fts != nil {
 		if is, ok := indexReader.(*scorch.IndexSnapshot); ok {
 			is.UpdateSynonymSearchCount(1)
@@ -888,6 +864,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	// the context object
 	if bm25Stats != nil {
 		ctx = context.WithValue(ctx, search.BM25StatsKey, bm25Stats)
+	}
+
+	// let a top level term query hand out a per segment searcher, if the request
+	// is one that the per segment path serves
+	if perSegmentSearchEligible(ctx, req, fts, contextScoreFusionKeyExists || rescorer != nil) {
+		ctx = context.WithValue(ctx, search.PerSegmentSearchKey, true)
 	}
 
 	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
@@ -903,6 +885,41 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			err = serr
 		}
 	}()
+
+	// A per segment searcher is collected by the per segment collector; for
+	// anything else it's the TopN one. Only the collector that is going to run
+	// gets built.
+	var coll *collector.TopNCollector
+	var resultColl searchResultCollector
+	if psColl := perSegmentCollector(searcher, req); psColl != nil {
+		resultColl = psColl
+	} else {
+		topNCollectorsBuilt.Add(1)
+		coll, err = i.buildTopNCollector(ctx, req, indexReader)
+		if err != nil {
+			return nil, err
+		}
+
+		// score="none" + Size means "return any Size+From matching docs", so the
+		// collector may stop scanning early — provided nothing below depends on
+		// unseen matches (facets, KNN, pagination cursor, nested rollup, field sort).
+		if req.Score == ScoreNone && req.Size > 0 &&
+			len(req.Facets) == 0 &&
+			!requestHasKNN(req) &&
+			req.SearchAfter == nil && !reverseQueryExecution &&
+			len(req.Sort) == 1 && req.Sort[0].RequiresScoring() {
+			if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); !ok || !nestedMode {
+				coll.SetEarlyStop(req.Size + req.From)
+			}
+		}
+
+		// if score fusion, no faceting for knn hits is done
+		// hence we can skip setting the knn hits in the collector
+		if !contextScoreFusionKeyExists {
+			setKnnHitsInCollector(knnHits, coll)
+		}
+		resultColl = coll
+	}
 
 	if req.Facets != nil {
 		facetsBuilder := search.NewFacetsBuilder(indexReader)
@@ -962,10 +979,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				facetsBuilder.Add(facetName, facetBuilder)
 			}
 		}
-		coll.SetFacetsBuilder(facetsBuilder)
+		resultColl.SetFacetsBuilder(facetsBuilder)
 	}
 
-	memNeeded := memNeededForSearch(req, searcher, coll)
+	memNeeded := memNeededForSearch(req, searcher, resultColl)
 	if cb := ctx.Value(SearchQueryStartCallbackKey); cb != nil {
 		if cbF, ok := cb.(SearchQueryStartCallbackFn); ok {
 			err = cbF(memNeeded)
@@ -983,12 +1000,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}
 
-	err = coll.Collect(ctx, searcher, indexReader)
+	err = resultColl.Collect(ctx, searcher, indexReader)
 	if err != nil {
 		return nil, err
 	}
 
-	hits := coll.Results()
+	hits := resultColl.Results()
 
 	var highlighter highlight.Highlighter
 
@@ -1053,7 +1070,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	totalRelation := TotalRelationEq
-	if coll.EarlyStopped() {
+	if resultColl.EarlyStopped() {
 		totalRelation = TotalRelationGte
 	}
 	rv := &SearchResult{
@@ -1062,11 +1079,11 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			Successful: 1,
 		},
 		Hits:          hits,
-		Total:         coll.Total(),
+		Total:         resultColl.Total(),
 		TotalRelation: totalRelation,
-		MaxScore:      coll.MaxScore(),
+		MaxScore:      resultColl.MaxScore(),
 		Took:          searchDuration,
-		Facets:        coll.FacetResults(),
+		Facets:        resultColl.FacetResults(),
 	}
 
 	// rescore if fusion flag is set

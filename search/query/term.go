@@ -59,5 +59,18 @@ func (q *TermQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
+	// the per segment path, if the index reader is able to provide per segment
+	// postings (and the caller has opted in, which NewPerSegmentTermSearcher
+	// checks); otherwise it's the regular searcher
+	if psReader, ok := i.(searcher.PerSegmentIndexReader); ok {
+		psSearcher, err := searcher.NewPerSegmentTermSearcher(ctx, psReader, q.Term, field,
+			q.BoostVal.Value(), options)
+		if err != nil {
+			return nil, err
+		}
+		if psSearcher != nil {
+			return psSearcher, nil
+		}
+	}
 	return searcher.NewTermSearcher(ctx, i, q.Term, field, q.BoostVal.Value(), options)
 }
