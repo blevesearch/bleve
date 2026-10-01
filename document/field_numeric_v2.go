@@ -87,6 +87,12 @@ func (n *NumericV2Field) Value() []byte {
 	return n.value
 }
 
+// DocValue returns the term written to this field's doc values.
+// Duplicate needed to serve readers at the segment level
+func (n *NumericV2Field) DocValue() []byte {
+	return n.value
+}
+
 // SortableValue returns the value encoded as a uint64 whose unsigned ordering
 // matches the float64 ordering of the original number.
 func (n *NumericV2Field) SortableValue() uint64 {
