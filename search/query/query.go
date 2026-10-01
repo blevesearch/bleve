@@ -233,6 +233,16 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
+
+	_, hasRangeV2 := tmp["range_v2"]
+	if hasRangeV2 {
+		var rv NumericRangeV2Query
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
 	_, hasMin := tmp["min"].(float64)
 	_, hasMax := tmp["max"].(float64)
 	if hasMin || hasMax {
