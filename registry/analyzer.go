@@ -45,11 +45,14 @@ func NewAnalyzerCache() *AnalyzerCache {
 func AnalyzerBuild(name string, config map[string]interface{}, cache *Cache) (interface{}, error) {
 	cons, registered := analyzers[name]
 	if !registered {
+		if _, deprecated := deprecatedAnalyzers[name]; deprecated {
+			return nil, deprecatedError("analyzer", name)
+		}
 		return nil, fmt.Errorf("no analyzer with name or type '%s' registered", name)
 	}
 	analyzer, err := cons(config, cache)
 	if err != nil {
-		return nil, fmt.Errorf("error building analyzer: %v", err)
+		return nil, fmt.Errorf("error building analyzer: %w", err)
 	}
 	return analyzer, nil
 }

@@ -64,7 +64,7 @@ func ElisionFilterConstructor(config map[string]interface{}, cache *registry.Cac
 	}
 	articlesTokenMap, err := cache.TokenMapNamed(articlesTokenMapName)
 	if err != nil {
-		return nil, fmt.Errorf("error building elision filter: %v", err)
+		return nil, fmt.Errorf("error building elision filter: %w", err)
 	}
 	return NewElisionFilter(articlesTokenMap), nil
 }

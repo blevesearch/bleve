@@ -131,7 +131,7 @@ func DictionaryCompoundFilterConstructor(config map[string]interface{}, cache *r
 	}
 	dictTokenMap, err := cache.TokenMapNamed(dictTokenMapName)
 	if err != nil {
-		return nil, fmt.Errorf("error building dict compound words filter: %v", err)
+		return nil, fmt.Errorf("error building dict compound words filter: %w", err)
 	}
 	return NewDictionaryCompoundFilter(dictTokenMap, minWordSize, minSubWordSize, maxSubWordSize, onlyLongestMatch), nil
 }

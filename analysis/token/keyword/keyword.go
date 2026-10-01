@@ -50,7 +50,7 @@ func KeyWordMarkerFilterConstructor(config map[string]interface{}, cache *regist
 	}
 	keywordsTokenMap, err := cache.TokenMapNamed(keywordsTokenMapName)
 	if err != nil {
-		return nil, fmt.Errorf("error building keyword marker filter: %v", err)
+		return nil, fmt.Errorf("error building keyword marker filter: %w", err)
 	}
 	return NewKeyWordMarkerFilter(keywordsTokenMap), nil
 }
