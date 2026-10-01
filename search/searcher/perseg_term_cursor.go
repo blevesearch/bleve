@@ -54,9 +54,13 @@ type termCursor struct {
 	// cur are the bounds of the decoded block, if the reader can tell
 	cur segment.BlockBounds
 
-	// the block ShallowSeek last looked at, and the most it can score
-	shallow    segment.BlockBounds
-	shallowMax float32
+	// The block ShallowSeek last looked at, and the most it can score. It is the
+	// block of every doc from shallowTarget to its last doc, so as long as
+	// the targets keep going up and stay in it, there's nothing to look up.
+	shallow       segment.BlockBounds
+	shallowMax    float32
+	shallowTarget uint32
+	shallowValid  bool
 
 	maxScore float32
 	cost     uint64
@@ -146,22 +150,38 @@ func (t *termCursor) Seek(target uint32) uint32 {
 	if t.doc == noMoreDocs || target <= t.doc {
 		return t.doc
 	}
+	docs := t.blk.Docs[:t.n]
 	// in the decoded block?
-	if last := t.blk.Docs[t.n-1]; target <= last {
-		lo, hi := t.pos+1, t.n-1 // Docs[hi] >= target
-		for lo < hi {
-			mid := int(uint(lo+hi) >> 1)
-			if t.blk.Docs[mid] < target {
-				lo = mid + 1
-			} else {
-				hi = mid
-			}
-		}
-		t.pos = lo
-		t.doc = t.blk.Docs[lo]
+	if target > docs[len(docs)-1] {
+		t.seekBlock(target)
 		return t.doc
 	}
-	t.seekBlock(target)
+
+	// Seeks come in ascending order and usually a short way apart: the very
+	// next posting is the answer more often than not, and is worth a look
+	// before a search.
+	pos := t.pos + 1 // in range: target is above the current doc and not above the last
+	if docs[pos] >= target {
+		t.pos = pos
+		t.doc = docs[pos]
+		return t.doc
+	}
+
+	// The first posting >= target is in (pos, len(docs)), and the last one is
+	// one. The search has no branch on the comparison -- the compiler turns the
+	// conditional step into a select -- as a branch here is a coin toss for the
+	// predictor, and costs more than the whole search.
+	base := pos + 1
+	n := len(docs) - base
+	for n > 1 {
+		half := n >> 1
+		if docs[base+half-1] < target {
+			base += half
+		}
+		n -= half
+	}
+	t.pos = base
+	t.doc = docs[base]
 	return t.doc
 }
 
@@ -197,6 +217,9 @@ func (t *termCursor) seekBlock(target uint32) {
 // doesn't move and nothing is decoded. Needs the reader to have block-max
 // data.
 func (t *termCursor) ShallowSeek(target uint32) {
+	if t.shallowValid && target >= t.shallowTarget && target <= t.shallow.LastDoc {
+		return // the same block
+	}
 	if t.doc != noMoreDocs && target <= t.cur.LastDoc {
 		// the block the cursor is in already
 		t.shallow = t.cur
@@ -205,6 +228,7 @@ func (t *termCursor) ShallowSeek(target uint32) {
 	} else {
 		t.shallow = segment.BlockBounds{LastDoc: noMoreDocs, FreqBounded: true}
 	}
+	t.shallowTarget, t.shallowValid = target, true
 	t.shallowMax = t.scorer.UpperBound(t.shallow.MaxFreq, t.shallow.MaxNorm, t.shallow.FreqBounded)
 }
 

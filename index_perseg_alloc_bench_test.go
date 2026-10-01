@@ -16,20 +16,32 @@ package bleve
 
 import (
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/search/query"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 // buildAllocBenchIndex builds the corpus of the allocation benchmarks: many
 // documents spread over several segments, as the latency benchmark's.
 func buildAllocBenchIndex(b *testing.B, numDocs, numSegments int) (Index, func()) {
+	return buildAllocBenchIndexModel(b, numDocs, numSegments, "")
+}
+
+// buildAllocBenchIndexModel is buildAllocBenchIndex with a scoring model: "bm25"
+// or, by default, tf-idf.
+func buildAllocBenchIndexModel(b *testing.B, numDocs, numSegments int, model string) (Index, func()) {
 	b.Helper()
 	dir := createTmpIndexPath(b)
-	idx, err := NewUsing(dir, NewIndexMapping(), scorch.Name, scorch.Name, map[string]interface{}{
+	im := NewIndexMapping()
+	if model == "bm25" {
+		im.ScoringModel = index.BM25Scoring
+	}
+	idx, err := NewUsing(dir, im, scorch.Name, scorch.Name, map[string]interface{}{
 		"scorchMergePlanOptions": map[string]interface{}{"MaxSegmentSize": 2},
 	})
 	if err != nil {
@@ -128,6 +140,49 @@ func BenchmarkSearchAllocs(b *testing.B) {
 					}
 				}
 			})
+		}
+	}
+}
+
+// BenchmarkSearchCPU is for CPU profiles of the per segment path: one shape at
+// a time, BM25 or tf-idf, the way a profile of a running service would see it.
+//
+//	PERSEG_SHAPE=term|and|or PERSEG_MODEL=bm25 go test -run xxx -bench SearchCPU \
+//	    -benchtime 20s -cpuprofile cpu.out
+func BenchmarkSearchCPU(b *testing.B) {
+	shape := os.Getenv("PERSEG_SHAPE")
+	if shape == "" {
+		b.Skip("set PERSEG_SHAPE")
+	}
+	idx, cleanup := buildAllocBenchIndexModel(b, 200000, 8, os.Getenv("PERSEG_MODEL"))
+	defer cleanup()
+
+	term := func(t string) query.Query {
+		q := query.NewTermQuery(t)
+		q.SetField("body")
+		return q
+	}
+	var q query.Query
+	switch shape {
+	case "term":
+		q = term("mk10")
+	case "and":
+		q = query.NewConjunctionQuery([]query.Query{term("w0"), term("w1"), term("w2")})
+	case "or":
+		q = query.NewDisjunctionQuery([]query.Query{term("w0"), term("w1"), term("w10"), term("w100"), term("mk1")})
+	default:
+		b.Fatalf("unknown shape %q", shape)
+	}
+	for i := 0; i < 50; i++ {
+		if _, err := idx.Search(NewSearchRequestOptions(q, 10, 0, false)); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := idx.Search(NewSearchRequestOptions(q, 10, 0, false)); err != nil {
+			b.Fatal(err)
 		}
 	}
 }
