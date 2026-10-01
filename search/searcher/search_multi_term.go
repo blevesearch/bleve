@@ -16,7 +16,6 @@ package searcher
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
@@ -112,6 +111,42 @@ func newMultiTermSearcherInternal(ctx context.Context, indexReader index.IndexRe
 	return searcher, nil
 }
 
+// optimizeOrDisjunct merges the batch of searchers into a single searcher. It
+// first tries the index's "disjunction:unadorned" optimization. If the index
+// does not implement it for these searchers (for example, a segment format
+// without optimizable postings), it falls back to a plain disjunction over the
+// batch, which is not bound by DisjunctionMaxClauseCount.
+// On return, every searcher in batch is either closed or owned by the result.
+func optimizeOrDisjunct(ctx context.Context, indexReader index.IndexReader,
+	batch []search.Searcher, options search.SearcherOptions) (search.Searcher, error) {
+	closeBatch := func() {
+		for _, searcher := range batch {
+			if searcher != nil {
+				_ = searcher.Close()
+			}
+		}
+	}
+
+	optimized, err := optimizeCompositeSearcher(ctx, "disjunction:unadorned",
+		indexReader, batch, options)
+	if err != nil {
+		closeBatch()
+		return nil, err
+	}
+	if optimized != nil {
+		// the optimized searcher does not reference the batch searchers
+		closeBatch()
+		return optimized, nil
+	}
+
+	rv, err := newDisjunctionSearcher(ctx, indexReader, batch, 0, options, false)
+	if err != nil {
+		closeBatch()
+		return nil, err
+	}
+	return rv, nil
+}
+
 func optimizeMultiTermSearcher(ctx context.Context, indexReader index.IndexReader, terms []string,
 	field string, boost float64, options search.SearcherOptions) (
 	search.Searcher, error) {
@@ -132,23 +167,9 @@ func optimizeMultiTermSearcher(ctx context.Context, indexReader index.IndexReade
 		if finalSearcher != nil {
 			batch = append(batch, finalSearcher)
 		}
-		cleanup := func() {
-			for _, searcher := range batch {
-				if searcher != nil {
-					_ = searcher.Close()
-				}
-			}
-		}
-		finalSearcher, err = optimizeCompositeSearcher(ctx, "disjunction:unadorned",
-			indexReader, batch, options)
-		// all searchers in batch should be closed, regardless of error or optimization failure
-		// either we're returning, or continuing and only finalSearcher is needed for next loop
-		cleanup()
+		finalSearcher, err = optimizeOrDisjunct(ctx, indexReader, batch, options)
 		if err != nil {
 			return nil, err
-		}
-		if finalSearcher == nil {
-			return nil, fmt.Errorf("unable to optimize")
 		}
 	}
 	return finalSearcher, nil
@@ -223,23 +244,9 @@ func optimizeMultiTermSearcherBytes(ctx context.Context, indexReader index.Index
 		if finalSearcher != nil {
 			batch = append(batch, finalSearcher)
 		}
-		cleanup := func() {
-			for _, searcher := range batch {
-				if searcher != nil {
-					_ = searcher.Close()
-				}
-			}
-		}
-		finalSearcher, err = optimizeCompositeSearcher(ctx, "disjunction:unadorned",
-			indexReader, batch, options)
-		// all searchers in batch should be closed, regardless of error or optimization failure
-		// either we're returning, or continuing and only finalSearcher is needed for next loop
-		cleanup()
+		finalSearcher, err = optimizeOrDisjunct(ctx, indexReader, batch, options)
 		if err != nil {
 			return nil, err
-		}
-		if finalSearcher == nil {
-			return nil, fmt.Errorf("unable to optimize")
 		}
 	}
 	return finalSearcher, nil
