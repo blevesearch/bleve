@@ -90,26 +90,6 @@ func (q *DisjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		return searcher.NewMatchNoneSearcher(i)
 	}
 
-	// the per segment path, if the caller has opted in
-	if perSegment, _ := ctx.Value(search.PerSegmentSearchKey).(bool); perSegment {
-		numPerSegment := searcher.CountPerSegmentSearchers(ss)
-		switch {
-		case numPerSegment == 0:
-			// the index can't search per segment: the searchers are regular
-			// ones, and what comes next is as it always was
-		case numPerSegment == len(ss) && !q.retrieveScoreBreakdown &&
-			(searcher.DisjunctionMaxClauseCount == 0 || len(ss) <= searcher.DisjunctionMaxClauseCount):
-			return searcher.NewPerSegmentDisjunctionSearcher(ss, q.Min, options), nil
-		default:
-			// some clauses are per segment and some are not, or this
-			// disjunction can't be: do it the regular way throughout
-			for _, s := range ss {
-				_ = s.Close()
-			}
-			return q.Searcher(context.WithValue(ctx, search.PerSegmentSearchKey, false), i, m, options)
-		}
-	}
-
 	nctx := context.WithValue(ctx, search.IncludeScoreBreakdownKey, q.retrieveScoreBreakdown)
 
 	return searcher.NewDisjunctionSearcher(nctx, i, ss, q.Min, options)

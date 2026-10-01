@@ -36,7 +36,8 @@ import (
 //
 // PERSEG_BENCH_DOCS (default 200000) and PERSEG_BENCH_BATCHES (default 8,
 // which is the number of segments) size the index. PERSEG_BENCH_MODEL=bm25
-// scores with bm25. PERSEG_BENCH_SHAPES=composites leaves the single terms out.
+// scores with bm25. PERSEG_BENCH_SHAPES=composites leaves the single terms out, and =boolean has
+// only the boolean and query string queries.
 // PERSEG_BENCH_WARMUP, PERSEG_BENCH_ROUNDS and PERSEG_BENCH_QUERIES set the
 // rounds thrown away, the rounds measured, and the queries run for a shape in
 // each (defaults 3, 15 and 200).
@@ -152,7 +153,7 @@ func TestPerSegmentSearchBench(t *testing.T) {
 	}
 
 	var cells []cell
-	if os.Getenv("PERSEG_BENCH_SHAPES") != "composites" {
+	if os.Getenv("PERSEG_BENCH_SHAPES") == "" {
 		for _, m := range markers {
 			for _, size := range []int{10, 100} {
 				cells = append(cells, cell{m.term, termQ(m.term), size, false})
@@ -176,6 +177,28 @@ func TestPerSegmentSearchBench(t *testing.T) {
 		{"or-zipf-mix", orQ("w0", "w10", "w100", "w1000", "mk1")},
 		{"match-or-3", matchQ("w2 w30 w400", query.MatchQueryOperatorOr)},
 		{"match-and-2", matchQ("w2 w30", query.MatchQueryOperatorAnd)},
+	}
+	// the queries that are built of those
+	boolean := []struct {
+		name string
+		q    func() query.Query
+	}{
+		{"qs-or-4", func() query.Query { return query.NewQueryStringQuery("body:w0 body:w1 body:w10 body:w100") }},
+		{"qs-and-2", func() query.Query { return query.NewQueryStringQuery("+body:w0 +body:w1") }},
+		{"qs-and-not", func() query.Query { return query.NewQueryStringQuery("+body:w0 -body:w1") }},
+		{"qs-must-should", func() query.Query { return query.NewQueryStringQuery("+body:w0 body:w10 body:w100") }},
+		{"bool-should", func() query.Query { return query.NewBooleanQuery(nil, terms("w0", "w1", "w10"), nil) }},
+		{"bool-must-not", func() query.Query { return query.NewBooleanQuery(terms("w0", "w1"), nil, terms("w10")) }},
+		{"bool-must-should", func() query.Query { return query.NewBooleanQuery(terms("w0"), terms("w1", "w10"), nil) }},
+	}
+	if os.Getenv("PERSEG_BENCH_SHAPES") == "boolean" {
+		composites = nil
+	}
+	for _, c := range boolean {
+		composites = append(composites, struct {
+			name string
+			q    func() query.Query
+		}{c.name, c.q})
 	}
 	for _, c := range composites {
 		cells = append(cells, cell{c.name, c.q, 10, false})

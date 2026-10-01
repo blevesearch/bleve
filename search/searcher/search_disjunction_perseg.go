@@ -71,7 +71,7 @@ func NewPerSegmentDisjunctionSearcher(qsearchers []search.Searcher, min float64,
 		if !ok {
 			return nil
 		}
-		children[i] = c
+		children[i] = unwrapSingle(c)
 	}
 	rv := &PerSegmentDisjunctionSearcher{
 		perSegBase: perSegBase{children: children, scored: options.Score != "none"},
@@ -138,12 +138,29 @@ func (s *PerSegmentDisjunctionSearcher) NextBlock(blk *search.PerSegmentScoredBl
 
 // CanCollectOptimized implements search.OptimizedPerSegmentSearcher.
 func (s *PerSegmentDisjunctionSearcher) CanCollectOptimized() bool {
+	// what the algorithms work on, or a search that doesn't want scores, for
+	// which it's enough to stop at the first matches
+	return s.pruningApplies() || !s.scored
+}
+
+// pruningApplies reports whether the clauses are what the algorithms for
+// disjunctions work on: a plain OR of terms.
+func (s *PerSegmentDisjunctionSearcher) pruningApplies() bool {
 	return s.terms != nil && s.min <= 1
 }
 
 // CollectOptimized implements search.OptimizedPerSegmentSearcher.
 func (s *PerSegmentDisjunctionSearcher) CollectOptimized(ctx context.Context,
 	sink search.PerSegmentSink) error {
+	if !s.pruningApplies() {
+		// not a plain OR of terms, and so a search without scores
+		return s.collectUnscoredGeneric(ctx, sink, func(seg int) docCursor {
+			if c, ok := s.segCursor(seg, false); ok {
+				return c
+			}
+			return nil
+		})
+	}
 	for seg := 0; seg < s.segments(); seg++ {
 		select {
 		case <-ctx.Done():

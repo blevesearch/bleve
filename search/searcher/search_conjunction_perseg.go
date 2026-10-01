@@ -68,7 +68,7 @@ func NewPerSegmentConjunctionSearcher(qsearchers []search.Searcher,
 		if !ok {
 			return nil
 		}
-		children[i] = c
+		children[i] = unwrapSingle(c)
 	}
 	rv := &PerSegmentConjunctionSearcher{
 		perSegBase: perSegBase{children: children, scored: options.Score != "none"},
@@ -136,12 +136,29 @@ func (s *PerSegmentConjunctionSearcher) NextBlock(blk *search.PerSegmentScoredBl
 
 // CanCollectOptimized implements search.OptimizedPerSegmentSearcher.
 func (s *PerSegmentConjunctionSearcher) CanCollectOptimized() bool {
+	// what the algorithms work on, or a search that doesn't want scores, for
+	// which it's enough to stop at the first matches
+	return s.pruningApplies() || !s.scored
+}
+
+// pruningApplies reports whether the clauses are what the algorithms for
+// conjunctions work on: an AND of at least two terms.
+func (s *PerSegmentConjunctionSearcher) pruningApplies() bool {
 	return s.terms != nil && len(s.terms) >= 2
 }
 
 // CollectOptimized implements search.OptimizedPerSegmentSearcher.
 func (s *PerSegmentConjunctionSearcher) CollectOptimized(ctx context.Context,
 	sink search.PerSegmentSink) error {
+	if !s.pruningApplies() {
+		// not an AND of terms, and so a search without scores
+		return s.collectUnscoredGeneric(ctx, sink, func(seg int) docCursor {
+			if c, ok := s.segCursor(seg, false); ok {
+				return c
+			}
+			return nil
+		})
+	}
 	for seg := 0; seg < s.segments(); seg++ {
 		select {
 		case <-ctx.Done():

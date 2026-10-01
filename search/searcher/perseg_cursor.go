@@ -228,3 +228,102 @@ func (x *intersectionCursor) Err() error {
 	}
 	return nil
 }
+
+// booleanCursor is the matches of a boolean query: the docs that the required
+// clause is on (or, without one, the optional clause), that the excluding
+// clause isn't on; scored by the sum of the scores of the required clause and
+// the optional one, the latter where it matches too. It is BooleanSearcher's
+// semantics:
+//
+//   - a "should" whose own minimum is 0 only adds to the score of the docs of the
+//     must clause; one with a minimum above 0 is required as well;
+//   - with no must clause, the docs are those of the should clause.
+type booleanCursor struct {
+	must, should, mustNot docCursor // nil when there is none
+	shouldOptional        bool
+
+	// driver is the clause whose docs are candidates: must, else should
+	driver docCursor
+	doc    uint32
+}
+
+func newBooleanCursor(must, should, mustNot docCursor, shouldOptional bool) *booleanCursor {
+	b := &booleanCursor{must: must, should: should, mustNot: mustNot, shouldOptional: shouldOptional}
+	b.driver = must
+	if b.driver == nil {
+		b.driver = should
+	}
+	b.settle()
+	return b
+}
+
+// settle goes to the first doc, from where the driver is, that qualifies
+func (b *booleanCursor) settle() {
+	for {
+		d := b.driver.Doc()
+		if d == noMoreDocs {
+			b.doc = noMoreDocs
+			return
+		}
+		if b.mustNot != nil && b.mustNot.Seek(d) == d {
+			b.driver.Advance() // excluded
+			continue
+		}
+		if b.must != nil && b.should != nil && !b.shouldOptional && b.should.Seek(d) != d {
+			b.driver.Advance() // the should clause is required, and not here
+			continue
+		}
+		b.doc = d
+		return
+	}
+}
+
+func (b *booleanCursor) Doc() uint32 { return b.doc }
+
+func (b *booleanCursor) Advance() uint32 {
+	if b.doc == noMoreDocs {
+		return noMoreDocs
+	}
+	b.driver.Advance()
+	b.settle()
+	return b.doc
+}
+
+func (b *booleanCursor) Seek(target uint32) uint32 {
+	if b.doc == noMoreDocs || target <= b.doc {
+		return b.doc
+	}
+	b.driver.Seek(target)
+	b.settle()
+	return b.doc
+}
+
+func (b *booleanCursor) Score() float32 {
+	var sum float32
+	if b.must != nil {
+		sum += b.must.Score()
+	}
+	if b.should != nil {
+		// the optional clause is on the doc, or ahead of it, or behind
+		// it: Seek brings it up if it was behind
+		if b.must == nil || b.should.Seek(b.doc) == b.doc {
+			sum += b.should.Score()
+		}
+	}
+	return sum
+}
+
+func (b *booleanCursor) Cost() uint64 { return b.driver.Cost() }
+
+func (b *booleanCursor) Offset() uint64 { return b.driver.Offset() }
+
+func (b *booleanCursor) Err() error {
+	for _, c := range []docCursor{b.must, b.should, b.mustNot} {
+		if c != nil {
+			if err := c.Err(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}

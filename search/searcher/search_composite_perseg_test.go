@@ -755,3 +755,84 @@ func TestPerSegmentConjunctionCountStrategies(t *testing.T) {
 		}
 	}
 }
+
+// A clause that is a disjunction or conjunction of one is its clause: a match of
+// one token is one, and an OR of those should be an OR of terms, to the bit, and
+// get the algorithms that work on terms.
+func TestPerSegmentUnwrapsSingleClauses(t *testing.T) {
+	fx := newPerSegFixture(t, perSegFixtureOpts{segments: 3, docsPerSeg: 2000, deleteEvery: 7, seed: 51})
+	for _, model := range []string{index.DefaultScoringModel, index.BM25Scoring} {
+		for _, scored := range []bool{true, false} {
+			opts := search.SearcherOptions{}
+			if !scored {
+				opts.Score = "none"
+			}
+			mk := func(wrapped bool, conjunction bool, terms ...string) search.PerSegmentSearcher {
+				var qs []search.Searcher
+				for _, term := range terms {
+					var c search.Searcher = fx.termSearcher(term, scored, model)
+					if wrapped {
+						if (len(qs)+1)%2 == 0 {
+							c = NewPerSegmentConjunctionSearcher([]search.Searcher{c}, opts)
+						} else {
+							c = NewPerSegmentDisjunctionSearcher([]search.Searcher{c}, 1, opts)
+						}
+					}
+					qs = append(qs, c)
+				}
+				if conjunction {
+					return NewPerSegmentConjunctionSearcher(qs, opts)
+				}
+				return NewPerSegmentDisjunctionSearcher(qs, 1, opts)
+			}
+
+			for _, conjunction := range []bool{false, true} {
+				terms := []string{"alpha", "bravo", "charlie", "delta"}
+				wrapped := mk(true, conjunction, terms...)
+
+				// they are made of terms: the algorithms apply
+				switch w := wrapped.(type) {
+				case *PerSegmentDisjunctionSearcher:
+					if w.terms == nil || !w.pruningApplies() {
+						t.Fatal("an OR of one clause queries should be an OR of terms")
+					}
+				case *PerSegmentConjunctionSearcher:
+					if w.terms == nil || !w.pruningApplies() {
+						t.Fatal("an AND of one clause queries should be an AND of terms")
+					}
+				}
+
+				_ = wrapped.Close()
+
+				for _, sz := range []struct{ size, from int }{{5, 0}, {50, 3}, {0, 0}} {
+					what := fmt.Sprintf("%s scored=%v conj=%v %+v", model, scored, conjunction, sz)
+					a := collect(t, mk(true, conjunction, terms...), fx, sz.size, sz.from)
+					b := collect(t, mk(false, conjunction, terms...), fx, sz.size, sz.from)
+					ra, rb := a.Results(), b.Results()
+					if len(ra) != len(rb) || a.Total() != b.Total() || a.EarlyStopped() != b.EarlyStopped() {
+						t.Fatalf("%s: %d hits / total %d vs %d hits / total %d", what, len(ra), a.Total(), len(rb), b.Total())
+					}
+					for i := range ra {
+						if ra[i].IndexInternalID.Value() != rb[i].IndexInternalID.Value() || ra[i].Score != rb[i].Score {
+							t.Fatalf("%s: hit %d: %v/%v vs %v/%v", what, i, ra[i].IndexInternalID.Value(), ra[i].Score,
+								rb[i].IndexInternalID.Value(), rb[i].Score)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// a disjunction that wants two of its one clause matches nothing, whatever it
+	// is wrapped in: it is not its clause
+	s := fx.termSearcher("alpha", true, index.DefaultScoringModel)
+	never := NewPerSegmentDisjunctionSearcher([]search.Searcher{s}, 2, search.SearcherOptions{})
+	outer := NewPerSegmentDisjunctionSearcher([]search.Searcher{never, fx.termSearcher("bravo", true, index.DefaultScoringModel)}, 1, search.SearcherOptions{})
+	if outer.terms != nil {
+		t.Fatal("a disjunction with a minimum above its one clause must not be unwrapped")
+	}
+	c := collect(t, outer, fx, 5, 0)
+	if c.Total() == 0 {
+		t.Fatal("the bravo clause still matches")
+	}
+}

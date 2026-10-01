@@ -47,18 +47,6 @@ func (s *PerSegmentTermSearcher) segCursor(seg int, scored bool) (docCursor, boo
 	return newTermCursor(0, s.readers[seg], s.scorer, scored), true
 }
 
-// CountPerSegmentSearchers says how many of the searchers are per segment
-// searchers that a composite can be made of.
-func CountPerSegmentSearchers(qsearchers []search.Searcher) int {
-	n := 0
-	for _, q := range qsearchers {
-		if _, ok := q.(perSegChild); ok {
-			n++
-		}
-	}
-	return n
-}
-
 // perSegBase is what the composite per segment searchers (conjunction and
 // disjunction) have in common.
 type perSegBase struct {
@@ -215,4 +203,91 @@ func thresholdOf(sink search.PerSegmentSink) float32 {
 		return thr
 	}
 	return float32(math.Inf(-1))
+}
+
+// unwrapSingle returns what a one clause disjunction or conjunction is: its
+// clause. A one clause conjunction sums the one score, a one clause disjunction
+// adds the one score and multiplies by a coord of 1 of 1, and both weigh what the
+// clause weighs, so a query that is one of them is the clause, to the bit. The
+// clause being a term matters: the algorithms that prune only work on terms, and a
+// match of a single token, which is a query of one clause, is a term.
+//
+// A disjunction that wants more than one of its one clause matches nothing, so
+// that is not unwrapped.
+func unwrapSingle(c perSegChild) perSegChild {
+	for {
+		switch w := c.(type) {
+		case *PerSegmentDisjunctionSearcher:
+			if len(w.children) == 1 && w.min <= 1 {
+				c = w.children[0]
+				continue
+			}
+		case *PerSegmentConjunctionSearcher:
+			if len(w.children) == 1 {
+				c = w.children[0]
+				continue
+			}
+		}
+		return c
+	}
+}
+
+// collectUnscoredGeneric collects a search without scores from cursors, one
+// segment after the other. What is wanted is the first matches in doc order and,
+// like the regular path does with them, it stops once it has them: the total is
+// then a lower bound, as counting the rest takes walking all of it. A search for
+// no hits at all is a count, and counts. makeCursor builds the cursor over the
+// matches of a segment, nil if there are none.
+func (b *perSegBase) collectUnscoredGeneric(ctx context.Context, sink search.PerSegmentSink,
+	makeCursor func(seg int) docCursor) error {
+	k := sink.Limit()
+	for seg := 0; seg < b.segments(); seg++ {
+		select {
+		case <-ctx.Done():
+			search.RecordSearchCost(ctx, search.AbortM, 0)
+			return ctx.Err()
+		default:
+		}
+
+		if k > 0 && heapIsFull(sink) {
+			// the segments that follow have matches, or may have, that aren't counted
+			sink.MarkPruned()
+			return nil
+		}
+		c := makeCursor(seg)
+		if c == nil {
+			continue
+		}
+		if k == 0 {
+			if err := drainCursor(ctx, sink, seg, c, false); err != nil {
+				return err
+			}
+			continue
+		}
+
+		h := sink.Heap(seg)
+		offset := c.Offset()
+		var total uint64
+		for c.Doc() != noMoreDocs && h.Len() < k {
+			if total%checkDoneEvery == 0 {
+				select {
+				case <-ctx.Done():
+					search.RecordSearchCost(ctx, search.AbortM, 0)
+					return ctx.Err()
+				default:
+				}
+			}
+			h.Offer(search.PerSegmentHit{Doc: offset + uint64(c.Doc()), Ord: uint32(total), Seg: uint32(seg)})
+			total++
+			c.Advance()
+		}
+		if c.Doc() != noMoreDocs {
+			sink.MarkPruned() // there is more, uncounted
+		}
+		sink.AddTotal(seg, total)
+		if err := c.Err(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

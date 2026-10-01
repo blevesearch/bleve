@@ -16,12 +16,33 @@ package query
 
 // SupportsPerSegment reports whether the query is of a shape whose searchers
 // can be per segment searchers (see search.PerSegmentSearchKey): a term, a
-// match of terms, and conjunctions and disjunctions of these.
+// boolean field, a match of terms, a query string that is made of these, and
+// conjunctions, disjunctions and boolean queries of these.
 //
 // It says nothing of the rest of the request, nor of the index.
 func SupportsPerSegment(q Query) bool {
 	switch q := q.(type) {
-	case *TermQuery:
+	case *TermQuery, *BoolFieldQuery:
+		return true
+	case *QueryStringQuery:
+		// the string is parsed into a query, which is what is searched
+		parsed, err := parseQuerySyntax(q.Query)
+		return err == nil && SupportsPerSegment(parsed)
+	case *BooleanQuery:
+		// a filter is a searcher that is walked a doc at a time alongside
+		if q.Filter != nil {
+			return false
+		}
+		// the docs are those of the must clause or, without one, of the should
+		// clause; what only excludes has nothing to start from
+		if q.Must == nil && q.Should == nil {
+			return false
+		}
+		for _, c := range []Query{q.Must, q.Should, q.MustNot} {
+			if c != nil && !SupportsPerSegment(c) {
+				return false
+			}
+		}
 		return true
 	case *MatchQuery:
 		// a fuzzy match is made of fuzzy queries, not terms

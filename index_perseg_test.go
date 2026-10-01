@@ -89,7 +89,7 @@ func perSegmentTestIndex(t *testing.T, scoringModel string, extraConfig map[stri
 			toks = append(toks, words[rnd.Intn(len(words))])
 		}
 		rnd.Shuffle(len(toks), func(a, b int) { toks[a], toks[b] = toks[b], toks[a] })
-		return map[string]interface{}{"body": strings.Join(toks, " ")}
+		return map[string]interface{}{"body": strings.Join(toks, " "), "flag": i%3 == 0}
 	}
 
 	const numDocs = 1600
@@ -369,8 +369,9 @@ func TestPerSegmentSearchIneligibleRequests(t *testing.T) {
 		"a phrase": func() *SearchRequest {
 			return NewSearchRequest(query.NewMatchPhraseQuery("common even"))
 		},
-		"boolean over terms": func() *SearchRequest {
+		"boolean with a filter": func() *SearchRequest {
 			b := query.NewBooleanQuery([]query.Query{tq()}, nil, nil)
+			b.Filter = termQueryOn("body", "even")
 			return NewSearchRequest(b)
 		},
 	}

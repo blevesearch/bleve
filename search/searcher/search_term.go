@@ -59,6 +59,10 @@ func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader,
 			}
 		}
 	}
+	// the per segment kind, if the caller has opted in and the index can do it
+	if rv, err := perSegmentTermSearcherFor(ctx, indexReader, term, field, boost, options); err != nil || rv != nil {
+		return rv, err
+	}
 	needFreqNorm := options.Score != "none"
 	reader, err := indexReader.TermFieldReader(ctx, term, field, needFreqNorm, needFreqNorm, options.IncludeTermVectors)
 	if err != nil {

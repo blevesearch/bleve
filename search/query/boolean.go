@@ -134,9 +134,17 @@ func (q *BooleanQuery) Boost() float64 {
 
 func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	var err error
+	perSegment, _ := ctx.Value(search.PerSegmentSearchKey).(bool)
+
 	var mustNotSearcher search.Searcher
 	if q.MustNot != nil {
-		mustNotSearcher, err = q.MustNot.Searcher(ctx, i, m, options)
+		// What is excluded is not scored. On the per segment path that spares
+		// decoding the frequencies and norms of its postings.
+		mustNotOptions := options
+		if perSegment {
+			mustNotOptions.Score = "none"
+		}
+		mustNotSearcher, err = q.MustNot.Searcher(ctx, i, m, mustNotOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -254,7 +262,7 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 		}
 	}
 
-	bs, err := searcher.NewBooleanSearcher(ctx, i, mustSearcher, shouldSearcher, mustNotSearcher, options)
+	bs, err := searcher.NewBooleanSearcherOrPerSegment(ctx, i, mustSearcher, shouldSearcher, mustNotSearcher, options)
 	if err != nil {
 		return nil, err
 	}
