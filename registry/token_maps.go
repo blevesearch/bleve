@@ -45,11 +45,14 @@ func NewTokenMapCache() *TokenMapCache {
 func TokenMapBuild(name string, config map[string]interface{}, cache *Cache) (interface{}, error) {
 	cons, registered := tokenMaps[name]
 	if !registered {
+		if _, deprecated := deprecatedTokenMaps[name]; deprecated {
+			return nil, deprecatedError("token map", name)
+		}
 		return nil, fmt.Errorf("no token map with name or type '%s' registered", name)
 	}
 	tokenMap, err := cons(config, cache)
 	if err != nil {
-		return nil, fmt.Errorf("error building token map: %v", err)
+		return nil, fmt.Errorf("error building token map: %w", err)
 	}
 	return tokenMap, nil
 }

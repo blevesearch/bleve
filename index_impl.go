@@ -16,6 +16,7 @@ package bleve
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -72,9 +73,22 @@ func indexStorePath(path string) string {
 	return path + string(os.PathSeparator) + storePath
 }
 
+// validateExistingMapping validates the mapping of an index that is being
+// opened (pre-existing), as opposed to newly defined. Unlike IndexMappingImpl.Validate,
+// it allows a reference to a deprecated analysis component to pass, since the
+// mapping is otherwise valid: rejecting it here would make an index that was
+// created while the component was still available impossible to open or rebuild.
+func validateExistingMapping(m mapping.IndexMapping) error {
+	err := m.Validate()
+	if errors.Is(err, registry.ErrDeprecatedComponent) {
+		return nil
+	}
+	return err
+}
+
 func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (*indexImpl, error) {
 	// first validate the mapping
-	err := mapping.Validate()
+	err := validateExistingMapping(mapping)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +266,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	}
 
 	// validate the mapping
-	err = im.Validate()
+	err = validateExistingMapping(im)
 	if err != nil {
 		// no longer return usable index on error because there
 		// is a chance the index is not open at this stage
@@ -261,7 +275,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 
 	// Validate and update the index with the new mapping
 	if um != nil && ui != nil {
-		err = um.Validate()
+		err = validateExistingMapping(um)
 		if err != nil {
 			return nil, err
 		}
