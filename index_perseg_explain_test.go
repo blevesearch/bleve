@@ -112,8 +112,23 @@ func TestPerSegmentExplain(t *testing.T) {
 		return m
 	}
 	boolQ := query.NewBooleanQuery(terms("w0"), terms("hot"), terms("w2"))
+	minShould := query.NewBooleanQuery(terms("w2"), terms("w0", "w1", "hot"), nil)
+	minShould.SetMinShould(2)
+	minTwo := query.NewDisjunctionQuery(terms("w0", "w1", "w2", "hot"))
+	minTwo.SetMin(2)
+	boostedOr := query.NewDisjunctionQuery(terms("w0", "w1", "w2"))
+	boostedOr.SetBoost(2.5)
+	boostedAnd := query.NewConjunctionQuery(terms("w0", "w1"))
+	boostedAnd.SetBoost(3)
+	matchNothing := func() query.Query {
+		m := query.NewMatchQuery("")
+		m.SetField("body")
+		return m
+	}
 	// the queries for which the regular path lists the clauses in an order of its own
 	unordered := map[string]bool{"or of 12": true}
+	// the queries that match nothing, on both paths
+	matchesNothing := map[string]bool{"and with a match of nothing": true}
 	queries := []struct {
 		name string
 		q    func() query.Query
@@ -125,6 +140,27 @@ func TestPerSegmentExplain(t *testing.T) {
 		{"or", func() query.Query { return query.NewDisjunctionQuery(terms("w0", "w1", "w2", "hot")) }},
 		{"or of 7", func() query.Query {
 			return query.NewDisjunctionQuery(terms("w0", "w1", "w2", "w3", "w4", "w5", "hot"))
+		}},
+		{"boolean: musts only", func() query.Query { return query.NewBooleanQuery(terms("w0", "w1"), nil, nil) }},
+		{"boolean: shoulds only", func() query.Query { return query.NewBooleanQuery(nil, terms("w0", "w1", "hot"), nil) }},
+		{"boolean: shoulds, must not", func() query.Query { return query.NewBooleanQuery(nil, terms("w0", "w1"), terms("w2")) }},
+		{"boolean: required shoulds", func() query.Query { return minShould }},
+		{"boolean: composite clauses", func() query.Query {
+			return query.NewBooleanQuery([]query.Query{query.NewDisjunctionQuery(terms("w0", "w1"))},
+				[]query.Query{query.NewConjunctionQuery(terms("w2", "w3"))},
+				[]query.Query{query.NewDisjunctionQuery(terms("w4", "w5"))})
+		}},
+		{"boolean in and", func() query.Query {
+			return query.NewConjunctionQuery([]query.Query{query.NewBooleanQuery(terms("w0"), terms("w1"), nil), termQueryOn("body", "w2")})
+		}},
+		{"or with a minimum of two", func() query.Query { return minTwo }},
+		{"boosted or", func() query.Query { return boostedOr }},
+		{"boosted and", func() query.Query { return boostedAnd }},
+		{"or with a match of nothing", func() query.Query {
+			return query.NewDisjunctionQuery([]query.Query{matchNothing(), termQueryOn("body", "w0"), termQueryOn("body", "w1")})
+		}},
+		{"and with a match of nothing", func() query.Query {
+			return query.NewConjunctionQuery([]query.Query{matchNothing(), termQueryOn("body", "w0")})
 		}},
 		{"or of 12", func() query.Query {
 			return query.NewDisjunctionQuery(terms("w0", "w1", "w2", "w3", "w4", "w5", "w6", "w8", "w13", "w21", "w34", "hot"))
@@ -183,6 +219,12 @@ func TestPerSegmentExplain(t *testing.T) {
 							}
 							if perSegmentSearches.Load() != before+1 {
 								t.Fatalf("%s: not served by the per segment path", what)
+							}
+							if matchesNothing[qc.name] {
+								if len(res.Hits) != 0 || len(refExpl) != 0 {
+									t.Fatalf("%s: %d hits (the regular path: %d), want none", what, len(res.Hits), len(refExpl))
+								}
+								continue
 							}
 							if len(res.Hits) == 0 {
 								t.Fatalf("%s: no hits", what)

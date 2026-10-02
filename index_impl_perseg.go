@@ -49,8 +49,9 @@ func init() {
 // descending score, that needs nothing more than the score of each hit (or
 // that there be none, with Score: "none"):
 // no locations or highlights, facets, KNN, search after / before, pre search data,
-// synonyms, nested documents or score fusion. (Explanations are fine: the
-// collector asks for those of the hits it returns once it has them.)
+// synonyms, nested documents or score fusion. (Explanations are fine, but for
+// ones of a search that has no scores: the collector asks for those of the hits it
+// returns once it has them.)
 //
 // Whether the index reader is able to provide per segment postings isn't
 // decided here: if it can't, the query hands out a regular searcher, and the
@@ -64,6 +65,12 @@ func perSegmentSearchEligible(ctx context.Context, req *SearchRequest,
 		return false
 	}
 	if req.IncludeLocations || req.Highlight != nil {
+		return false
+	}
+	// An explanation of scores that were asked not to be computed is a tree of
+	// zeros in the regular path, and the per segment path would show the scores the
+	// hits don't have.
+	if req.Explain && req.Score == ScoreNone {
 		return false
 	}
 	if len(req.Facets) > 0 || requestHasKNN(req) {
