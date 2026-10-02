@@ -122,7 +122,7 @@ func TestPerSegmentCountQuery(t *testing.T) {
 }
 
 // genericOnly hides the optimized path of the searcher it wraps, so that the
-// collector has to drain it block by block
+// collector has to drain it match by match
 type genericOnly struct {
 	search.PerSegmentSearcher
 }

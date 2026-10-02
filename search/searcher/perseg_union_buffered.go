@@ -16,8 +16,6 @@ package searcher
 
 import (
 	"math/bits"
-
-	"github.com/blevesearch/bleve/v2/search"
 )
 
 // bufferedUnionCursor is the matches of a plain OR of terms, found a window of
@@ -301,30 +299,6 @@ func (u *bufferedUnionCursor) Err() error {
 		}
 	}
 	return nil
-}
-
-// fillBlock puts the next matches, up to a block of them, in blk, and returns how
-// many there are (0 when the cursor is done). It is Advance and Score, without
-// the call for each match.
-func (u *bufferedUnionCursor) fillBlock(blk *search.PerSegmentScoredBlock) int {
-	n := 0
-	var max float32
-	for n < search.PerSegmentBlockLen && u.doc != noMoreDocs {
-		var score float32
-		if u.scored {
-			score = u.Score()
-			if score > max {
-				max = score
-			}
-		}
-		blk.Docs[n] = u.doc
-		blk.Scores[n] = score
-		n++
-		u.Advance()
-	}
-	blk.Offset = u.offset
-	blk.MaxScore = max
-	return n
 }
 
 var (

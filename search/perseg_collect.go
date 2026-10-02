@@ -18,14 +18,14 @@ import (
 	"context"
 )
 
-// The per segment search path: a Searcher that produces its matches a block at
-// a time, tagged with the segment they belong to, and a collector that
-// consumes them. Nothing here knows about DocumentMatches, locations or any
-// index types, only doc numbers and scores.
+// The per segment search path: a Searcher that produces its matches one at a
+// time, tagged with the segment they belong to, and a collector that consumes
+// them. Nothing here knows about DocumentMatches, locations or any index types,
+// only doc numbers and scores.
 //
-// The collector is generic. All it does is call NextBlock until the searcher
-// is exhausted, put what it gets in the heap of the segment the block came
-// from, and, at the end, merge those heaps into the top hits.
+// The collector is generic. All it does is call NextMatch until the searcher is
+// exhausted, put what it gets in the heap of the segment the match came from,
+// and, at the end, merge those heaps into the top hits.
 //
 // A searcher that knows how to do better than that for the kind of search it
 // is (a lone term, say) can offer an optimized path: OptimizedPerSegmentSearcher.
@@ -33,46 +33,40 @@ import (
 // to it, so that query specific tricks live with the searcher and don't bloat
 // the collector.
 
-// PerSegmentBlockLen is the most matches that a PerSegmentScoredBlock holds.
+// PerSegmentBlockLen is the number of postings in a block of the postings that
+// the per segment path reads and scores together.
 const PerSegmentBlockLen = 128
 
-// PerSegmentScoredBlock is a batch of the matches of one segment.
-type PerSegmentScoredBlock struct {
-	// Seg is the index of the segment the matches are from, and Offset is what
-	// has to be added to one of its local doc numbers to make it unique across
-	// the index.
-	Seg    int
-	Offset uint64
-
-	// Docs are segment local doc numbers, strictly ascending.
-	Docs   [PerSegmentBlockLen]uint32
-	Scores [PerSegmentBlockLen]float32
-
-	// MaxScore is the highest of the first n Scores.
-	MaxScore float32
+// PerSegmentMatch is a match of a search, found by a PerSegmentSearcher.
+type PerSegmentMatch struct {
+	// Seg is the index of the segment the match is from.
+	Seg int
+	// Doc is the number of the doc across the index (its number in the segment
+	// plus the offset of the segment).
+	Doc uint64
+	// Score is the match's score, 0 for a search that has no scores.
+	Score float32
 }
 
-// PerSegmentSearcher is a Searcher that is consumed a block of matches at a
-// time. This is the generic contract; it is all that a per segment collector
-// needs. Next and Advance of such a searcher fail.
+// PerSegmentSearcher is a Searcher that is consumed a match at a time. This is
+// the generic contract; it is all that a per segment collector needs. Next and
+// Advance of such a searcher fail.
 type PerSegmentSearcher interface {
 	Searcher
 
-	// NextBlock fills b with the next matches and returns how many there are;
-	// 0 means that the searcher is exhausted. The matches of a segment come in
-	// consecutive blocks, in ascending doc number order, and the segments come
-	// in index order. A search that has no scores gives all of them a score of
-	// 0.
-	NextBlock(b *PerSegmentScoredBlock) (n int, err error)
+	// NextMatch returns the next match, and false once the searcher is
+	// exhausted. The matches of a segment come together, in ascending doc
+	// number order, and the segments come in index order.
+	NextMatch() (match PerSegmentMatch, ok bool, err error)
 }
 
 // OptimizedPerSegmentSearcher is implemented by searchers that can collect
-// faster than by being drained block after block.
+// faster than by being drained match after match.
 type OptimizedPerSegmentSearcher interface {
 	PerSegmentSearcher
 
 	// CanCollectOptimized reports whether the searcher can do the collection
-	// itself. If it can't, the collector falls back to NextBlock.
+	// itself. If it can't, the collector falls back to NextMatch.
 	CanCollectOptimized() bool
 
 	// CollectOptimized collects every match of the searcher into the sink:
@@ -82,7 +76,7 @@ type OptimizedPerSegmentSearcher interface {
 }
 
 // PerSegmentSink is what the collector offers a searcher's optimized path.
-// What gets collected is the same as with NextBlock: the best hits, and totals.
+// What gets collected is the same as with NextMatch: the best hits, and totals.
 type PerSegmentSink interface {
 	// Limit is how many hits the collection can use in all.
 	Limit() int
@@ -115,24 +109,37 @@ type PerSegmentSink interface {
 }
 
 // DrainPerSegmentSearcher is the generic collection: ask the searcher for its
-// next block until there are none, offering each match to the heap of its
-// segment. Every match is visited and counted.
+// next match until there are none, offering each to the heap of its segment.
+// Every match is visited and counted.
 func DrainPerSegmentSearcher(ctx context.Context, searcher PerSegmentSearcher,
 	sink PerSegmentSink, checkDoneEvery uint64) error {
-	var blk PerSegmentScoredBlock
-	var totals []uint64
-	var sinceCheck uint64
+	var (
+		seg      = -1 // the segment being read, whose matches are counted
+		h        *PerSegmentHeap
+		thr      float32
+		full     bool
+		total    uint64  // matches of the segment so far
+		maxScore float32 // the highest score of its matches
+		seen     uint64
+	)
+	// what is known of a segment is told to the sink when it's done with
+	flush := func() {
+		if seg >= 0 {
+			sink.AddTotal(seg, total)
+			sink.ObserveMaxScore(maxScore)
+		}
+	}
 	for {
-		n, err := searcher.NextBlock(&blk)
+		m, ok, err := searcher.NextMatch()
 		if err != nil {
 			return err
 		}
-		if n == 0 {
+		if !ok {
+			flush()
 			return nil
 		}
 
-		if sinceCheck >= checkDoneEvery {
-			sinceCheck = 0
+		if seen%checkDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
 				RecordSearchCost(ctx, AbortM, 0)
@@ -140,38 +147,27 @@ func DrainPerSegmentSearcher(ctx context.Context, searcher PerSegmentSearcher,
 			default:
 			}
 		}
-		sinceCheck += uint64(n)
+		seen++
 
-		seg := blk.Seg
-		h := sink.Heap(seg)
-		for len(totals) <= seg {
-			totals = append(totals, 0)
-		}
-		ord := uint32(totals[seg])
-		totals[seg] += uint64(n)
-		sink.AddTotal(seg, uint64(n))
-		sink.ObserveMaxScore(blk.MaxScore)
-
-		// Matches come in ascending doc order, so one that ties the worst hit
-		// kept ranks below it: only a better score gets in. A block whose best
-		// score doesn't beat it has nothing to offer.
-		thr, full := h.Threshold()
-		if full && blk.MaxScore <= thr {
-			continue
-		}
-		for i := 0; i < n; i++ {
-			sc := blk.Scores[i]
-			if full && sc <= thr {
-				continue
-			}
-			h.Offer(PerSegmentHit{
-				Score: sc,
-				Doc:   blk.Offset + uint64(blk.Docs[i]),
-				Ord:   ord + uint32(i),
-				Seg:   uint32(seg),
-			})
+		if m.Seg != seg {
+			flush()
+			seg, total, maxScore = m.Seg, 0, 0
+			h = sink.Heap(seg)
 			thr, full = h.Threshold()
 		}
+		ord := uint32(total)
+		total++
+		if m.Score > maxScore {
+			maxScore = m.Score
+		}
+
+		// Matches come in ascending doc order, so one that ties the worst hit
+		// kept ranks below it: only a better score gets in.
+		if full && m.Score <= thr {
+			continue
+		}
+		h.Offer(PerSegmentHit{Score: m.Score, Doc: m.Doc, Ord: ord, Seg: uint32(seg)})
+		thr, full = h.Threshold()
 	}
 }
 

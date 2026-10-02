@@ -34,19 +34,14 @@ type explainingSearcher struct {
 	explainedEarly  bool
 }
 
-func (s *explainingSearcher) NextBlock(b *search.PerSegmentScoredBlock) (int, error) {
+func (s *explainingSearcher) NextMatch() (search.PerSegmentMatch, bool, error) {
 	if s.next >= s.n {
 		s.exhausted = true
-		return 0, nil
+		return search.PerSegmentMatch{}, false, nil
 	}
-	k := 0
-	for ; k < search.PerSegmentBlockLen && s.next < s.n; k++ {
-		b.Docs[k] = uint32(s.next)
-		b.Scores[k] = float32(s.next)
-		s.next++
-	}
-	b.Seg, b.Offset, b.MaxScore = 0, 0, float32(s.next-1)
-	return k, nil
+	m := search.PerSegmentMatch{Seg: 0, Doc: uint64(s.next), Score: float32(s.next)}
+	s.next++
+	return m, true, nil
 }
 
 func (s *explainingSearcher) ExplainMatch(seg int, doc uint64) (*search.Explanation, bool, error) {
@@ -104,9 +99,9 @@ type panickingSearcher struct {
 	with            func()
 }
 
-func (s *panickingSearcher) NextBlock(b *search.PerSegmentScoredBlock) (int, error) {
+func (s *panickingSearcher) NextMatch() (search.PerSegmentMatch, bool, error) {
 	s.with()
-	return 0, nil
+	return search.PerSegmentMatch{}, false, nil
 }
 
 // An index out of range in an algorithm fails the search that hit it, with an
@@ -120,7 +115,7 @@ func TestPerSegmentCollectorTurnsRuntimePanicsIntoErrors(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "index out of range") {
 		t.Fatalf("got %v, want the index out of range as an error", err)
 	}
-	if !strings.Contains(err.Error(), "NextBlock") {
+	if !strings.Contains(err.Error(), "NextMatch") {
 		t.Fatalf("the error doesn't say where: %v", err)
 	}
 

@@ -48,7 +48,7 @@ var ErrPerSegmentSearcherIterated = errors.New(
 //
 // It is a search.PerSegmentSearcher, which is the generic way in which a
 // collector can drain it, one scored block of a segment at a time with
-// NextBlock. As it knows that it is a lone term, it is also a
+// NextMatch. As it knows that it is a lone term, it is also a
 // search.OptimizedPerSegmentSearcher, whose CollectOptimized does the
 // collection itself:
 //
@@ -72,8 +72,13 @@ type PerSegmentTermSearcher struct {
 	field string
 	term  string
 
-	// the segment NextBlock is on
+	// where NextMatch is: the segment, and in it the block of postings being given
+	// out, with its scores
 	nextSeg int
+	blk     *segment.PostingsBlock
+	blkN    int
+	blkPos  int
+	scores  [scorer.PerSegmentBlockLen]float32
 }
 
 var _ search.PerSegmentSearcher = (*PerSegmentTermSearcher)(nil)
@@ -191,35 +196,38 @@ func (s *PerSegmentTermSearcher) Scorer() *scorer.PerSegmentTermScorer { return 
 // IsScored reports whether the search wants scores.
 func (s *PerSegmentTermSearcher) IsScored() bool { return s.scored }
 
-// NextBlock implements search.PerSegmentSearcher.
-func (s *PerSegmentTermSearcher) NextBlock(b *search.PerSegmentScoredBlock) (int, error) {
+// NextMatch implements search.PerSegmentSearcher. The postings are read a block at a
+// time, and a block is scored in one go by the SIMD kernel when it's read.
+func (s *PerSegmentTermSearcher) NextMatch() (search.PerSegmentMatch, bool, error) {
 	for s.nextSeg < len(s.readers) {
 		r := s.readers[s.nextSeg]
 		if r == nil {
 			s.nextSeg++
 			continue
 		}
+		if s.blkPos < s.blkN {
+			m := search.PerSegmentMatch{Seg: s.nextSeg, Doc: r.Offset() + uint64(s.blk.Docs[s.blkPos])}
+			if s.scored {
+				m.Score = s.scores[s.blkPos]
+			}
+			s.blkPos++
+			return m, true, nil
+		}
 		blk, n, err := r.NextBlock()
 		if err != nil {
-			return 0, err
+			return search.PerSegmentMatch{}, false, err
 		}
 		if n == 0 {
 			s.nextSeg++
+			s.blkN, s.blkPos = 0, 0
 			continue
 		}
-
-		b.Seg = s.nextSeg
-		b.Offset = r.Offset()
-		copy(b.Docs[:n], blk.Docs[:n])
+		s.blk, s.blkN, s.blkPos = blk, n, 0
 		if s.scored {
-			b.MaxScore = s.scorer.ScoreBlock(&blk.Freqs, &blk.Norms, n, &b.Scores)
-		} else {
-			clear(b.Scores[:n])
-			b.MaxScore = 0
+			s.scorer.ScoreBlock(&blk.Freqs, &blk.Norms, n, &s.scores)
 		}
-		return n, nil
 	}
-	return 0, nil
+	return search.PerSegmentMatch{}, false, nil
 }
 
 // CanCollectOptimized implements search.OptimizedPerSegmentSearcher. A lone

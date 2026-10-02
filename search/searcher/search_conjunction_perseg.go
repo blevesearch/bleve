@@ -34,7 +34,7 @@ func init() {
 // PerSegmentConjunctionSearcher is the conjunction of per segment searchers:
 // the docs that match all of them, scored by the sum of their scores.
 //
-// It is a search.PerSegmentSearcher. NextBlock is the generic iteration, which
+// It is a search.PerSegmentSearcher. NextMatch is the generic iteration, which
 // handles every clause and visits every match: an AND of terms none of which has
 // far more postings than the rest reads through a bufferedIntersectionCursor, a
 // window of docs at a time; anything else through an intersectionCursor, leapfrogging.
@@ -161,9 +161,9 @@ func (s *PerSegmentConjunctionSearcher) segCursorSeeked(seg int, scored bool, se
 	return newIntersectionCursor(cursors), true
 }
 
-// NextBlock implements search.PerSegmentSearcher.
-func (s *PerSegmentConjunctionSearcher) NextBlock(blk *search.PerSegmentScoredBlock) (int, error) {
-	return s.nextBlock(blk, func(seg int) docCursor {
+// NextMatch implements search.PerSegmentSearcher.
+func (s *PerSegmentConjunctionSearcher) NextMatch() (search.PerSegmentMatch, bool, error) {
+	return s.nextMatch(func(seg int) docCursor {
 		if c, ok := s.segCursor(seg, s.scored); ok {
 			return c
 		}

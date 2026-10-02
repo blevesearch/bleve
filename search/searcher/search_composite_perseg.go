@@ -86,10 +86,11 @@ type perSegBase struct {
 	// (nothing, mostly), outermost first
 	wraps [][]wrapKind
 
-	// the generic iteration (NextBlock): the segment it is in, and the cursor
-	// over its matches
+	// the generic iteration (NextMatch): the segment it is on, the cursor over its
+	// matches and the offset of the segment
 	nextSeg int
 	cursor  docCursor
+	offset  uint64
 }
 
 // segments is how many segments the index has. A clause that matches in none
@@ -152,73 +153,41 @@ func (b *perSegBase) Advance(ctx *search.SearchContext, ID index.IndexInternalID
 
 func (b *perSegBase) DocumentMatchPoolSize() int { return 0 }
 
-// nextBlock is the generic iteration: the matches of each segment, one segment
-// after the other, a block of them at a time. makeCursor builds the cursor
-// over the matches of a segment, nil if there are none.
-func (b *perSegBase) nextBlock(blk *search.PerSegmentScoredBlock,
-	makeCursor func(seg int) docCursor) (int, error) {
+// nextMatch is the generic iteration: the next match of the segment being read, and
+// then, once its cursor is spent, of the next segment that has matches. makeCursor
+// builds the cursor over the matches of a segment, nil if there are none.
+func (b *perSegBase) nextMatch(makeCursor func(seg int) docCursor) (search.PerSegmentMatch, bool, error) {
 	for {
 		if b.cursor == nil {
 			if b.nextSeg >= b.segments() {
-				return 0, nil
+				return search.PerSegmentMatch{}, false, nil
 			}
 			b.cursor = makeCursor(b.nextSeg)
 			b.nextSeg++
 			if b.cursor == nil {
 				continue
 			}
+			b.offset = b.cursor.Offset()
 		}
 
 		c := b.cursor
-		if f, ok := c.(blockFiller); ok {
-			// a cursor that can fill a block by itself does it without a call for
-			// each match
-			n := f.fillBlock(blk)
-			if err := c.Err(); err != nil {
-				return 0, err
-			}
-			if n > 0 {
-				blk.Seg = b.nextSeg - 1
-				return n, nil
-			}
+		doc := c.Doc()
+		if doc == noMoreDocs {
+			err := c.Err()
 			releaseCursor(c)
 			b.cursor = nil
+			if err != nil {
+				return search.PerSegmentMatch{}, false, err
+			}
 			continue
 		}
-		n := 0
-		var max float32
-		for n < search.PerSegmentBlockLen && c.Doc() != noMoreDocs {
-			blk.Docs[n] = c.Doc()
-			var score float32
-			if b.scored {
-				score = c.Score()
-			}
-			blk.Scores[n] = score
-			if score > max {
-				max = score
-			}
-			n++
-			c.Advance()
+		m := search.PerSegmentMatch{Seg: b.nextSeg - 1, Doc: b.offset + uint64(doc)}
+		if b.scored {
+			m.Score = c.Score()
 		}
-		if err := c.Err(); err != nil {
-			return 0, err
-		}
-		if n > 0 {
-			blk.Seg = b.nextSeg - 1
-			blk.Offset = c.Offset()
-			blk.MaxScore = max
-			return n, nil
-		}
-		releaseCursor(c)
-		b.cursor = nil
+		c.Advance()
+		return m, true, nil
 	}
-}
-
-// blockFiller is a docCursor that can put its next matches in a block itself.
-type blockFiller interface {
-	// fillBlock puts the next matches, up to a block, in blk -- Docs, Scores,
-	// Offset and MaxScore -- and returns how many there are, 0 once it is done.
-	fillBlock(blk *search.PerSegmentScoredBlock) int
 }
 
 // drainCursor offers every match of a segment to the sink: what's done when

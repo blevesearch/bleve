@@ -42,10 +42,10 @@ func init() {
 
 // PerSegmentTopNCollector collects the top N hits of a search.PerSegmentSearcher,
 // ordered by score. It is generic: all it knows about the search is what the
-// searcher tells it, a block of scored matches at a time.
+// searcher tells it, a scored match at a time.
 //
-// Collect repeatedly asks the searcher for its next block and offers the
-// matches to the heap of the segment they are from, until the searcher is
+// Collect repeatedly asks the searcher for its next match and offers it to
+// the heap of the segment it is from, until the searcher is
 // exhausted; then it merges the segment heaps into the top hits. That's all.
 //
 // A searcher that has a faster way to fill the heaps for the kind of search it

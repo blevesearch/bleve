@@ -35,7 +35,7 @@ func init() {
 // but for one of the first two. It is BooleanSearcher's semantics, see
 // booleanCursor.
 //
-// It has the generic path only, NextBlock: like tantivy, which only prunes plain
+// It has the generic path only, NextMatch: like tantivy, which only prunes plain
 // unions and intersections of terms, it doesn't prune once there are clauses
 // with different roles. The clause that drives it (the required one, or without
 // it the optional one) is read through, and the other clauses are sought about
@@ -206,9 +206,9 @@ func (s *PerSegmentBooleanSearcher) CollectOptimized(ctx context.Context, sink s
 	})
 }
 
-// NextBlock implements search.PerSegmentSearcher.
-func (s *PerSegmentBooleanSearcher) NextBlock(blk *search.PerSegmentScoredBlock) (int, error) {
-	return s.nextBlock(blk, func(seg int) docCursor {
+// NextMatch implements search.PerSegmentSearcher.
+func (s *PerSegmentBooleanSearcher) NextMatch() (search.PerSegmentMatch, bool, error) {
+	return s.nextMatch(func(seg int) docCursor {
 		if c, ok := s.segCursor(seg, s.scored); ok {
 			return c
 		}

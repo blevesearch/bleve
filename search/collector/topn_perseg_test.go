@@ -32,16 +32,15 @@ type fakeSeg struct {
 	scores []float32
 }
 
-// fakeSearcher streams its segments' matches in blocks of at most blockLen.
+// fakeSearcher streams its segments' matches, one at a time.
 type fakeSearcher struct {
 	search.Searcher // not used
 	segs            []fakeSeg
-	blockLen        int
 
 	seg, pos int
 }
 
-func (f *fakeSearcher) NextBlock(b *search.PerSegmentScoredBlock) (int, error) {
+func (f *fakeSearcher) NextMatch() (search.PerSegmentMatch, bool, error) {
 	for f.seg < len(f.segs) {
 		s := f.segs[f.seg]
 		if f.pos >= len(s.docs) {
@@ -49,19 +48,11 @@ func (f *fakeSearcher) NextBlock(b *search.PerSegmentScoredBlock) (int, error) {
 			f.pos = 0
 			continue
 		}
-		n := min(f.blockLen, len(s.docs)-f.pos, search.PerSegmentBlockLen)
-		b.Seg, b.Offset, b.MaxScore = f.seg, s.offset, 0
-		for i := 0; i < n; i++ {
-			b.Docs[i] = s.docs[f.pos+i]
-			b.Scores[i] = s.scores[f.pos+i]
-			if b.Scores[i] > b.MaxScore {
-				b.MaxScore = b.Scores[i]
-			}
-		}
-		f.pos += n
-		return n, nil
+		m := search.PerSegmentMatch{Seg: f.seg, Doc: s.offset + uint64(s.docs[f.pos]), Score: s.scores[f.pos]}
+		f.pos++
+		return m, true, nil
 	}
-	return 0, nil
+	return search.PerSegmentMatch{}, false, nil
 }
 
 func (f *fakeSearcher) Close() error { return nil }
@@ -122,12 +113,10 @@ func TestPerSegmentCollectorIsGeneric(t *testing.T) {
 	}
 
 	for name, mk := range map[string]func() search.Searcher{
-		"blocks of 128": func() search.Searcher { return &fakeSearcher{segs: fakeSegments(), blockLen: 128} },
-		"blocks of 2":   func() search.Searcher { return &fakeSearcher{segs: fakeSegments(), blockLen: 2} },
-		"blocks of 1":   func() search.Searcher { return &fakeSearcher{segs: fakeSegments(), blockLen: 1} },
-		"optimized":     func() search.Searcher { return &optimizedFake{fakeSearcher: &fakeSearcher{segs: fakeSegments()}} },
+		"generic":   func() search.Searcher { return &fakeSearcher{segs: fakeSegments()} },
+		"optimized": func() search.Searcher { return &optimizedFake{fakeSearcher: &fakeSearcher{segs: fakeSegments()}} },
 		"declines optimized": func() search.Searcher {
-			return &declinesOptimized{&optimizedFake{fakeSearcher: &fakeSearcher{segs: fakeSegments(), blockLen: 3}}}
+			return &declinesOptimized{&optimizedFake{fakeSearcher: &fakeSearcher{segs: fakeSegments()}}}
 		},
 	} {
 		for _, sz := range []struct{ size, from int }{{3, 0}, {4, 2}, {100, 0}, {0, 0}, {2, 9}, {5, 10}, {1, 50}} {
@@ -164,7 +153,7 @@ func TestPerSegmentCollectorIsGeneric(t *testing.T) {
 }
 
 func TestPerSegmentCollectorUsesTheOptimizedPathWhenOffered(t *testing.T) {
-	opt := &optimizedFake{fakeSearcher: &fakeSearcher{segs: fakeSegments(), blockLen: 4}}
+	opt := &optimizedFake{fakeSearcher: &fakeSearcher{segs: fakeSegments()}}
 	if err := NewPerSegmentTopNCollector(3, 0).Collect(context.Background(), opt, fakeReader{}); err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +164,7 @@ func TestPerSegmentCollectorUsesTheOptimizedPathWhenOffered(t *testing.T) {
 		t.Fatal("the searcher was drained as well")
 	}
 
-	declines := &declinesOptimized{&optimizedFake{fakeSearcher: &fakeSearcher{segs: fakeSegments(), blockLen: 4}}}
+	declines := &declinesOptimized{&optimizedFake{fakeSearcher: &fakeSearcher{segs: fakeSegments()}}}
 	if err := NewPerSegmentTopNCollector(3, 0).Collect(context.Background(), declines, fakeReader{}); err != nil {
 		t.Fatal(err)
 	}

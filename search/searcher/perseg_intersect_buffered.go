@@ -16,8 +16,6 @@ package searcher
 
 import (
 	"math/bits"
-
-	"github.com/blevesearch/bleve/v2/search"
 )
 
 // bufferedIntersectionCursor is the matches of an AND of terms that have about as
@@ -291,29 +289,6 @@ func (x *bufferedIntersectionCursor) Err() error {
 		}
 	}
 	return nil
-}
-
-// fillBlock puts the next matches, up to a block of them, in blk, and returns how
-// many there are (0 when the cursor is done).
-func (x *bufferedIntersectionCursor) fillBlock(blk *search.PerSegmentScoredBlock) int {
-	n := 0
-	var max float32
-	for n < search.PerSegmentBlockLen && x.doc != noMoreDocs {
-		var score float32
-		if x.scored {
-			score = x.Score()
-			if score > max {
-				max = score
-			}
-		}
-		blk.Docs[n] = x.doc
-		blk.Scores[n] = score
-		n++
-		x.Advance()
-	}
-	blk.Offset = x.offset
-	blk.MaxScore = max
-	return n
 }
 
 var (

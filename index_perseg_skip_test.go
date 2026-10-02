@@ -435,7 +435,7 @@ func TestPerSegmentConjunctionRetrievesTheBestDocs(t *testing.T) {
 	}
 }
 
-// A plain OR of terms that is read block by block (the generic loop, which is what
+// A plain OR of terms that is read match by match (the generic loop, which is what
 // the collection of a sort other than by score is made of) finds every match, with
 // the score the regular path gives it, and counts them all: it is the best k of the
 // regular path's ranking of every match, and the total is exact.
@@ -500,7 +500,7 @@ func TestPerSegmentOrGenericLoopFindsEveryMatch(t *testing.T) {
 								t.Fatalf("%s: %T is not a per segment searcher", what, s)
 							}
 							c := collector.NewPerSegmentTopNCollector(k, 0)
-							// the generic loop: NextBlock until there are no more
+							// the generic loop: NextMatch until there are no more
 							if err := c.Collect(ctx, genericOnly{ps}, reader); err != nil {
 								t.Fatalf("%s: %v", what, err)
 							}
@@ -540,7 +540,7 @@ func TestPerSegmentOrGenericLoopFindsEveryMatch(t *testing.T) {
 	}
 }
 
-// An AND of terms that is read block by block (the generic loop, which is what
+// An AND of terms that is read match by match (the generic loop, which is what
 // the collection of a sort other than by score is made of) finds every match, with
 // the score the regular path gives it, and counts them all: it is the best k of the
 // regular path's ranking of every match, and the total is exact.
@@ -605,7 +605,7 @@ func TestPerSegmentAndGenericLoopFindsEveryMatch(t *testing.T) {
 								t.Fatalf("%s: %T is not a per segment searcher", what, s)
 							}
 							c := collector.NewPerSegmentTopNCollector(k, 0)
-							// the generic loop: NextBlock until there are no more
+							// the generic loop: NextMatch until there are no more
 							if err := c.Collect(ctx, genericOnly{ps}, reader); err != nil {
 								t.Fatalf("%s: %v", what, err)
 							}

@@ -35,7 +35,7 @@ func init() {
 // the docs that match at least min of them, scored by the sum of the scores of
 // the clauses that match times the share of the clauses that do (coord).
 //
-// It is a search.PerSegmentSearcher. NextBlock is the generic iteration, which
+// It is a search.PerSegmentSearcher. NextMatch is the generic iteration, which
 // handles every clause and every min, and visits every match: a plain OR of terms
 // (all clauses terms, min 1) reads through a bufferedUnionCursor, a window of
 // docs at a time; anything else through a unionCursor, a match at a time. When its
@@ -159,9 +159,9 @@ func (s *PerSegmentDisjunctionSearcher) segCursorSeeked(seg int, scored bool, se
 	return newUnionCursor(cursors, len(s.children), s.min), true
 }
 
-// NextBlock implements search.PerSegmentSearcher.
-func (s *PerSegmentDisjunctionSearcher) NextBlock(blk *search.PerSegmentScoredBlock) (int, error) {
-	return s.nextBlock(blk, func(seg int) docCursor {
+// NextMatch implements search.PerSegmentSearcher.
+func (s *PerSegmentDisjunctionSearcher) NextMatch() (search.PerSegmentMatch, bool, error) {
+	return s.nextMatch(func(seg int) docCursor {
 		if c, ok := s.segCursor(seg, s.scored); ok {
 			return c
 		}
