@@ -15,7 +15,7 @@
 package query
 
 // SupportsPerSegment reports whether the query is of a shape whose searchers
-// can be per segment searchers (see search.PerSegmentSearchKey): a term, a
+// can be per segment searchers (see PerSegmentQuery): a term, a
 // boolean field, a match of terms, a query string that is made of these, and
 // conjunctions, disjunctions and boolean queries of these.
 //

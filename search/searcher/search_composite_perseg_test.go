@@ -136,7 +136,7 @@ type compositeBuilder func(fx *perSegFixture, terms []string, scored bool, model
 func disjunctionBuilder(min int) compositeBuilder {
 	return func(fx *perSegFixture, terms []string, scored bool, model string) (search.PerSegmentSearcher, []*PerSegmentTermSearcher) {
 		var ts []*PerSegmentTermSearcher
-		var qs []search.Searcher
+		var qs []search.PerSegmentSearcher
 		for _, term := range terms {
 			s := fx.termSearcher(term, scored, model)
 			ts = append(ts, s)
@@ -146,14 +146,14 @@ func disjunctionBuilder(min int) compositeBuilder {
 		if !scored {
 			opts.Score = "none"
 		}
-		return NewPerSegmentDisjunctionSearcher(qs, float64(min), opts), ts
+		return fx.disjunction(qs, float64(min), opts), ts
 	}
 }
 
 func conjunctionBuilder() compositeBuilder {
 	return func(fx *perSegFixture, terms []string, scored bool, model string) (search.PerSegmentSearcher, []*PerSegmentTermSearcher) {
 		var ts []*PerSegmentTermSearcher
-		var qs []search.Searcher
+		var qs []search.PerSegmentSearcher
 		for _, term := range terms {
 			s := fx.termSearcher(term, scored, model)
 			ts = append(ts, s)
@@ -163,7 +163,7 @@ func conjunctionBuilder() compositeBuilder {
 		if !scored {
 			opts.Score = "none"
 		}
-		return NewPerSegmentConjunctionSearcher(qs, opts), ts
+		return fx.conjunction(qs, opts), ts
 	}
 }
 
@@ -357,9 +357,9 @@ func TestPerSegmentNestedComposites(t *testing.T) {
 			mk := func(term string) *PerSegmentTermSearcher { return fx.termSearcher(term, scored, model) }
 			a, b, c, d := mk("alpha"), mk("bravo"), mk("charlie"), mk("delta")
 			// alpha AND (bravo OR (charlie AND delta))
-			inner := NewPerSegmentConjunctionSearcher([]search.Searcher{c, d}, opts)
-			mid := NewPerSegmentDisjunctionSearcher([]search.Searcher{b, inner}, 1, opts)
-			top := NewPerSegmentConjunctionSearcher([]search.Searcher{a, mid}, opts)
+			inner := fx.conjunction([]search.PerSegmentSearcher{c, d}, opts)
+			mid := fx.disjunction([]search.PerSegmentSearcher{b, inner}, 1, opts)
+			top := fx.conjunction([]search.PerSegmentSearcher{a, mid}, opts)
 			return top, []*PerSegmentTermSearcher{a, b, c, d}
 		}
 
@@ -776,22 +776,22 @@ func TestPerSegmentUnwrapsSingleClauses(t *testing.T) {
 				opts.Score = "none"
 			}
 			mk := func(wrapped bool, conjunction bool, terms ...string) search.PerSegmentSearcher {
-				var qs []search.Searcher
+				var qs []search.PerSegmentSearcher
 				for _, term := range terms {
-					var c search.Searcher = fx.termSearcher(term, scored, model)
+					var c search.PerSegmentSearcher = fx.termSearcher(term, scored, model)
 					if wrapped {
 						if (len(qs)+1)%2 == 0 {
-							c = NewPerSegmentConjunctionSearcher([]search.Searcher{c}, opts)
+							c = fx.conjunction([]search.PerSegmentSearcher{c}, opts)
 						} else {
-							c = NewPerSegmentDisjunctionSearcher([]search.Searcher{c}, 1, opts)
+							c = fx.disjunction([]search.PerSegmentSearcher{c}, 1, opts)
 						}
 					}
 					qs = append(qs, c)
 				}
 				if conjunction {
-					return NewPerSegmentConjunctionSearcher(qs, opts)
+					return fx.conjunction(qs, opts)
 				}
-				return NewPerSegmentDisjunctionSearcher(qs, 1, opts)
+				return fx.disjunction(qs, 1, opts)
 			}
 
 			for _, conjunction := range []bool{false, true} {
@@ -834,8 +834,8 @@ func TestPerSegmentUnwrapsSingleClauses(t *testing.T) {
 	// a disjunction that wants two of its one clause matches nothing, whatever it
 	// is wrapped in: it is not its clause
 	s := fx.termSearcher("alpha", true, index.DefaultScoringModel)
-	never := NewPerSegmentDisjunctionSearcher([]search.Searcher{s}, 2, search.SearcherOptions{})
-	outer := NewPerSegmentDisjunctionSearcher([]search.Searcher{never, fx.termSearcher("bravo", true, index.DefaultScoringModel)}, 1, search.SearcherOptions{})
+	never := fx.disjunction([]search.PerSegmentSearcher{s}, 2, search.SearcherOptions{})
+	outer := fx.disjunction([]search.PerSegmentSearcher{never, fx.termSearcher("bravo", true, index.DefaultScoringModel)}, 1, search.SearcherOptions{})
 	if outer.terms != nil {
 		t.Fatal("a disjunction with a minimum above its one clause must not be unwrapped")
 	}

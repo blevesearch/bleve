@@ -28,8 +28,6 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-var _ search.Collector = (*PerSegmentTopNCollector)(nil)
-
 var reflectStaticSizePerSegmentTopNCollector int
 var reflectStaticSizePerSegmentHit int
 
@@ -135,9 +133,9 @@ func (st *perSegmentState) ObserveMaxScore(score float32) {
 
 func (st *perSegmentState) MarkPruned() { st.pruned = true }
 
-// Collect goes to the searcher to find the matching documents. The searcher has
-// to be a search.PerSegmentSearcher.
-func (hc *PerSegmentTopNCollector) Collect(ctx context.Context, searcher search.Searcher,
+// Collect goes to the searcher to find the matching documents. (It is not a
+// search.Collector, which collects the matches of a search.Searcher.)
+func (hc *PerSegmentTopNCollector) Collect(ctx context.Context, searcher search.PerSegmentSearcher,
 	reader index.IndexReader) (err error) {
 	// The algorithms index dense arrays by doc offset and trust that their cursors
 	// are where they say: a mistake there is a runtime panic. It fails the search
@@ -159,21 +157,16 @@ func (hc *PerSegmentTopNCollector) Collect(ctx context.Context, searcher search.
 	return hc.collect(ctx, searcher, reader)
 }
 
-func (hc *PerSegmentTopNCollector) collect(ctx context.Context, searcher search.Searcher,
+func (hc *PerSegmentTopNCollector) collect(ctx context.Context, searcher search.PerSegmentSearcher,
 	reader index.IndexReader) error {
 	startTime := time.Now()
-
-	psSearcher, ok := searcher.(search.PerSegmentSearcher)
-	if !ok {
-		return fmt.Errorf("collector: per segment collector needs a per segment searcher, got %T", searcher)
-	}
 
 	state := &perSegmentState{k: hc.size + hc.skip}
 	var err error
 	if opt, ok := searcher.(search.OptimizedPerSegmentSearcher); ok && opt.CanCollectOptimized() {
 		err = opt.CollectOptimized(ctx, state)
 	} else {
-		err = search.DrainPerSegmentSearcher(ctx, psSearcher, state, CheckDoneEvery)
+		err = search.DrainPerSegmentSearcher(ctx, searcher, state, CheckDoneEvery)
 	}
 	if err != nil {
 		return err
@@ -202,6 +195,7 @@ func (hc *PerSegmentTopNCollector) collect(ctx context.Context, searcher search.
 
 	var explainer search.PerSegmentExplainer
 	if hc.explain {
+		var ok bool
 		if explainer, ok = searcher.(search.PerSegmentExplainer); !ok {
 			return fmt.Errorf("collector: %T can't explain its hits", searcher)
 		}
@@ -291,14 +285,4 @@ func (hc *PerSegmentTopNCollector) Took() time.Duration {
 // the total: it is then a lower bound.
 func (hc *PerSegmentTopNCollector) EarlyStopped() bool {
 	return hc.pruned
-}
-
-// SetFacetsBuilder isn't supported; a request with facets isn't served by this
-// collector.
-func (hc *PerSegmentTopNCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
-}
-
-// FacetResults has nothing to return.
-func (hc *PerSegmentTopNCollector) FacetResults() search.FacetResults {
-	return nil
 }

@@ -34,7 +34,6 @@ var (
 	_ search.PerSegmentExplainer = (*PerSegmentConjunctionSearcher)(nil)
 	_ search.PerSegmentExplainer = (*PerSegmentDisjunctionSearcher)(nil)
 	_ search.PerSegmentExplainer = (*PerSegmentBooleanSearcher)(nil)
-	_ search.PerSegmentExplainer = (*MatchNoneSearcher)(nil)
 )
 
 // clausesByCount is the clauses of a composite in the order a regular searcher
@@ -259,10 +258,4 @@ func (s *PerSegmentBooleanSearcher) ExplainMatch(seg int, doc uint64) (*search.E
 		return nil, false, nil
 	}
 	return &search.Explanation{Value: float64(sum), Message: "sum of:", Children: children}, true, nil
-}
-
-// ExplainMatch implements search.PerSegmentExplainer: a searcher of no matches
-// has none to explain.
-func (s *MatchNoneSearcher) ExplainMatch(seg int, doc uint64) (*search.Explanation, bool, error) {
-	return nil, false, nil
 }

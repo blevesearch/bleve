@@ -35,20 +35,13 @@ func init() {
 	reflectStaticSizePerSegmentTermSearcher = int(reflect.TypeOf(ts).Size())
 }
 
-// ErrPerSegmentSearcherIterated is returned by the Next and Advance of a
-// PerSegmentTermSearcher: its postings are consumed segment by segment through
-// PerSegmentReaders, never one DocumentMatch at a time.
-var ErrPerSegmentSearcherIterated = errors.New(
-	"searcher: a per segment term searcher can't be iterated, it has to be read through its per segment readers")
-
 // PerSegmentTermSearcher is the searcher of a term for the per segment search
 // path. It is to the segment-oblivious TermSearcher what the per segment
 // collector is to the TopN one: it neither hides the segments nor builds a
 // DocumentMatch per posting.
 //
 // It is a search.PerSegmentSearcher, which is the generic way in which a
-// collector can drain it, one scored block of a segment at a time with
-// NextMatch. As it knows that it is a lone term, it is also a
+// collector can drain it, a match at a time with NextMatch. As it knows that it is a lone term, it is also a
 // search.OptimizedPerSegmentSearcher, whose CollectOptimized does the
 // collection itself:
 //
@@ -59,9 +52,6 @@ var ErrPerSegmentSearcherIterated = errors.New(
 //     skipped a block counts what it visited and the search is marked as pruned;
 //   - when not scored: the first k matches in doc order, and the exact total,
 //     which costs nothing for a segment without deletions.
-//
-// It implements search.Searcher only so that it can be returned by
-// Query.Searcher; Next and Advance fail.
 type PerSegmentTermSearcher struct {
 	readers []*scorch.PerSegmentIndexSnapshotTermFieldReader
 	scorer  *scorer.PerSegmentTermScorer
@@ -92,44 +82,40 @@ type PerSegmentIndexReader interface {
 	scorch.PerSegmentIndexReader
 }
 
-// NewPerSegmentTermSearcher returns the per segment searcher of the term, or
-// nil (and no error) if the term search can't be done that way, in which case
-// NewTermSearcher is what has to be used.
-//
-// Only a request-level opt in (search.PerSegmentSearchKey in the context) makes
-// it eligible, on top of what's needed to be served correctly by scalars alone:
-// segments that can be read that way, and a search that needs neither
-// explanations nor locations. A search without scores is fine.
-func NewPerSegmentTermSearcher(ctx context.Context, indexReader PerSegmentIndexReader,
+// NewPerSegmentTermSearcher returns the per segment searcher of the term. It
+// returns search.ErrPerSegmentUnsupported if the term can't be searched that way,
+// in which case NewTermSearcher is what has to be used: the index reader isn't one
+// that hands out postings by segment, or its segments can't be read that way, or
+// the search needs more than the per segment path gives (term vectors, synonyms).
+// A search without scores is fine.
+func NewPerSegmentTermSearcher(ctx context.Context, indexReader index.IndexReader,
 	term string, field string, boost float64, options search.SearcherOptions) (
 	*PerSegmentTermSearcher, error) {
-	if ctx == nil {
-		return nil, nil
-	}
-	if enabled, _ := ctx.Value(search.PerSegmentSearchKey).(bool); !enabled {
-		return nil, nil
+	psReader, ok := indexReader.(PerSegmentIndexReader)
+	if !ok {
+		return nil, search.ErrPerSegmentUnsupported
 	}
 	// An explanation is not built while searching: the collector asks for the
 	// explanations of the hits it returns once it has them (ExplainMatch). Term
 	// vectors are another matter.
 	if options.IncludeTermVectors {
-		return nil, nil
+		return nil, search.ErrPerSegmentUnsupported
 	}
 	scored := options.Score != "none"
 	// synonyms turn a term search into a disjunction
 	if fts, ok := ctx.Value(search.FieldTermSynonymMapKey).(search.FieldTermSynonymMap); ok {
 		if _, exists := fts[field]; exists {
-			return nil, nil
+			return nil, search.ErrPerSegmentUnsupported
 		}
 	}
 	if isTermQuery(ctx) {
 		ctx = context.WithValue(ctx, search.QueryTypeKey, search.Term)
 	}
 
-	readers, err := indexReader.PerSegmentTermFieldReader(ctx, []byte(term), field, scored)
+	readers, err := psReader.PerSegmentTermFieldReader(ctx, []byte(term), field, scored)
 	if err != nil {
 		if errors.Is(err, scorch.ErrPerSegmentUnsupported) {
-			return nil, nil
+			return nil, search.ErrPerSegmentUnsupported
 		}
 		return nil, err
 	}
@@ -459,15 +445,6 @@ func (s *PerSegmentTermSearcher) SetQueryNorm(qnorm float64) {
 	s.scorer.SetQueryNorm(qnorm)
 }
 
-func (s *PerSegmentTermSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
-	return nil, ErrPerSegmentSearcherIterated
-}
-
-func (s *PerSegmentTermSearcher) Advance(ctx *search.SearchContext,
-	ID index.IndexInternalID) (*search.DocumentMatch, error) {
-	return nil, ErrPerSegmentSearcherIterated
-}
-
 func (s *PerSegmentTermSearcher) Close() error {
 	// A closed reader is back in a pool, and may be some other query's at once:
 	// the searcher lets go of them, so that nothing can reach one through it.
@@ -486,9 +463,5 @@ func (s *PerSegmentTermSearcher) Close() error {
 }
 
 func (s *PerSegmentTermSearcher) Min() int {
-	return 0
-}
-
-func (s *PerSegmentTermSearcher) DocumentMatchPoolSize() int {
 	return 0
 }

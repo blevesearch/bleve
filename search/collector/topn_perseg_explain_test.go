@@ -26,12 +26,12 @@ import (
 // explainingSearcher is a per segment searcher of docs 0..n-1 in one segment,
 // scored by their number, that records when it is asked to explain.
 type explainingSearcher struct {
-	search.Searcher // never called
-	n               int
-	next            int
-	exhausted       bool
-	explained       []uint64
-	explainedEarly  bool
+	search.PerSegmentSearcher // never called
+	n                         int
+	next                      int
+	exhausted                 bool
+	explained                 []uint64
+	explainedEarly            bool
 }
 
 func (s *explainingSearcher) NextMatch() (search.PerSegmentMatch, bool, error) {
@@ -95,8 +95,8 @@ func TestPerSegmentCollectorExplainsOnlyTheHitsReturned(t *testing.T) {
 
 // panickingSearcher is a per segment searcher that goes wrong while it is read
 type panickingSearcher struct {
-	search.Searcher // never called
-	with            func()
+	search.PerSegmentSearcher // never called
+	with                      func()
 }
 
 func (s *panickingSearcher) NextMatch() (search.PerSegmentMatch, bool, error) {

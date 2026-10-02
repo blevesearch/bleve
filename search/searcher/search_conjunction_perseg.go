@@ -16,6 +16,7 @@ package searcher
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"math/bits"
 	"reflect"
@@ -59,18 +60,18 @@ var _ search.PerSegmentSearcher = (*PerSegmentConjunctionSearcher)(nil)
 var _ search.OptimizedPerSegmentSearcher = (*PerSegmentConjunctionSearcher)(nil)
 var _ perSegChild = (*PerSegmentConjunctionSearcher)(nil)
 
-// NewPerSegmentConjunctionSearcher builds the conjunction of the searchers, or
-// returns nil if one of them is not a per segment searcher, in which case the
-// regular NewConjunctionSearcher is what has to be used (and the searchers
-// have to be closed by whoever has them).
-func NewPerSegmentConjunctionSearcher(qsearchers []search.Searcher,
-	options search.SearcherOptions) *PerSegmentConjunctionSearcher {
+// NewPerSegmentConjunctionSearcher builds the conjunction of the searchers, which
+// have to be searchers of this package: it returns an error if one is not. The
+// searchers are closed by whoever has them if it does; if not, they are the
+// conjunction's, and closed with it.
+func NewPerSegmentConjunctionSearcher(qsearchers []search.PerSegmentSearcher,
+	options search.SearcherOptions) (*PerSegmentConjunctionSearcher, error) {
 	children := make([]perSegChild, len(qsearchers))
 	wraps := make([][]wrapKind, len(qsearchers))
 	for i, q := range qsearchers {
 		c, ok := q.(perSegChild)
 		if !ok {
-			return nil
+			return nil, fmt.Errorf("searcher: %T can't be a clause of a per segment conjunction", q)
 		}
 		children[i], wraps[i] = unwrapSingleKinds(c)
 	}
@@ -88,7 +89,7 @@ func NewPerSegmentConjunctionSearcher(qsearchers []search.Searcher,
 	}
 	rv.terms = terms
 	rv.computeQueryNorm()
-	return rv
+	return rv, nil
 }
 
 func (s *PerSegmentConjunctionSearcher) Size() int {

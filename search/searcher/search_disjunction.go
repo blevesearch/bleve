@@ -47,11 +47,6 @@ func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
 	limit bool) (search.Searcher, error) {
 
-	// the per segment kind, if the caller has opted in and the clauses are of it
-	if rv, err := perSegmentDisjunction(ctx, indexReader, qsearchers, min, options, limit); err != nil || rv != nil {
-		return rv, err
-	}
-
 	var disjOverKNN bool
 	if ctx != nil {
 		disjOverKNN, _ = ctx.Value(search.IncludeScoreBreakdownKey).(bool)

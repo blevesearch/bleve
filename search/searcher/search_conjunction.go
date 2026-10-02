@@ -49,11 +49,6 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, options search.SearcherOptions) (
 	search.Searcher, error,
 ) {
-	// the per segment kind, if the caller has opted in and the clauses are of it
-	if rv, err := perSegmentConjunction(ctx, indexReader, qsearchers, options); err != nil || rv != nil {
-		return rv, err
-	}
-
 	// build the sorted downstream searchers
 	searchers := make(OrderedSearcherList, len(qsearchers))
 	copy(searchers, qsearchers)

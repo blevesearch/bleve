@@ -16,6 +16,7 @@ package search
 
 import (
 	"context"
+	"errors"
 )
 
 // The per segment search path: a Searcher that produces its matches one at a
@@ -48,17 +49,43 @@ type PerSegmentMatch struct {
 	Score float32
 }
 
-// PerSegmentSearcher is a Searcher that is consumed a match at a time. This is
-// the generic contract; it is all that a per segment collector needs. Next and
-// Advance of such a searcher fail.
+// PerSegmentSearcher is the searcher of the per segment path: a search that is
+// consumed a match at a time, and that knows which segment each match is from. It
+// is not a Searcher, which is consumed a DocumentMatch at a time and knows of no
+// segments: the two are built differently (see query.PerSegmentQuery) and read
+// differently, and a collector of one can't read the other.
+//
+// This is the generic contract; it is all that a per segment collector needs. The
+// other methods are what the searchers need of each other: the weights that make
+// the query norm, and the counts and minimum that the composites look at.
 type PerSegmentSearcher interface {
-	Searcher
-
 	// NextMatch returns the next match, and false once the searcher is
 	// exhausted. The matches of a segment come together, in ascending doc
 	// number order, and the segments come in index order.
 	NextMatch() (match PerSegmentMatch, ok bool, err error)
+
+	// Close releases what the searcher holds. It has to be called, once the
+	// searcher has been read, and nothing may be done with it after.
+	Close() error
+
+	// Weight and SetQueryNorm are those of Searcher: the share of the query norm
+	// that the searcher is responsible for, and the setting of the norm.
+	Weight() float64
+	SetQueryNorm(float64)
+
+	// Count is the number of matches the searcher has, at most. Min is how many of
+	// its clauses at least have to match, if it has clauses to be required.
+	Count() uint64
+	Min() int
+
+	// Size is an estimate of the memory the searcher needs.
+	Size() int
 }
+
+// ErrPerSegmentUnsupported is returned by the building of a per segment searcher
+// that can't be done: the query, or the index, is not of a kind that the per
+// segment path serves. A search that gets it is served by the regular path.
+var ErrPerSegmentUnsupported = errors.New("search: the per segment path can't serve this search")
 
 // OptimizedPerSegmentSearcher is implemented by searchers that can collect
 // faster than by being drained match after match.

@@ -16,6 +16,7 @@ package searcher
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"math/bits"
 	"reflect"
@@ -64,18 +65,23 @@ var _ search.PerSegmentSearcher = (*PerSegmentDisjunctionSearcher)(nil)
 var _ search.OptimizedPerSegmentSearcher = (*PerSegmentDisjunctionSearcher)(nil)
 var _ perSegChild = (*PerSegmentDisjunctionSearcher)(nil)
 
-// NewPerSegmentDisjunctionSearcher builds the disjunction of the searchers, or
-// returns nil if one of them is not a per segment searcher, in which case the
-// regular NewDisjunctionSearcher is what has to be used (and the searchers have
-// to be closed by whoever has them).
-func NewPerSegmentDisjunctionSearcher(qsearchers []search.Searcher, min float64,
-	options search.SearcherOptions) *PerSegmentDisjunctionSearcher {
+// NewPerSegmentDisjunctionSearcher builds the disjunction of the searchers, which
+// have to be searchers of this package: it returns an error if one is not, or if
+// there are more of them than a disjunction may have. The searchers are closed by
+// whoever has them if it does; if not, they are the disjunction's, and closed with
+// it.
+func NewPerSegmentDisjunctionSearcher(qsearchers []search.PerSegmentSearcher, min float64,
+	options search.SearcherOptions) (*PerSegmentDisjunctionSearcher, error) {
+	if tooManyClauses(len(qsearchers)) {
+		// the very error the regular searchers give
+		return nil, tooManyClausesErr("", len(qsearchers))
+	}
 	children := make([]perSegChild, len(qsearchers))
 	wraps := make([][]wrapKind, len(qsearchers))
 	for i, q := range qsearchers {
 		c, ok := q.(perSegChild)
 		if !ok {
-			return nil
+			return nil, fmt.Errorf("searcher: %T can't be a clause of a per segment disjunction", q)
 		}
 		children[i], wraps[i] = unwrapSingleKinds(c)
 	}
@@ -94,7 +100,7 @@ func NewPerSegmentDisjunctionSearcher(qsearchers []search.Searcher, min float64,
 	}
 	rv.terms = terms
 	rv.computeQueryNorm()
-	return rv
+	return rv, nil
 }
 
 func (s *PerSegmentDisjunctionSearcher) Size() int {

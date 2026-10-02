@@ -16,6 +16,7 @@ package searcher
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"reflect"
 
@@ -59,16 +60,17 @@ var _ search.OptimizedPerSegmentSearcher = (*PerSegmentBooleanSearcher)(nil)
 var _ perSegChild = (*PerSegmentBooleanSearcher)(nil)
 
 // NewPerSegmentBooleanSearcher builds the boolean combination of the searchers,
-// nil for the clauses there aren't, or returns nil if one of them is not a per
-// segment searcher, in which case the regular NewBooleanSearcher is what has to
-// be used (and the searchers have to be closed by whoever has them).
-func NewPerSegmentBooleanSearcher(must, should, mustNot search.Searcher,
-	options search.SearcherOptions) *PerSegmentBooleanSearcher {
+// nil for the clauses there aren't, which have to be searchers of this package: it
+// returns an error if one is not, or if there is neither a must nor a should clause
+// to drive it. The searchers are closed by whoever has them if it does; if not,
+// they are the boolean's, and closed with it.
+func NewPerSegmentBooleanSearcher(must, should, mustNot search.PerSegmentSearcher,
+	options search.SearcherOptions) (*PerSegmentBooleanSearcher, error) {
 	rv := &PerSegmentBooleanSearcher{
 		perSegBase: perSegBase{scored: options.Score != "none"},
 	}
 	for _, c := range []struct {
-		in    search.Searcher
+		in    search.PerSegmentSearcher
 		out   *perSegChild
 		wraps *[]wrapKind
 	}{{must, &rv.must, &rv.mustWraps}, {should, &rv.should, &rv.shouldWraps}, {mustNot, &rv.mustNot, &rv.mustNotWraps}} {
@@ -77,7 +79,7 @@ func NewPerSegmentBooleanSearcher(must, should, mustNot search.Searcher,
 		}
 		child, ok := c.in.(perSegChild)
 		if !ok {
-			return nil
+			return nil, fmt.Errorf("searcher: %T can't be a clause of a per segment boolean", c.in)
 		}
 		if c.in == should {
 			rv.shouldRequired = should.Min() > 0
@@ -87,10 +89,10 @@ func NewPerSegmentBooleanSearcher(must, should, mustNot search.Searcher,
 		rv.children = append(rv.children, child)
 	}
 	if rv.must == nil && rv.should == nil {
-		return nil // nothing to drive it
+		return nil, fmt.Errorf("searcher: a per segment boolean needs a must or a should clause")
 	}
 	rv.computeQueryNorm()
-	return rv
+	return rv, nil
 }
 
 // computeQueryNorm is BooleanSearcher's: the clauses that score tell the query

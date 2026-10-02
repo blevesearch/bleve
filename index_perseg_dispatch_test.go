@@ -16,7 +16,6 @@ package bleve
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -112,9 +111,10 @@ func TestPerSegmentDisjunctionClauseLimit(t *testing.T) {
 	}
 }
 
-// Per segment searchers and regular ones can't be combined; it must be an
-// error that says so, not a search that fails somewhere inside.
-func TestPerSegmentSearchersAreNotMixedWithRegularOnes(t *testing.T) {
+// The per segment searcher is not a Searcher, and a query that has one builds it
+// itself, apart from the regular searcher: the two kinds can't be combined, as the
+// compiler would not have it.
+func TestPerSegmentSearchersAreTheirOwnKind(t *testing.T) {
 	idx, cleanup := perSegmentTestIndex(t, index.DefaultScoringModel, nil)
 	defer cleanup()
 	adv, _ := idx.Advanced()
@@ -124,55 +124,40 @@ func TestPerSegmentSearchersAreNotMixedWithRegularOnes(t *testing.T) {
 	}
 	defer func() { _ = reader.Close() }()
 
-	flagged := context.WithValue(context.Background(), search.PerSegmentSearchKey, true)
-	plain := context.Background()
+	m := NewIndexMapping()
 	opts := search.SearcherOptions{}
-
-	perSeg, err := searcher.NewTermSearcher(flagged, reader, "common", "body", 1.0, opts)
-	if err != nil {
-		t.Fatal(err)
-	}
-	regular, err := searcher.NewTermSearcher(plain, reader, "even", "body", 1.0, opts)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := perSeg.(*searcher.PerSegmentTermSearcher); !ok {
-		t.Fatalf("expected a per segment term searcher, got %T", perSeg)
-	}
-	if _, ok := regular.(*searcher.TermSearcher); !ok {
-		t.Fatalf("expected a regular term searcher, got %T", regular)
-	}
-
-	for name, build := range map[string]func(c1, c2 search.Searcher) (search.Searcher, error){
-		"conjunction": func(c1, c2 search.Searcher) (search.Searcher, error) {
-			return searcher.NewConjunctionSearcher(flagged, reader, []search.Searcher{c1, c2}, opts)
-		},
-		"disjunction": func(c1, c2 search.Searcher) (search.Searcher, error) {
-			return searcher.NewDisjunctionSearcher(flagged, reader, []search.Searcher{c1, c2}, 0, opts)
-		},
-		"boolean": func(c1, c2 search.Searcher) (search.Searcher, error) {
-			return searcher.NewBooleanSearcherOrPerSegment(flagged, reader, c1, c2, nil, opts)
-		},
+	for name, q := range map[string]query.Query{
+		"term":         termQueryOn("body", "common"),
+		"conjunction":  query.NewConjunctionQuery(terms("common", "even")),
+		"disjunction":  query.NewDisjunctionQuery(terms("common", "even")),
+		"boolean":      booleanOf(terms("common"), terms("even"), terms("five"), 0),
+		"match":        query.NewMatchQuery("common even"),
+		"query string": query.NewQueryStringQuery("+body:common body:even"),
 	} {
-		// each build closes what it's given when it fails, so get new ones
-		a, _ := searcher.NewTermSearcher(flagged, reader, "common", "body", 1.0, opts)
-		b, _ := searcher.NewTermSearcher(plain, reader, "even", "body", 1.0, opts)
-		if _, err := build(a, b); !errors.Is(err, searcher.ErrPerSegmentMixed) {
-			t.Fatalf("%s: expected ErrPerSegmentMixed, got %v", name, err)
+		if mq, ok := q.(*query.MatchQuery); ok {
+			mq.SetField("body")
+		}
+		pq, ok := q.(query.PerSegmentQuery)
+		if !ok {
+			t.Fatalf("%s: %T has no per segment searcher", name, q)
+		}
+		ps, err := pq.PerSegmentSearcher(context.Background(), reader, m, opts)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if _, isSearcher := ps.(search.Searcher); isSearcher {
+			t.Fatalf("%s: %T is a Searcher as well", name, ps)
+		}
+		if _, isSearcher := ps.(interface {
+			Next(*search.SearchContext) (*search.DocumentMatch, error)
+		}); isSearcher {
+			t.Fatalf("%s: %T can be iterated one DocumentMatch at a time", name, ps)
+		}
+		if _, ok := ps.(search.OptimizedPerSegmentSearcher); !ok && name != "match" {
+			t.Fatalf("%s: %T has no optimized path", name, ps)
+		}
+		if err := ps.Close(); err != nil {
+			t.Fatalf("%s: %v", name, err)
 		}
 	}
-	_ = perSeg.Close()
-	_ = regular.Close()
-
-	// and nothing is per segment where the caller hasn't opted in
-	a, _ := searcher.NewTermSearcher(plain, reader, "common", "body", 1.0, opts)
-	b, _ := searcher.NewTermSearcher(plain, reader, "even", "body", 1.0, opts)
-	conj, err := searcher.NewConjunctionSearcher(flagged, reader, []search.Searcher{a, b}, opts)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := conj.(*searcher.ConjunctionSearcher); !ok {
-		t.Fatalf("regular clauses should give a regular conjunction, got %T", conj)
-	}
-	_ = conj.Close()
 }

@@ -16,6 +16,7 @@ package bleve
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -37,9 +38,10 @@ func termQueryOn(field, term string) *query.TermQuery {
 	return q
 }
 
-// TermQuery.Searcher is what decides, per reader, whether a per segment
-// searcher is handed out.
-func TestPerSegmentTermQuerySearcherChecksTheReader(t *testing.T) {
+// What a query can be searched by the per segment path is the query's to say, per
+// reader: search.ErrPerSegmentUnsupported is what its PerSegmentSearcher returns
+// when it can't, and the search goes to the regular path then.
+func TestPerSegmentSearcherIsRefusedWhenItCannotServe(t *testing.T) {
 	idx, cleanup := perSegmentTestIndex(t, index.DefaultScoringModel, nil)
 	defer cleanup()
 
@@ -54,62 +56,76 @@ func TestPerSegmentTermQuerySearcherChecksTheReader(t *testing.T) {
 	defer func() { _ = reader.Close() }()
 
 	m := NewIndexMapping()
+	ctx := context.Background()
 	opts := search.SearcherOptions{}
-	optedIn := context.WithValue(context.Background(), search.PerSegmentSearchKey, true)
-	notOptedIn := context.Background()
 
-	kind := func(ctx context.Context, r index.IndexReader, o search.SearcherOptions) string {
+	build := func(q query.Query, r index.IndexReader, o search.SearcherOptions) error {
 		t.Helper()
-		s, err := termQueryOn("body", "common").Searcher(ctx, r, m, o)
-		if err != nil {
-			t.Fatal(err)
+		ps, err := q.(query.PerSegmentQuery).PerSegmentSearcher(ctx, r, m, o)
+		if err == nil {
+			_ = ps.Close()
 		}
-		defer func() { _ = s.Close() }()
-		if _, ok := s.(search.PerSegmentSearcher); ok {
-			return "per-segment"
-		}
-		if _, ok := s.(*searcher.TermSearcher); ok {
-			return "regular"
-		}
-		return "other"
+		return err
 	}
+	term := termQueryOn("body", "common")
 
-	// the scorch snapshot is a per segment index reader, and the caller opted in
+	// the scorch snapshot is a per segment index reader
 	if _, ok := reader.(searcher.PerSegmentIndexReader); !ok {
 		t.Fatal("expected the scorch reader to be a PerSegmentIndexReader")
 	}
-	if got := kind(optedIn, reader, opts); got != "per-segment" {
-		t.Errorf("scorch reader, opted in: got %s searcher", got)
-	}
-
-	// a reader that is not one never gets it, even if the caller opted in
-	if got := kind(optedIn, plainReader{reader}, opts); got != "regular" {
-		t.Errorf("plain reader, opted in: got %s searcher", got)
-	}
-
-	// without the opt in nobody gets it
-	if got := kind(notOptedIn, reader, opts); got != "regular" {
-		t.Errorf("scorch reader, not opted in: got %s searcher", got)
-	}
-
-	// a search that wants no scores is served too
-	if got := kind(optedIn, reader, search.SearcherOptions{Score: ScoreNone}); got != "per-segment" {
-		t.Errorf("scorch reader, opted in, score none: got %s searcher", got)
-	}
-
-	// an explanation is built for the hits afterwards, so asking for one doesn't
-	// keep the searcher from being a per segment one
-	if got := kind(optedIn, reader, search.SearcherOptions{Explain: true}); got != "per-segment" {
-		t.Errorf("scorch reader, opted in, explain: got %s searcher", got)
-	}
-
-	// but term vectors, which need the matches' positions, do
 	for name, o := range map[string]search.SearcherOptions{
-		"term vectors": {IncludeTermVectors: true},
+		"scored":          opts,
+		"without scores":  {Score: ScoreNone},
+		"with an explain": {Explain: true},
 	} {
-		if got := kind(optedIn, reader, o); got != "regular" {
-			t.Errorf("scorch reader, opted in, %s: got %s searcher", name, got)
+		if err := build(term, reader, o); err != nil {
+			t.Errorf("%s: %v", name, err)
 		}
+	}
+
+	refused := map[string]struct {
+		q query.Query
+		r index.IndexReader
+		o search.SearcherOptions
+	}{
+		// a reader that can't give the postings by segment
+		"a reader that isn't a per segment one": {term, plainReader{reader}, opts},
+		// term vectors need the matches' positions
+		"term vectors": {term, reader, search.SearcherOptions{IncludeTermVectors: true}},
+		"a clause with term vectors": {query.NewConjunctionQuery(terms("common", "even")), reader,
+			search.SearcherOptions{IncludeTermVectors: true}},
+		"a fuzzy match": {func() query.Query {
+			q := query.NewMatchQuery("common")
+			q.SetField("body")
+			q.SetFuzziness(1)
+			return q
+		}(), reader, opts},
+		"a boolean with a filter": {func() query.Query {
+			b := booleanOf(terms("common"), nil, nil, 0)
+			b.Filter = termQueryOn("body", "even")
+			return b
+		}(), reader, opts},
+		"a boolean that only excludes": {booleanOf(nil, nil, terms("common"), 0), reader, opts},
+		"a disjunction with scores broken down": {func() query.Query {
+			d := query.NewDisjunctionQuery(terms("common", "even"))
+			d.RetrieveScoreBreakdown(true)
+			return d
+		}(), reader, opts},
+	}
+	for name, c := range refused {
+		if err := build(c.q, c.r, c.o); !errors.Is(err, search.ErrPerSegmentUnsupported) {
+			t.Errorf("%s: expected ErrPerSegmentUnsupported, got %v", name, err)
+		}
+	}
+
+	// the search that goes to the regular path is answered all the same
+	if res, err := idx.Search(NewSearchRequest(func() query.Query {
+		q := query.NewMatchQuery("common")
+		q.SetField("body")
+		q.SetFuzziness(1)
+		return q
+	}())); err != nil || res.Total == 0 {
+		t.Errorf("a fuzzy match: %v, %v", res, err)
 	}
 }
 
@@ -260,4 +276,77 @@ func TestPerSegmentSearchThroughIndexAlias(t *testing.T) {
 		cleanup2()
 		cleanup1()
 	}
+}
+
+// A per segment searcher that can't be built closes what it had built by then: every
+// term searcher that was started is finished, whether the query was refused halfway
+// or failed, and whatever its shape.
+func TestPerSegmentSearcherBuildsThatFailCloseTheirClauses(t *testing.T) {
+	idx, cleanup := perSegmentTestIndex(t, index.DefaultScoringModel, nil)
+	defer cleanup()
+	adv, err := idx.Advanced()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader, err := adv.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = reader.Close() }()
+
+	termSearchers := func() (started, finished interface{}) {
+		stats := idx.StatsMap()["index"].(map[string]interface{})
+		return stats["term_searchers_started"], stats["term_searchers_finished"]
+	}
+	fuzzy := func() query.Query {
+		q := query.NewMatchQuery("common")
+		q.SetField("body")
+		q.SetFuzziness(1)
+		return q
+	}
+	filtered := booleanOf(terms("common"), terms("even"), nil, 0)
+	filtered.Filter = termQueryOn("body", "five")
+
+	orig := searcher.DisjunctionMaxClauseCount
+	searcher.DisjunctionMaxClauseCount = 2
+	defer func() { searcher.DisjunctionMaxClauseCount = orig }()
+
+	for name, q := range map[string]query.Query{
+		// the clause that is refused comes last, after the others were built
+		"an and with a fuzzy match last": query.NewConjunctionQuery([]query.Query{termQueryOn("body", "common"), termQueryOn("body", "even"), fuzzy()}),
+		"an or with a fuzzy match last":  query.NewDisjunctionQuery([]query.Query{termQueryOn("body", "common"), fuzzy()}),
+		"a boolean with a filter":        filtered,
+		"a boolean that only excludes":   booleanOf(nil, nil, terms("common"), 0),
+		"a boolean, its should refused":  booleanOf(terms("common"), []query.Query{fuzzy()}, terms("five"), 0),
+		// too many clauses: all of them built, then the disjunction fails
+		"an or of too many clauses": query.NewDisjunctionQuery(terms("common", "even", "five")),
+	} {
+		before1, before2 := termSearchers()
+		ps, err := q.(query.PerSegmentQuery).PerSegmentSearcher(context.Background(), reader, NewIndexMapping(), search.SearcherOptions{})
+		if err == nil {
+			_ = ps.Close()
+			t.Errorf("%s: expected an error", name)
+		}
+		started, finished := termSearchers()
+		// the readers of the snapshot count; compare what this build changed
+		if started == before1 && finished == before2 {
+			continue // no term searcher was started
+		}
+		if toInt(started)-toInt(before1) != toInt(finished)-toInt(before2) {
+			t.Errorf("%s: %d term searchers started, %d finished", name,
+				toInt(started)-toInt(before1), toInt(finished)-toInt(before2))
+		}
+	}
+}
+
+func toInt(v interface{}) int {
+	switch n := v.(type) {
+	case uint64:
+		return int(n)
+	case int:
+		return n
+	case int64:
+		return int(n)
+	}
+	return 0
 }

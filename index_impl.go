@@ -562,7 +562,10 @@ func init() {
 // memNeededForSearch is a helper function that returns an estimate of RAM
 // needed to execute a search request.
 func memNeededForSearch(req *SearchRequest,
-	searcher search.Searcher,
+	searcher interface {
+		Size() int
+		DocumentMatchPoolSize() int
+	},
 	topnCollector interface{ Size() int },
 ) uint64 {
 	backingSize := req.Size + req.From + 1
@@ -866,32 +869,52 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		ctx = context.WithValue(ctx, search.BM25StatsKey, bm25Stats)
 	}
 
-	// let a top level term query hand out a per segment searcher, if the request
-	// is one that the per segment path serves
-	if perSegmentSearchEligible(ctx, req, fts, contextScoreFusionKeyExists || rescorer != nil) {
-		ctx = context.WithValue(ctx, search.PerSegmentSearchKey, true)
-	}
-
-	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
+	searcherOptions := search.SearcherOptions{
 		Explain:            req.Explain,
 		IncludeTermVectors: req.IncludeLocations || req.Highlight != nil,
 		Score:              req.Score,
-	})
-	if err != nil {
-		return nil, err
 	}
-	defer func() {
-		if serr := searcher.Close(); err == nil && serr != nil {
-			err = serr
-		}
-	}()
 
-	// A per segment searcher is collected by the per segment collector; for
-	// anything else it's the TopN one. Only the collector that is going to run
-	// gets built.
+	// A request that the per segment path serves, of a query and an index that it
+	// serves, is searched by a searcher of its own (which is not a Searcher) and its
+	// own collector; any other by the regular searcher and the TopN collector.
+	var psSearcher search.PerSegmentSearcher
+	if perSegmentSearchEligible(ctx, req, fts, contextScoreFusionKeyExists || rescorer != nil) {
+		psSearcher, err = perSegmentSearcherFor(ctx, req, indexReader, i.m, searcherOptions)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var searcher search.Searcher
+	var searcherSize interface {
+		Size() int
+		DocumentMatchPoolSize() int
+	}
+	if psSearcher != nil {
+		searcherSize = perSegmentSearcherSize{psSearcher}
+		defer func() {
+			if serr := psSearcher.Close(); err == nil && serr != nil {
+				err = serr
+			}
+		}()
+	} else {
+		searcher, err = req.Query.Searcher(ctx, indexReader, i.m, searcherOptions)
+		if err != nil {
+			return nil, err
+		}
+		searcherSize = searcher
+		defer func() {
+			if serr := searcher.Close(); err == nil && serr != nil {
+				err = serr
+			}
+		}()
+	}
+
 	var coll *collector.TopNCollector
-	var resultColl searchResultCollector
-	if psColl := perSegmentCollector(searcher, req); psColl != nil {
+	var psColl *collector.PerSegmentTopNCollector
+	var resultColl searchResults
+	if psSearcher != nil {
+		psColl = newPerSegmentCollector(req)
 		resultColl = psColl
 	} else {
 		topNCollectorsBuilt.Add(1)
@@ -979,10 +1002,11 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				facetsBuilder.Add(facetName, facetBuilder)
 			}
 		}
-		resultColl.SetFacetsBuilder(facetsBuilder)
+		// a request with facets is not served by the per segment path
+		coll.SetFacetsBuilder(facetsBuilder)
 	}
 
-	memNeeded := memNeededForSearch(req, searcher, resultColl)
+	memNeeded := memNeededForSearch(req, searcherSize, resultColl)
 	if cb := ctx.Value(SearchQueryStartCallbackKey); cb != nil {
 		if cbF, ok := cb.(SearchQueryStartCallbackFn); ok {
 			err = cbF(memNeeded)
@@ -1000,7 +1024,11 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}
 
-	err = resultColl.Collect(ctx, searcher, indexReader)
+	if psSearcher != nil {
+		err = psColl.Collect(ctx, psSearcher, indexReader)
+	} else {
+		err = coll.Collect(ctx, searcher, indexReader)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -1083,7 +1111,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		TotalRelation: totalRelation,
 		MaxScore:      resultColl.MaxScore(),
 		Took:          searchDuration,
-		Facets:        resultColl.FacetResults(),
+	}
+	if coll != nil {
+		rv.Facets = coll.FacetResults()
 	}
 
 	// rescore if fusion flag is set

@@ -166,7 +166,7 @@ func newPerSegFixture(t *testing.T, o perSegFixtureOpts) *perSegFixture {
 // termSearcher is the per segment searcher of a term of the fixture.
 func (f *perSegFixture) termSearcher(term string, scored bool, model string) *PerSegmentTermSearcher {
 	f.t.Helper()
-	ctx := context.WithValue(context.Background(), search.PerSegmentSearchKey, true)
+	ctx := context.Background()
 	if model == index.BM25Scoring {
 		ctx = context.WithValue(ctx, search.GetScoringModelCallbackKey,
 			search.GetScoringModelCallbackFn(func() string { return index.BM25Scoring }))
@@ -179,8 +179,26 @@ func (f *perSegFixture) termSearcher(term string, scored bool, model string) *Pe
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	if s == nil {
-		f.t.Fatalf("no per segment searcher for %q", term)
+	return s
+}
+
+// conjunction and disjunction build the composite searchers of the clauses.
+func (f *perSegFixture) conjunction(clauses []search.PerSegmentSearcher,
+	opts search.SearcherOptions) *PerSegmentConjunctionSearcher {
+	f.t.Helper()
+	s, err := NewPerSegmentConjunctionSearcher(clauses, opts)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	return s
+}
+
+func (f *perSegFixture) disjunction(clauses []search.PerSegmentSearcher, min float64,
+	opts search.SearcherOptions) *PerSegmentDisjunctionSearcher {
+	f.t.Helper()
+	s, err := NewPerSegmentDisjunctionSearcher(clauses, min, opts)
+	if err != nil {
+		f.t.Fatal(err)
 	}
 	return s
 }

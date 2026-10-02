@@ -458,9 +458,8 @@ func TestPerSegmentOrGenericLoopFindsEveryMatch(t *testing.T) {
 					t.Fatal(err)
 				}
 				defer func() { _ = reader.Close() }()
-				ctx := context.WithValue(context.Background(), search.PerSegmentSearchKey, true)
 				// the model the index scores with, which the searchers ask for
-				ctx = context.WithValue(ctx, search.GetScoringModelCallbackKey,
+				ctx := context.WithValue(context.Background(), search.GetScoringModelCallbackKey,
 					search.GetScoringModelCallbackFn(func() string { return model }))
 
 				rnd := rand.New(rand.NewSource(21))
@@ -491,20 +490,16 @@ func TestPerSegmentOrGenericLoopFindsEveryMatch(t *testing.T) {
 						}
 						for _, k := range []int{1, 10, 100, 27000} {
 							what := fmt.Sprintf("%s deletions=%v %v scored=%v k=%d", model, deletions, names, scored, k)
-							s, err := mk().Searcher(ctx, reader, NewIndexMapping(), opts)
+							ps, err := mk().(query.PerSegmentQuery).PerSegmentSearcher(ctx, reader, NewIndexMapping(), opts)
 							if err != nil {
 								t.Fatalf("%s: %v", what, err)
-							}
-							ps, ok := s.(search.PerSegmentSearcher)
-							if !ok {
-								t.Fatalf("%s: %T is not a per segment searcher", what, s)
 							}
 							c := collector.NewPerSegmentTopNCollector(k, 0)
 							// the generic loop: NextMatch until there are no more
 							if err := c.Collect(ctx, genericOnly{ps}, reader); err != nil {
 								t.Fatalf("%s: %v", what, err)
 							}
-							_ = s.Close()
+							_ = ps.Close()
 
 							if c.Total() != truth.Total || c.EarlyStopped() {
 								t.Fatalf("%s: total %d (early stopped: %v), want exactly %d", what,
@@ -563,9 +558,8 @@ func TestPerSegmentAndGenericLoopFindsEveryMatch(t *testing.T) {
 					t.Fatal(err)
 				}
 				defer func() { _ = reader.Close() }()
-				ctx := context.WithValue(context.Background(), search.PerSegmentSearchKey, true)
 				// the model the index scores with, which the searchers ask for
-				ctx = context.WithValue(ctx, search.GetScoringModelCallbackKey,
+				ctx := context.WithValue(context.Background(), search.GetScoringModelCallbackKey,
 					search.GetScoringModelCallbackFn(func() string { return model }))
 
 				rnd := rand.New(rand.NewSource(21))
@@ -596,20 +590,16 @@ func TestPerSegmentAndGenericLoopFindsEveryMatch(t *testing.T) {
 						}
 						for _, k := range []int{1, 10, 100, 27000} {
 							what := fmt.Sprintf("%s deletions=%v %v scored=%v k=%d", model, deletions, names, scored, k)
-							s, err := mk().Searcher(ctx, reader, NewIndexMapping(), opts)
+							ps, err := mk().(query.PerSegmentQuery).PerSegmentSearcher(ctx, reader, NewIndexMapping(), opts)
 							if err != nil {
 								t.Fatalf("%s: %v", what, err)
-							}
-							ps, ok := s.(search.PerSegmentSearcher)
-							if !ok {
-								t.Fatalf("%s: %T is not a per segment searcher", what, s)
 							}
 							c := collector.NewPerSegmentTopNCollector(k, 0)
 							// the generic loop: NextMatch until there are no more
 							if err := c.Collect(ctx, genericOnly{ps}, reader); err != nil {
 								t.Fatalf("%s: %v", what, err)
 							}
-							_ = s.Close()
+							_ = ps.Close()
 
 							if c.Total() != truth.Total || c.EarlyStopped() {
 								t.Fatalf("%s: total %d (early stopped: %v), want exactly %d", what,

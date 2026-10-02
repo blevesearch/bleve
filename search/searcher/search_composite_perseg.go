@@ -19,13 +19,12 @@ import (
 	"math"
 
 	"github.com/blevesearch/bleve/v2/search"
-	index "github.com/blevesearch/bleve_index_api"
 )
 
 // perSegChild is a clause of a composite per segment searcher: a term, or a
 // composite itself.
 type perSegChild interface {
-	search.Searcher
+	search.PerSegmentSearcher
 
 	// segCursor is the cursor over the matches of the clause in segment seg,
 	// and false if there are none there. A cursor can only be had once.
@@ -142,16 +141,6 @@ func (b *perSegBase) Close() error {
 	}
 	return rv
 }
-
-func (b *perSegBase) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
-	return nil, ErrPerSegmentSearcherIterated
-}
-
-func (b *perSegBase) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
-	return nil, ErrPerSegmentSearcherIterated
-}
-
-func (b *perSegBase) DocumentMatchPoolSize() int { return 0 }
 
 // nextMatch is the generic iteration: the next match of the segment being read, and
 // then, once its cursor is spent, of the next segment that has matches. makeCursor

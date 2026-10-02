@@ -144,19 +144,15 @@ func TestPerSegmentOptimizedPathMatchesGenericLoop(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			ctx := context.WithValue(context.Background(), search.PerSegmentSearchKey, true)
+			ctx := context.Background()
 			opts := search.SearcherOptions{}
 			if !scored {
 				opts.Score = ScoreNone
 			}
 			newSearcher := func(term string) search.PerSegmentSearcher {
-				s, err := termQueryOn("body", term).Searcher(ctx, reader, NewIndexMapping(), opts)
+				ps, err := termQueryOn("body", term).PerSegmentSearcher(ctx, reader, NewIndexMapping(), opts)
 				if err != nil {
 					t.Fatal(err)
-				}
-				ps, ok := s.(search.PerSegmentSearcher)
-				if !ok {
-					t.Fatalf("not a per segment searcher: %T", s)
 				}
 				return ps
 			}
