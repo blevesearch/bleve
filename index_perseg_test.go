@@ -211,14 +211,23 @@ func compareSearchResultsIgnoringIndex(t *testing.T, what string, old, got *Sear
 
 func compareSearchResultsOpt(t *testing.T, what string, old, got *SearchResult, ignoreIndex bool) {
 	t.Helper()
-	if old.Total != got.Total {
-		t.Fatalf("%s: total %d, want %d", what, got.Total, old.Total)
+	// A search that skipped blocks that couldn't make the top hits says so, and
+	// then its total is a lower bound of the real one.
+	if got.TotalRelation == TotalRelationGte && old.TotalRelation == TotalRelationEq {
+		if got.Total > old.Total || got.Total < uint64(len(got.Hits)) {
+			t.Fatalf("%s: total %d (a lower bound), the real total is %d with %d hits",
+				what, got.Total, old.Total, len(got.Hits))
+		}
+	} else {
+		if old.Total != got.Total {
+			t.Fatalf("%s: total %d, want %d", what, got.Total, old.Total)
+		}
+		if old.TotalRelation != got.TotalRelation {
+			t.Fatalf("%s: total relation %v, want %v", what, got.TotalRelation, old.TotalRelation)
+		}
 	}
 	if !sameScore(old.MaxScore, got.MaxScore) {
 		t.Fatalf("%s: max score %v, want %v", what, got.MaxScore, old.MaxScore)
-	}
-	if old.TotalRelation != got.TotalRelation {
-		t.Fatalf("%s: total relation %v, want %v", what, got.TotalRelation, old.TotalRelation)
 	}
 	if len(old.Hits) != len(got.Hits) {
 		t.Fatalf("%s: %d hits, want %d", what, len(got.Hits), len(old.Hits))

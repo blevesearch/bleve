@@ -15,8 +15,10 @@
 package bleve
 
 import (
+	"github.com/blevesearch/bleve/v2/search/searcher"
 	"math/rand"
 	"os"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"testing"
@@ -151,8 +153,19 @@ func BenchmarkSearchAllocs(b *testing.B) {
 //	    -benchtime 20s -cpuprofile cpu.out
 func BenchmarkSearchCPU(b *testing.B) {
 	shape := os.Getenv("PERSEG_SHAPE")
+	// PERSEG_DISJ=wand|maxscore picks the algorithm of ORs, for comparisons
+	restoreAlgo := searcher.SetPerSegmentDisjunctionAlgo(os.Getenv("PERSEG_DISJ"))
+	defer restoreAlgo()
+	// PERSEG_CONJ_MINCAND=n sets how many candidates a window of an AND needs to
+	// be done on bitmaps (a huge number turns that off)
+	restoreConj := searcher.SetPerSegmentConjunctionBitmapMinCandidates(envInt("PERSEG_CONJ_MINCAND", 16))
+	defer restoreConj()
 	if shape == "" {
 		b.Skip("set PERSEG_SHAPE")
+	}
+	size := 10
+	if v, err := strconv.Atoi(os.Getenv("PERSEG_SIZE")); err == nil {
+		size = v
 	}
 	idx, cleanup := buildAllocBenchIndexModel(b, 200000, 8, os.Getenv("PERSEG_MODEL"))
 	defer cleanup()
@@ -170,18 +183,60 @@ func BenchmarkSearchCPU(b *testing.B) {
 		q = query.NewConjunctionQuery([]query.Query{term("w0"), term("w1"), term("w2")})
 	case "or":
 		q = query.NewDisjunctionQuery([]query.Query{term("w0"), term("w1"), term("w10"), term("w100"), term("mk1")})
+	case "or3":
+		q = query.NewDisjunctionQuery([]query.Query{term("w0"), term("w1"), term("w2")})
+	case "or10":
+		terms := make([]query.Query, 0, 10)
+		for _, w := range []string{"w0", "w1", "w2", "w3", "w5", "w8", "w13", "w21", "w34", "w55"} {
+			terms = append(terms, term(w))
+		}
+		q = query.NewDisjunctionQuery(terms)
+	case "orskew":
+		q = query.NewDisjunctionQuery([]query.Query{term("w0"), term("w1"), term("mk1"), term("mk01")})
+	case "ormid":
+		q = query.NewDisjunctionQuery([]query.Query{term("mk50"), term("mk10"), term("w3")})
+	case "andmid":
+		q = query.NewConjunctionQuery([]query.Query{term("mk50"), term("mk10")})
+	case "andhl":
+		q = query.NewConjunctionQuery([]query.Query{term("mk100"), term("mk1")})
+	case "and2z":
+		q = query.NewConjunctionQuery([]query.Query{term("w0"), term("w1")})
+	case "and4":
+		q = query.NewConjunctionQuery([]query.Query{term("w0"), term("w1"), term("w2"), term("w3")})
+	case "andmk":
+		q = query.NewConjunctionQuery([]query.Query{term("mk100"), term("mk50"), term("mk10")})
+	case "or2":
+		q = query.NewDisjunctionQuery([]query.Query{term("w0"), term("w1")})
+	case "or2rare":
+		q = query.NewDisjunctionQuery([]query.Query{term("mk1"), term("mk01")})
+	case "orrare":
+		q = query.NewDisjunctionQuery([]query.Query{term("mk01"), term("mk1"), term("w3000"), term("w4000"), term("w4999")})
+	case "ormk":
+		q = query.NewDisjunctionQuery([]query.Query{term("mk100"), term("mk50"), term("mk10")})
+	case "orlongtail":
+		q = query.NewDisjunctionQuery([]query.Query{term("w300"), term("w500"), term("w800"), term("w1200"), term("w2000")})
 	default:
 		b.Fatalf("unknown shape %q", shape)
 	}
 	for i := 0; i < 50; i++ {
-		if _, err := idx.Search(NewSearchRequestOptions(q, 10, 0, false)); err != nil {
+		if _, err := idx.Search(NewSearchRequestOptions(q, size, 0, false)); err != nil {
 			b.Fatal(err)
 		}
 	}
 	b.ReportAllocs()
+	if f := os.Getenv("PERSEG_CPUPROF"); f != "" {
+		pf, err := os.Create(f)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if err := pprof.StartCPUProfile(pf); err != nil {
+			b.Fatal(err)
+		}
+		defer func() { pprof.StopCPUProfile(); _ = pf.Close() }()
+	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := idx.Search(NewSearchRequestOptions(q, 10, 0, false)); err != nil {
+		if _, err := idx.Search(NewSearchRequestOptions(q, size, 0, false)); err != nil {
 			b.Fatal(err)
 		}
 	}

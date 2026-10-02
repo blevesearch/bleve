@@ -19,6 +19,7 @@ import (
 	"math"
 	"math/bits"
 	"reflect"
+	"sync"
 
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
@@ -409,7 +410,15 @@ func conjunctionWindow(leader *termCursor, secs []*termCursor, doc uint32,
 // threshold; and once a term has been looked at, the bounds of the rest are all
 // that's left to assume.
 func (s *PerSegmentConjunctionSearcher) windowSegment(ctx context.Context, sink search.PerSegmentSink,
-	seg int, byIdx []*termCursor) error {
+	seg int, byIdx []*termCursor) (retErr error) {
+	// working memory for the windows that are done with bitmaps, taken when
+	// the first of them is
+	var scratch *conjScratch
+	defer func() {
+		if scratch != nil {
+			conjScratchPool.Put(scratch)
+		}
+	}()
 	h := sink.Heap(seg)
 	offset := byIdx[0].Offset()
 
@@ -500,6 +509,93 @@ func (s *PerSegmentConjunctionSearcher) windowSegment(ctx context.Context, sink 
 		}
 		scoreThreshold := thr - secBlockMax
 
+		// A window that is narrow, with many of the leader's postings that could
+		// make the heap, is done on bitmaps: the leader's candidates and each
+		// term's postings in the window are put in one, the bitmaps are ANDed,
+		// and the matches that are left are scored from the scores of the terms,
+		// which were worked out for blocks. No cursor is moved for any single doc.
+		if len(secs) > 0 && uint64(windowEnd-doc) < msBatch {
+			cands := 0
+			for _, sc := range scores[start:end] {
+				cands += b2i(sc > scoreThreshold)
+			}
+			if cands >= conjBitmapMinCandidates {
+				if scratch == nil {
+					scratch = conjScratchPool.Get().(*conjScratch)
+				}
+				base := doc
+				nw := int(windowEnd-base)/64 + 1
+				res, tmp := scratch.res[:nw], scratch.tmp[:nw]
+				clear(res)
+				lead := scratch.lane(leader.idx)
+				for i := start; i < end; i++ {
+					if sc := scores[i]; sc > scoreThreshold {
+						off := docs[i] - base
+						res[off>>6] |= 1 << (off & 63)
+						lead[off] = sc
+					}
+				}
+				alive := true
+				for _, c := range secs {
+					if c.Seek(base) == noMoreDocs {
+						finished = true // a term has run out: there are no more matches
+						alive = false
+						break
+					}
+					sdocs := c.blk.Docs[c.pos:c.n]
+					sscores := c.blockScores()[c.pos:c.n]
+					lane := scratch.lane(c.idx)
+					clear(tmp)
+					for j, d := range sdocs {
+						if d > windowEnd {
+							break
+						}
+						off := d - base
+						tmp[off>>6] |= 1 << (off & 63)
+						lane[off] = sscores[j]
+					}
+					var any uint64
+					for w := range res {
+						res[w] &= tmp[w]
+						any |= res[w]
+					}
+					if any == 0 {
+						alive = false
+						break
+					}
+				}
+				if alive {
+				matches:
+					for w, word := range res {
+						for ; word != 0; word &= word - 1 {
+							off := w*64 + bits.TrailingZeros64(word)
+							var total float32
+							for _, c := range byIdx {
+								total += scratch.lanes[c.idx][off]
+							}
+							if total > maxScore {
+								maxScore = total
+							}
+							if total > thr {
+								h.Offer(search.PerSegmentHit{Score: total, Doc: offset + uint64(base) + uint64(off),
+									Ord: uint32(visited), Seg: uint32(seg)})
+								thr = thresholdOf(sink)
+								markPruning(thr)
+								if globalMax <= thr {
+									finished = true
+									visited++
+									break matches
+								}
+							}
+							visited++
+						}
+					}
+				}
+				doc = windowEnd + 1
+				continue
+			}
+		}
+
 	candidates:
 		for i := start; i < end; i++ {
 			leaderScore := scores[i]
@@ -560,4 +656,49 @@ func (s *PerSegmentConjunctionSearcher) windowSegment(ctx context.Context, sink 
 		}
 	}
 	return nil
+}
+
+// conjScratch is the working memory of the windows of an AND that are done on
+// bitmaps: a lane of scores by doc offset for each term, and two bitmaps. The
+// lanes are not cleaned after a window -- a score is only read where every term
+// has set its bit in that window, which is where it was written -- so a conjScratch
+// is its own kind: nothing else can use its lanes, which are not zeros.
+type conjScratch struct {
+	lanes [][]float32
+	res   [msWords]uint64
+	tmp   [msWords]uint64
+}
+
+var conjScratchPool = sync.Pool{New: func() any { return new(conjScratch) }}
+
+// lane is the lane of scores of the term in the place idx of the query.
+func (c *conjScratch) lane(idx int) []float32 {
+	for len(c.lanes) <= idx {
+		c.lanes = append(c.lanes, nil)
+	}
+	if c.lanes[idx] == nil {
+		c.lanes[idx] = make([]float32, msBatch)
+	}
+	return c.lanes[idx]
+}
+
+// conjBitmapMinCandidates is how many of the leader's postings in a window have
+// to be able to make the heap for the window to be done on bitmaps.
+var conjBitmapMinCandidates = 16
+
+func b2i(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// SetPerSegmentConjunctionBitmapMinCandidates sets how many of the leader's
+// postings in a window have to be able to make the heap for the window to be
+// done on bitmaps (a very large number turns that off), and returns a function
+// that puts back what was. It is for tests and benchmarks.
+func SetPerSegmentConjunctionBitmapMinCandidates(n int) (restore func()) {
+	prev := conjBitmapMinCandidates
+	conjBitmapMinCandidates = n
+	return func() { conjBitmapMinCandidates = prev }
 }

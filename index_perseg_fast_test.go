@@ -185,7 +185,12 @@ func TestPerSegmentOptimizedPathMatchesGenericLoop(t *testing.T) {
 					}
 					_ = slow.Close()
 
-					if cf.Total() != cg.Total() || cf.MaxScore() != cg.MaxScore() {
+					totalOK := cf.Total() == cg.Total()
+					if cf.EarlyStopped() {
+						// blocks were skipped: the total is a lower bound
+						totalOK = cf.Total() <= cg.Total() && cf.Total() >= uint64(len(cf.Results()))
+					}
+					if !totalOK || cf.MaxScore() != cg.MaxScore() {
 						t.Fatalf("%s: total/max %d/%v vs generic %d/%v", what,
 							cf.Total(), cf.MaxScore(), cg.Total(), cg.MaxScore())
 					}
@@ -194,7 +199,7 @@ func TestPerSegmentOptimizedPathMatchesGenericLoop(t *testing.T) {
 						t.Fatalf("%s: %d hits vs generic %d", what, len(rf), len(rg))
 					}
 					for i := range rf {
-						if rf[i].ID != rg[i].ID || rf[i].Score != rg[i].Score || rf[i].HitNumber != rg[i].HitNumber {
+						if rf[i].ID != rg[i].ID || rf[i].Score != rg[i].Score || (!cf.EarlyStopped() && rf[i].HitNumber != rg[i].HitNumber) {
 							t.Fatalf("%s: hit %d is %s/%v/%d vs generic %s/%v/%d", what, i,
 								rf[i].ID, rf[i].Score, rf[i].HitNumber, rg[i].ID, rg[i].Score, rg[i].HitNumber)
 						}

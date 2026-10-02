@@ -281,3 +281,82 @@ func (t *termCursor) fillBits(start, end uint32, words []uint64) {
 		t.seekBlock(last + 1)
 	}
 }
+
+// blockBoundsSource tells the bounds of the blocks of a term's postings: what a
+// reader that has block-max data does.
+type blockBoundsSource interface {
+	BoundsAt(target uint32) (segment.BlockBounds, bool)
+}
+
+// boundUpTo is the most that a posting of the term from start to target can
+// score, as the best of the bounds of the blocks that cover them, and the last
+// doc of the last of those blocks. ok is false if there's no block from start on.
+func (t *termCursor) boundUpTo(start uint32, target uint64) (bound float32, last uint32, ok bool) {
+	return boundUpTo(t.reader, t.scorer, start, target)
+}
+
+func boundUpTo(src blockBoundsSource, sc *scorer.PerSegmentTermScorer, start uint32,
+	target uint64) (bound float32, last uint32, ok bool) {
+	bd, ok := src.BoundsAt(start)
+	if !ok {
+		return 0, noMoreDocs, false
+	}
+	bound = sc.UpperBound(bd.MaxFreq, bd.MaxNorm, bd.FreqBounded)
+	last = bd.LastDoc
+	for uint64(last) < target && last != noMoreDocs {
+		next, ok := src.BoundsAt(last + 1)
+		if !ok {
+			break
+		}
+		if b := sc.UpperBound(next.MaxFreq, next.MaxNorm, next.FreqBounded); b > bound {
+			bound = b
+		}
+		last = next.LastDoc
+	}
+	return bound, last, true
+}
+
+// scatter puts the score of each of the cursor's postings below end into lane,
+// by its doc's offset from base, sets the doc's bit in words and counts it in
+// counts, and moves the cursor to its first posting at or after end. The cursor
+// has to be on a doc >= base, and the lane, words and counts have to have a
+// place for each of the docs from base to end.
+func (t *termCursor) scatter(base, end uint32, lane []float32, words *[msWords]uint64,
+	counts *[msBatch]uint8) {
+	for t.doc != noMoreDocs && t.doc < end {
+		docs := t.blk.Docs[t.pos:t.n]
+		c := len(docs)
+		if docs[c-1] >= end {
+			// the first posting at or after end
+			lo, hi := 0, c
+			for lo < hi {
+				mid := int(uint(lo+hi) >> 1)
+				if docs[mid] < end {
+					lo = mid + 1
+				} else {
+					hi = mid
+				}
+			}
+			c = lo
+		}
+		scores := t.blockScores()[t.pos : t.pos+c]
+		for i, d := range docs[:c] {
+			off := d - base
+			lane[off] = scores[i]
+			words[off>>6] |= 1 << (off & 63)
+			counts[off]++
+		}
+		t.pos += c
+		if t.pos < t.n {
+			t.doc = t.blk.Docs[t.pos]
+			return
+		}
+		// the block is used up
+		last := t.blk.Docs[t.n-1]
+		if last == noMoreDocs-1 {
+			t.finish()
+			return
+		}
+		t.seekBlock(last + 1)
+	}
+}

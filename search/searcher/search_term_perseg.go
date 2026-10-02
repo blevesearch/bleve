@@ -17,6 +17,7 @@ package searcher
 import (
 	"context"
 	"errors"
+	"math"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/index/scorch"
@@ -24,6 +25,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search/scorer"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
 
 var reflectStaticSizePerSegmentTermSearcher int
@@ -226,27 +228,97 @@ func (s *PerSegmentTermSearcher) CollectOptimized(ctx context.Context,
 // context.
 const checkDoneEvery = 1024
 
-// collectScored scores every segment's matches a block at a time, keeping the
-// best k of each.
+// collectScored scores the matches of every segment a block at a time, keeping
+// the best k of them.
+//
+// Once the heap is full a block is only worth reading if it can beat the worst
+// hit in it, and the skip data tells what a block can score at most without
+// decoding it: a block that can't is passed over (the lone term version of
+// block-max WAND). Whatever is skipped can't change the top hits or the max
+// score; it only isn't visited.
+//
+// The total stays exact for a segment without deletions, as the term's count
+// is then the number of its matches. With deletions it can't be known without
+// walking the postings, so a segment that skipped a block counts only what it
+// visited, and the collection is marked as pruned: the total is a lower bound.
 func (s *PerSegmentTermSearcher) collectScored(ctx context.Context,
 	sink search.PerSegmentSink) error {
 	var scores [scorer.PerSegmentBlockLen]float32
 	var sinceCheck int
+	// a scorer whose idf is negative has no bounds; nor does a collection that
+	// wants no hits
+	prune := s.scorer.Prunable() && sink.Limit() > 0
 	for seg, r := range s.readers {
 		if r == nil {
 			continue
 		}
 		h := sink.Heap(seg)
 		offset := r.Offset()
-		var total uint64
+		var total uint64 // matches visited
+		var ord uint32   // the place of the next match among the segment's
+		skipping := prune && r.HasBlockMax()
+		exact := skipping && !r.HasDeletions()
+		skipped := false
+		var target uint32 // the next block holds the first match >= target
+		// the bound of the last block looked at: neighbors tend to have the same
+		var bound struct {
+			freq    uint32
+			norm    float32
+			bounded bool
+			ub      float32
+			valid   bool
+		}
 
 		for {
-			blk, n, err := r.NextBlock()
+			var bd segment.BlockBounds
+			if skipping {
+				var ok bool
+				bd, ok = r.BoundsAt(target)
+				if !ok {
+					break
+				}
+				if !bound.valid || bound.freq != bd.MaxFreq || bound.norm != bd.MaxNorm ||
+					bound.bounded != bd.FreqBounded {
+					bound.freq, bound.norm, bound.bounded = bd.MaxFreq, bd.MaxNorm, bd.FreqBounded
+					bound.ub = s.scorer.UpperBound(bd.MaxFreq, bd.MaxNorm, bd.FreqBounded)
+					bound.valid = true
+				}
+				if thr, full := h.Threshold(); full && bound.ub <= thr {
+					skipped = true
+					if bd.LastDoc == math.MaxUint32 {
+						break
+					}
+					// a block that is passed over has all of its 128 matches or,
+					// if it is the last, nothing follows it
+					ord += scorer.PerSegmentBlockLen
+					target = bd.LastDoc + 1
+					continue
+				}
+			}
+
+			var blk *segment.PostingsBlock
+			var n int
+			var err error
+			if skipping {
+				blk, n, err = r.SeekBlock(target)
+			} else {
+				blk, n, err = r.NextBlock()
+			}
 			if err != nil {
 				return err
 			}
 			if n == 0 {
 				break
+			}
+			if skipping {
+				// the block read is the one that was bounded unless all of its
+				// postings were deleted, in which case it's a later one
+				target = max(bd.LastDoc, blk.Docs[n-1])
+				if target == math.MaxUint32 {
+					skipping = false // nothing can follow
+				} else {
+					target++
+				}
 			}
 
 			if sinceCheck >= checkDoneEvery {
@@ -261,7 +333,8 @@ func (s *PerSegmentTermSearcher) collectScored(ctx context.Context,
 			sinceCheck += n
 
 			blockMax := s.scorer.ScoreBlock(&blk.Freqs, &blk.Norms, n, &scores)
-			ord := uint32(total)
+			blockOrd := ord
+			ord += uint32(n)
 			total += uint64(n)
 			sink.ObserveMaxScore(blockMax)
 
@@ -280,13 +353,21 @@ func (s *PerSegmentTermSearcher) collectScored(ctx context.Context,
 				h.Offer(search.PerSegmentHit{
 					Score: sc,
 					Doc:   offset + uint64(blk.Docs[i]),
-					Ord:   ord + uint32(i),
+					Ord:   blockOrd + uint32(i),
 					Seg:   uint32(seg),
 				})
 				thr, full = h.Threshold()
 			}
 		}
-		sink.AddTotal(seg, total)
+		switch {
+		case exact:
+			sink.AddTotal(seg, r.Count())
+		default:
+			sink.AddTotal(seg, total)
+			if skipped {
+				sink.MarkPruned()
+			}
+		}
 	}
 	return nil
 }

@@ -82,6 +82,9 @@ type PerSegmentIndexSnapshotTermFieldReader struct {
 	count  uint64
 	// segmentDocs is how many docs the segment has, deleted ones included
 	segmentDocs uint64
+	// hasDeletions is whether the segment has any deleted doc at all, not
+	// whether the term's postings have
+	hasDeletions bool
 
 	// pl is the postings list the cursor reads, kept with the cursor as buffers
 	// for the next query to reuse (see perSegmentReaderPool)
@@ -115,6 +118,10 @@ func (r *PerSegmentIndexSnapshotTermFieldReader) SegmentDocs() uint64 { return r
 // Count is the number of documents of this segment having the term. Like the
 // segment-oblivious reader's count it doesn't discount deletions.
 func (r *PerSegmentIndexSnapshotTermFieldReader) Count() uint64 { return r.count }
+
+// HasDeletions reports whether the segment has deleted docs. If it hasn't, the
+// postings are all live, and Count is exactly the number of matches.
+func (r *PerSegmentIndexSnapshotTermFieldReader) HasDeletions() bool { return r.hasDeletions }
 
 // LiveCount is the exact number of documents of this segment having the term,
 // deletions discounted. It costs next to nothing if the segment has no
@@ -438,6 +445,7 @@ func (is *IndexSnapshot) PerSegmentTermFieldReader(ctx context.Context, term []b
 		r.offset = is.offsets[i]
 		r.count = r.pl.Count()
 		r.segmentDocs = is.segment[i].segment.Count()
+		r.hasDeletions = is.segment[i].deleted != nil && !is.segment[i].deleted.IsEmpty()
 		r.n, r.pos = 0, 0
 		r.reportedBytes = 0
 		r.closed = false

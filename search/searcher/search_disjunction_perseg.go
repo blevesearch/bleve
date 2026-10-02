@@ -151,7 +151,7 @@ func (s *PerSegmentDisjunctionSearcher) pruningApplies() bool {
 
 // CollectOptimized implements search.OptimizedPerSegmentSearcher.
 func (s *PerSegmentDisjunctionSearcher) CollectOptimized(ctx context.Context,
-	sink search.PerSegmentSink) error {
+	sink search.PerSegmentSink) (err error) {
 	if !s.pruningApplies() {
 		// not a plain OR of terms, and so a search without scores
 		return s.collectUnscoredGeneric(ctx, sink, func(seg int) docCursor {
@@ -161,6 +161,14 @@ func (s *PerSegmentDisjunctionSearcher) CollectOptimized(ctx context.Context,
 			return nil
 		})
 	}
+	var scratch *msScratch
+	defer func() {
+		// given back only if it was left clean, which is when the collection ran
+		// to its end
+		if scratch != nil && err == nil {
+			msScratchPool.Put(scratch)
+		}
+	}()
 	for seg := 0; seg < s.segments(); seg++ {
 		select {
 		case <-ctx.Done():
@@ -188,7 +196,6 @@ func (s *PerSegmentDisjunctionSearcher) CollectOptimized(ctx context.Context,
 			return nil
 		}
 
-		var err error
 		switch {
 		case !s.scored:
 			err = s.unionUnscored(ctx, sink, seg, curs)
@@ -196,6 +203,11 @@ func (s *PerSegmentDisjunctionSearcher) CollectOptimized(ctx context.Context,
 			// the total and the max score have to be exact, or the scores
 			// can't be bounded: no pruning, then
 			err = s.drain(ctx, sink, seg, curs)
+		case s.useMaxScore(curs):
+			if scratch == nil {
+				scratch = msScratchPool.Get().(*msScratch)
+			}
+			err = s.maxScoreSegment(ctx, sink, seg, curs, scratch)
 		default:
 			err = s.wandSegment(ctx, sink, seg, curs)
 		}

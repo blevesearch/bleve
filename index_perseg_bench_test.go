@@ -16,6 +16,7 @@ package bleve
 
 import (
 	"fmt"
+	"github.com/blevesearch/bleve/v2/search/searcher"
 	"math/rand"
 	"os"
 	"sort"
@@ -49,6 +50,13 @@ func TestPerSegmentSearchBench(t *testing.T) {
 		t.Skip("set PERSEG_BENCH=1 to run")
 	}
 	numDocs := envInt("PERSEG_BENCH_DOCS", 200000)
+	// PERSEG_DISJ=wand|maxscore picks the algorithm of ORs, for comparisons
+	restoreAlgo := searcher.SetPerSegmentDisjunctionAlgo(os.Getenv("PERSEG_DISJ"))
+	defer restoreAlgo()
+	// PERSEG_CONJ_MINCAND=n sets how many candidates a window of an AND needs to
+	// be done on bitmaps (a huge number turns that off)
+	restoreConj := searcher.SetPerSegmentConjunctionBitmapMinCandidates(envInt("PERSEG_CONJ_MINCAND", 16))
+	defer restoreConj()
 	numBatches := envInt("PERSEG_BENCH_BATCHES", 8)
 	warmupRounds := envInt("PERSEG_BENCH_WARMUP", 3)
 	measuredRounds := envInt("PERSEG_BENCH_ROUNDS", 15)
