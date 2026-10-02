@@ -66,15 +66,16 @@ var _ perSegChild = (*PerSegmentDisjunctionSearcher)(nil)
 func NewPerSegmentDisjunctionSearcher(qsearchers []search.Searcher, min float64,
 	options search.SearcherOptions) *PerSegmentDisjunctionSearcher {
 	children := make([]perSegChild, len(qsearchers))
+	wraps := make([][]wrapKind, len(qsearchers))
 	for i, q := range qsearchers {
 		c, ok := q.(perSegChild)
 		if !ok {
 			return nil
 		}
-		children[i] = unwrapSingle(c)
+		children[i], wraps[i] = unwrapSingleKinds(c)
 	}
 	rv := &PerSegmentDisjunctionSearcher{
-		perSegBase: perSegBase{children: children, scored: options.Score != "none"},
+		perSegBase: perSegBase{children: children, wraps: wraps, scored: options.Score != "none"},
 		min:        int(min),
 	}
 	terms := make([]*PerSegmentTermSearcher, len(children))

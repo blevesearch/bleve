@@ -30,13 +30,19 @@ const PerSegmentBlockLen = search.PerSegmentBlockLen
 // DocumentMatch to write to. It computes what TermQueryScorer does for a
 // scoring (non explaining) search, with either the tf-idf or the bm25 model.
 //
-// It supports neither explanations nor term vectors; those requests are to be
-// served by TermQueryScorer.
+// It doesn't build explanations while scoring: Explain does, for a posting that
+// is already known to be a hit, after the fact. Term vectors are not supported;
+// those requests are to be served by TermQueryScorer.
 type PerSegmentTermScorer struct {
 	queryBoost   float64
 	idf          float64
 	avgDocLength float64 // > 0 only for bm25 scoring
 	queryWeight  float64
+
+	// what an explanation of a score shows besides the score
+	docTotal  uint64
+	docTerm   uint64
+	queryNorm float64
 
 	// the float32 parameters of the SIMD kernels, derived from the above
 	kMul, kIdf, kK1, kOneMinusB, kB, kInvAvg, kQueryWeight float32
@@ -52,6 +58,8 @@ func NewPerSegmentTermScorer(queryBoost float64, docTotal, docTerm uint64,
 		queryBoost:   queryBoost,
 		avgDocLength: avgDocLength,
 		queryWeight:  1.0,
+		docTotal:     docTotal,
+		docTerm:      docTerm,
 	}
 	// the very function the regular scorer uses, so the two can't drift
 	rv.idf = (&TermQueryScorer{}).computeIDF(avgDocLength, docTotal, docTerm)
@@ -68,6 +76,7 @@ func (s *PerSegmentTermScorer) Weight() float64 {
 // SetQueryNorm sets the query norm, which scales every score by the query
 // weight.
 func (s *PerSegmentTermScorer) SetQueryNorm(qnorm float64) {
+	s.queryNorm = qnorm
 	s.queryWeight = s.queryBoost * s.idf * qnorm
 	s.refreshKernelParams()
 }

@@ -48,8 +48,9 @@ func init() {
 // conjunction or disjunction of those, sorted by
 // descending score, that needs nothing more than the score of each hit (or
 // that there be none, with Score: "none"):
-// no explanations, locations or highlights, facets, KNN, search after /
-// before, pre search data, synonyms, nested documents or score fusion.
+// no locations or highlights, facets, KNN, search after / before, pre search data,
+// synonyms, nested documents or score fusion. (Explanations are fine: the
+// collector asks for those of the hits it returns once it has them.)
 //
 // Whether the index reader is able to provide per segment postings isn't
 // decided here: if it can't, the query hands out a regular searcher, and the
@@ -62,7 +63,7 @@ func perSegmentSearchEligible(ctx context.Context, req *SearchRequest,
 	if !query.SupportsPerSegment(req.Query) {
 		return false
 	}
-	if req.Explain || req.IncludeLocations || req.Highlight != nil {
+	if req.IncludeLocations || req.Highlight != nil {
 		return false
 	}
 	if len(req.Facets) > 0 || requestHasKNN(req) {
@@ -106,5 +107,7 @@ func perSegmentCollector(searcher search.Searcher, req *SearchRequest) searchRes
 		return nil
 	}
 	perSegmentSearches.Add(1)
-	return collector.NewPerSegmentTopNCollector(req.Size, req.From)
+	rv := collector.NewPerSegmentTopNCollector(req.Size, req.From)
+	rv.SetExplain(req.Explain)
+	return rv
 }

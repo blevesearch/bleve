@@ -66,6 +66,10 @@ type PerSegmentTermSearcher struct {
 	scored  bool
 	count   uint64
 
+	// what an explanation of a match shows
+	field string
+	term  string
+
 	// the segment NextBlock is on
 	nextSeg int
 }
@@ -98,7 +102,10 @@ func NewPerSegmentTermSearcher(ctx context.Context, indexReader PerSegmentIndexR
 	if enabled, _ := ctx.Value(search.PerSegmentSearchKey).(bool); !enabled {
 		return nil, nil
 	}
-	if options.Explain || options.IncludeTermVectors {
+	// An explanation is not built while searching: the collector asks for the
+	// explanations of the hits it returns once it has them (ExplainMatch). Term
+	// vectors are another matter.
+	if options.IncludeTermVectors {
 		return nil, nil
 	}
 	scored := options.Score != "none"
@@ -164,6 +171,8 @@ func NewPerSegmentTermSearcher(ctx context.Context, indexReader PerSegmentIndexR
 		scorer:  scorer.NewPerSegmentTermScorer(boost, count, docTerm, avgDocLength),
 		scored:  scored,
 		count:   docTerm,
+		field:   field,
+		term:    term,
 	}, nil
 }
 

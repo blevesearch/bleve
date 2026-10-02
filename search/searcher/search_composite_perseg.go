@@ -53,6 +53,10 @@ type perSegBase struct {
 	children []perSegChild
 	scored   bool
 
+	// wraps[i] is what children[i] was wrapped in before it was unwrapped
+	// (nothing, mostly), outermost first
+	wraps [][]wrapKind
+
 	// the generic iteration (NextBlock): the segment it is in, and the cursor
 	// over its matches
 	nextSeg int
@@ -215,20 +219,40 @@ func thresholdOf(sink search.PerSegmentSink) float32 {
 // A disjunction that wants more than one of its one clause matches nothing, so
 // that is not unwrapped.
 func unwrapSingle(c perSegChild) perSegChild {
+	c, _ = unwrapSingleKinds(c)
+	return c
+}
+
+// wrapKind is what a clause that was unwrapped was wrapped in.
+type wrapKind uint8
+
+const (
+	wrapConjunction wrapKind = iota + 1
+	wrapDisjunction
+)
+
+// unwrapSingleKinds is unwrapSingle that also says what was taken off, outermost
+// first: scoring doesn't need the wrappers, but an explanation shows them, as the
+// regular searchers' do.
+func unwrapSingleKinds(c perSegChild) (perSegChild, []wrapKind) {
+	var kinds []wrapKind
 	for {
 		switch w := c.(type) {
 		case *PerSegmentDisjunctionSearcher:
 			if len(w.children) == 1 && w.min <= 1 {
+				// what its clause was wrapped in is under it
+				kinds = append(append(kinds, wrapDisjunction), w.wrapsOf(0)...)
 				c = w.children[0]
 				continue
 			}
 		case *PerSegmentConjunctionSearcher:
 			if len(w.children) == 1 {
+				kinds = append(append(kinds, wrapConjunction), w.wrapsOf(0)...)
 				c = w.children[0]
 				continue
 			}
 		}
-		return c
+		return c, kinds
 	}
 }
 

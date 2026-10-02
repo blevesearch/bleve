@@ -97,9 +97,14 @@ func TestPerSegmentTermQuerySearcherChecksTheReader(t *testing.T) {
 		t.Errorf("scorch reader, opted in, score none: got %s searcher", got)
 	}
 
-	// and neither does anything that needs more than a score
+	// an explanation is built for the hits afterwards, so asking for one doesn't
+	// keep the searcher from being a per segment one
+	if got := kind(optedIn, reader, search.SearcherOptions{Explain: true}); got != "per-segment" {
+		t.Errorf("scorch reader, opted in, explain: got %s searcher", got)
+	}
+
+	// but term vectors, which need the matches' positions, do
 	for name, o := range map[string]search.SearcherOptions{
-		"explain":      {Explain: true},
 		"term vectors": {IncludeTermVectors: true},
 	} {
 		if got := kind(optedIn, reader, o); got != "regular" {

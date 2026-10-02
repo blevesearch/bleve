@@ -563,8 +563,11 @@ func TestBM25GlobalScoring(t *testing.T) {
 		t.Error(err)
 	}
 
+	// The single partition search is served by the per segment path, which scores
+	// in float32, and the global scoring one by the regular path, in float64: the
+	// scores are the same to float32 precision.
 	for i, hit := range res.Hits {
-		if hit.Score != singlePartHits[i].Score {
+		if math.Abs(hit.Score-singlePartHits[i].Score) > 1e-6*math.Abs(singlePartHits[i].Score) {
 			t.Fatalf("expected the scores to be the same, got %v and %v",
 				hit.Score, singlePartHits[i].Score)
 		}

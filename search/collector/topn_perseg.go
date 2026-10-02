@@ -67,6 +67,9 @@ type PerSegmentTopNCollector struct {
 	took     time.Duration
 	results  search.DocumentMatchCollection
 	pruned   bool
+
+	// explain: the hits returned come with their explanations
+	explain bool
 }
 
 // NewPerSegmentTopNCollector builds a collector to find the top 'size' hits,
@@ -74,6 +77,12 @@ type PerSegmentTopNCollector struct {
 func NewPerSegmentTopNCollector(size int, skip int) *PerSegmentTopNCollector {
 	return &PerSegmentTopNCollector{size: size, skip: skip}
 }
+
+// SetExplain makes the collection explain the hits it returns. Nothing is
+// explained while the matches are found: the explanations are asked of the
+// searcher (see search.PerSegmentExplainer) for the few hits that are left once
+// the collection is done.
+func (hc *PerSegmentTopNCollector) SetExplain(explain bool) { hc.explain = explain }
 
 // perSegmentState is what a collection builds up: the best hits, the number of
 // matches of each segment, and the highest score. It is the sink an optimized
@@ -167,6 +176,13 @@ func (hc *PerSegmentTopNCollector) Collect(ctx context.Context, searcher search.
 		top = top[:hc.size]
 	}
 
+	var explainer search.PerSegmentExplainer
+	if hc.explain {
+		if explainer, ok = searcher.(search.PerSegmentExplainer); !ok {
+			return fmt.Errorf("collector: %T can't explain its hits", searcher)
+		}
+	}
+
 	// only the hits to be returned become DocumentMatches
 	hc.results = make(search.DocumentMatchCollection, 0, len(top))
 	for _, hit := range top {
@@ -180,6 +196,16 @@ func (hc *PerSegmentTopNCollector) Collect(ctx context.Context, searcher search.
 		dm.ID, err = reader.ExternalID(dm.IndexInternalID)
 		if err != nil {
 			return err
+		}
+		if explainer != nil {
+			expl, match, err := explainer.ExplainMatch(int(hit.Seg), hit.Doc)
+			if err != nil {
+				return err
+			}
+			if !match {
+				return fmt.Errorf("collector: hit %s of segment %d is not a match to explain", dm.ID, hit.Seg)
+			}
+			dm.Expl = expl
 		}
 		dm.Complete(nil)
 		hc.results = append(hc.results, dm)

@@ -45,6 +45,9 @@ type PerSegmentBooleanSearcher struct {
 	// to be in it too. It is read from the clause as it was given, as a clause
 	// of one that is unwrapped has lost its minimum.
 	shouldRequired bool
+
+	// what each clause was wrapped in before it was unwrapped, outermost first
+	mustWraps, shouldWraps, mustNotWraps []wrapKind
 }
 
 var _ search.PerSegmentSearcher = (*PerSegmentBooleanSearcher)(nil)
@@ -61,9 +64,10 @@ func NewPerSegmentBooleanSearcher(must, should, mustNot search.Searcher,
 		perSegBase: perSegBase{scored: options.Score != "none"},
 	}
 	for _, c := range []struct {
-		in  search.Searcher
-		out *perSegChild
-	}{{must, &rv.must}, {should, &rv.should}, {mustNot, &rv.mustNot}} {
+		in    search.Searcher
+		out   *perSegChild
+		wraps *[]wrapKind
+	}{{must, &rv.must, &rv.mustWraps}, {should, &rv.should, &rv.shouldWraps}, {mustNot, &rv.mustNot, &rv.mustNotWraps}} {
 		if c.in == nil {
 			continue
 		}
@@ -74,7 +78,7 @@ func NewPerSegmentBooleanSearcher(must, should, mustNot search.Searcher,
 		if c.in == should {
 			rv.shouldRequired = should.Min() > 0
 		}
-		child = unwrapSingle(child)
+		child, *c.wraps = unwrapSingleKinds(child)
 		*c.out = child
 		rv.children = append(rv.children, child)
 	}

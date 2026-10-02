@@ -167,6 +167,7 @@ func BenchmarkSearchCPU(b *testing.B) {
 	if v, err := strconv.Atoi(os.Getenv("PERSEG_SIZE")); err == nil {
 		size = v
 	}
+	explain := os.Getenv("PERSEG_EXPLAIN") == "1" // PERSEG_EXPLAIN=1 asks for the explanations of the hits
 	idx, cleanup := buildAllocBenchIndexModel(b, 200000, 8, os.Getenv("PERSEG_MODEL"))
 	defer cleanup()
 
@@ -219,7 +220,7 @@ func BenchmarkSearchCPU(b *testing.B) {
 		b.Fatalf("unknown shape %q", shape)
 	}
 	for i := 0; i < 50; i++ {
-		if _, err := idx.Search(NewSearchRequestOptions(q, size, 0, false)); err != nil {
+		if _, err := idx.Search(NewSearchRequestOptions(q, size, 0, explain)); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -236,7 +237,7 @@ func BenchmarkSearchCPU(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := idx.Search(NewSearchRequestOptions(q, size, 0, false)); err != nil {
+		if _, err := idx.Search(NewSearchRequestOptions(q, size, 0, explain)); err != nil {
 			b.Fatal(err)
 		}
 	}
