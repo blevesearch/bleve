@@ -129,11 +129,49 @@ func (s *PerSegmentConjunctionSearcher) segCursor(seg int, scored bool) (docCurs
 // NextBlock implements search.PerSegmentSearcher.
 func (s *PerSegmentConjunctionSearcher) NextBlock(blk *search.PerSegmentScoredBlock) (int, error) {
 	return s.nextBlock(blk, func(seg int) docCursor {
+		if s.pruningApplies() && s.intersectsByWindows(seg) {
+			// an AND of terms with about as many postings as each other: a window
+			// of docs at a time
+			return newBufferedIntersectionCursor(s.termCursors(seg), s.scored)
+		}
 		if c, ok := s.segCursor(seg, s.scored); ok {
 			return c
 		}
 		return nil
 	})
+}
+
+// termCursors are the cursors over the postings of the terms in segment seg, in the
+// order of the query, nil if one of them has none there. The clauses have to be
+// terms.
+func (s *PerSegmentConjunctionSearcher) termCursors(seg int) []*termCursor {
+	curs := make([]*termCursor, 0, len(s.terms))
+	for idx, t := range s.terms {
+		if seg >= len(t.readers) || t.readers[seg] == nil {
+			return nil
+		}
+		curs = append(curs, newTermCursor(idx, t.readers[seg], t.scorer, s.scored))
+	}
+	return curs
+}
+
+// intersectsByWindows reports whether the matches of the segment are found a
+// window of docs at a time (see bufferedIntersectionCursor): when every term has
+// postings there and none has far more than the others. The clauses have to be
+// terms.
+func (s *PerSegmentConjunctionSearcher) intersectsByWindows(seg int) bool {
+	var lo, hi uint64
+	for i, t := range s.terms {
+		if seg >= len(t.readers) || t.readers[seg] == nil {
+			return false
+		}
+		n := t.readers[seg].Count()
+		if i == 0 {
+			lo, hi = n, n
+		}
+		lo, hi = min(lo, n), max(hi, n)
+	}
+	return len(s.terms) >= 2 && hi <= lo*bufferedIntersectionMaxSkew
 }
 
 // CanCollectOptimized implements search.OptimizedPerSegmentSearcher.
@@ -199,11 +237,15 @@ func (s *PerSegmentConjunctionSearcher) CollectOptimized(ctx context.Context,
 		} else {
 			// no scores, or the total and max score have to be exact, or the
 			// scores can't be bounded: every match is visited, and counted
-			cursors := make([]docCursor, len(curs))
-			for i, c := range curs {
-				cursors[i] = c
+			if useBufferedIntersection(curs) {
+				err = drainCursor(ctx, sink, seg, newBufferedIntersectionCursor(curs, s.scored), s.scored)
+			} else {
+				cursors := make([]docCursor, len(curs))
+				for i, c := range curs {
+					cursors[i] = c
+				}
+				err = drainCursor(ctx, sink, seg, newIntersectionCursor(cursors), s.scored)
 			}
-			err = drainCursor(ctx, sink, seg, newIntersectionCursor(cursors), s.scored)
 		}
 		if err != nil {
 			return err

@@ -15,6 +15,7 @@
 package bleve
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -22,6 +23,8 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/index/scorch"
+	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
 	"github.com/blevesearch/bleve/v2/search/searcher"
 	index "github.com/blevesearch/bleve_index_api"
@@ -29,16 +32,24 @@ import (
 
 // skipTestIndex builds an index whose terms have many blocks of postings, with
 // frequencies and field lengths that vary a lot from block to block, so that a
-// lone term search has blocks to skip. With deletions, one doc in 20 is deleted
-// after the fact.
+// lone term search has blocks to skip. The segments have 9000 docs: more than the
+// 4096 of a batch of the algorithms that work on windows of docs, and than the 8192
+// of their outer window, so that they cross the edges of those. With deletions, one
+// doc in 20 is deleted after the fact.
 func skipTestIndex(t testing.TB, model string, deletions bool) (Index, func()) {
 	t.Helper()
-	return skipTestIndexN(t, model, deletions, 12000, 300)
+	return skipTestIndexN(t, model, deletions, 27000, 300)
 }
 
 // skipTestIndexN is skipTestIndex for a number of docs, of which starsPer100k
 // in every 100000 are "stars": short, with a high frequency of "hot".
 func skipTestIndexN(t testing.TB, model string, deletions bool, docs, starsPer100k int) (Index, func()) {
+	t.Helper()
+	return skipTestIndexB(t, model, deletions, docs, starsPer100k, 3)
+}
+
+// skipTestIndexB is skipTestIndexN for a number of segments (batches).
+func skipTestIndexB(t testing.TB, model string, deletions bool, docs, starsPer100k, batches int) (Index, func()) {
 	t.Helper()
 	dir := createTmpIndexPath(t)
 	im := NewIndexMapping()
@@ -57,7 +68,6 @@ func skipTestIndexN(t testing.TB, model string, deletions bool, docs, starsPer10
 
 	rnd := rand.New(rand.NewSource(7))
 	zipf := rand.NewZipf(rnd, 1.3, 3, 999)
-	const batches = 4
 	for bt := 0; bt < batches; bt++ {
 		b := idx.NewBatch()
 		for i := bt * docs / batches; i < (bt+1)*docs/batches; i++ {
@@ -170,7 +180,7 @@ func TestPerSegmentTermBlockSkippingReadsLess(t *testing.T) {
 	// warm: the first query on a segment pays for its metadata
 	bytesOf(10)
 	few, resFew := bytesOf(10)
-	all, resAll := bytesOf(12000)
+	all, resAll := bytesOf(27000)
 	if resFew.TotalRelation != TotalRelationEq || resFew.Total != resAll.Total {
 		t.Fatalf("total %d (%v) for 10 hits, %d (%v) for all", resFew.Total, resFew.TotalRelation,
 			resAll.Total, resAll.TotalRelation)
@@ -421,6 +431,216 @@ func TestPerSegmentConjunctionRetrievesTheBestDocs(t *testing.T) {
 					}
 				})
 			}
+		}
+	}
+}
+
+// A plain OR of terms that is read block by block (the generic loop, which is what
+// the collection of a sort other than by score is made of) finds every match, with
+// the score the regular path gives it, and counts them all: it is the best k of the
+// regular path's ranking of every match, and the total is exact.
+func TestPerSegmentOrGenericLoopFindsEveryMatch(t *testing.T) {
+	vocab := []string{"hot", "common"}
+	for _, w := range []int{0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 997} {
+		vocab = append(vocab, "w"+strconv.Itoa(w))
+	}
+	for _, model := range []string{index.DefaultScoringModel, index.BM25Scoring} {
+		for _, deletions := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/deletions=%v", model, deletions), func(t *testing.T) {
+				idx, cleanup := skipTestIndex(t, model, deletions)
+				defer cleanup()
+				adv, err := idx.Advanced()
+				if err != nil {
+					t.Fatal(err)
+				}
+				reader, err := adv.Reader()
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer func() { _ = reader.Close() }()
+				ctx := context.WithValue(context.Background(), search.PerSegmentSearchKey, true)
+				// the model the index scores with, which the searchers ask for
+				ctx = context.WithValue(ctx, search.GetScoringModelCallbackKey,
+					search.GetScoringModelCallbackFn(func() string { return model }))
+
+				rnd := rand.New(rand.NewSource(21))
+				for qi := 0; qi < 25; qi++ {
+					terms := map[string]bool{}
+					for want := 2 + rnd.Intn(9); len(terms) < want; {
+						terms[vocab[rnd.Intn(len(vocab))]] = true
+					}
+					names := make([]string, 0, len(terms))
+					qs := make([]query.Query, 0, len(terms))
+					for name := range terms {
+						names = append(names, name)
+						qs = append(qs, termQueryOn("body", name))
+					}
+					mk := func() query.Query { return query.NewDisjunctionQuery(qs) }
+
+					perSegmentSearchEnabled.Store(false)
+					truth, err := idx.Search(NewSearchRequestOptions(mk(), 27000, 0, false))
+					perSegmentSearchEnabled.Store(true)
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					for _, scored := range []bool{true, false} {
+						opts := search.SearcherOptions{}
+						if !scored {
+							opts.Score = ScoreNone
+						}
+						for _, k := range []int{1, 10, 100, 27000} {
+							what := fmt.Sprintf("%s deletions=%v %v scored=%v k=%d", model, deletions, names, scored, k)
+							s, err := mk().Searcher(ctx, reader, NewIndexMapping(), opts)
+							if err != nil {
+								t.Fatalf("%s: %v", what, err)
+							}
+							ps, ok := s.(search.PerSegmentSearcher)
+							if !ok {
+								t.Fatalf("%s: %T is not a per segment searcher", what, s)
+							}
+							c := collector.NewPerSegmentTopNCollector(k, 0)
+							// the generic loop: NextBlock until there are no more
+							if err := c.Collect(ctx, genericOnly{ps}, reader); err != nil {
+								t.Fatalf("%s: %v", what, err)
+							}
+							_ = s.Close()
+
+							if c.Total() != truth.Total || c.EarlyStopped() {
+								t.Fatalf("%s: total %d (early stopped: %v), want exactly %d", what,
+									c.Total(), c.EarlyStopped(), truth.Total)
+							}
+							got := c.Results()
+							if want := min(k, len(truth.Hits)); len(got) != want {
+								t.Fatalf("%s: %d hits, want %d", what, len(got), want)
+							}
+							if !scored {
+								continue // the hits are the first matches; their scores are 0
+							}
+							if !sameScore(c.MaxScore(), truth.MaxScore) {
+								t.Fatalf("%s: max score %v, want %v", what, c.MaxScore(), truth.MaxScore)
+							}
+							truthScore := map[string]float64{}
+							for _, h := range truth.Hits {
+								truthScore[h.ID] = h.Score
+							}
+							for i, h := range got {
+								if !sameScore(h.Score, truth.Hits[i].Score) {
+									t.Fatalf("%s: rank %d scores %v, want %v", what, i, h.Score, truth.Hits[i].Score)
+								}
+								if ts, ok := truthScore[h.ID]; !ok || !sameScore(h.Score, ts) {
+									t.Fatalf("%s: doc %s scores %v, it is %v (%v) in the truth", what, h.ID, h.Score, ts, ok)
+								}
+							}
+						}
+					}
+				}
+			})
+		}
+	}
+}
+
+// An AND of terms that is read block by block (the generic loop, which is what
+// the collection of a sort other than by score is made of) finds every match, with
+// the score the regular path gives it, and counts them all: it is the best k of the
+// regular path's ranking of every match, and the total is exact.
+func TestPerSegmentAndGenericLoopFindsEveryMatch(t *testing.T) {
+	vocab := []string{"hot", "common"}
+	for _, w := range []int{0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 997} {
+		vocab = append(vocab, "w"+strconv.Itoa(w))
+	}
+	for _, model := range []string{index.DefaultScoringModel, index.BM25Scoring} {
+		for _, deletions := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/deletions=%v", model, deletions), func(t *testing.T) {
+				idx, cleanup := skipTestIndex(t, model, deletions)
+				defer cleanup()
+				adv, err := idx.Advanced()
+				if err != nil {
+					t.Fatal(err)
+				}
+				reader, err := adv.Reader()
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer func() { _ = reader.Close() }()
+				ctx := context.WithValue(context.Background(), search.PerSegmentSearchKey, true)
+				// the model the index scores with, which the searchers ask for
+				ctx = context.WithValue(ctx, search.GetScoringModelCallbackKey,
+					search.GetScoringModelCallbackFn(func() string { return model }))
+
+				rnd := rand.New(rand.NewSource(21))
+				for qi := 0; qi < 30; qi++ {
+					terms := map[string]bool{}
+					for want := 2 + rnd.Intn(3); len(terms) < want; {
+						terms[vocab[rnd.Intn(len(vocab))]] = true
+					}
+					names := make([]string, 0, len(terms))
+					qs := make([]query.Query, 0, len(terms))
+					for name := range terms {
+						names = append(names, name)
+						qs = append(qs, termQueryOn("body", name))
+					}
+					mk := func() query.Query { return query.NewConjunctionQuery(qs) }
+
+					perSegmentSearchEnabled.Store(false)
+					truth, err := idx.Search(NewSearchRequestOptions(mk(), 27000, 0, false))
+					perSegmentSearchEnabled.Store(true)
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					for _, scored := range []bool{true, false} {
+						opts := search.SearcherOptions{}
+						if !scored {
+							opts.Score = ScoreNone
+						}
+						for _, k := range []int{1, 10, 100, 27000} {
+							what := fmt.Sprintf("%s deletions=%v %v scored=%v k=%d", model, deletions, names, scored, k)
+							s, err := mk().Searcher(ctx, reader, NewIndexMapping(), opts)
+							if err != nil {
+								t.Fatalf("%s: %v", what, err)
+							}
+							ps, ok := s.(search.PerSegmentSearcher)
+							if !ok {
+								t.Fatalf("%s: %T is not a per segment searcher", what, s)
+							}
+							c := collector.NewPerSegmentTopNCollector(k, 0)
+							// the generic loop: NextBlock until there are no more
+							if err := c.Collect(ctx, genericOnly{ps}, reader); err != nil {
+								t.Fatalf("%s: %v", what, err)
+							}
+							_ = s.Close()
+
+							if c.Total() != truth.Total || c.EarlyStopped() {
+								t.Fatalf("%s: total %d (early stopped: %v), want exactly %d", what,
+									c.Total(), c.EarlyStopped(), truth.Total)
+							}
+							got := c.Results()
+							if want := min(k, len(truth.Hits)); len(got) != want {
+								t.Fatalf("%s: %d hits, want %d", what, len(got), want)
+							}
+							if !scored {
+								continue // the hits are the first matches; their scores are 0
+							}
+							if !sameScore(c.MaxScore(), truth.MaxScore) {
+								t.Fatalf("%s: max score %v, want %v", what, c.MaxScore(), truth.MaxScore)
+							}
+							truthScore := map[string]float64{}
+							for _, h := range truth.Hits {
+								truthScore[h.ID] = h.Score
+							}
+							for i, h := range got {
+								if !sameScore(h.Score, truth.Hits[i].Score) {
+									t.Fatalf("%s: rank %d scores %v, want %v", what, i, h.Score, truth.Hits[i].Score)
+								}
+								if ts, ok := truthScore[h.ID]; !ok || !sameScore(h.Score, ts) {
+									t.Fatalf("%s: doc %s scores %v, it is %v (%v) in the truth", what, h.ID, h.Score, ts, ok)
+								}
+							}
+						}
+					}
+				}
+			})
 		}
 	}
 }

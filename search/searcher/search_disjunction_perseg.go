@@ -130,11 +130,30 @@ func (s *PerSegmentDisjunctionSearcher) segCursor(seg int, scored bool) (docCurs
 // NextBlock implements search.PerSegmentSearcher.
 func (s *PerSegmentDisjunctionSearcher) NextBlock(blk *search.PerSegmentScoredBlock) (int, error) {
 	return s.nextBlock(blk, func(seg int) docCursor {
+		if s.pruningApplies() {
+			// a plain OR of terms: found a window of docs at a time
+			if curs := s.termCursors(seg); len(curs) > 0 {
+				return newBufferedUnionCursor(curs, len(s.children), s.scored)
+			}
+			return nil
+		}
 		if c, ok := s.segCursor(seg, s.scored); ok {
 			return c
 		}
 		return nil
 	})
+}
+
+// termCursors are the cursors over the postings of the terms in segment seg, for
+// those that have some, in the order of the query. The clauses have to be terms.
+func (s *PerSegmentDisjunctionSearcher) termCursors(seg int) []*termCursor {
+	var curs []*termCursor
+	for idx, t := range s.terms {
+		if seg < len(t.readers) && t.readers[seg] != nil {
+			curs = append(curs, newTermCursor(idx, t.readers[seg], t.scorer, s.scored))
+		}
+	}
+	return curs
 }
 
 // CanCollectOptimized implements search.OptimizedPerSegmentSearcher.
@@ -231,11 +250,7 @@ func prunable(curs []*termCursor) bool {
 
 func (s *PerSegmentDisjunctionSearcher) drain(ctx context.Context, sink search.PerSegmentSink,
 	seg int, curs []*termCursor) error {
-	cursors := make([]docCursor, len(curs))
-	for i, c := range curs {
-		cursors[i] = c
-	}
-	return drainCursor(ctx, sink, seg, newUnionCursor(cursors, len(s.children), 1), s.scored)
+	return drainCursor(ctx, sink, seg, newBufferedUnionCursor(curs, len(s.children), s.scored), s.scored)
 }
 
 // sortCursorsByDoc orders the cursors by the doc they are on. They are nearly

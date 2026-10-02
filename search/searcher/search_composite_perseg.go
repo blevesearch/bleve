@@ -136,6 +136,20 @@ func (b *perSegBase) nextBlock(blk *search.PerSegmentScoredBlock,
 		}
 
 		c := b.cursor
+		if f, ok := c.(blockFiller); ok {
+			// a cursor that can fill a block by itself does it without a call for
+			// each match
+			n := f.fillBlock(blk)
+			if err := c.Err(); err != nil {
+				return 0, err
+			}
+			if n > 0 {
+				blk.Seg = b.nextSeg - 1
+				return n, nil
+			}
+			b.cursor = nil
+			continue
+		}
 		n := 0
 		var max float32
 		for n < search.PerSegmentBlockLen && c.Doc() != noMoreDocs {
@@ -162,6 +176,13 @@ func (b *perSegBase) nextBlock(blk *search.PerSegmentScoredBlock,
 		}
 		b.cursor = nil
 	}
+}
+
+// blockFiller is a docCursor that can put its next matches in a block itself.
+type blockFiller interface {
+	// fillBlock puts the next matches, up to a block, in blk -- Docs, Scores,
+	// Offset and MaxScore -- and returns how many there are, 0 once it is done.
+	fillBlock(blk *search.PerSegmentScoredBlock) int
 }
 
 // drainCursor offers every match of a segment to the sink: what's done when

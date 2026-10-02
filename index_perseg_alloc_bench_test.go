@@ -167,6 +167,11 @@ func BenchmarkSearchCPU(b *testing.B) {
 	if v, err := strconv.Atoi(os.Getenv("PERSEG_SIZE")); err == nil {
 		size = v
 	}
+	// PERSEG_REGULAR=1 turns the per segment path off, to compare with the regular one
+	if os.Getenv("PERSEG_REGULAR") == "1" {
+		perSegmentSearchEnabled.Store(false)
+		defer perSegmentSearchEnabled.Store(true)
+	}
 	explain := os.Getenv("PERSEG_EXPLAIN") == "1" // PERSEG_EXPLAIN=1 asks for the explanations of the hits
 	idx, cleanup := buildAllocBenchIndexModel(b, 200000, 8, os.Getenv("PERSEG_MODEL"))
 	defer cleanup()
@@ -223,6 +228,9 @@ func BenchmarkSearchCPU(b *testing.B) {
 		if _, err := idx.Search(NewSearchRequestOptions(q, size, 0, explain)); err != nil {
 			b.Fatal(err)
 		}
+	}
+	if res, err := idx.Search(NewSearchRequestOptions(q, size, 0, explain)); err == nil {
+		b.ReportMetric(float64(res.Total), "matches")
 	}
 	b.ReportAllocs()
 	if f := os.Getenv("PERSEG_CPUPROF"); f != "" {
