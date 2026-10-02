@@ -53,8 +53,10 @@ var ErrPerSegmentSearcherIterated = errors.New(
 // collection itself:
 //
 //   - when scored: the best k of every segment, scoring a block per SIMD
-//     kernel call and looking at the heap only for blocks that can contribute
-//     to it;
+//     kernel call and, once the heap is full, passing over the blocks that the
+//     skip data says can't beat its worst hit without decoding them. The total is
+//     exact for a segment without deletions; with deletions, a segment that
+//     skipped a block counts what it visited and the search is marked as pruned;
 //   - when not scored: the first k matches in doc order, and the exact total,
 //     which costs nothing for a segment without deletions.
 //

@@ -16,6 +16,7 @@ package collector
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -95,4 +96,42 @@ func TestPerSegmentCollectorExplainsOnlyTheHitsReturned(t *testing.T) {
 	if len(s.explained) != 0 {
 		t.Fatalf("%d hits explained without being asked to", len(s.explained))
 	}
+}
+
+// panickingSearcher is a per segment searcher that goes wrong while it is read
+type panickingSearcher struct {
+	search.Searcher // never called
+	with            func()
+}
+
+func (s *panickingSearcher) NextBlock(b *search.PerSegmentScoredBlock) (int, error) {
+	s.with()
+	return 0, nil
+}
+
+// An index out of range in an algorithm fails the search that hit it, with an
+// error that says where, and not the process; a panic that isn't one of the
+// runtime's is not touched.
+func TestPerSegmentCollectorTurnsRuntimePanicsIntoErrors(t *testing.T) {
+	var small [4]int
+	idx := 5
+	s := &panickingSearcher{with: func() { _ = small[idx%8] }}
+	err := NewPerSegmentTopNCollector(5, 0).Collect(context.Background(), s, idReader{})
+	if err == nil || !strings.Contains(err.Error(), "index out of range") {
+		t.Fatalf("got %v, want the index out of range as an error", err)
+	}
+	if !strings.Contains(err.Error(), "NextBlock") {
+		t.Fatalf("the error doesn't say where: %v", err)
+	}
+
+	s = &panickingSearcher{with: func() { panic("something else") }}
+	func() {
+		defer func() {
+			if r := recover(); r != "something else" {
+				t.Fatalf("recovered %v, want the panic to go through", r)
+			}
+		}()
+		_ = NewPerSegmentTopNCollector(5, 0).Collect(context.Background(), s, idReader{})
+		t.Fatal("no panic")
+	}()
 }

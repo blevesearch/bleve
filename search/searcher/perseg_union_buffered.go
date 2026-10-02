@@ -16,7 +16,6 @@ package searcher
 
 import (
 	"math/bits"
-	"sync"
 
 	"github.com/blevesearch/bleve/v2/search"
 )
@@ -33,38 +32,37 @@ import (
 // summed in that order, and is the unionCursor's, to the bit: the sum times the
 // share of the clauses that match.
 //
-// It can only be moved forward a doc at a time (Advance), or a block of docs
-// (fillBlock). That is all a collection that visits every match needs.
+// A window pays for all the postings in it, which is right for a cursor that is
+// read doc after doc, and wrong for one whose consumer jumps far ahead with Seek
+// and looks at little: the postings it skipped over would be put in a window
+// for nothing. So a Seek that goes beyond the window sends the cursor to the
+// unionCursor over the same terms, which seeks each term for next to nothing,
+// and it stays there until it has been advanced a number of times in a row.
 type bufferedUnionCursor struct {
 	terms  []*termCursor // in the order of the query
 	n      float32       // the clauses of the query, also those with no postings in the segment
 	scored bool
 
-	scratch  *bufUnionScratch
-	start    uint32 // the first doc of the window
-	word     int    // the word of the bitmap being read
-	bitsLeft uint64 // what's left of it
-	off      int    // where the doc the cursor is on is in the window
+	// fb is the cursor the work is delegated to while the consumer seeks far; nil
+	// while the windows are used. advances counts the Advance calls in a row it
+	// has had.
+	fb       docCursor
+	advances int
+
+	scratch  *bufUnionScratch // nil in fallback, and once released
+	start    uint32           // the first doc of the window
+	span     uint32           // how many docs the next window covers, up to windowDocs
+	nw       int              // the words of the bitmap the window uses
+	word     int              // the word of the bitmap being read
+	bitsLeft uint64           // what's left of it
+	off      int              // where the doc the cursor is on is in the window
 	doc      uint32
 	offset   uint64
 }
 
-const (
-	bufUnionWords   = 64
-	bufUnionHorizon = bufUnionWords * 64
-)
-
-// bufUnionScratch is the working memory of a bufferedUnionCursor: the scores and
-// the number of terms by doc of the window, and the bitmap. It is left zeroed by a
-// cursor that has gone through all its matches, which is the only kind it is given
-// back by.
-type bufUnionScratch struct {
-	scores [bufUnionHorizon]float32
-	counts [bufUnionHorizon]uint8
-	words  [bufUnionWords]uint64
-}
-
-var bufUnionScratchPool = sync.Pool{New: func() any { return new(bufUnionScratch) }}
+// fallbackAdvances is how many Advance calls in a row the unionCursor that a far
+// Seek sent a cursor to has before the windows take over again.
+const fallbackAdvances = 32
 
 // newBufferedUnionCursor is the union of the terms, which are in the order of the
 // query; n is the number of clauses the query has.
@@ -76,17 +74,35 @@ func newBufferedUnionCursor(terms []*termCursor, n int, scored bool) *bufferedUn
 		scratch: bufUnionScratchPool.Get().(*bufUnionScratch),
 		offset:  terms[0].Offset(),
 		off:     -1,
+		span:    windowDocs,
 	}
 	u.doc = u.refill()
 	return u
 }
 
-// release gives the memory back, if it is clean: the cursor went through all of
-// its matches.
-func (u *bufferedUnionCursor) release() {
-	if u.scratch != nil && u.doc == noMoreDocs {
-		bufUnionScratchPool.Put(u.scratch)
+// discardWindow puts back to zero everything the window has not been read through
+// yet, and the slot of the doc the cursor is on.
+func (u *bufferedUnionCursor) discardWindow() {
+	s := u.scratch
+	u.consumed()
+	for u.word < u.nw {
+		u.clearSlots(u.word, u.bitsLeft)
+		s.words[u.word] = 0
+		u.word++
+		u.bitsLeft = 0
+		if u.word < u.nw {
+			u.bitsLeft = s.words[u.word]
+		}
 	}
+}
+
+// release implements releaser: the memory goes back, zeroed.
+func (u *bufferedUnionCursor) release() {
+	if u.scratch == nil {
+		return // in fallback, or released: nothing is held
+	}
+	u.discardWindow()
+	bufUnionScratchPool.Put(u.scratch)
 	u.scratch = nil
 }
 
@@ -106,8 +122,8 @@ func (u *bufferedUnionCursor) refill() uint32 {
 		return noMoreDocs
 	}
 	end := uint32(noMoreDocs)
-	if uint64(start)+bufUnionHorizon < uint64(noMoreDocs) {
-		end = start + bufUnionHorizon
+	if uint64(start)+uint64(u.span) < uint64(noMoreDocs) {
+		end = start + u.span
 	}
 	s := u.scratch
 	for _, t := range u.terms {
@@ -116,7 +132,10 @@ func (u *bufferedUnionCursor) refill() uint32 {
 		}
 	}
 	u.start, u.word, u.off = start, 0, -1
+	u.nw = int(end-start+63) / 64
 	u.bitsLeft = s.words[0]
+	// the next window covers more, up to a whole one
+	u.span = min(u.span*2, windowDocs)
 	return u.next()
 }
 
@@ -132,7 +151,7 @@ func (u *bufferedUnionCursor) next() uint32 {
 		}
 		s.words[u.word] = 0
 		u.word++
-		if u.word == bufUnionWords {
+		if u.word >= u.nw {
 			return u.refill()
 		}
 		u.bitsLeft = s.words[u.word]
@@ -148,6 +167,46 @@ func (u *bufferedUnionCursor) consumed() {
 	}
 }
 
+// clearSlots puts back to zero the slots of the docs whose bits are set in bits64,
+// a word of the bitmap.
+func (u *bufferedUnionCursor) clearSlots(word int, bits64 uint64) {
+	s := u.scratch
+	for ; bits64 != 0; bits64 &= bits64 - 1 {
+		off := word*64 + bits.TrailingZeros64(bits64)
+		s.scores[off] = 0
+		s.counts[off] = 0
+	}
+}
+
+// toFallback sends the cursor to the unionCursor over the terms, which have been
+// moved to the target.
+func (u *bufferedUnionCursor) toFallback(target uint32) uint32 {
+	u.discardWindow()
+	bufUnionScratchPool.Put(u.scratch)
+	u.scratch = nil
+	cursors := make([]docCursor, len(u.terms))
+	for i, t := range u.terms {
+		if t.doc < target {
+			t.Seek(target)
+		}
+		cursors[i] = t
+	}
+	u.fb = newUnionCursor(cursors, int(u.n), 1)
+	u.advances = 0
+	u.doc = u.fb.Doc()
+	return u.doc
+}
+
+// toWindows takes the cursor back from the unionCursor, which is on the doc it is
+// to be on: the terms are, so the window starts there.
+func (u *bufferedUnionCursor) toWindows() uint32 {
+	u.fb = nil
+	u.scratch = bufUnionScratchPool.Get().(*bufUnionScratch)
+	u.span = 256
+	u.doc = u.refill()
+	return u.doc
+}
+
 // Doc implements docCursor.
 func (u *bufferedUnionCursor) Doc() uint32 { return u.doc }
 
@@ -156,21 +215,68 @@ func (u *bufferedUnionCursor) Advance() uint32 {
 	if u.doc == noMoreDocs {
 		return noMoreDocs
 	}
+	if u.fb != nil {
+		u.doc = u.fb.Advance()
+		u.advances++
+		if u.doc != noMoreDocs && u.advances >= fallbackAdvances {
+			return u.toWindows()
+		}
+		return u.doc
+	}
 	u.consumed()
 	u.doc = u.next()
 	return u.doc
 }
 
-// Seek implements docCursor, the slow way: the cursor is made to be advanced.
+// Seek implements docCursor. Within the window it skips to the word of the target
+// and clears what it passes; just beyond it a new window is started at the target;
+// further than a whole window, the cursor falls back to the unionCursor.
 func (u *bufferedUnionCursor) Seek(target uint32) uint32 {
-	for u.doc < target {
-		u.Advance()
+	if u.doc >= target {
+		return u.doc
 	}
+	if u.fb != nil {
+		u.advances = 0
+		u.doc = u.fb.Seek(target)
+		return u.doc
+	}
+	u.consumed()
+	if windowEnd := uint64(u.start) + uint64(u.nw)*64; uint64(target) >= windowEnd {
+		if uint64(target) >= windowEnd+windowDocs {
+			return u.toFallback(target)
+		}
+		// just beyond the window: the next one has it, or is near
+		u.discardWindow()
+		for _, t := range u.terms {
+			if t.doc < target {
+				t.Seek(target)
+			}
+		}
+		u.doc = u.refill()
+		return u.doc
+	}
+	// in the window
+	s := u.scratch
+	toff := int(target - u.start)
+	tword := toff / 64
+	for u.word < tword {
+		u.clearSlots(u.word, u.bitsLeft)
+		s.words[u.word] = 0
+		u.word++
+		u.bitsLeft = s.words[u.word]
+	}
+	below := u.bitsLeft & (1<<(toff%64) - 1)
+	u.clearSlots(u.word, below)
+	u.bitsLeft &^= below
+	u.doc = u.next()
 	return u.doc
 }
 
 // Score implements docCursor.
 func (u *bufferedUnionCursor) Score() float32 {
+	if u.fb != nil {
+		return u.fb.Score()
+	}
 	s := u.scratch
 	return s.scores[u.off] * (float32(s.counts[u.off]) / u.n)
 }
@@ -214,12 +320,14 @@ func (u *bufferedUnionCursor) fillBlock(blk *search.PerSegmentScoredBlock) int {
 		blk.Docs[n] = u.doc
 		blk.Scores[n] = score
 		n++
-		u.consumed()
-		u.doc = u.next()
+		u.Advance()
 	}
 	blk.Offset = u.offset
 	blk.MaxScore = max
 	return n
 }
 
-var _ docCursor = (*bufferedUnionCursor)(nil)
+var (
+	_ docCursor = (*bufferedUnionCursor)(nil)
+	_ releaser  = (*bufferedUnionCursor)(nil)
+)

@@ -37,7 +37,11 @@ func init() {
 //
 // It has the generic path only, NextBlock: like tantivy, which only prunes plain
 // unions and intersections of terms, it doesn't prune once there are clauses
-// with different roles.
+// with different roles. The clause that drives it (the required one, or without
+// it the optional one) is read through, and the other clauses are sought about
+// as often as it has matches, which is what each is told when it is asked for
+// its cursor (segCursorSeeked) so that a clause of terms is read a window of docs
+// at a time only when that pays.
 type PerSegmentBooleanSearcher struct {
 	perSegBase
 	must, should, mustNot perSegChild
@@ -141,16 +145,36 @@ func (s *PerSegmentBooleanSearcher) numSegments() int { return s.segments() }
 
 // segCursor implements perSegChild.
 func (s *PerSegmentBooleanSearcher) segCursor(seg int, scored bool) (docCursor, bool) {
+	return s.segCursorSeeked(seg, scored, 0)
+}
+
+// segCost implements perSegChild: the matches of the clause that drives it.
+func (s *PerSegmentBooleanSearcher) segCost(seg int) uint64 {
+	if s.must != nil {
+		return s.must.segCost(seg)
+	}
+	return s.should.segCost(seg)
+}
+
+// segCursorSeeked implements perSegChild. The clause that drives the cursor -- the
+// required one, or without it the optional one -- is read through, whatever the
+// consumer does; the other clauses are sought as many times as it has matches.
+func (s *PerSegmentBooleanSearcher) segCursorSeeked(seg int, scored bool, seeks uint64) (docCursor, bool) {
+	driven := s.segCost(seg)
 	var must, should, mustNot docCursor
 	if s.must != nil {
-		c, ok := s.must.segCursor(seg, scored)
+		c, ok := s.must.segCursorSeeked(seg, scored, 0)
 		if !ok {
 			return nil, false // nothing is a match without the required clause
 		}
 		must = c
 	}
 	if s.should != nil {
-		c, ok := s.should.segCursor(seg, scored)
+		hint := driven
+		if s.must == nil {
+			hint = 0 // it is the one that is read through
+		}
+		c, ok := s.should.segCursorSeeked(seg, scored, hint)
 		if ok {
 			should = c
 		} else if s.must == nil || s.shouldRequired {
@@ -159,7 +183,7 @@ func (s *PerSegmentBooleanSearcher) segCursor(seg int, scored bool) (docCursor, 
 	}
 	if s.mustNot != nil {
 		// the scores of what is excluded don't matter
-		if c, ok := s.mustNot.segCursor(seg, false); ok {
+		if c, ok := s.mustNot.segCursorSeeked(seg, false, driven); ok {
 			mustNot = c
 		}
 	}

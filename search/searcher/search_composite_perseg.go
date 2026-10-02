@@ -31,10 +31,26 @@ type perSegChild interface {
 	// and false if there are none there. A cursor can only be had once.
 	segCursor(seg int, scored bool) (docCursor, bool)
 
+	// segCursorSeeked is segCursor for a consumer that is going to move the cursor
+	// with about seeks calls to Seek, instead of reading it through (seeks is 0 for
+	// one that reads it through). A clause that has a cursor for reading a window of
+	// docs at a time, and one that is cheap to seek, picks by what it is told: the
+	// first pays for every posting in the stretch it covers, the second for
+	// the ones it lands on.
+	segCursorSeeked(seg int, scored bool, seeks uint64) (docCursor, bool)
+
+	// segCost is roughly how many matches the clause has in segment seg: what it
+	// costs to read through. It is 0 if there are none.
+	segCost(seg int) uint64
+
 	// numSegments is how many segments the clause has readers for: all of
 	// the index's, or none if it matches nothing anywhere.
 	numSegments() int
 }
+
+// nestedBufferedMaxRatio is how many times more matches than the seeks it is going
+// to be given a clause may have to be read a window at a time.
+const nestedBufferedMaxRatio = 4
 
 // numSegments implements perSegChild.
 func (s *PerSegmentTermSearcher) numSegments() int { return len(s.readers) }
@@ -45,6 +61,19 @@ func (s *PerSegmentTermSearcher) segCursor(seg int, scored bool) (docCursor, boo
 		return nil, false
 	}
 	return newTermCursor(0, s.readers[seg], s.scorer, scored), true
+}
+
+// segCursorSeeked implements perSegChild: a term seeks as well as it reads.
+func (s *PerSegmentTermSearcher) segCursorSeeked(seg int, scored bool, seeks uint64) (docCursor, bool) {
+	return s.segCursor(seg, scored)
+}
+
+// segCost implements perSegChild.
+func (s *PerSegmentTermSearcher) segCost(seg int) uint64 {
+	if seg >= len(s.readers) || s.readers[seg] == nil {
+		return 0
+	}
+	return s.readers[seg].Count()
 }
 
 // perSegBase is what the composite per segment searchers (conjunction and
@@ -99,6 +128,11 @@ func (b *perSegBase) SetQueryNorm(qnorm float64) {
 }
 
 func (b *perSegBase) Close() error {
+	// a cursor in the middle of a segment holds memory that wants giving back
+	if b.cursor != nil {
+		releaseCursor(b.cursor)
+		b.cursor = nil
+	}
 	var rv error
 	for _, c := range b.children {
 		if err := c.Close(); err != nil && rv == nil {
@@ -147,6 +181,7 @@ func (b *perSegBase) nextBlock(blk *search.PerSegmentScoredBlock,
 				blk.Seg = b.nextSeg - 1
 				return n, nil
 			}
+			releaseCursor(c)
 			b.cursor = nil
 			continue
 		}
@@ -174,6 +209,7 @@ func (b *perSegBase) nextBlock(blk *search.PerSegmentScoredBlock,
 			blk.MaxScore = max
 			return n, nil
 		}
+		releaseCursor(c)
 		b.cursor = nil
 	}
 }
@@ -188,6 +224,7 @@ type blockFiller interface {
 // drainCursor offers every match of a segment to the sink: what's done when
 // there is nothing to prune with. Every match is visited and counted.
 func drainCursor(ctx context.Context, sink search.PerSegmentSink, seg int, c docCursor, scored bool) error {
+	defer releaseCursor(c)
 	h := sink.Heap(seg)
 	offset := c.Offset()
 	var visited uint64
@@ -318,6 +355,7 @@ func (b *perSegBase) collectUnscoredGeneric(ctx context.Context, sink search.Per
 				select {
 				case <-ctx.Done():
 					search.RecordSearchCost(ctx, search.AbortM, 0)
+					releaseCursor(c)
 					return ctx.Err()
 				default:
 				}
@@ -330,7 +368,9 @@ func (b *perSegBase) collectUnscoredGeneric(ctx context.Context, sink search.Per
 			sink.MarkPruned() // there is more, uncounted
 		}
 		sink.AddTotal(seg, total)
-		if err := c.Err(); err != nil {
+		err := c.Err()
+		releaseCursor(c)
+		if err != nil {
 			return err
 		}
 	}

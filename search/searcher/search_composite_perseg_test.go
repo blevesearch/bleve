@@ -433,7 +433,10 @@ func TestPerSegmentPruningStress(t *testing.T) {
 	for seed := int64(1); seed <= 4; seed++ {
 		rnd := rand.New(rand.NewSource(seed * 7919))
 		outlier := []int{25, 150, 700, 3000}[seed-1]
-		fx := newPerSegFixture(t, perSegFixtureOpts{segments: 2 + int(seed%2), docsPerSeg: 2500,
+		// two of the four have segments of more than a window of docs (4096, and the
+		// 8192 of the outer window of MAXSCORE), where the edges of windows are crossed
+		fx := newPerSegFixture(t, perSegFixtureOpts{segments: 2 + int(seed%2),
+			docsPerSeg:  []int{2500, 9000, 2500, 9000}[seed-1],
 			deleteEvery: []int{0, 13, 0, 6}[seed-1], seed: seed, outlierOneIn: outlier})
 
 		for q := 0; q < queries; q++ {
@@ -497,7 +500,12 @@ func TestPerSegmentConjunctionWindowStress(t *testing.T) {
 		outlierOneIn, deleteEvery int
 		seed                      int64
 	}{{150, 0, 31}, {400, 7, 32}, {1500, 0, 33}, {6000, 5, 34}} {
-		fx := newPerSegFixture(t, perSegFixtureOpts{segments: 3, docsPerSeg: 3000,
+		// the last two have segments of more than a window of docs
+		docsPerSeg := 3000
+		if regime.seed >= 33 {
+			docsPerSeg = 9000
+		}
+		fx := newPerSegFixture(t, perSegFixtureOpts{segments: 3, docsPerSeg: docsPerSeg,
 			deleteEvery: regime.deleteEvery, seed: regime.seed, outlierOneIn: regime.outlierOneIn})
 		for _, model := range []string{index.DefaultScoringModel, index.BM25Scoring} {
 			for _, terms := range sets {

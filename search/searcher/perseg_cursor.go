@@ -20,8 +20,14 @@ package searcher
 // per segment searchers nest.
 //
 // This is the generic machinery: no pruning, every match is visited. The
-// algorithms that prune (WAND, the block windows of an intersection) work on
-// term cursors specifically, and use these as their oracle.
+// algorithms that prune (WAND, MAXSCORE, the block windows of an intersection)
+// work on term cursors specifically, and use these as their oracle. A union or
+// intersection of terms is read a window of docs at a time by a bufferedUnionCursor
+// or bufferedIntersectionCursor; the cursors here are for the rest, and for the
+// consumers that seek far (the buffered ones hand over to them then).
+//
+// A clause is given a cursor by segCursorSeeked, which says how its consumer is going
+// to move it, so that it picks the kind that suits.
 type docCursor interface {
 	// Doc is the doc the cursor is on, noMoreDocs once it has run out.
 	Doc() uint32
@@ -40,6 +46,22 @@ type docCursor interface {
 }
 
 var _ docCursor = (*termCursor)(nil)
+
+// releaser is a docCursor that holds working memory it can give back to a pool
+// (a cursor that goes through a window of docs at a time does). Whoever is done
+// with a cursor, before it ran out of matches or not, releases it; a cursor that
+// isn't released is only garbage collected, which is the cost of an allocation,
+// not an error. Releasing twice is harmless; using a cursor after it was is not.
+type releaser interface {
+	release()
+}
+
+// releaseCursor gives back what the cursor holds, if it holds anything.
+func releaseCursor(c docCursor) {
+	if r, ok := c.(releaser); ok {
+		r.release()
+	}
+}
 
 // unionCursor is the matches of a disjunction: the docs that at least min of
 // its cursors are on. The score of a doc is the sum of the scores of the
@@ -132,6 +154,13 @@ func (u *unionCursor) Score() float32 {
 	return sum * (float32(u.matches) / float32(u.n))
 }
 
+// release implements releaser: the clauses' cursors may hold memory.
+func (u *unionCursor) release() {
+	for _, c := range u.cursors {
+		releaseCursor(c)
+	}
+}
+
 func (u *unionCursor) Cost() uint64 {
 	var cost uint64
 	for _, c := range u.cursors {
@@ -214,6 +243,13 @@ func (x *intersectionCursor) Score() float32 {
 		sum += c.Score()
 	}
 	return sum
+}
+
+// release implements releaser.
+func (x *intersectionCursor) release() {
+	for _, c := range x.cursors {
+		releaseCursor(c)
+	}
 }
 
 func (x *intersectionCursor) Cost() uint64 { return x.byCost[0].Cost() }
@@ -311,6 +347,15 @@ func (b *booleanCursor) Score() float32 {
 		}
 	}
 	return sum
+}
+
+// release implements releaser.
+func (b *booleanCursor) release() {
+	for _, c := range []docCursor{b.must, b.should, b.mustNot} {
+		if c != nil {
+			releaseCursor(c)
+		}
+	}
 }
 
 func (b *booleanCursor) Cost() uint64 { return b.driver.Cost() }

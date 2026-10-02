@@ -26,5 +26,13 @@ func (s *MatchNoneSearcher) segCursor(seg int, scored bool) (docCursor, bool) {
 	return nil, false
 }
 
+// segCursorSeeked implements perSegChild.
+func (s *MatchNoneSearcher) segCursorSeeked(seg int, scored bool, seeks uint64) (docCursor, bool) {
+	return nil, false
+}
+
+// segCost implements perSegChild.
+func (s *MatchNoneSearcher) segCost(seg int) uint64 { return 0 }
+
 // numSegments implements perSegChild.
 func (s *MatchNoneSearcher) numSegments() int { return 0 }

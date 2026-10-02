@@ -36,13 +36,18 @@ func init() {
 // the clauses that match times the share of the clauses that do (coord).
 //
 // It is a search.PerSegmentSearcher. NextBlock is the generic iteration, which
-// handles every clause and every min, and visits every match. When its clauses
-// are all terms and min is 1 (a plain OR), it is also a
+// handles every clause and every min, and visits every match: a plain OR of terms
+// (all clauses terms, min 1) reads through a bufferedUnionCursor, a window of
+// docs at a time; anything else through a unionCursor, a match at a time. When its
+// clauses are all terms and min is 1 it is also a
 // search.OptimizedPerSegmentSearcher:
 //
-//   - with scores, CollectOptimized is block-max WAND: the top hits are found
-//     without visiting the docs that, by what is known of the best score of a
-//     term, or of a block of its postings, cannot make them. See wandSegment.
+//   - with scores, CollectOptimized finds the top hits without visiting the docs that,
+//     by what is known of the best score of a term, or of a block of its
+//     postings, cannot make them: block-max MAXSCORE (maxScoreSegment), a window
+//     of docs at a time, or, for terms that have few postings between them, block-max
+//     WAND (wandSegment). A search for no hits, or whose scores can't be
+//     bounded, visits every match instead.
 //   - without scores, it is a union by windows of a bitset: the first matches
 //     are taken in doc order, and the matches are counted with a popcount, up to
 //     the window in which the last hit was found (a lower bound), or all of
@@ -114,9 +119,36 @@ func (s *PerSegmentDisjunctionSearcher) numSegments() int { return s.segments() 
 
 // segCursor implements perSegChild.
 func (s *PerSegmentDisjunctionSearcher) segCursor(seg int, scored bool) (docCursor, bool) {
+	return s.segCursorSeeked(seg, scored, 0)
+}
+
+// segCost implements perSegChild: the matches of its clauses, at most.
+func (s *PerSegmentDisjunctionSearcher) segCost(seg int) uint64 {
+	var cost uint64
+	for _, c := range s.children {
+		cost += c.segCost(seg)
+	}
+	return cost
+}
+
+// segCursorSeeked implements perSegChild.
+func (s *PerSegmentDisjunctionSearcher) segCursorSeeked(seg int, scored bool, seeks uint64) (docCursor, bool) {
+	if s.pruningApplies() {
+		// a plain OR of terms
+		cost := s.segCost(seg)
+		if cost == 0 {
+			return nil, false
+		}
+		if seeks == 0 || cost <= nestedBufferedMaxRatio*seeks {
+			// read through, or sought about as often as it has matches: a window of
+			// docs at a time
+			return newBufferedUnionCursor(buildTermCursors(s.terms, seg, scored, false),
+				len(s.children), scored), true
+		}
+	}
 	cursors := make([]docCursor, 0, len(s.children))
 	for _, c := range s.children {
-		if cur, ok := c.segCursor(seg, scored); ok {
+		if cur, ok := c.segCursorSeeked(seg, scored, seeks); ok {
 			cursors = append(cursors, cur)
 		}
 	}
@@ -130,30 +162,11 @@ func (s *PerSegmentDisjunctionSearcher) segCursor(seg int, scored bool) (docCurs
 // NextBlock implements search.PerSegmentSearcher.
 func (s *PerSegmentDisjunctionSearcher) NextBlock(blk *search.PerSegmentScoredBlock) (int, error) {
 	return s.nextBlock(blk, func(seg int) docCursor {
-		if s.pruningApplies() {
-			// a plain OR of terms: found a window of docs at a time
-			if curs := s.termCursors(seg); len(curs) > 0 {
-				return newBufferedUnionCursor(curs, len(s.children), s.scored)
-			}
-			return nil
-		}
 		if c, ok := s.segCursor(seg, s.scored); ok {
 			return c
 		}
 		return nil
 	})
-}
-
-// termCursors are the cursors over the postings of the terms in segment seg, for
-// those that have some, in the order of the query. The clauses have to be terms.
-func (s *PerSegmentDisjunctionSearcher) termCursors(seg int) []*termCursor {
-	var curs []*termCursor
-	for idx, t := range s.terms {
-		if seg < len(t.readers) && t.readers[seg] != nil {
-			curs = append(curs, newTermCursor(idx, t.readers[seg], t.scorer, s.scored))
-		}
-	}
-	return curs
 }
 
 // CanCollectOptimized implements search.OptimizedPerSegmentSearcher.
@@ -182,10 +195,11 @@ func (s *PerSegmentDisjunctionSearcher) CollectOptimized(ctx context.Context,
 		})
 	}
 	var scratch *msScratch
+	// scratchBusy is whether the scratch is being worked in, and so may not be clean:
+	// it's given back only when it isn't -- not after an error, nor a panic
+	scratchBusy := false
 	defer func() {
-		// given back only if it was left clean, which is when the collection ran
-		// to its end
-		if scratch != nil && err == nil {
+		if scratch != nil && !scratchBusy {
 			msScratchPool.Put(scratch)
 		}
 	}()
@@ -199,13 +213,7 @@ func (s *PerSegmentDisjunctionSearcher) CollectOptimized(ctx context.Context,
 
 		// the clauses that have postings in the segment, in the order of the
 		// query
-		var curs []*termCursor
-		for idx, t := range s.terms {
-			if seg < len(t.readers) && t.readers[seg] != nil {
-				c := newTermCursor(idx, t.readers[seg], t.scorer, s.scored)
-				curs = append(curs, c)
-			}
-		}
+		curs := buildTermCursors(s.terms, seg, s.scored, false)
 		if len(curs) == 0 {
 			continue
 		}
@@ -227,7 +235,9 @@ func (s *PerSegmentDisjunctionSearcher) CollectOptimized(ctx context.Context,
 			if scratch == nil {
 				scratch = msScratchPool.Get().(*msScratch)
 			}
+			scratchBusy = true
 			err = s.maxScoreSegment(ctx, sink, seg, curs, scratch)
+			scratchBusy = err != nil
 		default:
 			err = s.wandSegment(ctx, sink, seg, curs)
 		}

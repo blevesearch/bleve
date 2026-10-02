@@ -316,58 +316,13 @@ func boundUpTo(src blockBoundsSource, sc *scorer.PerSegmentTermScorer, start uin
 	return bound, last, true
 }
 
-// scatter puts the score of each of the cursor's postings below end into lane,
-// by its doc's offset from base, sets the doc's bit in words and counts it in
-// counts, and moves the cursor to its first posting at or after end. The cursor
-// has to be on a doc >= base, and the lane, words and counts have to have a
-// place for each of the docs from base to end.
-func (t *termCursor) scatter(base, end uint32, lane []float32, words *[msWords]uint64,
-	counts *[msBatch]uint8) {
-	for t.doc != noMoreDocs && t.doc < end {
-		docs := t.blk.Docs[t.pos:t.n]
-		c := len(docs)
-		if docs[c-1] >= end {
-			// the first posting at or after end
-			lo, hi := 0, c
-			for lo < hi {
-				mid := int(uint(lo+hi) >> 1)
-				if docs[mid] < end {
-					lo = mid + 1
-				} else {
-					hi = mid
-				}
-			}
-			c = lo
-		}
-		scores := t.blockScores()[t.pos : t.pos+c]
-		for i, d := range docs[:c] {
-			off := d - base
-			lane[off] = scores[i]
-			words[off>>6] |= 1 << (off & 63)
-			counts[off]++
-		}
-		t.pos += c
-		if t.pos < t.n {
-			t.doc = t.blk.Docs[t.pos]
-			return
-		}
-		// the block is used up
-		last := t.blk.Docs[t.n-1]
-		if last == noMoreDocs-1 {
-			t.finish()
-			return
-		}
-		t.seekBlock(last + 1)
-	}
-}
-
 // scatterAdd puts the cursor's postings below end in the window that starts at
 // base: the doc's bit in words, one more term on it in counts and, if scored, its
 // score added to the doc's in scores. The cursor moves to its first posting at or
 // after end. The cursor has to be on a doc >= base, and the arrays have to have a
 // place for each of the docs from base to end.
-func (t *termCursor) scatterAdd(base, end uint32, scores []float32, words *[bufUnionWords]uint64,
-	counts *[bufUnionHorizon]uint8, scored bool) {
+func (t *termCursor) scatterAdd(base, end uint32, scores []float32, words *[windowWords]uint64,
+	counts *[windowDocs]uint8, scored bool) {
 	for t.doc != noMoreDocs && t.doc < end {
 		docs := t.blk.Docs[t.pos:t.n]
 		c := len(docs)

@@ -16,7 +16,6 @@ package searcher
 
 import (
 	"math/bits"
-	"sync"
 
 	"github.com/blevesearch/bleve/v2/search"
 )
@@ -32,35 +31,26 @@ import (
 // The terms are visited in the order of the query, so the score of a doc is summed
 // in that order, and is intersectionCursor's, to the bit.
 //
-// Like bufferedUnionCursor, it is for collections that visit every match: it is
-// moved forward a doc at a time (Advance) or a block of docs (fillBlock).
+// Like bufferedUnionCursor, it falls back to the cursor it stands for (the
+// intersectionCursor over the same terms) when its consumer seeks beyond the
+// window, and comes back after a run of Advance calls.
 type bufferedIntersectionCursor struct {
 	terms  []*termCursor // in the order of the query
 	scored bool
 
-	scratch  *bufIntersectScratch
-	start    uint32 // the first doc of the window
-	word     int    // the word of the bitmap being read
-	bitsLeft uint64 // what's left of it
-	off      int    // where the doc the cursor is on is in the window
+	fb       docCursor
+	advances int
+
+	scratch  *bufIntersectScratch // nil in fallback, and once released
+	start    uint32               // the first doc of the window
+	span     uint32               // how many docs the next window covers, up to windowDocs
+	nw       int                  // the words of the bitmap the window uses
+	word     int                  // the word of the bitmap being read
+	bitsLeft uint64               // what's left of it
+	off      int                  // where the doc the cursor is on is in the window
 	doc      uint32
 	offset   uint64
 }
-
-// bufIntersectScratch is the working memory of a bufferedIntersectionCursor. It is
-// cleaned where it is used, so it can be given back in any state.
-type bufIntersectScratch struct {
-	scores [bufUnionHorizon]float32
-	counts [bufUnionHorizon]uint8 // not looked at: what a term puts the bits and scores with wants it
-	res    [bufUnionWords]uint64
-	tmp    [bufUnionWords]uint64
-}
-
-var bufIntersectScratchPool = sync.Pool{New: func() any { return new(bufIntersectScratch) }}
-
-// bufferedIntersectionMaxSkew is how many times more postings a term may have
-// than the one with the fewest for the intersection to be done by windows.
-const bufferedIntersectionMaxSkew = 8
 
 // useBufferedIntersection reports whether the AND of the terms is done by windows:
 // when no term has far more postings than the rest, as the windows pay for the
@@ -73,7 +63,7 @@ func useBufferedIntersection(terms []*termCursor) bool {
 	for _, t := range terms[1:] {
 		lo, hi = min(lo, t.Cost()), max(hi, t.Cost())
 	}
-	return hi <= lo*bufferedIntersectionMaxSkew
+	return intersectsByWindowsCounts(lo, hi)
 }
 
 // newBufferedIntersectionCursor is the intersection of the terms, in the order of
@@ -85,18 +75,25 @@ func newBufferedIntersectionCursor(terms []*termCursor, scored bool) *bufferedIn
 		scratch: bufIntersectScratchPool.Get().(*bufIntersectScratch),
 		offset:  terms[0].Offset(),
 		off:     -1,
+		span:    windowDocs,
 	}
 	x.doc = x.refill()
 	return x
 }
 
-// finish gives the memory back.
-func (x *bufferedIntersectionCursor) finish() uint32 {
-	x.doc = noMoreDocs
+// release implements releaser. The memory is cleaned where it is used, so it goes
+// back as it is.
+func (x *bufferedIntersectionCursor) release() {
 	if x.scratch != nil {
 		bufIntersectScratchPool.Put(x.scratch)
 		x.scratch = nil
 	}
+}
+
+// finish is where the cursor is when it has no more matches.
+func (x *bufferedIntersectionCursor) finish() uint32 {
+	x.doc = noMoreDocs
+	x.release()
 	return noMoreDocs
 }
 
@@ -114,9 +111,12 @@ func (x *bufferedIntersectionCursor) refill() uint32 {
 			start = max(start, t.doc)
 		}
 		end := uint32(noMoreDocs)
-		if uint64(start)+bufUnionHorizon < uint64(noMoreDocs) {
-			end = start + bufUnionHorizon
+		if uint64(start)+uint64(x.span) < uint64(noMoreDocs) {
+			end = start + x.span
 		}
+		// the window after this one covers more, up to a whole one
+		x.span = min(x.span*2, windowDocs)
+		nw := int(end-start+63) / 64
 
 		if x.scored {
 			clear(s.scores[:])
@@ -141,7 +141,7 @@ func (x *bufferedIntersectionCursor) refill() uint32 {
 			clear(s.tmp[:])
 			t.scatterAdd(start, end, s.scores[:], &s.tmp, &s.counts, x.scored)
 			var any uint64
-			for w := range s.res {
+			for w := 0; w < nw; w++ {
 				s.res[w] &= s.tmp[w]
 				any |= s.res[w]
 			}
@@ -153,7 +153,7 @@ func (x *bufferedIntersectionCursor) refill() uint32 {
 		if empty {
 			continue
 		}
-		x.start, x.word, x.off = start, 0, -1
+		x.start, x.word, x.off, x.nw = start, 0, -1, nw
 		x.bitsLeft = s.res[0]
 		return x.next()
 	}
@@ -169,11 +169,44 @@ func (x *bufferedIntersectionCursor) next() uint32 {
 			return x.start + uint32(x.off)
 		}
 		x.word++
-		if x.word == bufUnionWords {
+		if x.word >= x.nw {
 			return x.refill()
 		}
 		x.bitsLeft = x.scratch.res[x.word]
 	}
+}
+
+// toFallback sends the cursor to the intersectionCursor over the terms, once they
+// are at the target.
+func (x *bufferedIntersectionCursor) toFallback(target uint32) uint32 {
+	x.release()
+	cursors := make([]docCursor, len(x.terms))
+	for i, t := range x.terms {
+		if t.doc < target {
+			t.Seek(target)
+		}
+		cursors[i] = t
+	}
+	for _, t := range x.terms {
+		if t.doc == noMoreDocs {
+			x.doc = noMoreDocs
+			return noMoreDocs
+		}
+	}
+	x.fb = newIntersectionCursor(cursors)
+	x.advances = 0
+	x.doc = x.fb.Doc()
+	return x.doc
+}
+
+// toWindows takes the cursor back from the intersectionCursor, which is on the
+// doc it is to be on.
+func (x *bufferedIntersectionCursor) toWindows() uint32 {
+	x.fb = nil
+	x.scratch = bufIntersectScratchPool.Get().(*bufIntersectScratch)
+	x.span = 256
+	x.doc = x.refill()
+	return x.doc
 }
 
 // Doc implements docCursor.
@@ -184,20 +217,59 @@ func (x *bufferedIntersectionCursor) Advance() uint32 {
 	if x.doc == noMoreDocs {
 		return noMoreDocs
 	}
+	if x.fb != nil {
+		x.doc = x.fb.Advance()
+		x.advances++
+		if x.doc != noMoreDocs && x.advances >= fallbackAdvances {
+			return x.toWindows()
+		}
+		return x.doc
+	}
 	x.doc = x.next()
 	return x.doc
 }
 
-// Seek implements docCursor, the slow way: the cursor is made to be advanced.
+// Seek implements docCursor. Within the window it skips to the target's word and
+// masks off what's before it; just beyond it a new window is started at the target;
+// further than a whole window, the cursor falls back to the intersectionCursor.
 func (x *bufferedIntersectionCursor) Seek(target uint32) uint32 {
-	for x.doc < target {
-		x.Advance()
+	if x.doc >= target {
+		return x.doc
 	}
+	if x.fb != nil {
+		x.advances = 0
+		x.doc = x.fb.Seek(target)
+		return x.doc
+	}
+	if windowEnd := uint64(x.start) + uint64(x.nw)*64; uint64(target) >= windowEnd {
+		if uint64(target) >= windowEnd+windowDocs {
+			return x.toFallback(target)
+		}
+		// just beyond the window: the next one has it, or is near
+		for _, t := range x.terms {
+			if t.doc < target {
+				t.Seek(target)
+			}
+		}
+		x.doc = x.refill()
+		return x.doc
+	}
+	toff := int(target - x.start)
+	if tword := toff / 64; tword > x.word {
+		x.word, x.bitsLeft = tword, x.scratch.res[tword]
+	}
+	x.bitsLeft &^= 1<<(toff%64) - 1
+	x.doc = x.next()
 	return x.doc
 }
 
 // Score implements docCursor.
-func (x *bufferedIntersectionCursor) Score() float32 { return x.scratch.scores[x.off] }
+func (x *bufferedIntersectionCursor) Score() float32 {
+	if x.fb != nil {
+		return x.fb.Score()
+	}
+	return x.scratch.scores[x.off]
+}
 
 // Cost implements docCursor.
 func (x *bufferedIntersectionCursor) Cost() uint64 {
@@ -237,11 +309,14 @@ func (x *bufferedIntersectionCursor) fillBlock(blk *search.PerSegmentScoredBlock
 		blk.Docs[n] = x.doc
 		blk.Scores[n] = score
 		n++
-		x.doc = x.next()
+		x.Advance()
 	}
 	blk.Offset = x.offset
 	blk.MaxScore = max
 	return n
 }
 
-var _ docCursor = (*bufferedIntersectionCursor)(nil)
+var (
+	_ docCursor = (*bufferedIntersectionCursor)(nil)
+	_ releaser  = (*bufferedIntersectionCursor)(nil)
+)

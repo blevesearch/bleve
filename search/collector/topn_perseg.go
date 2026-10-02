@@ -18,6 +18,8 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"runtime"
+	"runtime/debug"
 	"sort"
 	"time"
 
@@ -136,6 +138,28 @@ func (st *perSegmentState) MarkPruned() { st.pruned = true }
 // Collect goes to the searcher to find the matching documents. The searcher has
 // to be a search.PerSegmentSearcher.
 func (hc *PerSegmentTopNCollector) Collect(ctx context.Context, searcher search.Searcher,
+	reader index.IndexReader) (err error) {
+	// The algorithms index dense arrays by doc offset and trust that their cursors
+	// are where they say: a mistake there is a runtime panic. It fails the search
+	// that hit it, not the process, and says what went wrong and where. (Other
+	// panics are not touched.)
+	defer func() {
+		if r := recover(); r != nil {
+			rerr, isRuntime := r.(runtime.Error)
+			if !isRuntime {
+				panic(r)
+			}
+			stack := debug.Stack()
+			if len(stack) > 2048 {
+				stack = stack[:2048]
+			}
+			err = fmt.Errorf("collector: the per segment search failed: %v\n%s", rerr, stack)
+		}
+	}()
+	return hc.collect(ctx, searcher, reader)
+}
+
+func (hc *PerSegmentTopNCollector) collect(ctx context.Context, searcher search.Searcher,
 	reader index.IndexReader) error {
 	startTime := time.Now()
 

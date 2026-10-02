@@ -19,7 +19,6 @@ import (
 	"math"
 	"math/bits"
 	"reflect"
-	"sync"
 
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
@@ -36,12 +35,15 @@ func init() {
 // the docs that match all of them, scored by the sum of their scores.
 //
 // It is a search.PerSegmentSearcher. NextBlock is the generic iteration, which
-// handles every clause and visits every match. When its clauses are all terms,
-// and there are at least two, it is also a search.OptimizedPerSegmentSearcher:
+// handles every clause and visits every match: an AND of terms none of which has
+// far more postings than the rest reads through a bufferedIntersectionCursor, a
+// window of docs at a time; anything else through an intersectionCursor, leapfrogging.
+// When its clauses are all terms, and there are at least two, it is also a
+// search.OptimizedPerSegmentSearcher:
 //
-//   - with scores, CollectOptimized works in windows of the rarest term's
-//     blocks, skipping a window whose best possible score can't make the heap.
-//     See windowSegment.
+//   - with scores, CollectOptimized works in windows of the blocks of the terms,
+//     skipping a window whose best possible score can't make the heap, and
+//     doing the narrow ones that are worth it on bitmaps. See windowSegment.
 //   - without scores, it takes the first matches in doc order by leapfrogging
 //     cursors that decode doc numbers only, and stops there, the total being
 //     a lower bound -- or, for a search for no hits (a count), it goes on to
@@ -112,11 +114,44 @@ func (s *PerSegmentConjunctionSearcher) numSegments() int { return s.segments() 
 
 // segCursor implements perSegChild.
 func (s *PerSegmentConjunctionSearcher) segCursor(seg int, scored bool) (docCursor, bool) {
+	return s.segCursorSeeked(seg, scored, 0)
+}
+
+// segCost implements perSegChild: the matches of its clause that has the fewest, at
+// most.
+func (s *PerSegmentConjunctionSearcher) segCost(seg int) uint64 {
+	cost := uint64(math.MaxUint64)
+	for _, c := range s.children {
+		cost = min(cost, c.segCost(seg))
+	}
+	if len(s.children) == 0 {
+		return 0
+	}
+	return cost
+}
+
+// segCursorSeeked implements perSegChild.
+func (s *PerSegmentConjunctionSearcher) segCursorSeeked(seg int, scored bool, seeks uint64) (docCursor, bool) {
+	cost := s.segCost(seg)
+	if cost == 0 {
+		return nil, false // a clause that doesn't match here: nothing does
+	}
+	if s.pruningApplies() && s.intersectsByWindows(seg) && (seeks == 0 || cost <= nestedBufferedMaxRatio*seeks) {
+		// an AND of terms with about as many postings as each other: a window of
+		// docs at a time
+		return newBufferedIntersectionCursor(buildTermCursors(s.terms, seg, scored, true), scored), true
+	}
+	// the cursors are walked cheapest first: the clause with the fewest matches is
+	// read through and the others are sought about as many times as that has matches
+	hint := cost
+	if seeks > 0 {
+		hint = min(hint, seeks)
+	}
 	cursors := make([]docCursor, 0, len(s.children))
 	for _, c := range s.children {
-		cur, ok := c.segCursor(seg, scored)
+		cur, ok := c.segCursorSeeked(seg, scored, hint)
 		if !ok {
-			return nil, false // a clause that doesn't match here: nothing does
+			return nil, false
 		}
 		cursors = append(cursors, cur)
 	}
@@ -129,30 +164,11 @@ func (s *PerSegmentConjunctionSearcher) segCursor(seg int, scored bool) (docCurs
 // NextBlock implements search.PerSegmentSearcher.
 func (s *PerSegmentConjunctionSearcher) NextBlock(blk *search.PerSegmentScoredBlock) (int, error) {
 	return s.nextBlock(blk, func(seg int) docCursor {
-		if s.pruningApplies() && s.intersectsByWindows(seg) {
-			// an AND of terms with about as many postings as each other: a window
-			// of docs at a time
-			return newBufferedIntersectionCursor(s.termCursors(seg), s.scored)
-		}
 		if c, ok := s.segCursor(seg, s.scored); ok {
 			return c
 		}
 		return nil
 	})
-}
-
-// termCursors are the cursors over the postings of the terms in segment seg, in the
-// order of the query, nil if one of them has none there. The clauses have to be
-// terms.
-func (s *PerSegmentConjunctionSearcher) termCursors(seg int) []*termCursor {
-	curs := make([]*termCursor, 0, len(s.terms))
-	for idx, t := range s.terms {
-		if seg >= len(t.readers) || t.readers[seg] == nil {
-			return nil
-		}
-		curs = append(curs, newTermCursor(idx, t.readers[seg], t.scorer, s.scored))
-	}
-	return curs
 }
 
 // intersectsByWindows reports whether the matches of the segment are found a
@@ -171,7 +187,7 @@ func (s *PerSegmentConjunctionSearcher) intersectsByWindows(seg int) bool {
 		}
 		lo, hi = min(lo, n), max(hi, n)
 	}
-	return len(s.terms) >= 2 && hi <= lo*bufferedIntersectionMaxSkew
+	return len(s.terms) >= 2 && intersectsByWindowsCounts(lo, hi)
 }
 
 // CanCollectOptimized implements search.OptimizedPerSegmentSearcher.
@@ -208,14 +224,7 @@ func (s *PerSegmentConjunctionSearcher) CollectOptimized(ctx context.Context,
 		}
 
 		// all of the clauses have to have postings in the segment
-		curs := make([]*termCursor, 0, len(s.terms))
-		for idx, t := range s.terms {
-			if seg >= len(t.readers) || t.readers[seg] == nil {
-				curs = nil
-				break
-			}
-			curs = append(curs, newTermCursor(idx, t.readers[seg], t.scorer, s.scored))
-		}
+		curs := buildTermCursors(s.terms, seg, s.scored, true)
 		if curs == nil {
 			continue
 		}
@@ -452,10 +461,17 @@ func conjunctionWindow(leader *termCursor, secs []*termCursor, doc uint32,
 // its score, with the bounds of the others' blocks added, can beat the
 // threshold; and once a term has been looked at, the bounds of the rest are all
 // that's left to assume.
+//
+// A window that is narrow (so that its docs fit a bitmap), and has a good many of the
+// leader's postings that could make the heap, is done on bitmaps instead: the
+// candidates and the postings of each other term in the window are put in
+// bitmaps, which are ANDed, and what's left is scored from lanes of block scores,
+// rather than looking each candidate up with a seek. See conjBitmapMinCandidates.
 func (s *PerSegmentConjunctionSearcher) windowSegment(ctx context.Context, sink search.PerSegmentSink,
 	seg int, byIdx []*termCursor) (retErr error) {
 	// working memory for the windows that are done with bitmaps, taken when
 	// the first of them is
+	minCands := int(conjBitmapMinCandidates.Load())
 	var scratch *conjScratch
 	defer func() {
 		if scratch != nil {
@@ -557,12 +573,12 @@ func (s *PerSegmentConjunctionSearcher) windowSegment(ctx context.Context, sink 
 		// term's postings in the window are put in one, the bitmaps are ANDed,
 		// and the matches that are left are scored from the scores of the terms,
 		// which were worked out for blocks. No cursor is moved for any single doc.
-		if len(secs) > 0 && uint64(windowEnd-doc) < msBatch {
+		if len(secs) > 0 && uint64(windowEnd-doc) < windowDocs {
 			cands := 0
 			for _, sc := range scores[start:end] {
 				cands += b2i(sc > scoreThreshold)
 			}
-			if cands >= conjBitmapMinCandidates {
+			if cands >= minCands {
 				if scratch == nil {
 					scratch = conjScratchPool.Get().(*conjScratch)
 				}
@@ -701,47 +717,9 @@ func (s *PerSegmentConjunctionSearcher) windowSegment(ctx context.Context, sink 
 	return nil
 }
 
-// conjScratch is the working memory of the windows of an AND that are done on
-// bitmaps: a lane of scores by doc offset for each term, and two bitmaps. The
-// lanes are not cleaned after a window -- a score is only read where every term
-// has set its bit in that window, which is where it was written -- so a conjScratch
-// is its own kind: nothing else can use its lanes, which are not zeros.
-type conjScratch struct {
-	lanes [][]float32
-	res   [msWords]uint64
-	tmp   [msWords]uint64
-}
-
-var conjScratchPool = sync.Pool{New: func() any { return new(conjScratch) }}
-
-// lane is the lane of scores of the term in the place idx of the query.
-func (c *conjScratch) lane(idx int) []float32 {
-	for len(c.lanes) <= idx {
-		c.lanes = append(c.lanes, nil)
-	}
-	if c.lanes[idx] == nil {
-		c.lanes[idx] = make([]float32, msBatch)
-	}
-	return c.lanes[idx]
-}
-
-// conjBitmapMinCandidates is how many of the leader's postings in a window have
-// to be able to make the heap for the window to be done on bitmaps.
-var conjBitmapMinCandidates = 16
-
 func b2i(b bool) int {
 	if b {
 		return 1
 	}
 	return 0
-}
-
-// SetPerSegmentConjunctionBitmapMinCandidates sets how many of the leader's
-// postings in a window have to be able to make the heap for the window to be
-// done on bitmaps (a very large number turns that off), and returns a function
-// that puts back what was. It is for tests and benchmarks.
-func SetPerSegmentConjunctionBitmapMinCandidates(n int) (restore func()) {
-	prev := conjBitmapMinCandidates
-	conjBitmapMinCandidates = n
-	return func() { conjBitmapMinCandidates = prev }
 }

@@ -644,3 +644,79 @@ func TestPerSegmentAndGenericLoopFindsEveryMatch(t *testing.T) {
 		}
 	}
 }
+
+// Booleans and ORs and ANDs inside other composites have the cursors of their
+// clauses picked by how they will be used (read through, or sought: see
+// segCursorSeeked), and read a window of docs at a time when that pays. Whichever it
+// is, the hits are the regular path's, on segments of more than a window of docs, with
+// clauses that are dense and sparse, alike and not.
+func TestPerSegmentNestedAndBooleanOnBigSegments(t *testing.T) {
+	terms := func(names ...string) []query.Query {
+		rv := make([]query.Query, len(names))
+		for i, n := range names {
+			rv[i] = termQueryOn("body", n)
+		}
+		return rv
+	}
+	or := func(names ...string) query.Query { return query.NewDisjunctionQuery(terms(names...)) }
+	and := func(names ...string) query.Query { return query.NewConjunctionQuery(terms(names...)) }
+	queries := []struct {
+		name string
+		q    func() query.Query
+	}{
+		{"and of an or and a term", func() query.Query {
+			return query.NewConjunctionQuery([]query.Query{or("w0", "w1", "w5"), termQueryOn("body", "w2")})
+		}},
+		{"a rare term and an or", func() query.Query {
+			return query.NewConjunctionQuery([]query.Query{termQueryOn("body", "hot"), or("w0", "w1", "w5")})
+		}},
+		{"a very rare term and an or", func() query.Query {
+			return query.NewConjunctionQuery([]query.Query{termQueryOn("body", "w997"), or("w0", "w1", "common")})
+		}},
+		{"or of an and and a term", func() query.Query {
+			return query.NewDisjunctionQuery([]query.Query{and("w0", "w1"), termQueryOn("body", "w2")})
+		}},
+		{"or of two ands", func() query.Query {
+			return query.NewDisjunctionQuery([]query.Query{and("w0", "w1"), and("w2", "w3")})
+		}},
+		{"and of two ors", func() query.Query {
+			return query.NewConjunctionQuery([]query.Query{or("w0", "w3"), or("w1", "w2", "w4")})
+		}},
+		{"boolean: must, should and must not", func() query.Query {
+			return query.NewBooleanQuery(terms("w0"), terms("w1", "w5"), terms("w2"))
+		}},
+		{"boolean: must with ors", func() query.Query {
+			return query.NewBooleanQuery([]query.Query{or("w0", "w1")}, []query.Query{or("w2", "w3")}, []query.Query{or("w4", "w6")})
+		}},
+		{"boolean: should only", func() query.Query { return query.NewBooleanQuery(nil, terms("w0", "w1", "w5"), nil) }},
+		{"boolean: should, must not", func() query.Query {
+			return query.NewBooleanQuery(nil, terms("w0", "w1"), terms("w3", "w4"))
+		}},
+		{"boolean: a rare must and a dense should", func() query.Query {
+			return query.NewBooleanQuery(terms("hot"), terms("w0", "w1"), terms("w2"))
+		}},
+		{"boolean: a dense must and a rare should", func() query.Query {
+			return query.NewBooleanQuery(terms("w0"), terms("w400", "w600"), nil)
+		}},
+		{"boolean: must not rare", func() query.Query {
+			return query.NewBooleanQuery(terms("w0", "w1"), nil, terms("hot"))
+		}},
+	}
+	for _, model := range []string{index.DefaultScoringModel, index.BM25Scoring} {
+		for _, deletions := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/deletions=%v", model, deletions), func(t *testing.T) {
+				idx, cleanup := skipTestIndex(t, model, deletions)
+				defer cleanup()
+				for _, qc := range queries {
+					for _, sz := range []struct{ size, from int }{{1, 0}, {10, 0}, {10, 25}, {200, 0}, {0, 0}} {
+						what := fmt.Sprintf("%s %s deletions=%v %+v", qc.name, model, deletions, sz)
+						old, got := runBothPaths(t, idx, func() *SearchRequest {
+							return NewSearchRequestOptions(qc.q(), sz.size, sz.from, false)
+						}, what)
+						compareCompositeResults(t, what, old, got)
+					}
+				}
+			})
+		}
+	}
+}

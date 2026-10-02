@@ -18,23 +18,15 @@ import (
 	"context"
 	"math"
 	"math/bits"
-	"sync"
 
 	"github.com/blevesearch/bleve/v2/search"
 )
-
-// disjunctionAlgo selects the algorithm that finds the best hits of a plain OR
-// of terms: "wand", "maxscore", or "" for what the searcher thinks fits best.
-var disjunctionAlgo string
 
 const (
 	// msOuterWindow is the least number of docs of the outer window, in which
 	// each term has a single bound (the best of its blocks there) and so the
 	// split into terms that can drive a match and terms that can't is made once.
 	msOuterWindow = 8192
-	// msBatch is how many docs are accumulated at a time, in dense arrays.
-	msBatch = 4096
-	msWords = msBatch / 64
 	// msBootstrapBatch is the batch while there is no threshold yet.
 	msBootstrapBatch = 256
 	// msMinPostings is how many postings the terms of a segment need to have
@@ -62,42 +54,6 @@ type msSurvivor struct {
 	s   float32
 }
 
-// msScratch is the working memory of maxScoreSegment: the dense arrays of a
-// batch. A set is 16KB for each term that needs a lane of scores, so they are
-// kept for the next search. Whoever holds one leaves the lanes zeroed, which is
-// what lets the next one use them; one that was cut short (an error) is not given
-// back.
-type msScratch struct {
-	lanes [][]float32
-	words [msWords]uint64
-	count [msBatch]uint8
-	surv  []msSurvivor
-	// the offsets, in the batch, of the docs that have a strong term: all that
-	// the lanes have anything at
-	cands []uint16
-	// per segment
-	all     []*msTerm
-	live    []*msTerm
-	weakPre []float32
-	dirty   []bool
-	terms   []msTerm
-}
-
-var msScratchPool = sync.Pool{New: func() any {
-	return &msScratch{surv: make([]msSurvivor, 0, 256)}
-}}
-
-// lane is the lane of scores of the term in the place idx of the query.
-func (m *msScratch) lane(idx int) []float32 {
-	for len(m.lanes) <= idx {
-		m.lanes = append(m.lanes, nil)
-	}
-	if m.lanes[idx] == nil {
-		m.lanes[idx] = make([]float32, msBatch)
-	}
-	return m.lanes[idx]
-}
-
 // useMaxScore reports whether maxScoreSegment is the algorithm for the cursors
 // of a segment. It is, unless the terms have so few postings together that
 // there is little for a pass over batches of docs to be good at, and WAND,
@@ -105,10 +61,10 @@ func (m *msScratch) lane(idx int) []float32 {
 // does not depend on the number of terms the way WAND's per document cost does,
 // and it is not any worse for a single pair of terms.
 func (s *PerSegmentDisjunctionSearcher) useMaxScore(curs []*termCursor) bool {
-	switch disjunctionAlgo {
-	case "wand":
+	switch disjunctionAlgo.Load() {
+	case disjunctionAlgoWAND:
 		return false
-	case "maxscore":
+	case disjunctionAlgoMaxScore:
 		return true
 	}
 	if len(curs) < 2 {
@@ -287,7 +243,7 @@ func (s *PerSegmentDisjunctionSearcher) maxScoreSegment(ctx context.Context, sin
 			}
 			// until the heap is full the threshold is nothing, so the batches
 			// are small, to get one soon
-			batch := uint64(msBatch)
+			batch := uint64(windowDocs)
 			if math.IsInf(float64(thr), -1) {
 				batch = msBootstrapBatch
 			}
@@ -297,7 +253,7 @@ func (s *PerSegmentDisjunctionSearcher) maxScoreSegment(ctx context.Context, sin
 
 			// the strong terms' postings in the batch
 			for _, t := range strong {
-				t.c.scatter(base, winEnd, laneFor(t.c.idx), words, counts)
+				t.c.scatterAdd(base, winEnd, laneFor(t.c.idx), words, counts, true) // the lane is zero: adding is setting
 				laneDirty[t.c.idx] = true
 			}
 
@@ -407,13 +363,4 @@ func (s *PerSegmentDisjunctionSearcher) maxScoreSegment(ctx context.Context, sin
 		}
 	}
 	return nil
-}
-
-// SetPerSegmentDisjunctionAlgo makes the searchers of a plain OR of terms use
-// the algorithm named ("wand", "maxscore", or "" for what fits best), and
-// returns a function that puts back what was. It is for tests and benchmarks.
-func SetPerSegmentDisjunctionAlgo(algo string) (restore func()) {
-	prev := disjunctionAlgo
-	disjunctionAlgo = algo
-	return func() { disjunctionAlgo = prev }
 }

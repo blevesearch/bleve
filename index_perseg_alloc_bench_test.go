@@ -211,6 +211,22 @@ func BenchmarkSearchCPU(b *testing.B) {
 		q = query.NewConjunctionQuery([]query.Query{term("w0"), term("w1"), term("w2"), term("w3")})
 	case "andmk":
 		q = query.NewConjunctionQuery([]query.Query{term("mk100"), term("mk50"), term("mk10")})
+	case "bool":
+		q = query.NewBooleanQuery([]query.Query{term("w0")}, []query.Query{term("w1"), term("w10")}, []query.Query{term("w2")})
+	case "boolshould":
+		q = query.NewBooleanQuery(nil, []query.Query{term("w0"), term("w1"), term("w10")}, nil)
+	case "boolmust2":
+		q = query.NewBooleanQuery([]query.Query{term("w0"), term("w1")}, []query.Query{term("w10")}, nil)
+	case "andor":
+		q = query.NewConjunctionQuery([]query.Query{
+			query.NewDisjunctionQuery([]query.Query{term("w0"), term("w1"), term("w10")}), term("w2")})
+	case "orand":
+		q = query.NewDisjunctionQuery([]query.Query{
+			query.NewConjunctionQuery([]query.Query{term("w0"), term("w1")}), term("w2")})
+	case "andorsparse":
+		// a sparse leader over a dense nested OR: its seeks go far
+		q = query.NewConjunctionQuery([]query.Query{term("mk1"),
+			query.NewDisjunctionQuery([]query.Query{term("w0"), term("w1"), term("w10")})})
 	case "or2":
 		q = query.NewDisjunctionQuery([]query.Query{term("w0"), term("w1")})
 	case "or2rare":
