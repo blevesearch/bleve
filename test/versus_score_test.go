@@ -15,6 +15,7 @@
 package test
 
 import (
+	"math"
 	"os"
 	"strconv"
 	"testing"
@@ -38,7 +39,10 @@ func TestDisjunctionSearchScoreIndexWithCompositeFields(t *testing.T) {
 			upHits[0].ID, upHits[1].ID, scHits[0].ID, scHits[1].ID)
 	}
 
-	if scHits[0].Score != upHits[0].Score || scHits[1].Score != upHits[1].Score {
+	// (scorch scores a search of this kind in float32, upsidedown in float64: the
+	// same scores to float32 precision)
+	near := func(a, b float64) bool { return math.Abs(a-b) <= 1e-6*math.Max(math.Abs(a), math.Abs(b)) }
+	if !near(scHits[0].Score, upHits[0].Score) || !near(scHits[1].Score, upHits[1].Score) {
 		t.Errorf("upsidedown, scorch showing different scores;\n"+
 			"upsidedown: (%+v, %+v), scorch: (%+v, %+v)\n",
 			*upHits[0].Expl, *upHits[1].Expl, *scHits[0].Expl, *scHits[1].Expl)

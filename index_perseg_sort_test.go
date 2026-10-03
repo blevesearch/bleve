@@ -136,6 +136,18 @@ func perSegmentSortTestIndex(t *testing.T, scoringModel string) (Index, func()) 
 // places, same sort values, same hit numbers; scores are within float32 precision.
 func compareSortedResults(t *testing.T, what string, old, got *SearchResult) {
 	t.Helper()
+	compareSortedResultsOpt(t, what, old, got, false)
+}
+
+// compareSortedResultsIgnoringIndex is for the results of several indexes with the
+// same content, where hits that tie are in either order between the indexes.
+func compareSortedResultsIgnoringIndex(t *testing.T, what string, old, got *SearchResult) {
+	t.Helper()
+	compareSortedResultsOpt(t, what, old, got, true)
+}
+
+func compareSortedResultsOpt(t *testing.T, what string, old, got *SearchResult, ignoreIndex bool) {
+	t.Helper()
 	if old.Total != got.Total || old.TotalRelation != got.TotalRelation {
 		t.Fatalf("%s: total %d (%v), want %d (%v)", what, got.Total, got.TotalRelation, old.Total, old.TotalRelation)
 	}
@@ -147,8 +159,8 @@ func compareSortedResults(t *testing.T, what string, old, got *SearchResult) {
 	}
 	for i := range old.Hits {
 		o, g := old.Hits[i], got.Hits[i]
-		if o.ID != g.ID {
-			t.Fatalf("%s: hit %d is %s (sort %q), want %s (sort %q)", what, i, g.ID, g.Sort, o.ID, o.Sort)
+		if o.ID != g.ID || (!ignoreIndex && o.Index != g.Index) {
+			t.Fatalf("%s: hit %d is %s/%s (sort %q), want %s/%s (sort %q)", what, i, g.Index, g.ID, g.Sort, o.Index, o.ID, o.Sort)
 		}
 		if strings.Join(o.Sort, "|") != strings.Join(g.Sort, "|") {
 			t.Fatalf("%s: hit %d sort %q, want %q", what, i, g.Sort, o.Sort)
@@ -162,6 +174,50 @@ func compareSortedResults(t *testing.T, what string, old, got *SearchResult) {
 		if o.HitNumber != g.HitNumber {
 			t.Fatalf("%s: hit %d is the %dth match, want the %dth", what, i, g.HitNumber, o.HitNumber)
 		}
+	}
+}
+
+// compareScoreTiedResults is compareSortedResults for hits ordered by score and then
+// by something else. Scores that are the same to float32 precision are one tie for
+// this path, ordered by the next sort; the regular path computes them in float64,
+// where the sums of the same terms in another order differ in the twelfth digit and
+// so aren't a tie at all. So the hits whose scores are alike are compared as a set
+// (all but the last group, which the end of the page cuts: some of it may be other
+// hits of the same score).
+func compareScoreTiedResults(t *testing.T, what string, old, got *SearchResult) {
+	t.Helper()
+	if old.Total != got.Total || old.TotalRelation != got.TotalRelation {
+		t.Fatalf("%s: total %d (%v), want %d (%v)", what, got.Total, got.TotalRelation, old.Total, old.TotalRelation)
+	}
+	if !sameScore(old.MaxScore, got.MaxScore) {
+		t.Fatalf("%s: max score %v, want %v", what, got.MaxScore, old.MaxScore)
+	}
+	if len(old.Hits) != len(got.Hits) {
+		t.Fatalf("%s: %d hits, want %d", what, len(got.Hits), len(old.Hits))
+	}
+	for i := range old.Hits {
+		if !sameScore(old.Hits[i].Score, got.Hits[i].Score) {
+			t.Fatalf("%s: hit %d scores %v, want %v", what, i, got.Hits[i].Score, old.Hits[i].Score)
+		}
+	}
+	for i := 0; i < len(old.Hits); {
+		j := i + 1
+		for j < len(old.Hits) && sameScore(old.Hits[j].Score, old.Hits[j-1].Score) {
+			j++
+		}
+		if j < len(old.Hits) {
+			want := map[string]bool{}
+			for _, h := range old.Hits[i:j] {
+				want[h.ID] = true
+			}
+			for _, h := range got.Hits[i:j] {
+				if !want[h.ID] {
+					t.Fatalf("%s: hits %d..%d (all scoring %v) include %s, which the regular search has elsewhere",
+						what, i, j-1, old.Hits[i].Score, h.ID)
+				}
+			}
+		}
+		i = j
 	}
 }
 

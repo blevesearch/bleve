@@ -31,7 +31,7 @@ import (
 // buildSortBenchIndex is the corpus of buildAllocBenchIndexModel with fields to
 // sort by: n, a number of many values (a price, a timestamp), and s, a keyword of
 // a thousand values with a skewed share.
-func buildSortBenchIndex(b *testing.B, numDocs, numSegments int, model string) (Index, func()) {
+func buildSortBenchIndex(b testing.TB, numDocs, numSegments int, model string) (Index, func()) {
 	b.Helper()
 	dir := createTmpIndexPath(b)
 	im := NewIndexMapping()
