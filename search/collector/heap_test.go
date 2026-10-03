@@ -55,10 +55,10 @@ func checkTernaryInvariant(t *testing.T, h *collectStoreHeap) {
 // verifies the ternary invariant holds after every insertion.
 func TestTernaryHeapInvariantAfterInserts(t *testing.T) {
 	for _, scores := range [][]float64{
-		{5, 3, 8, 1, 7, 2, 9, 4, 6, 10},  // unsorted
-		{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},  // ascending
-		{10, 9, 8, 7, 6, 5, 4, 3, 2, 1},  // descending
-		{3, 3, 3, 3},                       // all equal
+		{5, 3, 8, 1, 7, 2, 9, 4, 6, 10}, // unsorted
+		{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, // ascending
+		{10, 9, 8, 7, 6, 5, 4, 3, 2, 1}, // descending
+		{3, 3, 3, 3},                    // all equal
 	} {
 		h := newStoreHeap(len(scores), scoreDesc)
 		for _, s := range scores {

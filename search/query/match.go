@@ -17,6 +17,7 @@ package query
 import (
 	"context"
 	"fmt"
+	"github.com/blevesearch/bleve/v2/analysis"
 
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
@@ -120,8 +121,8 @@ func (q *MatchQuery) SetOperator(operator MatchQueryOperator) {
 	q.Operator = operator
 }
 
-func (q *MatchQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
-
+// analyze is the field the query is on and the tokens of its text.
+func (q *MatchQuery) analyze(m mapping.IndexMapping) (string, analysis.TokenStream, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -136,10 +137,18 @@ func (q *MatchQuery) Searcher(ctx context.Context, i index.IndexReader, m mappin
 	analyzer := m.AnalyzerNamed(analyzerName)
 
 	if analyzer == nil {
-		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
+		return "", nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
 	}
 
-	tokens := analyzer.Analyze([]byte(q.Match))
+	return field, analyzer.Analyze([]byte(q.Match)), nil
+}
+
+func (q *MatchQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+
+	field, tokens, err := q.analyze(m)
+	if err != nil {
+		return nil, err
+	}
 	if len(tokens) > 0 {
 
 		tqs := make([]Query, len(tokens))

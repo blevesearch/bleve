@@ -134,6 +134,7 @@ func (q *BooleanQuery) Boost() float64 {
 
 func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	var err error
+
 	var mustNotSearcher search.Searcher
 	if q.MustNot != nil {
 		mustNotSearcher, err = q.MustNot.Searcher(ctx, i, m, options)

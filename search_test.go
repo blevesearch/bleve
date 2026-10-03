@@ -4790,8 +4790,10 @@ func TestFilteredBooleanQuery(t *testing.T) {
 		}
 	}
 	// Ensure that the scores are the same for all documents
+	// (the unfiltered query is served by the per segment search path, which scores
+	// in float32, and this one by the regular path: same score, to float32 precision)
 	for i := 0; i < len(res.Hits); i++ {
-		if res.Hits[i].Score != unfilteredScore {
+		if math.Abs(res.Hits[i].Score-unfilteredScore) > 1e-6*unfilteredScore {
 			t.Fatalf("expected score %f, got %f", unfilteredScore, res.Hits[i].Score)
 		}
 	}
