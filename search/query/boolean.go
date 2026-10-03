@@ -170,7 +170,7 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 		}
 	}
 
-	var filterFunc searcher.FilterFunc
+	var filterSearcher search.Searcher
 	if q.Filter != nil {
 		// create a new searcher options with disabled scoring, since filter should not affect scoring
 		// and we don't want to pay the cost of scoring if we don't need it, also disable term vectors
@@ -180,70 +180,34 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 			IncludeTermVectors: false,
 			Score:              "none",
 		}
-		filterSearcher, err := q.Filter.Searcher(ctx, i, m, filterOptions)
+		filterSearcher, err = q.Filter.Searcher(ctx, i, m, filterOptions)
 		if err != nil {
 			return nil, err
-		}
-		var init bool
-		var refDoc *search.DocumentMatch
-		filterFunc = func(sctx *search.SearchContext, d *search.DocumentMatch) bool {
-			// Initialize the reference document to point
-			// to the first document in the filterSearcher
-			var err error
-			if !init {
-				refDoc, err = filterSearcher.Next(sctx)
-				if err != nil {
-					return false
-				}
-				init = true
-			}
-			if refDoc == nil {
-				// filterSearcher is exhausted, d is not in filter
-				return false
-			}
-			// Compare document IDs
-			cmp := refDoc.IndexInternalID.Compare(d.IndexInternalID)
-			if cmp < 0 {
-				// recycle refDoc now that we do not need it
-				sctx.DocumentMatchPool.Put(refDoc)
-				// filterSearcher is behind the current document, Advance() it
-				refDoc, err = filterSearcher.Advance(sctx, d.IndexInternalID)
-				if err != nil || refDoc == nil {
-					return false
-				}
-				// After advance, check if they're now equal
-				cmp = refDoc.IndexInternalID.Compare(d.IndexInternalID)
-			}
-			// cmp >= 0: either equal (match) or filterSearcher is ahead (no match)
-			return cmp == 0
 		}
 	}
 
 	// if all 4 are nil, return MatchNone
-	if mustSearcher == nil && shouldSearcher == nil && mustNotSearcher == nil && filterFunc == nil {
+	if mustSearcher == nil && shouldSearcher == nil && mustNotSearcher == nil && filterSearcher == nil {
 		return searcher.NewMatchNoneSearcher(i)
 	}
 
 	// optimization, if only must searcher, just return it instead
-	if mustSearcher != nil && shouldSearcher == nil && mustNotSearcher == nil && filterFunc == nil {
+	if mustSearcher != nil && shouldSearcher == nil && mustNotSearcher == nil && filterSearcher == nil {
 		return mustSearcher, nil
 	}
 
 	// optimization, if only should searcher, just return it instead
-	if mustSearcher == nil && shouldSearcher != nil && mustNotSearcher == nil && filterFunc == nil {
+	if mustSearcher == nil && shouldSearcher != nil && mustNotSearcher == nil && filterSearcher == nil {
 		return shouldSearcher, nil
 	}
 
 	// optimization, if only filter searcher, wrap around a MatchAllSearcher
-	if mustSearcher == nil && shouldSearcher == nil && mustNotSearcher == nil && filterFunc != nil {
+	if mustSearcher == nil && shouldSearcher == nil && mustNotSearcher == nil && filterSearcher != nil {
 		mustSearcher, err = searcher.NewMatchAllSearcher(ctx, i, 1.0, options)
 		if err != nil {
 			return nil, err
 		}
-		return searcher.NewFilteringSearcher(ctx,
-			mustSearcher,
-			filterFunc,
-		), nil
+		return searcher.NewFilterSearcher(ctx, mustSearcher, filterSearcher), nil
 	}
 
 	// if only mustNotSearcher, start with MatchAll
@@ -259,8 +223,8 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 		return nil, err
 	}
 
-	if filterFunc != nil {
-		return searcher.NewFilteringSearcher(ctx, bs, filterFunc), nil
+	if filterSearcher != nil {
+		return searcher.NewFilterSearcher(ctx, bs, filterSearcher), nil
 	}
 	return bs, nil
 }
