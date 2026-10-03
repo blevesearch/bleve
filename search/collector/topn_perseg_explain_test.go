@@ -130,3 +130,22 @@ func TestPerSegmentCollectorTurnsRuntimePanicsIntoErrors(t *testing.T) {
 		t.Fatal("no panic")
 	}()
 }
+
+// wrongExplainer explains every hit with a score that isn't the one it was ranked by
+type wrongExplainer struct{ explainingSearcher }
+
+func (s *wrongExplainer) ExplainMatch(seg int, doc uint64) (*search.Explanation, bool, error) {
+	return &search.Explanation{Value: float64(doc) + 0.5, Message: "doc"}, true, nil
+}
+
+// An explanation that doesn't show the score its hit was ranked by is a searcher
+// that works scores out two ways: the search says so, instead of showing it.
+func TestPerSegmentCollectorRefusesAnExplanationOfAnotherScore(t *testing.T) {
+	s := &wrongExplainer{explainingSearcher{n: 100}}
+	c := NewPerSegmentTopNCollector(3, 0)
+	c.SetExplain(true)
+	err := c.Collect(context.Background(), s, idReader{})
+	if err == nil || !strings.Contains(err.Error(), "the explanation of hit") {
+		t.Fatalf("got %v, want an error about the explanation's score", err)
+	}
+}

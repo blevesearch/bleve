@@ -80,6 +80,19 @@ type PerSegmentSearcher interface {
 
 	// Size is an estimate of the memory the searcher needs.
 	Size() int
+
+	// ExplainMatch explains the score of the doc (its number across the index,
+	// in segment seg), and returns false if it is not a match. It may be asked
+	// about any doc, once the searcher has been read.
+	//
+	// Explaining is not part of searching: no explanation is built while the
+	// matches are found and scored. Once a search has settled on the hits to
+	// return, the collector asks for the explanation of each of those, and only
+	// those -- a lookup of the doc in the postings of the terms, and the scores
+	// worked out again, by the same arithmetic the search scored with, from what is
+	// found there. The score at the root of an explanation is the score the hit was
+	// ranked by; the collector checks that it is.
+	ExplainMatch(seg int, doc uint64) (explanation *Explanation, match bool, err error)
 }
 
 // ErrPerSegmentUnsupported is returned by the building of a per segment searcher

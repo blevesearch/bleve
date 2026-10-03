@@ -36,7 +36,6 @@ func init() {
 type PerSegmentMatchNoneSearcher struct{}
 
 var _ search.PerSegmentSearcher = (*PerSegmentMatchNoneSearcher)(nil)
-var _ search.PerSegmentExplainer = (*PerSegmentMatchNoneSearcher)(nil)
 var _ perSegChild = (*PerSegmentMatchNoneSearcher)(nil)
 
 // NewPerSegmentMatchNoneSearcher returns a searcher that has no matches.
@@ -79,8 +78,13 @@ func (s *PerSegmentMatchNoneSearcher) segCost(seg int) uint64 { return 0 }
 // numSegments implements perSegChild.
 func (s *PerSegmentMatchNoneSearcher) numSegments() int { return 0 }
 
-// ExplainMatch implements search.PerSegmentExplainer: a searcher of no matches has
+// ExplainMatch implements search.PerSegmentSearcher: a searcher of no matches has
 // none to explain.
 func (s *PerSegmentMatchNoneSearcher) ExplainMatch(seg int, doc uint64) (*search.Explanation, bool, error) {
+	return nil, false, nil
+}
+
+// explain implements perSegChild.
+func (s *PerSegmentMatchNoneSearcher) explain(seg int, doc uint64, build bool) (*search.Explanation, bool, error) {
 	return nil, false, nil
 }

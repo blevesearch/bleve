@@ -316,7 +316,7 @@ func (s *PerSegmentDisjunctionSearcher) maxScoreSegment(ctx context.Context, sin
 						total += lane[sv.off]
 					}
 				}
-				total *= float32(sv.m) / n
+				total = disjunctionScore(total, sv.m, n)
 				if total > maxScore {
 					maxScore = total
 				}

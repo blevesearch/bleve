@@ -27,14 +27,7 @@ import (
 // of its clauses and puts them together the way it puts their scores together
 // when it scores, in the same order and with the same float32 arithmetic, so that
 // the score at its root is the score of the hit to the bit. It is the same sums,
-// done again for the few docs that were returned. See search.PerSegmentExplainer.
-
-var (
-	_ search.PerSegmentExplainer = (*PerSegmentTermSearcher)(nil)
-	_ search.PerSegmentExplainer = (*PerSegmentConjunctionSearcher)(nil)
-	_ search.PerSegmentExplainer = (*PerSegmentDisjunctionSearcher)(nil)
-	_ search.PerSegmentExplainer = (*PerSegmentBooleanSearcher)(nil)
-)
+// done again for the few docs that were returned. See search.PerSegmentSearcher.ExplainMatch.
 
 // clausesByCount is the clauses of a composite in the order a regular searcher
 // lists them: by the number of docs the clause has, the fewest first, by the very
@@ -95,14 +88,11 @@ func regularOrder(clauses []perSegChild) []int {
 }
 
 // explainClause explains a match of a clause of a composite, wrapped in what it
-// was wrapped in before it was unwrapped, innermost first.
-func explainClause(c perSegChild, wraps []wrapKind, seg int, doc uint64) (*search.Explanation, bool, error) {
-	ex, ok := c.(search.PerSegmentExplainer)
-	if !ok {
-		return nil, false, fmt.Errorf("searcher: %T can't explain its matches", c)
-	}
-	e, match, err := ex.ExplainMatch(seg, doc)
-	if err != nil || !match {
+// was wrapped in before it was unwrapped, innermost first. With build false it
+// only tells whether the doc is a match of the clause.
+func explainClause(c perSegChild, wraps []wrapKind, seg int, doc uint64, build bool) (*search.Explanation, bool, error) {
+	e, match, err := c.explain(seg, doc, build)
+	if err != nil || !match || !build {
 		return e, match, err
 	}
 	for i := len(wraps) - 1; i >= 0; i-- {
@@ -114,10 +104,10 @@ func explainClause(c perSegChild, wraps []wrapKind, seg int, doc uint64) (*searc
 			// the sum of one score times a coord of 1 of 1
 			raw := &search.Explanation{Value: e.Value, Message: "sum of:", Children: []*search.Explanation{e}}
 			e = &search.Explanation{
-				Value:   e.Value,
+				Value:   float64(disjunctionScore(float32(e.Value), 1, 1)),
 				Message: "product of:",
 				Children: []*search.Explanation{raw,
-					{Value: 1, Message: "coord(1/1)"}},
+					{Value: float64(disjunctionCoord(1, 1)), Message: "coord(1/1)"}},
 			}
 		}
 	}
@@ -132,8 +122,13 @@ func (b *perSegBase) wrapsOf(i int) []wrapKind {
 	return nil
 }
 
-// ExplainMatch implements search.PerSegmentExplainer.
+// ExplainMatch implements search.PerSegmentSearcher.
 func (s *PerSegmentTermSearcher) ExplainMatch(seg int, doc uint64) (*search.Explanation, bool, error) {
+	return s.explain(seg, doc, true)
+}
+
+// explain implements perSegChild.
+func (s *PerSegmentTermSearcher) explain(seg int, doc uint64, build bool) (*search.Explanation, bool, error) {
 	if seg < 0 || seg >= len(s.readers) || s.readers[seg] == nil {
 		return nil, false, nil
 	}
@@ -142,25 +137,38 @@ func (s *PerSegmentTermSearcher) ExplainMatch(seg int, doc uint64) (*search.Expl
 		return nil, false, nil
 	}
 	freq, norm, ok, err := r.Probe(uint32(doc - r.Offset()))
-	if err != nil || !ok {
-		return nil, false, err
+	if err != nil || !ok || !build {
+		return nil, ok && err == nil, err
 	}
 	id := index.NewIndexInternalID(nil, doc)
 	return s.scorer.Explain(s.field, s.term, id, freq, norm), true, nil
 }
 
-// ExplainMatch implements search.PerSegmentExplainer. A conjunction's score is
-// the sum of its clauses' scores.
+// ExplainMatch implements search.PerSegmentSearcher.
 func (s *PerSegmentConjunctionSearcher) ExplainMatch(seg int, doc uint64) (*search.Explanation, bool, error) {
-	expls := make([]*search.Explanation, len(s.children))
+	return s.explain(seg, doc, true)
+}
+
+// explain implements perSegChild. A conjunction's score is the sum of its
+// clauses' scores.
+func (s *PerSegmentConjunctionSearcher) explain(seg int, doc uint64, build bool) (*search.Explanation, bool, error) {
+	var expls []*search.Explanation
+	if build {
+		expls = make([]*search.Explanation, len(s.children))
+	}
 	var sum float32
 	for i, c := range s.children {
-		e, ok, err := explainClause(c, s.wrapsOf(i), seg, doc)
+		e, ok, err := explainClause(c, s.wrapsOf(i), seg, doc, build)
 		if err != nil || !ok {
 			return nil, false, err
 		}
-		expls[i] = e
-		sum += float32(e.Value)
+		if build {
+			expls[i] = e
+			sum += float32(e.Value)
+		}
+	}
+	if !build {
+		return nil, true, nil
 	}
 	children := make([]*search.Explanation, len(expls))
 	for i, pos := range regularOrder(s.children) {
@@ -169,27 +177,39 @@ func (s *PerSegmentConjunctionSearcher) ExplainMatch(seg int, doc uint64) (*sear
 	return &search.Explanation{Value: float64(sum), Message: "sum of:", Children: children}, true, nil
 }
 
-// ExplainMatch implements search.PerSegmentExplainer. A disjunction's score is
-// the sum of the scores of the clauses that match times the share of the clauses
-// that do (coord).
+// ExplainMatch implements search.PerSegmentSearcher.
 func (s *PerSegmentDisjunctionSearcher) ExplainMatch(seg int, doc uint64) (*search.Explanation, bool, error) {
-	expls := make([]*search.Explanation, len(s.children)) // nil where the clause doesn't match
+	return s.explain(seg, doc, true)
+}
+
+// explain implements perSegChild. A disjunction's score is the sum of the scores
+// of the clauses that match times the share of the clauses that do (coord).
+func (s *PerSegmentDisjunctionSearcher) explain(seg int, doc uint64, build bool) (*search.Explanation, bool, error) {
+	var expls []*search.Explanation // nil where the clause doesn't match
+	if build {
+		expls = make([]*search.Explanation, len(s.children))
+	}
 	matches := 0
 	var sum float32
 	for i, c := range s.children {
-		e, ok, err := explainClause(c, s.wrapsOf(i), seg, doc)
+		e, ok, err := explainClause(c, s.wrapsOf(i), seg, doc, build)
 		if err != nil {
 			return nil, false, err
 		}
 		if !ok {
 			continue
 		}
-		expls[i] = e
 		matches++
-		sum += float32(e.Value)
+		if build {
+			expls[i] = e
+			sum += float32(e.Value)
+		}
 	}
 	if matches == 0 || matches < s.min {
 		return nil, false, nil
+	}
+	if !build {
+		return nil, true, nil
 	}
 	matched := make([]*search.Explanation, 0, matches)
 	if len(s.children) <= DisjunctionHeapTakeover {
@@ -208,54 +228,68 @@ func (s *PerSegmentDisjunctionSearcher) ExplainMatch(seg int, doc uint64) (*sear
 		}
 	}
 	n := len(s.children)
-	coord := float32(len(matched)) / float32(n)
 	raw := &search.Explanation{Value: float64(sum), Message: "sum of:", Children: matched}
 	return &search.Explanation{
-		Value:   float64(sum * coord),
+		Value:   float64(disjunctionScore(sum, matches, float32(n))),
 		Message: "product of:",
 		Children: []*search.Explanation{
 			raw,
-			{Value: float64(coord), Message: fmt.Sprintf("coord(%d/%d)", len(matched), n)},
+			{Value: float64(disjunctionCoord(matches, float32(n))), Message: fmt.Sprintf("coord(%d/%d)", matches, n)},
 		},
-		PartialMatch: len(matched) != n,
+		PartialMatch: matches != n,
 	}, true, nil
 }
 
-// ExplainMatch implements search.PerSegmentExplainer. A boolean's score is the
-// sum of the scores of its required clause and, where it matches, its optional
-// one.
+// ExplainMatch implements search.PerSegmentSearcher.
 func (s *PerSegmentBooleanSearcher) ExplainMatch(seg int, doc uint64) (*search.Explanation, bool, error) {
+	return s.explain(seg, doc, true)
+}
+
+// explain implements perSegChild. A boolean's score is the sum of the scores of
+// its required clause and, where it matches, its optional one.
+func (s *PerSegmentBooleanSearcher) explain(seg int, doc uint64, build bool) (*search.Explanation, bool, error) {
 	var children []*search.Explanation
 	var sum float32
+	matched := false
 	if s.must != nil {
-		e, ok, err := explainClause(s.must, s.mustWraps, seg, doc)
+		e, ok, err := explainClause(s.must, s.mustWraps, seg, doc, build)
 		if err != nil || !ok {
 			return nil, false, err
 		}
-		children = append(children, e)
-		sum += float32(e.Value)
+		matched = true
+		if build {
+			children = append(children, e)
+			sum += float32(e.Value)
+		}
 	}
 	if s.mustNot != nil {
-		_, excluded, err := explainClause(s.mustNot, s.mustNotWraps, seg, doc)
+		// whether it is a match is all that is asked of it: nothing is built
+		_, excluded, err := explainClause(s.mustNot, s.mustNotWraps, seg, doc, false)
 		if err != nil || excluded {
 			return nil, false, err
 		}
 	}
 	if s.should != nil {
-		e, ok, err := explainClause(s.should, s.shouldWraps, seg, doc)
+		e, ok, err := explainClause(s.should, s.shouldWraps, seg, doc, build)
 		if err != nil {
 			return nil, false, err
 		}
 		switch {
 		case ok:
-			children = append(children, e)
-			sum += float32(e.Value)
+			matched = true
+			if build {
+				children = append(children, e)
+				sum += float32(e.Value)
+			}
 		case s.must == nil || s.shouldRequired:
 			return nil, false, nil
 		}
 	}
-	if len(children) == 0 {
+	if !matched {
 		return nil, false, nil
+	}
+	if !build {
+		return nil, true, nil
 	}
 	return &search.Explanation{Value: float64(sum), Message: "sum of:", Children: children}, true, nil
 }

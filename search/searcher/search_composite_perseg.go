@@ -45,6 +45,11 @@ type perSegChild interface {
 	// numSegments is how many segments the clause has readers for: all of
 	// the index's, or none if it matches nothing anywhere.
 	numSegments() int
+
+	// explain is ExplainMatch for a composite that explains its clauses: with
+	// build false, it only tells whether the doc is a match, and builds nothing
+	// (what a clause that excludes docs is asked).
+	explain(seg int, doc uint64, build bool) (*search.Explanation, bool, error)
 }
 
 // nestedBufferedMaxRatio is how many times more matches than the seeks it is going

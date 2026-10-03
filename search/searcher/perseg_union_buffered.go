@@ -276,7 +276,7 @@ func (u *bufferedUnionCursor) Score() float32 {
 		return u.fb.Score()
 	}
 	s := u.scratch
-	return s.scores[u.off] * (float32(s.counts[u.off]) / u.n)
+	return disjunctionScore(s.scores[u.off], int(s.counts[u.off]), u.n)
 }
 
 // Cost implements docCursor.

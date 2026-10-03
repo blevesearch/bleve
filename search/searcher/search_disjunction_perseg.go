@@ -405,7 +405,7 @@ func (s *PerSegmentDisjunctionSearcher) wandSegment(ctx context.Context, sink se
 		// all of live[:pivotLen] are on the pivot doc. Scores are summed in the
 		// order of the query, whatever the order of the cursors is.
 		sum := sumInQueryOrder(byIdx, pivotDoc)
-		total := sum * (float32(pivotLen) / n)
+		total := disjunctionScore(sum, pivotLen, n)
 		if total > maxScore {
 			maxScore = total
 		}

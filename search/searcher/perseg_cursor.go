@@ -151,7 +151,7 @@ func (u *unionCursor) Score() float32 {
 			sum += c.Score()
 		}
 	}
-	return sum * (float32(u.matches) / float32(u.n))
+	return disjunctionScore(sum, u.matches, float32(u.n))
 }
 
 // release implements releaser: the clauses' cursors may hold memory.

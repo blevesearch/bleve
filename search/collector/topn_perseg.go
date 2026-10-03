@@ -80,7 +80,7 @@ func NewPerSegmentTopNCollector(size int, skip int) *PerSegmentTopNCollector {
 
 // SetExplain makes the collection explain the hits it returns. Nothing is
 // explained while the matches are found: the explanations are asked of the
-// searcher (see search.PerSegmentExplainer) for the few hits that are left once
+// searcher (see search.PerSegmentSearcher.ExplainMatch) for the few hits that are left once
 // the collection is done.
 func (hc *PerSegmentTopNCollector) SetExplain(explain bool) { hc.explain = explain }
 
@@ -198,14 +198,6 @@ func (hc *PerSegmentTopNCollector) collect(ctx context.Context, searcher search.
 		top = top[:hc.size]
 	}
 
-	var explainer search.PerSegmentExplainer
-	if hc.explain {
-		var ok bool
-		if explainer, ok = searcher.(search.PerSegmentExplainer); !ok {
-			return fmt.Errorf("collector: %T can't explain its hits", searcher)
-		}
-	}
-
 	// only the hits to be returned become DocumentMatches
 	hc.results = make(search.DocumentMatchCollection, 0, len(top))
 	for _, hit := range top {
@@ -220,13 +212,19 @@ func (hc *PerSegmentTopNCollector) collect(ctx context.Context, searcher search.
 		if err != nil {
 			return err
 		}
-		if explainer != nil {
-			expl, match, err := explainer.ExplainMatch(int(hit.Seg), hit.Doc)
+		if hc.explain {
+			expl, match, err := searcher.ExplainMatch(int(hit.Seg), hit.Doc)
 			if err != nil {
 				return err
 			}
 			if !match {
 				return fmt.Errorf("collector: hit %s of segment %d is not a match to explain", dm.ID, hit.Seg)
+			}
+			// the explanation has to show the score the hit was ranked by, to the bit:
+			// a searcher whose explanation works it out another way has to be told
+			if expl.Value != dm.Score {
+				return fmt.Errorf("collector: the explanation of hit %s scores %v, the hit %v",
+					dm.ID, expl.Value, dm.Score)
 			}
 			dm.Expl = expl
 		}
