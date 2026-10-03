@@ -219,6 +219,18 @@ func TestPerSegmentSortedSearchMatchesRegularSearch(t *testing.T) {
 		"field then id": func() search.SortOrder {
 			return search.SortOrder{sortField("n", asNumber), &search.SortDocID{}}
 		},
+		"own score sort": func() search.SortOrder {
+			return search.SortOrder{&ownScoreSort{search.SortScore{Desc: true}}}
+		},
+		"own score sort then field": func() search.SortOrder {
+			return search.SortOrder{sortField("s"), &ownScoreSort{search.SortScore{Desc: true}}, sortField("n", asNumber)}
+		},
+		"own sort reading the score": func() search.SortOrder {
+			return search.SortOrder{&ownScoreReader{search.SortDocID{Desc: true}}, sortField("n", asNumber)}
+		},
+		"own id sort": func() search.SortOrder {
+			return search.SortOrder{sortField("n", asNumber), &ownIDSort{search.SortDocID{Desc: true}}}
+		},
 		"distance": func() search.SortOrder {
 			g, err := search.NewSortGeoDistance("loc", "km", -121.0, 37.8, false)
 			if err != nil {
@@ -304,8 +316,26 @@ func TestPerSegmentSortedSearchExplains(t *testing.T) {
 	}
 }
 
-// ownSort is a sort the per segment path doesn't know how to ask for values.
-type ownSort struct{ search.SortScore }
+// ownScoreSort and ownIDSort are sorts of an application's own: by score, and by
+// document id, as far as the collector can tell (what they say they require).
+type ownScoreSort struct{ search.SortScore }
+type ownIDSort struct{ search.SortDocID }
+
+// ownScoreReader doesn't say it requires the score, but its value is made of the
+// score of the DocumentMatch it is asked about (the whole part, to 3 digits).
+type ownScoreReader struct{ search.SortDocID }
+
+// (Copy has to be theirs too: the one of the sort they embed makes one of that.)
+func (s *ownScoreSort) Copy() search.SearchSort { c := *s; return &c }
+func (s *ownIDSort) Copy() search.SearchSort    { c := *s; return &c }
+func (s *ownScoreReader) Copy() search.SearchSort {
+	c := *s
+	return &c
+}
+func (s *ownScoreReader) RequiresDocID() bool { return false }
+func (s *ownScoreReader) Value(i *search.DocumentMatch) string {
+	return fmt.Sprintf("%03d", int(i.Score))
+}
 
 // Requests it can't serve stay with the regular path, whatever the sort.
 func TestPerSegmentSortedSearchIneligibleRequests(t *testing.T) {
@@ -313,11 +343,6 @@ func TestPerSegmentSortedSearchIneligibleRequests(t *testing.T) {
 	defer cleanup()
 	tq := func() query.Query { return termQueryOn("body", "common") }
 	mk := map[string]func() *SearchRequest{
-		"a sort of its own": func() *SearchRequest {
-			r := NewSearchRequest(tq())
-			r.SortByCustom(search.SortOrder{&ownSort{}})
-			return r
-		},
 		"sorted with facets": func() *SearchRequest {
 			r := NewSearchRequest(tq())
 			r.SortBy([]string{"n"})

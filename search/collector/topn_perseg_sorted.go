@@ -53,6 +53,13 @@ func init() {
 // first, the same total (all of them, nothing is pruned) and the same highest
 // score, with scores within float32 precision. A score as one of the sorts is
 // compared as a float32, the precision the scores of this path are worked out in.
+//
+// Any search.SearchSort can be part of the sort order, as with the TopNCollector:
+// one that requires scoring is ordered by the score of the hit, and the others by
+// the value they give for a DocumentMatch that has the doc's internal id and
+// score, the external id if the sort requires it, and the doc values of the fields
+// it requires. (Nothing else of a DocumentMatch is there when a sort is asked for
+// its value: no fields, no locations, no explanation.)
 type PerSegmentSortedCollector struct {
 	size int
 	skip int
@@ -85,7 +92,7 @@ func NewPerSegmentSortedCollector(size int, skip int, sort search.SortOrder) *Pe
 		needDocIDs:   sort.RequiresDocID(),
 	}
 	for _, s := range sort {
-		if _, byScore := s.(*search.SortScore); byScore {
+		if s.RequiresScoring() {
 			hc.rank = append(hc.rank, sortComponent{desc: s.Descending(), score: true})
 			continue
 		}
@@ -162,6 +169,7 @@ func (hc *PerSegmentSortedCollector) collect(ctx context.Context, searcher searc
 		// the sort values of the match
 		idBuf = index.NewIndexInternalID(idBuf, m.Doc)
 		scratch.IndexInternalID = idBuf
+		scratch.Score = float64(m.Score)
 		if dvReader != nil {
 			if err = dvReader.VisitDocValues(scratch.IndexInternalID, visitor); err != nil {
 				return err

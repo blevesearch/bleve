@@ -87,31 +87,12 @@ func perSegmentSearchEligible(ctx context.Context, req *SearchRequest,
 	if fts != nil || fusion {
 		return false
 	}
-	if !perSegmentSortSupported(req.Sort) {
-		return false
-	}
 	if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); ok && nestedMode {
 		return false
 	}
 	// an application supplied document match handler expects DocumentMatches
 	if ctx.Value(search.MakeDocumentMatchHandlerKey) != nil {
 		return false
-	}
-	return true
-}
-
-// perSegmentSortSupported reports whether the per segment path can order hits by
-// the sort order: the sorts that come with bleve (a field, the document id, the
-// distance to a point, the score) can be; a sort of anyone's own can't, as the
-// collector asks sorts for their values the way a TopNCollector does only for
-// those it knows.
-func perSegmentSortSupported(so search.SortOrder) bool {
-	for _, s := range so {
-		switch s.(type) {
-		case *search.SortField, *search.SortDocID, *search.SortGeoDistance, *search.SortScore:
-		default:
-			return false
-		}
 	}
 	return true
 }
