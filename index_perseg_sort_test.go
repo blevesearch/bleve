@@ -343,24 +343,6 @@ func TestPerSegmentSortedSearchIneligibleRequests(t *testing.T) {
 	defer cleanup()
 	tq := func() query.Query { return termQueryOn("body", "common") }
 	mk := map[string]func() *SearchRequest{
-		"sorted with facets": func() *SearchRequest {
-			r := NewSearchRequest(tq())
-			r.SortBy([]string{"n"})
-			r.AddFacet("f", NewFacetRequest("s", 3))
-			return r
-		},
-		"sorted, search after": func() *SearchRequest {
-			r := NewSearchRequest(tq())
-			r.SortBy([]string{"n", "_id"})
-			r.SearchAfter = []string{"1", "doc1"}
-			return r
-		},
-		"sorted, search before": func() *SearchRequest {
-			r := NewSearchRequest(tq())
-			r.SortBy([]string{"n", "_id"})
-			r.SearchBefore = []string{"5", "doc1"}
-			return r
-		},
 		"sorted, with locations": func() *SearchRequest {
 			r := NewSearchRequest(tq())
 			r.SortBy([]string{"n"})

@@ -70,11 +70,7 @@ func perSegmentSearchEligible(ctx context.Context, req *SearchRequest,
 	if req.IncludeLocations || req.Highlight != nil {
 		return false
 	}
-	if len(req.Facets) > 0 || requestHasKNN(req) {
-		return false
-	}
-	// SearchBefore is turned into SearchAfter before the collector is built
-	if req.SearchAfter != nil || req.SearchBefore != nil || len(req.PreSearchData) > 0 {
+	if requestHasKNN(req) || len(req.PreSearchData) > 0 {
 		return false
 	}
 	if fts != nil || fusion {
@@ -92,13 +88,14 @@ func perSegmentSearchEligible(ctx context.Context, req *SearchRequest,
 
 // sortedByScoreDescending reports whether the hits are ordered by descending
 // score and nothing else, which is what the pruning algorithms are for. (No sort
-// at all is that too.)
+// at all is not that: hits are then in the order they were found, as the
+// regular collector has them.)
 func sortedByScoreDescending(so search.SortOrder) bool {
-	if len(so) == 0 {
-		return true
+	if len(so) != 1 {
+		return false
 	}
 	byScore, ok := so[0].(*search.SortScore)
-	return len(so) == 1 && ok && byScore.Desc
+	return ok && byScore.Desc
 }
 
 // perSegmentCollector is what the search needs of the collector of the per
@@ -106,6 +103,13 @@ func sortedByScoreDescending(so search.SortOrder) bool {
 type perSegmentCollector interface {
 	searchResults
 	Collect(ctx context.Context, searcher search.PerSegmentSearcher, reader index.IndexReader) error
+}
+
+// facetsCollector is a collector that counts facets, which are of every match, so
+// that it visits all of them: one that prunes can't.
+type facetsCollector interface {
+	SetFacetsBuilder(facetsBuilder *search.FacetsBuilder)
+	FacetResults() search.FacetResults
 }
 
 // searchResults is what a search needs of whichever collector ran it, TopNCollector
@@ -142,11 +146,13 @@ func perSegmentSearcherFor(ctx context.Context, req *SearchRequest, reader index
 // newPerSegmentCollector is the collector of a search that is run by the per
 // segment path.
 // Hits ordered by descending score only are collected by the collector that
-// prunes; any other order by the one that sorts.
+// prunes, unless facets are asked for (every match counts in them) or a page
+// after some hit (see below); any other order, and those, by the one that sorts.
+// SearchBefore has been turned into a search after of the reverse order by then.
 func newPerSegmentCollector(req *SearchRequest) perSegmentCollector {
 	// scores that were asked not to be computed have no explanation to give
 	explain := req.Explain && req.Score != ScoreNone
-	if sortedByScoreDescending(req.Sort) {
+	if sortedByScoreDescending(req.Sort) && len(req.Facets) == 0 && req.SearchAfter == nil {
 		rv := collector.NewPerSegmentTopNCollector(req.Size, req.From)
 		rv.SetExplain(explain)
 		return rv
@@ -155,6 +161,9 @@ func newPerSegmentCollector(req *SearchRequest) perSegmentCollector {
 	// its own, not the request's
 	rv := collector.NewPerSegmentSortedCollector(req.Size, req.From, req.Sort.Copy())
 	rv.SetExplain(explain)
+	if req.SearchAfter != nil {
+		rv.SetSearchAfter(req.SearchAfter)
+	}
 	return rv
 }
 

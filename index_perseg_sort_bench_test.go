@@ -167,3 +167,76 @@ func BenchmarkSortedSearch(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkFacetedSearch compares searches with facets, and a page after a hit,
+// on the per segment path and on the regular one:
+//
+//	go test -run xxx -bench FacetedSearch -benchmem -benchtime 20x
+func BenchmarkFacetedSearch(b *testing.B) {
+	idx, cleanup := buildSortBenchIndex(b, 200000, 8, os.Getenv("PERSEG_MODEL"))
+	defer cleanup()
+	term := func(t string) query.Query {
+		q := query.NewTermQuery(t)
+		q.SetField("body")
+		return q
+	}
+	queries := []struct {
+		name string
+		q    query.Query
+	}{
+		{"term10pct", term("mk10")},
+		{"or", query.NewDisjunctionQuery([]query.Query{term("mk10"), term("mk1"), term("mk01")})},
+	}
+	lo, hi := 500000.0, 500000.0
+	shapes := []struct {
+		name string
+		mod  func(r *SearchRequest)
+	}{
+		{"facet-terms", func(r *SearchRequest) { r.AddFacet("s", NewFacetRequest("s", 10)) }},
+		{"facet-ranges", func(r *SearchRequest) {
+			fr := NewFacetRequest("n", 2)
+			fr.AddNumericRange("low", nil, &lo)
+			fr.AddNumericRange("high", &hi, nil)
+			r.AddFacet("n", fr)
+		}},
+		{"facet-terms-size0", func(r *SearchRequest) { r.Size = 0; r.AddFacet("s", NewFacetRequest("s", 10)) }},
+		{"after-n", func(r *SearchRequest) {
+			r.SortByCustom(search.SortOrder{&search.SortField{Field: "n", Type: search.SortFieldAsNumber}, &search.SortDocID{}})
+			r.SearchAfter = []string{"500000", "100"}
+		}},
+	}
+	only := os.Getenv("PERSEG_SORT_ONLY")
+	for _, qy := range queries {
+		for _, sh := range shapes {
+			for _, path := range []struct {
+				name    string
+				enabled bool
+			}{{"regular", false}, {"perseg", true}} {
+				if only != "" && only != path.name {
+					continue
+				}
+				b.Run(qy.name+"/"+sh.name+"/"+path.name, func(b *testing.B) {
+					perSegmentSearchEnabled.Store(path.enabled)
+					defer perSegmentSearchEnabled.Store(true)
+					mk := func() *SearchRequest {
+						r := NewSearchRequestOptions(qy.q, 10, 0, false)
+						sh.mod(r)
+						return r
+					}
+					for i := 0; i < 3; i++ {
+						if _, err := idx.Search(mk()); err != nil {
+							b.Fatal(err)
+						}
+					}
+					b.ReportAllocs()
+					b.ResetTimer()
+					for i := 0; i < b.N; i++ {
+						if _, err := idx.Search(mk()); err != nil {
+							b.Fatal(err)
+						}
+					}
+				})
+			}
+		}
+	}
+}

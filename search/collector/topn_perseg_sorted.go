@@ -15,8 +15,10 @@
 package collector
 
 import (
+	"bytes"
 	"context"
 	"reflect"
+	"slices"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -65,10 +67,13 @@ type PerSegmentSortedCollector struct {
 	skip int
 	sort search.SortOrder
 
-	rank         sortRanking
-	numKeys      int
-	neededFields []string
-	needDocIDs   bool
+	rank        sortRanking
+	numKeys     int
+	sortFields  []string // the fields the sort order needs the doc values of
+	needDocIDs  bool
+	facets      *search.FacetsBuilder
+	facetFields []string
+	after       *searchAfterKey
 
 	total     uint64
 	maxScore  float64
@@ -85,11 +90,11 @@ type PerSegmentSortedCollector struct {
 // search.SortOrder.Copy).
 func NewPerSegmentSortedCollector(size int, skip int, sort search.SortOrder) *PerSegmentSortedCollector {
 	hc := &PerSegmentSortedCollector{
-		size:         size,
-		skip:         skip,
-		sort:         sort,
-		neededFields: sort.RequiredFields(),
-		needDocIDs:   sort.RequiresDocID(),
+		size:       size,
+		skip:       skip,
+		sort:       sort,
+		sortFields: sort.RequiredFields(),
+		needDocIDs: sort.RequiresDocID(),
 	}
 	for _, s := range sort {
 		if s.RequiresScoring() {
@@ -100,6 +105,76 @@ func NewPerSegmentSortedCollector(size int, skip int, sort search.SortOrder) *Pe
 		hc.numKeys++
 	}
 	return hc
+}
+
+// searchAfterKey is the sort values a hit has to rank after to be kept.
+type searchAfterKey struct {
+	keys  [][]byte // as the keys of a hit are, for the sorts that aren't by score
+	score float64  // for those that are
+}
+
+// SetSearchAfter makes the collection keep only the hits that rank strictly after
+// the sort values given (one for each sort of the sort order, as for a
+// TopNCollector). A hit that ties them on every sort is not after them: sort
+// orders for pagination end in something unique, the document id. The matches
+// that are left out are still counted, and facets still count them. Pagination by
+// this is not by offset: the skip is 0.
+//
+// A score among the sorts is as exact as the scores are: those of this path are
+// float32, and the value to continue from is the float64 of one of them, so
+// continuing from the page of this path is exact. The scores of the regular path
+// are float64: continuing from one of its pages, where hits tie on score, can leave
+// out or repeat a hit that ties the last one by a rounding.
+func (hc *PerSegmentSortedCollector) SetSearchAfter(after []string) {
+	doc := createSearchAfterDocument(hc.sort, after)
+	key := &searchAfterKey{keys: make([][]byte, hc.numKeys), score: doc.Score}
+	for i, c := range hc.rank {
+		if !c.score {
+			key.keys[c.key] = []byte(doc.Sort[i])
+		}
+	}
+	hc.after = key
+	hc.skip = 0
+}
+
+// ranksAfter reports whether the hit ranks strictly after the search after values.
+func (k *searchAfterKey) ranksAfter(r sortRanking, h *sortedHit) bool {
+	for _, c := range r {
+		var x int
+		if c.score {
+			if sc := float64(h.score); sc < k.score {
+				x = -1
+			} else if sc > k.score {
+				x = 1
+			}
+		} else {
+			x = bytes.Compare(h.keys[c.key], k.keys[c.key])
+		}
+		if x == 0 {
+			continue
+		}
+		if c.desc {
+			x = -x
+		}
+		return x > 0
+	}
+	return false
+}
+
+// SetFacetsBuilder makes the collection count the facets of every match, whether
+// it makes the top hits or not: the doc values of the fields of the facets are read
+// for each, along with those of the sorts, in one visit.
+func (hc *PerSegmentSortedCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
+	hc.facets = facetsBuilder
+	hc.facetFields = facetsBuilder.RequiredFields()
+}
+
+// FacetResults returns the facets counted.
+func (hc *PerSegmentSortedCollector) FacetResults() search.FacetResults {
+	if hc.facets != nil {
+		return hc.facets.Results()
+	}
+	return nil
 }
 
 // SetExplain makes the collection explain the hits it returns, as
@@ -118,15 +193,36 @@ func (hc *PerSegmentSortedCollector) collect(ctx context.Context, searcher searc
 	startTime := time.Now()
 	k := hc.size + hc.skip
 
+	// what is read of the doc values of a match: the fields of the sorts, if hits
+	// are wanted, and those of the facets
+	var fields []string
+	if k > 0 {
+		fields = append(fields, hc.sortFields...)
+	}
+	for _, f := range hc.facetFields {
+		if !slices.Contains(fields, f) {
+			fields = append(fields, f)
+		}
+	}
 	var dvReader index.DocValueReader
 	var visitor index.DocValueVisitor
-	if k > 0 && len(hc.neededFields) > 0 {
+	if len(fields) > 0 {
 		var err error
-		dvReader, err = reader.DocValueReader(hc.neededFields)
+		dvReader, err = reader.DocValueReader(fields)
 		if err != nil {
 			return err
 		}
-		visitor = hc.sort.UpdateVisitor
+		switch {
+		case hc.facets != nil && k > 0:
+			visitor = func(field string, term []byte) {
+				hc.facets.UpdateVisitor(field, term)
+				hc.sort.UpdateVisitor(field, term)
+			}
+		case hc.facets != nil:
+			visitor = hc.facets.UpdateVisitor
+		default:
+			visitor = hc.sort.UpdateVisitor
+		}
 	}
 	// ValueBytes of the sorts that have it, Value of the others
 	byteSorts := make([]search.SortValueBytes, len(hc.sort))
@@ -162,18 +258,34 @@ func (hc *PerSegmentSortedCollector) collect(ctx context.Context, searcher searc
 		if m.Score > maxScore {
 			maxScore = m.Score
 		}
-		if k == 0 {
+		if k == 0 && hc.facets == nil {
 			continue
 		}
 
-		// the sort values of the match
+		// the sort values of the match, and what the facets count of it
 		idBuf = index.NewIndexInternalID(idBuf, m.Doc)
 		scratch.IndexInternalID = idBuf
 		scratch.Score = float64(m.Score)
+		if hc.facets != nil {
+			hc.facets.StartDoc()
+		}
 		if dvReader != nil {
 			if err = dvReader.VisitDocValues(scratch.IndexInternalID, visitor); err != nil {
 				return err
 			}
+		}
+		if hc.facets != nil {
+			hc.facets.EndDoc()
+		}
+		if dvReader != nil {
+			// What the regular collector reports as the bytes read: the reader's
+			// running total, added up after each visit. It's not the number of bytes
+			// that were read, but it is what is reported, and what a search is
+			// accounted for.
+			hc.bytesRead += dvReader.BytesRead()
+		}
+		if k == 0 {
+			continue
 		}
 		if hc.needDocIDs {
 			if scratch.ID, err = reader.ExternalID(scratch.IndexInternalID); err != nil {
@@ -191,6 +303,9 @@ func (hc *PerSegmentSortedCollector) collect(ctx context.Context, searcher searc
 			}
 		}
 		candidate.doc, candidate.ord, candidate.score, candidate.seg = m.Doc, total, m.Score, uint32(m.Seg)
+		if hc.after != nil && !hc.after.ranksAfter(hc.rank, &candidate) {
+			continue
+		}
 		if !top.beats(&candidate) {
 			continue
 		}
@@ -199,9 +314,6 @@ func (hc *PerSegmentSortedCollector) collect(ctx context.Context, searcher searc
 	hc.total = total
 	hc.maxScore = float64(maxScore)
 
-	if dvReader != nil {
-		hc.bytesRead = dvReader.BytesRead()
-	}
 	if statsCallbackFn := ctx.Value(search.SearchIOStatsCallbackKey); statsCallbackFn != nil {
 		statsCallbackFn.(search.SearchIOStatsCallbackFunc)(hc.bytesRead)
 		search.RecordSearchCost(ctx, search.AddM, hc.bytesRead)
@@ -287,8 +399,11 @@ func (h sortedHit) own() sortedHit {
 func (hc *PerSegmentSortedCollector) Size() int {
 	k := min(hc.size+hc.skip, sortedTopNPreAlloc)
 	rv := reflectStaticSizePerSegmentSortedCollector + size.SizeOfPtr + 2*k*int(reflect.TypeOf(sortedHit{}).Size())
-	for _, f := range hc.neededFields {
+	for _, f := range hc.sortFields {
 		rv += len(f) + size.SizeOfString
+	}
+	if hc.facets != nil {
+		rv += hc.facets.Size()
 	}
 	return rv
 }

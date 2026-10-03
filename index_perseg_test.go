@@ -342,17 +342,6 @@ func TestPerSegmentSearchIneligibleRequests(t *testing.T) {
 			r.Highlight = NewHighlight()
 			return r
 		},
-		"facets": func() *SearchRequest {
-			r := NewSearchRequest(tq())
-			r.AddFacet("f", NewFacetRequest("body", 3))
-			return r
-		},
-		"search after": func() *SearchRequest {
-			r := NewSearchRequest(tq())
-			r.SearchAfter = []string{"1.0", "doc1"}
-			r.SortBy([]string{"-_score", "_id"})
-			return r
-		},
 		"a prefix query": func() *SearchRequest {
 			return NewSearchRequest(query.NewPrefixQuery("comm"))
 		},
@@ -451,10 +440,10 @@ func TestPerSegmentSearchDoesNotBuildTopNCollector(t *testing.T) {
 	}
 
 	// and it is for a search that isn't served that way
-	withFacets := c.request()
-	withFacets.AddFacet("f", NewFacetRequest("body", 3))
-	if ps, tn := run(withFacets); ps != 0 || tn != 1 {
-		t.Errorf("faceted search: %d per segment collectors, %d TopN collectors built", ps, tn)
+	withLocations := c.request()
+	withLocations.IncludeLocations = true
+	if ps, tn := run(withLocations); ps != 0 || tn != 1 {
+		t.Errorf("search with locations: %d per segment collectors, %d TopN collectors built", ps, tn)
 	}
 	perSegmentSearchEnabled.Store(false)
 	ps, tn := run(c.request())

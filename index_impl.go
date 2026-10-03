@@ -1002,8 +1002,16 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				facetsBuilder.Add(facetName, facetBuilder)
 			}
 		}
-		// a request with facets is not served by the per segment path
-		coll.SetFacetsBuilder(facetsBuilder)
+		if psColl != nil {
+			fc, ok := psColl.(facetsCollector)
+			if !ok {
+				// a request with facets is given a collector that has them
+				return nil, fmt.Errorf("the per segment collector %T can't count facets", psColl)
+			}
+			fc.SetFacetsBuilder(facetsBuilder)
+		} else {
+			coll.SetFacetsBuilder(facetsBuilder)
+		}
 	}
 
 	memNeeded := memNeededForSearch(req, searcherSize, resultColl)
@@ -1114,6 +1122,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 	if coll != nil {
 		rv.Facets = coll.FacetResults()
+	} else if fc, ok := psColl.(facetsCollector); ok {
+		rv.Facets = fc.FacetResults()
 	}
 
 	// rescore if fusion flag is set
