@@ -48,13 +48,12 @@ func init() {
 //
 // That path produces the same hits as the regular one, but only for a narrow
 // kind of request. It is limited to a term query, a match of terms, or a
-// conjunction or disjunction of those, sorted by
-// descending score, that needs nothing more than the score of each hit (or
-// that there be none, with Score: "none"):
+// conjunction or disjunction of those, in any sort order, that needs nothing more
+// than the score of each hit (or that there be none, with Score: "none"):
 // no locations or highlights, facets, KNN, search after / before, pre search data,
-// synonyms, nested documents or score fusion. (Explanations are fine, but for
-// ones of a search that has no scores: the collector asks for those of the hits it
-// returns once it has them.)
+// synonyms, nested documents or score fusion. (Explanations are fine: the
+// collector asks for those of the hits it returns once it has them. A search that
+// has no scores has none to explain, and its hits come without.)
 //
 // Whether the index reader is able to provide per segment postings isn't
 // decided here: if it can't, the query's per segment searcher is refused
@@ -69,12 +68,6 @@ func perSegmentSearchEligible(ctx context.Context, req *SearchRequest,
 		return false
 	}
 	if req.IncludeLocations || req.Highlight != nil {
-		return false
-	}
-	// An explanation of scores that were asked not to be computed is a tree of
-	// zeros in the regular path, and the per segment path would show the scores the
-	// hits don't have.
-	if req.Explain && req.Score == ScoreNone {
 		return false
 	}
 	if len(req.Facets) > 0 || requestHasKNN(req) {
@@ -151,15 +144,17 @@ func perSegmentSearcherFor(ctx context.Context, req *SearchRequest, reader index
 // Hits ordered by descending score only are collected by the collector that
 // prunes; any other order by the one that sorts.
 func newPerSegmentCollector(req *SearchRequest) perSegmentCollector {
+	// scores that were asked not to be computed have no explanation to give
+	explain := req.Explain && req.Score != ScoreNone
 	if sortedByScoreDescending(req.Sort) {
 		rv := collector.NewPerSegmentTopNCollector(req.Size, req.From)
-		rv.SetExplain(req.Explain)
+		rv.SetExplain(explain)
 		return rv
 	}
 	// the sorts hold the values of the doc they're asked about: the collector gets
 	// its own, not the request's
 	rv := collector.NewPerSegmentSortedCollector(req.Size, req.From, req.Sort.Copy())
-	rv.SetExplain(req.Explain)
+	rv.SetExplain(explain)
 	return rv
 }
 

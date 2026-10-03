@@ -332,11 +332,6 @@ func TestPerSegmentSearchIneligibleRequests(t *testing.T) {
 		return q
 	}
 	mk := map[string]func() *SearchRequest{
-		"explain, without scores": func() *SearchRequest {
-			r := NewSearchRequestOptions(tq(), 10, 0, true)
-			r.Score = ScoreNone
-			return r
-		},
 		"locations": func() *SearchRequest {
 			r := NewSearchRequest(tq())
 			r.IncludeLocations = true

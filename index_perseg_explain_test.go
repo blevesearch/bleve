@@ -283,3 +283,46 @@ func TestPerSegmentExplainIsForTheHitsReturned(t *testing.T) {
 		}
 	}
 }
+
+// A search that was asked not to compute scores has none to explain: with
+// Explain on it is still served by the per segment path, and its hits come without
+// explanations, with the hits the regular path gives.
+func TestPerSegmentExplainWithoutScoresExplainsNothing(t *testing.T) {
+	idx, cleanup := perSegmentTestIndex(t, index.DefaultScoringModel, nil)
+	defer cleanup()
+	for _, sorted := range []bool{false, true} {
+		mkReq := func() *SearchRequest {
+			q := query.NewDisjunctionQuery([]query.Query{termQueryOn("body", "even"), termQueryOn("body", "five")})
+			r := NewSearchRequestOptions(q, 10, 2, true)
+			r.Score = ScoreNone
+			if sorted {
+				r.SortBy([]string{"_id"})
+			}
+			return r
+		}
+		what := fmt.Sprintf("explain without scores, sorted=%v", sorted)
+		old, got := runBothPaths(t, idx, mkReq, what)
+		if len(got.Hits) == 0 {
+			t.Fatalf("%s: no hits", what)
+		}
+		if sorted {
+			compareSortedResults(t, what, old, got)
+		} else {
+			// (the regular path stops after the hits it needs when scores are off, and
+			// so has a lower total than this path, which counts them all)
+			if len(old.Hits) != len(got.Hits) {
+				t.Fatalf("%s: %d hits, want %d", what, len(got.Hits), len(old.Hits))
+			}
+			for i := range old.Hits {
+				if old.Hits[i].ID != got.Hits[i].ID {
+					t.Fatalf("%s: hit %d is %s, want %s", what, i, got.Hits[i].ID, old.Hits[i].ID)
+				}
+			}
+		}
+		for i, h := range got.Hits {
+			if h.Expl != nil {
+				t.Fatalf("%s: hit %d has an explanation of scores it doesn't have: %v", what, i, h.Expl)
+			}
+		}
+	}
+}
