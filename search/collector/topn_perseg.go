@@ -98,6 +98,10 @@ type perSegmentState struct {
 	totals   []uint64
 	maxScore float32
 	pruned   bool
+
+	// room for the totals of the usual number of segments, so that counting
+	// doesn't grow a slice one append at a time
+	totalsBuf [16]uint64
 }
 
 var _ search.PerSegmentSink = (*perSegmentState)(nil)
@@ -162,6 +166,7 @@ func (hc *PerSegmentTopNCollector) collect(ctx context.Context, searcher search.
 	startTime := time.Now()
 
 	state := &perSegmentState{k: hc.size + hc.skip}
+	state.totals = state.totalsBuf[:0]
 	var err error
 	if opt, ok := searcher.(search.OptimizedPerSegmentSearcher); ok && opt.CanCollectOptimized() {
 		err = opt.CollectOptimized(ctx, state)

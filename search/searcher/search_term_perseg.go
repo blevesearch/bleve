@@ -68,7 +68,10 @@ type PerSegmentTermSearcher struct {
 	blk     *segment.PostingsBlock
 	blkN    int
 	blkPos  int
-	scores  [scorer.PerSegmentBlockLen]float32
+	// the scores of the block, allocated by the first NextMatch that needs them:
+	// the optimized collection doesn't use them, and a searcher shouldn't weigh
+	// half a kilobyte more for the sake of the fallback
+	scores *[scorer.PerSegmentBlockLen]float32
 }
 
 var _ search.PerSegmentSearcher = (*PerSegmentTermSearcher)(nil)
@@ -210,7 +213,10 @@ func (s *PerSegmentTermSearcher) NextMatch() (search.PerSegmentMatch, bool, erro
 		}
 		s.blk, s.blkN, s.blkPos = blk, n, 0
 		if s.scored {
-			s.scorer.ScoreBlock(&blk.Freqs, &blk.Norms, n, &s.scores)
+			if s.scores == nil {
+				s.scores = new([scorer.PerSegmentBlockLen]float32)
+			}
+			s.scorer.ScoreBlock(&blk.Freqs, &blk.Norms, n, s.scores)
 		}
 	}
 	return search.PerSegmentMatch{}, false, nil
