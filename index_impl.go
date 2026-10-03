@@ -911,7 +911,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	var coll *collector.TopNCollector
-	var psColl *collector.PerSegmentTopNCollector
+	var psColl perSegmentCollector
 	var resultColl searchResults
 	if psSearcher != nil {
 		psColl = newPerSegmentCollector(req)

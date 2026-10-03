@@ -87,10 +87,7 @@ func perSegmentSearchEligible(ctx context.Context, req *SearchRequest,
 	if fts != nil || fusion {
 		return false
 	}
-	if len(req.Sort) != 1 {
-		return false
-	}
-	if byScore, ok := req.Sort[0].(*search.SortScore); !ok || !byScore.Desc {
+	if !perSegmentSortSupported(req.Sort) {
 		return false
 	}
 	if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); ok && nestedMode {
@@ -101,6 +98,40 @@ func perSegmentSearchEligible(ctx context.Context, req *SearchRequest,
 		return false
 	}
 	return true
+}
+
+// perSegmentSortSupported reports whether the per segment path can order hits by
+// the sort order: the sorts that come with bleve (a field, the document id, the
+// distance to a point, the score) can be; a sort of anyone's own can't, as the
+// collector asks sorts for their values the way a TopNCollector does only for
+// those it knows.
+func perSegmentSortSupported(so search.SortOrder) bool {
+	for _, s := range so {
+		switch s.(type) {
+		case *search.SortField, *search.SortDocID, *search.SortGeoDistance, *search.SortScore:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// sortedByScoreDescending reports whether the hits are ordered by descending
+// score and nothing else, which is what the pruning algorithms are for. (No sort
+// at all is that too.)
+func sortedByScoreDescending(so search.SortOrder) bool {
+	if len(so) == 0 {
+		return true
+	}
+	byScore, ok := so[0].(*search.SortScore)
+	return len(so) == 1 && ok && byScore.Desc
+}
+
+// perSegmentCollector is what the search needs of the collector of the per
+// segment path, of either kind.
+type perSegmentCollector interface {
+	searchResults
+	Collect(ctx context.Context, searcher search.PerSegmentSearcher, reader index.IndexReader) error
 }
 
 // searchResults is what a search needs of whichever collector ran it, TopNCollector
@@ -136,8 +167,17 @@ func perSegmentSearcherFor(ctx context.Context, req *SearchRequest, reader index
 
 // newPerSegmentCollector is the collector of a search that is run by the per
 // segment path.
-func newPerSegmentCollector(req *SearchRequest) *collector.PerSegmentTopNCollector {
-	rv := collector.NewPerSegmentTopNCollector(req.Size, req.From)
+// Hits ordered by descending score only are collected by the collector that
+// prunes; any other order by the one that sorts.
+func newPerSegmentCollector(req *SearchRequest) perSegmentCollector {
+	if sortedByScoreDescending(req.Sort) {
+		rv := collector.NewPerSegmentTopNCollector(req.Size, req.From)
+		rv.SetExplain(req.Explain)
+		return rv
+	}
+	// the sorts hold the values of the doc they're asked about: the collector gets
+	// its own, not the request's
+	rv := collector.NewPerSegmentSortedCollector(req.Size, req.From, req.Sort.Copy())
 	rv.SetExplain(req.Explain)
 	return rv
 }

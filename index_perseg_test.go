@@ -352,16 +352,6 @@ func TestPerSegmentSearchIneligibleRequests(t *testing.T) {
 			r.AddFacet("f", NewFacetRequest("body", 3))
 			return r
 		},
-		"sort by id": func() *SearchRequest {
-			r := NewSearchRequest(tq())
-			r.SortBy([]string{"_id"})
-			return r
-		},
-		"ascending score": func() *SearchRequest {
-			r := NewSearchRequest(tq())
-			r.SortBy([]string{"_score"})
-			return r
-		},
 		"search after": func() *SearchRequest {
 			r := NewSearchRequest(tq())
 			r.SearchAfter = []string{"1.0", "doc1"}

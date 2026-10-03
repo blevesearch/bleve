@@ -141,24 +141,47 @@ func (st *perSegmentState) MarkPruned() { st.pruned = true }
 // search.Collector, which collects the matches of a search.Searcher.)
 func (hc *PerSegmentTopNCollector) Collect(ctx context.Context, searcher search.PerSegmentSearcher,
 	reader index.IndexReader) (err error) {
-	// The algorithms index dense arrays by doc offset and trust that their cursors
-	// are where they say: a mistake there is a runtime panic. It fails the search
-	// that hit it, not the process, and says what went wrong and where. (Other
-	// panics are not touched.)
-	defer func() {
-		if r := recover(); r != nil {
-			rerr, isRuntime := r.(runtime.Error)
-			if !isRuntime {
-				panic(r)
-			}
-			stack := debug.Stack()
-			if len(stack) > 2048 {
-				stack = stack[:2048]
-			}
-			err = fmt.Errorf("collector: the per segment search failed: %v\n%s", rerr, stack)
-		}
-	}()
+	defer recoverPerSegmentPanic(&err)
 	return hc.collect(ctx, searcher, reader)
+}
+
+// recoverPerSegmentPanic turns a runtime error panic into the error of a collection,
+// to be deferred. The algorithms index dense arrays by doc offset and trust that
+// their cursors are where they say: a mistake there is a runtime panic. It fails
+// the search that hit it, not the process, and says what went wrong and where.
+// (Other panics are not touched.)
+func recoverPerSegmentPanic(err *error) {
+	if r := recover(); r != nil {
+		rerr, isRuntime := r.(runtime.Error)
+		if !isRuntime {
+			panic(r)
+		}
+		stack := debug.Stack()
+		if len(stack) > 2048 {
+			stack = stack[:2048]
+		}
+		*err = fmt.Errorf("collector: the per segment search failed: %v\n%s", rerr, stack)
+	}
+}
+
+// explainPerSegmentHit gives the hit, which is a match of the doc in segment seg,
+// the explanation its searcher has of it, and checks that the explanation shows
+// the score the hit was ranked by, to the bit: a searcher whose explanation
+// works scores out another way has to be told, not shown.
+func explainPerSegmentHit(searcher search.PerSegmentSearcher, dm *search.DocumentMatch, seg int, doc uint64) error {
+	expl, match, err := searcher.ExplainMatch(seg, doc)
+	if err != nil {
+		return err
+	}
+	if !match {
+		return fmt.Errorf("collector: hit %s of segment %d is not a match to explain", dm.ID, seg)
+	}
+	if expl.Value != dm.Score {
+		return fmt.Errorf("collector: the explanation of hit %s scores %v, the hit %v",
+			dm.ID, expl.Value, dm.Score)
+	}
+	dm.Expl = expl
+	return nil
 }
 
 func (hc *PerSegmentTopNCollector) collect(ctx context.Context, searcher search.PerSegmentSearcher,
@@ -213,20 +236,9 @@ func (hc *PerSegmentTopNCollector) collect(ctx context.Context, searcher search.
 			return err
 		}
 		if hc.explain {
-			expl, match, err := searcher.ExplainMatch(int(hit.Seg), hit.Doc)
-			if err != nil {
+			if err := explainPerSegmentHit(searcher, dm, int(hit.Seg), hit.Doc); err != nil {
 				return err
 			}
-			if !match {
-				return fmt.Errorf("collector: hit %s of segment %d is not a match to explain", dm.ID, hit.Seg)
-			}
-			// the explanation has to show the score the hit was ranked by, to the bit:
-			// a searcher whose explanation works it out another way has to be told
-			if expl.Value != dm.Score {
-				return fmt.Errorf("collector: the explanation of hit %s scores %v, the hit %v",
-					dm.ID, expl.Value, dm.Score)
-			}
-			dm.Expl = expl
 		}
 		dm.Complete(nil)
 		hc.results = append(hc.results, dm)
