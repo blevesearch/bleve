@@ -173,6 +173,15 @@ func BenchmarkSearchCPU(b *testing.B) {
 		defer perSegmentSearchEnabled.Store(true)
 	}
 	explain := os.Getenv("PERSEG_EXPLAIN") == "1" // PERSEG_EXPLAIN=1 asks for the explanations of the hits
+	// PERSEG_FIELDS=1 asks for the stored fields of the hits, as a service does
+	withFields := os.Getenv("PERSEG_FIELDS") == "1"
+	newRequest := func(q query.Query, size int) *SearchRequest {
+		r := NewSearchRequestOptions(q, size, 0, explain)
+		if withFields {
+			r.Fields = []string{"*"}
+		}
+		return r
+	}
 	idx, cleanup := buildAllocBenchIndexModel(b, 200000, 8, os.Getenv("PERSEG_MODEL"))
 	defer cleanup()
 
@@ -241,11 +250,11 @@ func BenchmarkSearchCPU(b *testing.B) {
 		b.Fatalf("unknown shape %q", shape)
 	}
 	for i := 0; i < 50; i++ {
-		if _, err := idx.Search(NewSearchRequestOptions(q, size, 0, explain)); err != nil {
+		if _, err := idx.Search(newRequest(q, size)); err != nil {
 			b.Fatal(err)
 		}
 	}
-	if res, err := idx.Search(NewSearchRequestOptions(q, size, 0, explain)); err == nil {
+	if res, err := idx.Search(newRequest(q, size)); err == nil {
 		b.ReportMetric(float64(res.Total), "matches")
 	}
 	b.ReportAllocs()
@@ -261,7 +270,7 @@ func BenchmarkSearchCPU(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := idx.Search(NewSearchRequestOptions(q, size, 0, explain)); err != nil {
+		if _, err := idx.Search(newRequest(q, size)); err != nil {
 			b.Fatal(err)
 		}
 	}

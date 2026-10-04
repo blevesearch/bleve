@@ -32,6 +32,12 @@ func TestPerSegmentSearchMatchesRegularSearchOnLargeSegments(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds an index of 100000 documents")
 	}
+	if raceDetectorOn {
+		// the regular path's searches over 100000 documents take minutes with the
+		// race detector on; the algorithms are raced by the tests of the searcher
+		// package and the smaller ones of this one
+		t.Skip("100000 documents under the race detector takes minutes")
+	}
 	idx, cleanup := buildSortBenchIndex(t, 100000, 8, "bm25")
 	defer cleanup()
 
