@@ -171,6 +171,26 @@ func recoverPerSegmentPanic(err *error) {
 	}
 }
 
+// hitSlab makes the DocumentMatches of the hits that are returned: one allocation
+// for all of them, and one for their internal ids, where a DocumentMatch of its own
+// for each takes two apiece. (They are not pooled, so nothing is asked of whoever
+// gets the hits.) The hits of a slab are kept alive by any one of them being kept.
+type hitSlab struct {
+	dms []search.DocumentMatch
+	ids []byte
+}
+
+func newHitSlab(n int) hitSlab {
+	return hitSlab{dms: make([]search.DocumentMatch, n), ids: make([]byte, 8*n)}
+}
+
+// next is the DocumentMatch of the i-th hit, with the internal id of its doc.
+func (s *hitSlab) next(i int, doc uint64) *search.DocumentMatch {
+	dm := &s.dms[i]
+	dm.IndexInternalID = index.NewIndexInternalID(s.ids[i*8:i*8:(i+1)*8], doc)
+	return dm
+}
+
 // explainPerSegmentHit gives the hit, which is a match of the doc in segment seg,
 // the explanation its searcher has of it, and checks that the explanation shows
 // the score the hit was ranked by, to the bit: a searcher whose explanation
@@ -230,13 +250,12 @@ func (hc *PerSegmentTopNCollector) collect(ctx context.Context, searcher search.
 
 	// only the hits to be returned become DocumentMatches
 	hc.results = make(search.DocumentMatchCollection, 0, len(top))
-	for _, hit := range top {
-		dm := &search.DocumentMatch{
-			IndexInternalID: index.NewIndexInternalID(nil, hit.Doc),
-			Score:           float64(hit.Score),
-			HitNumber:       hitBase[hit.Seg] + uint64(hit.Ord) + 1,
-			Sort:            sortByScoreOpt,
-		}
+	slab := newHitSlab(len(top))
+	for i, hit := range top {
+		dm := slab.next(i, hit.Doc)
+		dm.Score = float64(hit.Score)
+		dm.HitNumber = hitBase[hit.Seg] + uint64(hit.Ord) + 1
+		dm.Sort = sortByScoreOpt
 		var err error
 		dm.ID, err = reader.ExternalID(dm.IndexInternalID)
 		if err != nil {

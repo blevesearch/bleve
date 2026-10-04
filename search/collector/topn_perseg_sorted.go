@@ -335,14 +335,13 @@ func (hc *PerSegmentSortedCollector) collect(ctx context.Context, searcher searc
 
 	// only the hits to be returned become DocumentMatches
 	hc.results = make(search.DocumentMatchCollection, 0, len(best))
+	slab := newHitSlab(len(best))
 	for i := range best {
 		hit := &best[i]
-		dm := &search.DocumentMatch{
-			IndexInternalID: index.NewIndexInternalID(nil, hit.doc),
-			Score:           float64(hit.score),
-			HitNumber:       hit.ord,
-			Sort:            make([]string, len(hc.sort)),
-		}
+		dm := slab.next(i, hit.doc)
+		dm.Score = float64(hit.score)
+		dm.HitNumber = hit.ord
+		dm.Sort = make([]string, len(hc.sort))
 		// a sort by score alone has nothing to decode: TopNCollector gives its hits
 		// no decoded sort values
 		decode := !(len(hc.sort) == 1 && hc.rank[0].score)

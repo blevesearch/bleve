@@ -174,3 +174,31 @@ func TestPerSegmentCollectorUsesTheOptimizedPathWhenOffered(t *testing.T) {
 		t.Fatal("a searcher that can't collect optimized was asked to")
 	}
 }
+
+// The hits of a collection share two allocations (see hitSlab), and are as
+// independent as hits of their own: each has the internal id of its own doc, and
+// growing one id (an append) can't reach into the next hit's.
+func TestHitSlabHitsAreIndependent(t *testing.T) {
+	const n = 50
+	slab := newHitSlab(n)
+	dms := make([]*search.DocumentMatch, n)
+	for i := range dms {
+		dms[i] = slab.next(i, uint64(1000+i))
+		dms[i].Score = float64(i)
+	}
+	// an append to an id is a copy, not a write over what comes after it
+	for i := range dms {
+		_ = append(dms[i].IndexInternalID, 0xFF, 0xFF, 0xFF, 0xFF)
+	}
+	for i, dm := range dms {
+		if got := dm.IndexInternalID.Value(); got != uint64(1000+i) {
+			t.Fatalf("hit %d: internal id %d, want %d", i, got, 1000+i)
+		}
+		if dm.Score != float64(i) {
+			t.Fatalf("hit %d: score %v", i, dm.Score)
+		}
+	}
+	if n := newHitSlab(0); len(n.dms) != 0 || len(n.ids) != 0 {
+		t.Fatalf("a slab of no hits holds %d / %d", len(n.dms), len(n.ids))
+	}
+}
