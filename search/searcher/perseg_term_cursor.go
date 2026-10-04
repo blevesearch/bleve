@@ -16,6 +16,7 @@ package searcher
 
 import (
 	"math"
+	"sync"
 
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/search/scorer"
@@ -67,10 +68,18 @@ type termCursor struct {
 	err      error
 
 	// the scores of the whole decoded block, once someone has asked for them
-	scores    *[segment.PostingsBlockLen]float32 // allocated when first asked for
+	scores    *[segment.PostingsBlockLen]float32 // from scoreBufPool when first asked for, given back by release
 	scoresFor uint64                             // the block generation that scores is of; 0 for none
 	blockGen  uint64                             // changes with every block decoded
 }
+
+// scoreBufPool holds the buffers that termCursors score a block into. A query has
+// a cursor per term and segment, and each takes a buffer when it first scores a
+// block and gives it back when it is released, so the next segment's (and the next
+// query's) cursors work in the same few buffers instead of 512 bytes of their own
+// each. What is in a buffer when it is taken doesn't matter: the first n entries
+// are written before they are read.
+var scoreBufPool = sync.Pool{New: func() any { return new([segment.PostingsBlockLen]float32) }}
 
 // newTermCursor positions a cursor on the first posting of the reader.
 func newTermCursor(idx int, r *scorch.PerSegmentIndexSnapshotTermFieldReader,
@@ -100,13 +109,31 @@ func (t *termCursor) Offset() uint64 { return t.offset }
 // worked out once per block.
 func (t *termCursor) blockScores() *[segment.PostingsBlockLen]float32 {
 	if t.scores == nil {
-		t.scores = new([segment.PostingsBlockLen]float32)
+		t.scores = scoreBufPool.Get().(*[segment.PostingsBlockLen]float32)
 	}
 	if t.scoresFor != t.blockGen {
 		t.scorer.ScoreBlock(&t.blk.Freqs, &t.blk.Norms, t.n, t.scores)
 		t.scoresFor = t.blockGen
 	}
 	return t.scores
+}
+
+// release implements releaser: the buffer of scores goes back to the pool. It is
+// harmless at any time and any number of times: a cursor that is asked for scores
+// again takes a buffer again, and works the block's scores out again.
+func (t *termCursor) release() {
+	if t.scores != nil {
+		scoreBufPool.Put(t.scores)
+		t.scores = nil
+		t.scoresFor = 0
+	}
+}
+
+// releaseTermCursors gives back what the cursors hold.
+func releaseTermCursors(curs []*termCursor) {
+	for _, t := range curs {
+		t.release()
+	}
 }
 
 // Doc is the doc number the cursor is on, noMoreDocs if it's done.

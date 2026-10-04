@@ -79,19 +79,26 @@ func newBufferedIntersectionCursor(terms []*termCursor, scored bool) *bufferedIn
 	return x
 }
 
-// release implements releaser. The memory is cleaned where it is used, so it goes
-// back as it is.
-func (x *bufferedIntersectionCursor) release() {
+// releaseScratch gives the window's memory back. It is cleaned where it is used,
+// so it goes back as it is.
+func (x *bufferedIntersectionCursor) releaseScratch() {
 	if x.scratch != nil {
 		bufIntersectScratchPool.Put(x.scratch)
 		x.scratch = nil
 	}
 }
 
+// release implements releaser: the scratch, and what the terms hold (the same
+// terms in windows and in the fallback).
+func (x *bufferedIntersectionCursor) release() {
+	x.releaseScratch()
+	releaseTermCursors(x.terms)
+}
+
 // finish is where the cursor is when it has no more matches.
 func (x *bufferedIntersectionCursor) finish() uint32 {
 	x.doc = noMoreDocs
-	x.release()
+	x.releaseScratch()
 	return noMoreDocs
 }
 
@@ -177,7 +184,7 @@ func (x *bufferedIntersectionCursor) next() uint32 {
 // toFallback sends the cursor to the intersectionCursor over the terms, once they
 // are at the target.
 func (x *bufferedIntersectionCursor) toFallback(target uint32) uint32 {
-	x.release()
+	x.releaseScratch()
 	cursors := make([]docCursor, len(x.terms))
 	for i, t := range x.terms {
 		if t.doc < target {

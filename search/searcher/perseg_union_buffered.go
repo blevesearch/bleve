@@ -94,14 +94,22 @@ func (u *bufferedUnionCursor) discardWindow() {
 	}
 }
 
-// release implements releaser: the memory goes back, zeroed.
-func (u *bufferedUnionCursor) release() {
+// releaseScratch gives the window's memory back, zeroed. A cursor that is in the
+// fallback, or was released, holds none.
+func (u *bufferedUnionCursor) releaseScratch() {
 	if u.scratch == nil {
 		return // in fallback, or released: nothing is held
 	}
 	u.discardWindow()
 	bufUnionScratchPool.Put(u.scratch)
 	u.scratch = nil
+}
+
+// release implements releaser: the scratch, and what the terms hold (the same
+// terms in windows and in the fallback).
+func (u *bufferedUnionCursor) release() {
+	u.releaseScratch()
+	releaseTermCursors(u.terms)
 }
 
 // refill puts the window that starts at the lowest doc the terms are on in the
@@ -116,7 +124,7 @@ func (u *bufferedUnionCursor) refill() uint32 {
 	}
 	if start == noMoreDocs {
 		u.doc = noMoreDocs
-		u.release()
+		u.releaseScratch()
 		return noMoreDocs
 	}
 	end := uint32(noMoreDocs)

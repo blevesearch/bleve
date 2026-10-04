@@ -257,6 +257,8 @@ func (s *PerSegmentConjunctionSearcher) CollectOptimized(ctx context.Context,
 				err = drainCursor(ctx, sink, seg, newIntersectionCursor(cursors), s.scored)
 			}
 		}
+		// the segment is done with: its cursors give back what they hold
+		releaseTermCursors(curs)
 		if err != nil {
 			return err
 		}

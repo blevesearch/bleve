@@ -247,6 +247,8 @@ func (s *PerSegmentDisjunctionSearcher) CollectOptimized(ctx context.Context,
 		default:
 			err = s.wandSegment(ctx, sink, seg, curs)
 		}
+		// the segment is done with: its cursors give back what they hold
+		releaseTermCursors(curs)
 		if err != nil {
 			return err
 		}
