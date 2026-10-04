@@ -1264,6 +1264,11 @@ func LoadAndHighlightAllFields(
 	if err != nil {
 		return err, totalStoredFieldsBytes
 	}
+	// a document that has no descendants (most have none) has nothing more to
+	// load, and nothing to allocate for it
+	if len(root.Descendants) == 0 {
+		return nil, totalStoredFieldsBytes
+	}
 	// collect all descendant documents
 	nestedDocs := make([]*search.NestedDocumentMatch, 0, len(root.Descendants))
 	// create a dummy desc DocumentMatch to reuse LoadAndHighlightFields
