@@ -33,7 +33,7 @@ func (r *PerSegmentIndexSnapshotTermFieldReader) Probe(doc uint32) (freq uint32,
 	if !isProvider {
 		return 0, 0, false, fmt.Errorf("scorch: the postings of segment %d can't be read by block", r.segmentIndex)
 	}
-	cursor, err := provider.BlockCursor(true, true, r.cursor)
+	cursor, err := provider.BlockPostingsIterator(true, true, r.cursor)
 	if err != nil {
 		return 0, 0, false, err
 	}

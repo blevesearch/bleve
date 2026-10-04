@@ -433,7 +433,7 @@ func (is *IndexSnapshot) PerSegmentTermFieldReader(ctx context.Context, term []b
 		if r == nil {
 			continue
 		}
-		cursor, err := r.pl.(segment.BlockCursorProvider).BlockCursor(withFreqNorms, withFreqNorms, r.cursor)
+		cursor, err := r.pl.(segment.BlockCursorProvider).BlockPostingsIterator(withFreqNorms, withFreqNorms, r.cursor)
 		if err != nil {
 			releaseAll()
 			return nil, err
