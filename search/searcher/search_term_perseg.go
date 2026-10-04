@@ -71,7 +71,7 @@ type PerSegmentTermSearcher struct {
 	// the scores of the block, allocated by the first NextMatch that needs them:
 	// the optimized collection doesn't use them, and a searcher shouldn't weigh
 	// half a kilobyte more for the sake of the fallback
-	scores *[scorer.PerSegmentBlockLen]float32
+	scores *[segment.PostingsBlockLen]float32
 }
 
 var _ search.PerSegmentSearcher = (*PerSegmentTermSearcher)(nil)
@@ -214,7 +214,7 @@ func (s *PerSegmentTermSearcher) NextMatch() (search.PerSegmentMatch, bool, erro
 		s.blk, s.blkN, s.blkPos = blk, n, 0
 		if s.scored {
 			if s.scores == nil {
-				s.scores = new([scorer.PerSegmentBlockLen]float32)
+				s.scores = new([segment.PostingsBlockLen]float32)
 			}
 			s.scorer.ScoreBlock(&blk.Freqs, &blk.Norms, n, s.scores)
 		}
@@ -254,7 +254,7 @@ const checkDoneEvery = 1024
 // visited, and the collection is marked as pruned: the total is a lower bound.
 func (s *PerSegmentTermSearcher) collectScored(ctx context.Context,
 	sink search.PerSegmentSink) error {
-	var scores [scorer.PerSegmentBlockLen]float32
+	var scores [segment.PostingsBlockLen]float32
 	var sinceCheck int
 	// a scorer whose idf is negative has no bounds; nor does a collection that
 	// wants no hits
@@ -301,7 +301,7 @@ func (s *PerSegmentTermSearcher) collectScored(ctx context.Context,
 					}
 					// a block that is passed over has all of its 128 matches or,
 					// if it is the last, nothing follows it
-					ord += scorer.PerSegmentBlockLen
+					ord += segment.PostingsBlockLen
 					target = bd.LastDoc + 1
 					continue
 				}

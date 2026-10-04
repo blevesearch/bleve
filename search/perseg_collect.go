@@ -36,10 +36,6 @@ import (
 // to it, so that query specific tricks live with the searcher and don't bloat
 // the collector.
 
-// PerSegmentBlockLen is the number of postings in a block of the postings that
-// the per segment path reads and scores together.
-const PerSegmentBlockLen = 128
-
 // PerSegmentMatch is a match of a search, found by a PerSegmentSearcher.
 type PerSegmentMatch struct {
 	// Seg is the index of the segment the match is from.

@@ -67,9 +67,9 @@ type termCursor struct {
 	err      error
 
 	// the scores of the whole decoded block, once someone has asked for them
-	scores    *[scorer.PerSegmentBlockLen]float32 // allocated when first asked for
-	scoresFor uint64                              // the block generation that scores is of; 0 for none
-	blockGen  uint64                              // changes with every block decoded
+	scores    *[segment.PostingsBlockLen]float32 // allocated when first asked for
+	scoresFor uint64                             // the block generation that scores is of; 0 for none
+	blockGen  uint64                             // changes with every block decoded
 }
 
 // newTermCursor positions a cursor on the first posting of the reader.
@@ -98,9 +98,9 @@ func (t *termCursor) Offset() uint64 { return t.offset }
 // blockScores are the scores of the decoded block's postings, all of them
 // at once, by the block kernel. Entry i is that of blk.Docs[i]. They are
 // worked out once per block.
-func (t *termCursor) blockScores() *[scorer.PerSegmentBlockLen]float32 {
+func (t *termCursor) blockScores() *[segment.PostingsBlockLen]float32 {
 	if t.scores == nil {
-		t.scores = new([scorer.PerSegmentBlockLen]float32)
+		t.scores = new([segment.PostingsBlockLen]float32)
 	}
 	if t.scoresFor != t.blockGen {
 		t.scorer.ScoreBlock(&t.blk.Freqs, &t.blk.Norms, t.n, t.scores)

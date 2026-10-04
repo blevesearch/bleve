@@ -19,11 +19,8 @@ import (
 
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/freeway/simd"
+	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
-
-// PerSegmentBlockLen is the number of postings the per segment scorer scores
-// in one go.
-const PerSegmentBlockLen = search.PerSegmentBlockLen
 
 // PerSegmentTermScorer scores the postings of a single term, given nothing
 // but a frequency and a norm: there's no TermFieldDoc to read from and no
@@ -128,8 +125,8 @@ func (s *PerSegmentTermScorer) Score(freq uint32, norm float32) float64 {
 // The scores are therefore not bit-identical to Score's, whose float64
 // arithmetic is that of TermQueryScorer; they are within float32 precision of
 // them.
-func (s *PerSegmentTermScorer) ScoreBlock(freqs *[PerSegmentBlockLen]uint32,
-	norms *[PerSegmentBlockLen]float32, n int, scores *[PerSegmentBlockLen]float32) float32 {
+func (s *PerSegmentTermScorer) ScoreBlock(freqs *[segment.PostingsBlockLen]uint32,
+	norms *[segment.PostingsBlockLen]float32, n int, scores *[segment.PostingsBlockLen]float32) float32 {
 	if s.avgDocLength > 0 {
 		return simd.BM25_32(freqs[:], norms[:], s.kIdf, s.kK1, s.kOneMinusB, s.kB, s.kInvAvg,
 			s.kQueryWeight, scores[:], n)

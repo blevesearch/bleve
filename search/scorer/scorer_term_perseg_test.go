@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/search"
+	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
 
 // the scalar Score has to agree with TermQueryScorer, whose docScore the
@@ -45,9 +46,9 @@ func TestPerSegmentTermScorerMatchesTermQueryScorer(t *testing.T) {
 					ps.SetQueryNorm(qnorm)
 				}
 
-				var fr [PerSegmentBlockLen]uint32
-				var nr [PerSegmentBlockLen]float32
-				var sc [PerSegmentBlockLen]float32
+				var fr [segment.PostingsBlockLen]uint32
+				var nr [segment.PostingsBlockLen]float32
+				var sc [segment.PostingsBlockLen]float32
 				n := 0
 				for _, f := range freqs {
 					for _, nm := range norms {
@@ -112,15 +113,15 @@ func TestPerSegmentTermScorerScoreOneMatchesScoreBlock(t *testing.T) {
 			if qnorm >= 0 {
 				ps.SetQueryNorm(qnorm)
 			}
-			var fr [PerSegmentBlockLen]uint32
-			var nr [PerSegmentBlockLen]float32
-			var sc [PerSegmentBlockLen]float32
+			var fr [segment.PostingsBlockLen]uint32
+			var nr [segment.PostingsBlockLen]float32
+			var sc [segment.PostingsBlockLen]float32
 			for i := range fr {
 				fr[i] = uint32(1 + i*i%900)
 				nr[i] = float32(1.0 / math.Sqrt(float64(1+i%40)))
 			}
 			nr[5] = float32(math.Inf(1))
-			ps.ScoreBlock(&fr, &nr, PerSegmentBlockLen, &sc)
+			ps.ScoreBlock(&fr, &nr, segment.PostingsBlockLen, &sc)
 			for i := range fr {
 				if one := ps.ScoreOne(fr[i], nr[i]); math.Float32bits(one) != math.Float32bits(sc[i]) {
 					t.Fatalf("avg=%v i=%d: ScoreOne %v, ScoreBlock %v", avg, i, one, sc[i])
