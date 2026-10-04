@@ -23,7 +23,6 @@ import (
 
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/mapping"
-	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/query"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -413,7 +412,6 @@ func TestPerSegmentSearchTermSearcherStats(t *testing.T) {
 }
 
 var _ mapping.IndexMapping = (*mapping.IndexMappingImpl)(nil)
-var _ = search.SortScore{}
 
 // the TopN collector is only built for the searches that need it
 func TestPerSegmentSearchDoesNotBuildTopNCollector(t *testing.T) {

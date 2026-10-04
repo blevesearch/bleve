@@ -19,14 +19,16 @@ import (
 	"errors"
 )
 
-// The per segment search path: a Searcher that produces its matches one at a
-// time, tagged with the segment they belong to, and a collector that consumes
-// them. Nothing here knows about DocumentMatches, locations or any index types,
-// only doc numbers and scores.
+// The per segment search path: a PerSegmentSearcher that produces its matches one
+// at a time, tagged with the segment they belong to, and a collector that
+// consumes them. Nothing here knows about DocumentMatches, locations or any index
+// types, only doc numbers and scores.
 //
-// The collector is generic. All it does is call NextMatch until the searcher is
-// exhausted, put what it gets in the heap of the segment the match came from,
-// and, at the end, merge those heaps into the top hits.
+// The collector of descending score is generic. All it does is call NextMatch
+// until the searcher is exhausted and put what it gets in the heap of the best
+// hits (shared by all the segments, which are read in index order), then sort the
+// heap into the top hits. (Collectors of other orders, with facets or paging by
+// search after, live in search/collector too and use NextMatch only.)
 //
 // A searcher that knows how to do better than that for the kind of search it
 // is (a lone term, say) can offer an optimized path: OptimizedPerSegmentSearcher.

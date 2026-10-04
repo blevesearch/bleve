@@ -140,8 +140,6 @@ func TestPerSegmentSearchMatchesRegularSearchOnLargeSegments(t *testing.T) {
 	}
 }
 
-var _ = index.BM25Scoring
-
 // A search of several indexes (an alias) merges what the indexes' searches give by
 // the hits' sort values, and adds their facets and totals: with the per segment
 // path serving each of them, it comes out as with the regular path.

@@ -230,20 +230,6 @@ func thresholdOf(sink search.PerSegmentSink) float32 {
 	return float32(math.Inf(-1))
 }
 
-// unwrapSingle returns what a one clause disjunction or conjunction is: its
-// clause. A one clause conjunction sums the one score, a one clause disjunction
-// adds the one score and multiplies by a coord of 1 of 1, and both weigh what the
-// clause weighs, so a query that is one of them is the clause, to the bit. The
-// clause being a term matters: the algorithms that prune only work on terms, and a
-// match of a single token, which is a query of one clause, is a term.
-//
-// A disjunction that wants more than one of its one clause matches nothing, so
-// that is not unwrapped.
-func unwrapSingle(c perSegChild) perSegChild {
-	c, _ = unwrapSingleKinds(c)
-	return c
-}
-
 // wrapKind is what a clause that was unwrapped was wrapped in.
 type wrapKind uint8
 
@@ -252,9 +238,17 @@ const (
 	wrapDisjunction
 )
 
-// unwrapSingleKinds is unwrapSingle that also says what was taken off, outermost
-// first: scoring doesn't need the wrappers, but an explanation shows them, as the
-// regular searchers' do.
+// unwrapSingleKinds returns what a one clause disjunction or conjunction is: its
+// clause, and what was taken off it, outermost first. A one clause conjunction
+// sums the one score, a one clause disjunction adds the one score and multiplies
+// by a coord of 1 of 1, and both weigh what the clause weighs, so a query that is
+// one of them is the clause, to the bit. The clause being a term matters: the
+// algorithms that prune only work on terms, and a match of a single token, which
+// is a query of one clause, is a term. Scoring doesn't need the wrappers, but an
+// explanation shows them, as the regular searchers' do.
+//
+// A disjunction that wants more than one of its one clause matches nothing, so
+// that is not unwrapped.
 func unwrapSingleKinds(c perSegChild) (perSegChild, []wrapKind) {
 	var kinds []wrapKind
 	for {

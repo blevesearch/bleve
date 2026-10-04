@@ -39,25 +39,32 @@ func init() {
 }
 
 // PerSegmentTopNCollector collects the top N hits of a search.PerSegmentSearcher,
-// ordered by score. It is generic: all it knows about the search is what the
-// searcher tells it, a scored match at a time.
+// ordered by descending score. It is generic: all it knows about the search is
+// what the searcher tells it, a scored match at a time.
 //
-// Collect repeatedly asks the searcher for its next match and offers it to
-// the heap of the segment it is from, until the searcher is
-// exhausted; then it merges the segment heaps into the top hits. That's all.
+// Collect repeatedly asks the searcher for its next match and offers it to a
+// min-heap of the best hits so far, shared by all the segments (which are read one
+// after the other, in index order, so what a hit has to beat to be kept is the
+// worst of the best hits of all the segments so far), until the searcher is
+// exhausted. Then it sorts the heap into the top hits.
 //
-// A searcher that has a faster way to fill the heaps for the kind of search it
+// A searcher that has a faster way to fill the heap for the kind of search it
 // is (see search.OptimizedPerSegmentSearcher) is asked to do so: it is handed
-// the heaps through a search.PerSegmentSink, and what it does to fill them is
-// its own business. The merge at the end is the same either way.
+// the heap through a search.PerSegmentSink, and what it does to fill it is its
+// own business (skipping blocks that can't make the top hits, say, in which case
+// the total is a lower bound, see EarlyStopped). The result is the same either
+// way.
 //
 // For a scored search it gives the hits TopNCollector gives for a score sorted
 // search on the same searcher -- same order, ties going to the lower doc
-// number, same total -- with scores within float32 precision. A search without
-// scores comes out as the first N matches in doc order (all scores are 0, and
-// ties go to the lower doc number), with the exact total. It supports nothing
-// beyond that: no other sort, no facets, no search after, no explanations, no
-// locations.
+// number, same total unless it pruned -- with scores within float32 precision.
+// A search without scores comes out as the first N matches in doc order (all
+// scores are 0, and ties go to the lower doc number), with the exact total. Hits
+// can be explained (see SetExplain).
+//
+// Descending score is the only order it serves, and it doesn't count facets or
+// page after a hit: both need every match, which it may skip. Those searches are
+// collected by PerSegmentSortedCollector.
 type PerSegmentTopNCollector struct {
 	size int
 	skip int

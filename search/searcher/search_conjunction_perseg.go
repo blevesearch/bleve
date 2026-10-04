@@ -201,7 +201,7 @@ func (s *PerSegmentConjunctionSearcher) CanCollectOptimized() bool {
 // pruningApplies reports whether the clauses are what the algorithms for
 // conjunctions work on: an AND of at least two terms.
 func (s *PerSegmentConjunctionSearcher) pruningApplies() bool {
-	return s.terms != nil && len(s.terms) >= 2
+	return len(s.terms) >= 2
 }
 
 // CollectOptimized implements search.OptimizedPerSegmentSearcher.

@@ -244,11 +244,6 @@ func maxMode(f *search.SortField)  { f.Mode = search.SortFieldMax }
 // distance, the score as one sort among others, in both directions; ties on every
 // sort going to the doc found first; a page from anywhere, past the end, and none.
 func TestPerSegmentSortedSearchMatchesRegularSearch(t *testing.T) {
-	geo, err := search.NewSortGeoDistance("loc", "km", -121.0, 37.8, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = geo
 	sorts := map[string]func() search.SortOrder{
 		"number":               func() search.SortOrder { return search.SortOrder{sortField("n", asNumber)} },
 		"number desc":          func() search.SortOrder { return search.SortOrder{sortField("n", asNumber, desc)} },

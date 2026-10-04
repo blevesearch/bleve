@@ -42,13 +42,9 @@ func explanationMessage(m string) string {
 	return m
 }
 
-func compareExplanations(t *testing.T, what, path string, got, want *search.Explanation) {
-	t.Helper()
-	compareExplanationsOrdered(t, what, path, got, want, true)
-}
-
-// compareExplanationsOrdered is compareExplanations, with the children of a node
-// matched by their messages instead of by their places if ordered is false. A
+// compareExplanationsOrdered checks that an explanation is the regular path's,
+// with the children of a node matched by their messages instead of by their
+// places if ordered is false. A
 // disjunction of more than DisjunctionHeapTakeover clauses is a heap in the
 // regular path, which lists the clauses that match in an order of its own.
 func compareExplanationsOrdered(t *testing.T, what, path string, got, want *search.Explanation, ordered bool) {

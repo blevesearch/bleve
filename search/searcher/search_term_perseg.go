@@ -41,9 +41,9 @@ func init() {
 // DocumentMatch per posting.
 //
 // It is a search.PerSegmentSearcher, which is the generic way in which a
-// collector can drain it, a match at a time with NextMatch. As it knows that it is a lone term, it is also a
-// search.OptimizedPerSegmentSearcher, whose CollectOptimized does the
-// collection itself:
+// collector can drain it, a match at a time with NextMatch. As it knows that it
+// is a lone term, it is also a search.OptimizedPerSegmentSearcher, whose
+// CollectOptimized does the collection itself:
 //
 //   - when scored: the best k of every segment, scoring a block per SIMD
 //     kernel call and, once the heap is full, passing over the blocks that the
