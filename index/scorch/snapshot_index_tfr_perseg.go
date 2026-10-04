@@ -25,10 +25,10 @@ import (
 )
 
 // ErrPerSegmentUnsupported is returned by PerSegmentTermFieldReader when at
-// least one segment of the snapshot can't hand out block cursors (for example,
+// least one segment of the snapshot can't hand out block iterators (for example,
 // it is of an older segment format). The caller is expected to fall back to
 // IndexReader.TermFieldReader.
-var ErrPerSegmentUnsupported = errors.New("scorch: segment doesn't support block cursors")
+var ErrPerSegmentUnsupported = errors.New("scorch: segment doesn't support block iterators")
 
 // PerSegmentIndexReader is implemented by index readers that can expose a
 // term's postings segment by segment, as plain batches of doc numbers,
@@ -70,7 +70,7 @@ type perSegmentGroup struct {
 // PerSegmentIndexSnapshotTermFieldReader reads the postings of one term in one
 // segment. It does the job that IndexSnapshotTermFieldReader and the segment's
 // PostingsIterator do between them, but is a concrete type that sits directly
-// on the segment's block cursor and moves postings one block (of up to
+// on the segment's block iterator and moves postings one block (of up to
 // segment.PostingsBlockLen) at a time. All it hands out are local doc numbers,
 // term frequencies and norms.
 type PerSegmentIndexSnapshotTermFieldReader struct {
@@ -86,14 +86,14 @@ type PerSegmentIndexSnapshotTermFieldReader struct {
 	// whether the term's postings have
 	hasDeletions bool
 
-	// pl is the postings list the cursor reads, kept with the cursor as buffers
+	// pl is the postings list the blockIter reads, kept with the blockIter as buffers
 	// for the next query to reuse (see perSegmentReaderPool)
-	pl     segment.PostingsList
-	cursor segment.BlockCursor
-	// blockMax is the cursor's block-max capability, nil if it hasn't got any
-	blockMax segment.BlockMaxCursor
+	pl        segment.PostingsList
+	blockIter segment.BlockPostingsIterator
+	// blockMax is the blockIter's block-max capability, nil if it hasn't got any
+	blockMax segment.BlockMaxPostingsIterator
 
-	// blk is the block the cursor last filled; the entries [pos, n) have not
+	// blk is the block the blockIter last filled; the entries [pos, n) have not
 	// been handed out yet.
 	blk segment.PostingsBlock
 	n   int
@@ -128,7 +128,7 @@ func (r *PerSegmentIndexSnapshotTermFieldReader) HasDeletions() bool { return r.
 // deletions among them, and otherwise it has to walk the doc numbers of the
 // postings.
 func (r *PerSegmentIndexSnapshotTermFieldReader) LiveCount() (uint64, error) {
-	return r.cursor.LiveCount()
+	return r.blockIter.LiveCount()
 }
 
 // HasBlockMax reports whether the reader can bound the scores of its blocks,
@@ -159,7 +159,7 @@ func (r *PerSegmentIndexSnapshotTermFieldReader) TermBounds() segment.BlockBound
 // after target is left. The block is owned by the reader and is valid until
 // the next call on it. Like NextBlock it doesn't mix with Next and Advance.
 func (r *PerSegmentIndexSnapshotTermFieldReader) SeekBlock(target uint32) (*segment.PostingsBlock, int, error) {
-	n, err := r.cursor.SeekBlock(uint64(target), &r.blk)
+	n, err := r.blockIter.SeekBlock(uint64(target), &r.blk)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -184,7 +184,7 @@ func (r *PerSegmentIndexSnapshotTermFieldReader) NextBlock() (*segment.PostingsB
 		r.pos, r.n = 0, 0
 		return &r.blk, n, nil
 	}
-	n, err := r.cursor.NextBlock(&r.blk)
+	n, err := r.blockIter.NextBlock(&r.blk)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -197,7 +197,7 @@ func (r *PerSegmentIndexSnapshotTermFieldReader) NextBlock() (*segment.PostingsB
 func (r *PerSegmentIndexSnapshotTermFieldReader) Next() (doc, freq uint32,
 	norm float32, ok bool, err error) {
 	if r.pos >= r.n {
-		n, err := r.cursor.NextBlock(&r.blk)
+		n, err := r.blockIter.NextBlock(&r.blk)
 		if err != nil || n == 0 {
 			r.pos, r.n = 0, 0
 			return 0, 0, 0, false, err
@@ -222,7 +222,7 @@ func (r *PerSegmentIndexSnapshotTermFieldReader) Advance(target uint32) (doc, fr
 		}
 		r.pos++
 	}
-	n, err := r.cursor.SeekBlock(uint64(target), &r.blk)
+	n, err := r.blockIter.SeekBlock(uint64(target), &r.blk)
 	if err != nil || n == 0 {
 		r.pos, r.n = 0, 0
 		return 0, 0, 0, false, err
@@ -243,7 +243,7 @@ func (r *PerSegmentIndexSnapshotTermFieldReader) Close() error {
 	// it goes back to the pool, and so to the next query
 	defer r.release()
 
-	if bytesRead := r.cursor.BytesRead(); bytesRead > r.reportedBytes {
+	if bytesRead := r.blockIter.BytesRead(); bytesRead > r.reportedBytes {
 		atomic.AddUint64(&g.bytesRead, bytesRead-r.reportedBytes)
 		r.reportedBytes = bytesRead
 	}
@@ -262,8 +262,8 @@ func (r *PerSegmentIndexSnapshotTermFieldReader) Close() error {
 }
 
 // perSegmentReaderPool holds readers that have been closed, with the buffers
-// they had: the block they decode into, the postings list and the block cursor.
-// A reader is a kilobyte and a half and a cursor's decode buffer another one,
+// they had: the block they decode into, the postings list and the block iterator.
+// A reader is a kilobyte and a half and a blockIter's decode buffer another one,
 // for each segment of each term of each query, and none of it has anything to do
 // with the query that it was for.
 //
@@ -408,7 +408,7 @@ func (is *IndexSnapshot) PerSegmentTermFieldReader(ctx context.Context, term []b
 			releaseAll()
 			return nil, err
 		}
-		if _, ok := pl.(segment.BlockCursorProvider); !ok {
+		if _, ok := pl.(segment.BlockPostingsList); !ok {
 			releaseAll()
 			return nil, ErrPerSegmentUnsupported
 		}
@@ -433,13 +433,13 @@ func (is *IndexSnapshot) PerSegmentTermFieldReader(ctx context.Context, term []b
 		if r == nil {
 			continue
 		}
-		cursor, err := r.pl.(segment.BlockCursorProvider).BlockPostingsIterator(withFreqNorms, withFreqNorms, r.cursor)
+		blockIter, err := r.pl.(segment.BlockPostingsList).BlockIterator(withFreqNorms, withFreqNorms, r.blockIter)
 		if err != nil {
 			releaseAll()
 			return nil, err
 		}
-		r.cursor = cursor
-		r.blockMax, _ = cursor.(segment.BlockMaxCursor)
+		r.blockIter = blockIter
+		r.blockMax, _ = blockIter.(segment.BlockMaxPostingsIterator)
 		r.group = group
 		r.segmentIndex = i
 		r.offset = is.offsets[i]

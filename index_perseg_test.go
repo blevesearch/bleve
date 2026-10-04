@@ -370,7 +370,7 @@ func TestPerSegmentSearchIneligibleRequests(t *testing.T) {
 }
 
 func TestPerSegmentSearchFallsBackOnOlderSegments(t *testing.T) {
-	// zap v17 segments can't hand out block cursors
+	// zap v17 segments can't hand out block iterators
 	idx, cleanup := perSegmentTestIndex(t, index.DefaultScoringModel, map[string]interface{}{
 		"forceSegmentType":    "zap",
 		"forceSegmentVersion": 17,

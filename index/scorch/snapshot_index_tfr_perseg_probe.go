@@ -23,26 +23,26 @@ import (
 // Probe looks up one doc of the segment in the term's postings, and says whether
 // the term has it, with its frequency and norm. It is for the few docs that a
 // search has settled on (to explain them, say), not for reading: it starts a
-// cursor of its own, with frequencies and norms whether or not the reader was
+// blockIter of its own, with frequencies and norms whether or not the reader was
 // made for them, so it can be asked about any doc, in any order, before or after
 // the reader has been read, but not while the reader is being read. The reader
 // is left where a new one would be.
 func (r *PerSegmentIndexSnapshotTermFieldReader) Probe(doc uint32) (freq uint32, norm float32,
 	ok bool, err error) {
-	provider, isProvider := r.pl.(segment.BlockCursorProvider)
+	provider, isProvider := r.pl.(segment.BlockPostingsList)
 	if !isProvider {
 		return 0, 0, false, fmt.Errorf("scorch: the postings of segment %d can't be read by block", r.segmentIndex)
 	}
-	cursor, err := provider.BlockPostingsIterator(true, true, r.cursor)
+	blockIter, err := provider.BlockIterator(true, true, r.blockIter)
 	if err != nil {
 		return 0, 0, false, err
 	}
-	r.cursor = cursor
-	r.blockMax, _ = cursor.(segment.BlockMaxCursor)
+	r.blockIter = blockIter
+	r.blockMax, _ = blockIter.(segment.BlockMaxPostingsIterator)
 	r.n, r.pos = 0, 0
 
 	// the entries below the doc are dropped, so the doc is the first one if it's there
-	n, err := cursor.SeekBlock(uint64(doc), &r.blk)
+	n, err := blockIter.SeekBlock(uint64(doc), &r.blk)
 	if err != nil {
 		return 0, 0, false, err
 	}
