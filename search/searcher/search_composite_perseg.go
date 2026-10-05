@@ -1,0 +1,335 @@
+//  Copyright (c) 2026 Couchbase, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 		http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package searcher
+
+import (
+	"context"
+	"math"
+
+	"github.com/blevesearch/bleve/v2/search"
+)
+
+// perSegChild is a clause of a composite per segment searcher: a term, or a
+// composite itself.
+type perSegChild interface {
+	search.PerSegmentSearcher
+
+	// segCursor is the cursor over the matches of the clause in segment seg,
+	// and false if there are none there. A cursor can only be had once.
+	segCursor(seg int, scored bool) (docCursor, bool)
+
+	// segCursorSeeked is segCursor for a consumer that is going to move the cursor
+	// with about seeks calls to Seek, instead of reading it through (seeks is 0 for
+	// one that reads it through). A clause that has a cursor for reading a window of
+	// docs at a time, and one that is cheap to seek, picks by what it is told: the
+	// first pays for every posting in the stretch it covers, the second for
+	// the ones it lands on.
+	segCursorSeeked(seg int, scored bool, seeks uint64) (docCursor, bool)
+
+	// segCost is roughly how many matches the clause has in segment seg: what it
+	// costs to read through. It is 0 if there are none.
+	segCost(seg int) uint64
+
+	// numSegments is how many segments the clause has readers for: all of
+	// the index's, or none if it matches nothing anywhere.
+	numSegments() int
+
+	// explain is ExplainMatch for a composite that explains its clauses: with
+	// build false, it only tells whether the doc is a match, and builds nothing
+	// (what a clause that excludes docs is asked).
+	explain(seg int, doc uint64, build bool) (*search.Explanation, bool, error)
+}
+
+// nestedBufferedMaxRatio is how many times more matches than the seeks it is going
+// to be given a clause may have to be read a window at a time.
+const nestedBufferedMaxRatio = 4
+
+// numSegments implements perSegChild.
+func (s *PerSegmentTermSearcher) numSegments() int { return len(s.readers) }
+
+// segCursor implements perSegChild.
+func (s *PerSegmentTermSearcher) segCursor(seg int, scored bool) (docCursor, bool) {
+	if seg >= len(s.readers) || s.readers[seg] == nil {
+		return nil, false
+	}
+	return newTermCursor(0, s.readers[seg], s.scorer, scored), true
+}
+
+// segCursorSeeked implements perSegChild: a term seeks as well as it reads.
+func (s *PerSegmentTermSearcher) segCursorSeeked(seg int, scored bool, seeks uint64) (docCursor, bool) {
+	return s.segCursor(seg, scored)
+}
+
+// segCost implements perSegChild.
+func (s *PerSegmentTermSearcher) segCost(seg int) uint64 {
+	if seg >= len(s.readers) || s.readers[seg] == nil {
+		return 0
+	}
+	return s.readers[seg].Count()
+}
+
+// perSegBase is what the composite per segment searchers (conjunction and
+// disjunction) have in common.
+type perSegBase struct {
+	children []perSegChild
+	scored   bool
+
+	// wraps[i] is what children[i] was wrapped in before it was unwrapped
+	// (nothing, mostly), outermost first
+	wraps [][]wrapKind
+
+	// the generic iteration (NextMatch): the segment it is on, the cursor over its
+	// matches and the offset of the segment
+	nextSeg int
+	cursor  docCursor
+	offset  uint64
+}
+
+// segments is how many segments the index has. A clause that matches in none
+// of them has no readers, so it's the highest count among the clauses that
+// is the answer.
+func (b *perSegBase) segments() int {
+	n := 0
+	for _, c := range b.children {
+		n = max(n, c.numSegments())
+	}
+	return n
+}
+
+// computeQueryNorm does what the regular conjunction and disjunction
+// searchers do: the clauses are told the norm of the whole query.
+func (b *perSegBase) computeQueryNorm() {
+	var sumOfSquaredWeights float64
+	for _, c := range b.children {
+		sumOfSquaredWeights += c.Weight()
+	}
+	b.SetQueryNorm(1.0 / math.Sqrt(sumOfSquaredWeights))
+}
+
+func (b *perSegBase) Weight() float64 {
+	var rv float64
+	for _, c := range b.children {
+		rv += c.Weight()
+	}
+	return rv
+}
+
+func (b *perSegBase) SetQueryNorm(qnorm float64) {
+	for _, c := range b.children {
+		c.SetQueryNorm(qnorm)
+	}
+}
+
+func (b *perSegBase) Close() error {
+	// a cursor in the middle of a segment holds memory that wants giving back
+	if b.cursor != nil {
+		releaseCursor(b.cursor)
+		b.cursor = nil
+	}
+	var rv error
+	for _, c := range b.children {
+		if err := c.Close(); err != nil && rv == nil {
+			rv = err
+		}
+	}
+	return rv
+}
+
+// nextMatch is the generic iteration: the next match of the segment being read, and
+// then, once its cursor is spent, of the next segment that has matches. makeCursor
+// builds the cursor over the matches of a segment, nil if there are none.
+func (b *perSegBase) nextMatch(makeCursor func(seg int) docCursor) (search.PerSegmentMatch, bool, error) {
+	for {
+		if b.cursor == nil {
+			if b.nextSeg >= b.segments() {
+				return search.PerSegmentMatch{}, false, nil
+			}
+			b.cursor = makeCursor(b.nextSeg)
+			b.nextSeg++
+			if b.cursor == nil {
+				continue
+			}
+			b.offset = b.cursor.Offset()
+		}
+
+		c := b.cursor
+		doc := c.Doc()
+		if doc == noMoreDocs {
+			err := c.Err()
+			releaseCursor(c)
+			b.cursor = nil
+			if err != nil {
+				return search.PerSegmentMatch{}, false, err
+			}
+			continue
+		}
+		m := search.PerSegmentMatch{Seg: b.nextSeg - 1, Doc: b.offset + uint64(doc)}
+		if b.scored {
+			m.Score = c.Score()
+		}
+		c.Advance()
+		return m, true, nil
+	}
+}
+
+// drainCursor offers every match of a segment to the sink: what's done when
+// there is nothing to prune with. Every match is visited and counted.
+func drainCursor(ctx context.Context, sink search.PerSegmentSink, seg int, c docCursor, scored bool) error {
+	defer releaseCursor(c)
+	h := sink.Heap(seg)
+	offset := c.Offset()
+	var visited uint64
+	thr, full := h.Threshold()
+	var maxScore float32
+	for c.Doc() != noMoreDocs {
+		if visited%checkDoneEvery == 0 {
+			select {
+			case <-ctx.Done():
+				search.RecordSearchCost(ctx, search.AbortM, 0)
+				return ctx.Err()
+			default:
+			}
+		}
+		var score float32
+		if scored {
+			score = c.Score()
+			if score > maxScore {
+				maxScore = score
+			}
+		}
+		if !full || score > thr {
+			h.Offer(search.PerSegmentHit{Score: score, Doc: offset + uint64(c.Doc()), Ord: uint32(visited), Seg: uint32(seg)})
+			thr, full = h.Threshold()
+		}
+		visited++
+		c.Advance()
+	}
+	sink.AddTotal(seg, visited)
+	sink.ObserveMaxScore(maxScore)
+	return c.Err()
+}
+
+// thresholdOf is the score that a hit has to beat to make the heap: -Inf as long
+// as the heap isn't full.
+func thresholdOf(sink search.PerSegmentSink) float32 {
+	if thr, full := sink.Threshold(); full {
+		return thr
+	}
+	return float32(math.Inf(-1))
+}
+
+// wrapKind is what a clause that was unwrapped was wrapped in.
+type wrapKind uint8
+
+const (
+	wrapConjunction wrapKind = iota + 1
+	wrapDisjunction
+)
+
+// unwrapSingleKinds returns what a one clause disjunction or conjunction is: its
+// clause, and what was taken off it, outermost first. A one clause conjunction
+// sums the one score, a one clause disjunction adds the one score and multiplies
+// by a coord of 1 of 1, and both weigh what the clause weighs, so a query that is
+// one of them is the clause, to the bit. The clause being a term matters: the
+// algorithms that prune only work on terms, and a match of a single token, which
+// is a query of one clause, is a term. Scoring doesn't need the wrappers, but an
+// explanation shows them, as the regular searchers' do.
+//
+// A disjunction that wants more than one of its one clause matches nothing, so
+// that is not unwrapped.
+func unwrapSingleKinds(c perSegChild) (perSegChild, []wrapKind) {
+	var kinds []wrapKind
+	for {
+		switch w := c.(type) {
+		case *PerSegmentDisjunctionSearcher:
+			if len(w.children) == 1 && w.min <= 1 {
+				// what its clause was wrapped in is under it
+				kinds = append(append(kinds, wrapDisjunction), w.wrapsOf(0)...)
+				c = w.children[0]
+				continue
+			}
+		case *PerSegmentConjunctionSearcher:
+			if len(w.children) == 1 {
+				kinds = append(append(kinds, wrapConjunction), w.wrapsOf(0)...)
+				c = w.children[0]
+				continue
+			}
+		}
+		return c, kinds
+	}
+}
+
+// collectUnscoredGeneric collects a search without scores from cursors, one
+// segment after the other. What is wanted is the first matches in doc order and,
+// like the regular path does with them, it stops once it has them: the total is
+// then a lower bound, as counting the rest takes walking all of it. A search for
+// no hits at all is a count, and counts. makeCursor builds the cursor over the
+// matches of a segment, nil if there are none.
+func (b *perSegBase) collectUnscoredGeneric(ctx context.Context, sink search.PerSegmentSink,
+	makeCursor func(seg int) docCursor) error {
+	k := sink.Limit()
+	for seg := 0; seg < b.segments(); seg++ {
+		select {
+		case <-ctx.Done():
+			search.RecordSearchCost(ctx, search.AbortM, 0)
+			return ctx.Err()
+		default:
+		}
+
+		if k > 0 && heapIsFull(sink) {
+			// the segments that follow have matches, or may have, that aren't counted
+			sink.MarkPruned()
+			return nil
+		}
+		c := makeCursor(seg)
+		if c == nil {
+			continue
+		}
+		if k == 0 {
+			if err := drainCursor(ctx, sink, seg, c, false); err != nil {
+				return err
+			}
+			continue
+		}
+
+		h := sink.Heap(seg)
+		offset := c.Offset()
+		var total uint64
+		for c.Doc() != noMoreDocs && h.Len() < k {
+			if total%checkDoneEvery == 0 {
+				select {
+				case <-ctx.Done():
+					search.RecordSearchCost(ctx, search.AbortM, 0)
+					releaseCursor(c)
+					return ctx.Err()
+				default:
+				}
+			}
+			h.Offer(search.PerSegmentHit{Doc: offset + uint64(c.Doc()), Ord: uint32(total), Seg: uint32(seg)})
+			total++
+			c.Advance()
+		}
+		if c.Doc() != noMoreDocs {
+			sink.MarkPruned() // there is more, uncounted
+		}
+		sink.AddTotal(seg, total)
+		err := c.Err()
+		releaseCursor(c)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}

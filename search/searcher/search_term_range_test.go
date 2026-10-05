@@ -266,11 +266,13 @@ func TestTermRangeSearchTooManyTerms(t *testing.T) {
 	}
 
 	// check that the expected number of term searchers were started
-	// 6 = 4 original terms, 1 optimized after first round, then final searcher
-	// from the last round
+	// optimized: 6 = 4 original terms, 1 optimized after first round, then
+	// final searcher from the last round
+	// fallback to plain disjunctions (segment format without optimizable
+	// postings): 4 = just the original terms
 	statsMap := scorchIndex.(*scorch.Scorch).StatsMap()
-	if statsMap["term_searchers_started"].(uint64) != 6 {
-		t.Errorf("expected 6 term searchers started, got %d", statsMap["term_searchers_started"])
+	if started := statsMap["term_searchers_started"].(uint64); started != 6 && started != 4 {
+		t.Errorf("expected 6 (optimized) or 4 (unoptimized) term searchers started, got %d", started)
 	}
 	// check that all started searchers were closed
 	if statsMap["term_searchers_started"] != statsMap["term_searchers_finished"] {

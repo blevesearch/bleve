@@ -70,8 +70,9 @@ func earlyStopQuery() query.Query {
 //
 // Two things must hold. The caller must still get Size hits — stopping early must
 // not lose results it asked for. And Total must be reported as a lower bound
-// (TotalRelation "gte"), because the scan genuinely did not count the rest; a
-// caller that reads Total as exact would otherwise be silently misled.
+// (TotalRelation "gte") if the scan genuinely did not count the rest; a caller
+// that reads Total as exact would otherwise be silently misled. A path that does
+// count them all, without scanning, reports the exact Total ("eq").
 func TestEarlyStopBoundedScan(t *testing.T) {
 	const n = 5000
 	idx := buildEarlyStopIndex(t, n)
@@ -88,10 +89,21 @@ func TestEarlyStopBoundedScan(t *testing.T) {
 			t.Errorf("size=%d: got %d hits, want %d — early stop dropped results the "+
 				"caller asked for", size, len(res.Hits), size)
 		}
-		if res.TotalRelation != TotalRelationGte {
-			t.Errorf("size=%d: TotalRelation=%q, want %q — Total is a lower bound once "+
-				"the scan stops early, and saying otherwise misleads the caller",
-				size, res.TotalRelation, TotalRelationGte)
+		switch res.TotalRelation {
+		case TotalRelationGte:
+			// the scan stopped early: Total is a lower bound
+		case TotalRelationEq:
+			// some paths (the per segment term search) count the matches
+			// without scanning them, so the total is exact and may say so;
+			// what's not allowed is to call a lower bound exact
+			if res.Total != n {
+				t.Errorf("size=%d: TotalRelation=%q but Total=%d, and %d docs match — a "+
+					"lower bound reported as exact misleads the caller",
+					size, res.TotalRelation, res.Total, n)
+			}
+		default:
+			t.Errorf("size=%d: TotalRelation=%q, want %q (or %q for an exact total)",
+				size, res.TotalRelation, TotalRelationGte, TotalRelationEq)
 		}
 		if res.Total > uint64(n) {
 			t.Errorf("size=%d: Total=%d exceeds the corpus size %d", size, res.Total, n)
