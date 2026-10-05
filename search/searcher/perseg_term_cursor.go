@@ -67,6 +67,15 @@ type termCursor struct {
 	cost     uint64
 	err      error
 
+	// boundMemo is what the bounds of the last block ShallowSeek looked at can score
+	boundMemo struct {
+		freq    uint32
+		norm    float32
+		bounded bool
+		ub      float32
+		valid   bool
+	}
+
 	// the scores of the whole decoded block, once someone has asked for them
 	scores    *[segment.PostingsBlockLen]float32 // from scoreBufPool when first asked for, given back by release
 	scoresFor uint64                             // the block generation that scores is of; 0 for none
@@ -256,7 +265,15 @@ func (t *termCursor) ShallowSeek(target uint32) {
 		t.shallow = segment.BlockBounds{LastDoc: noMoreDocs, FreqBounded: true}
 	}
 	t.shallowTarget, t.shallowValid = target, true
-	t.shallowMax = t.scorer.UpperBound(t.shallow.MaxFreq, t.shallow.MaxNorm, t.shallow.FreqBounded)
+	// neighbors tend to have the same bounds, which are bytes: what they can score
+	// is worked out again only when they differ
+	if bd := &t.shallow; !t.boundMemo.valid || t.boundMemo.freq != bd.MaxFreq ||
+		t.boundMemo.norm != bd.MaxNorm || t.boundMemo.bounded != bd.FreqBounded {
+		t.boundMemo.freq, t.boundMemo.norm, t.boundMemo.bounded = bd.MaxFreq, bd.MaxNorm, bd.FreqBounded
+		t.boundMemo.ub = t.scorer.UpperBound(bd.MaxFreq, bd.MaxNorm, bd.FreqBounded)
+		t.boundMemo.valid = true
+	}
+	t.shallowMax = t.boundMemo.ub
 }
 
 // LastDocInBlock is the last doc of the block ShallowSeek looked at
