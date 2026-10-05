@@ -16,6 +16,7 @@ package bleve
 
 import (
 	"fmt"
+	"github.com/blevesearch/bleve/v2/search/searcher"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -41,6 +42,19 @@ func TestPerSegmentSearchMatchesRegularSearchOnLargeSegments(t *testing.T) {
 	idx, cleanup := buildSortBenchIndex(t, 100000, 8, "bm25")
 	defer cleanup()
 
+	// by what fits best, and with the ANDs done by the candidates of their leader (a
+	// leader that is far rarer than the others is, anyway)
+	for _, algo := range []string{"auto", "candidate"} {
+		t.Run(algo, func(t *testing.T) {
+			restore := searcher.SetPerSegmentConjunctionAlgo(algo, 0)
+			defer restore()
+			compareOnLargeSegments(t, idx)
+		})
+	}
+}
+
+// compareOnLargeSegments is the comparison of the two paths of the test above.
+func compareOnLargeSegments(t *testing.T, idx Index) {
 	term := func(s string) query.Query { return termQueryOn("body", s) }
 	queries := map[string]query.Query{
 		"term 10%":  term("mk10"),

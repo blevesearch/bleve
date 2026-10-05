@@ -243,7 +243,11 @@ func (s *PerSegmentConjunctionSearcher) CollectOptimized(ctx context.Context,
 			// a count
 			err = s.countSegment(ctx, sink, seg, curs)
 		} else if s.scored && sink.Limit() > 0 && prunable(curs) {
-			err = s.windowSegment(ctx, sink, seg, curs)
+			if candidateDriven(curs) {
+				err = s.candidateSegment(ctx, sink, seg, curs)
+			} else {
+				err = s.windowSegment(ctx, sink, seg, curs)
+			}
 		} else {
 			// no scores, or the total and max score have to be exact, or the
 			// scores can't be bounded: every match is visited, and counted
@@ -708,6 +712,205 @@ func (s *PerSegmentConjunctionSearcher) windowSegment(ctx context.Context, sink 
 			visited++
 		}
 		doc = windowEnd + 1
+	}
+
+	sink.AddTotal(seg, visited)
+	sink.ObserveMaxScore(maxScore)
+	for _, c := range byIdx {
+		if err := c.Err(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// candidateDriven reports whether an AND of terms is better done by going through
+// the postings of its leader than by windows. Windows are cut wherever a block of
+// any of the terms ends, so their number is that of the blocks of all the terms;
+// when the leader has far fewer postings than the others, almost all of them have
+// no posting of the leader in them, and the work is that of the others' blocks,
+// not of the leader's postings.
+func candidateDriven(curs []*termCursor) bool {
+	switch conjAlgo.Load() {
+	case conjAlgoWindow:
+		return false
+	case conjAlgoCandidate:
+		return len(curs) >= 2
+	}
+	if len(curs) < 2 {
+		return false
+	}
+	lowest, all := curs[0].cost, uint64(0)
+	for _, c := range curs {
+		lowest = min(lowest, c.cost)
+		all += c.cost
+	}
+	return lowest*uint64(conjCandidateRatio.Load()) < all
+}
+
+// candidateSegment finds the best hits of an AND of terms in one segment by going
+// through the postings of the term with the fewest, the leader, a block of them at
+// a time, and asking of each, before anything is decoded, whether it can make the
+// heap, with the bounds that are cheapest first:
+//
+//  1. the leader's block: its best score, with the best score of each of the other
+//     terms anywhere, can't beat the threshold: the whole block (128 postings, and the
+//     stretch of docs they span) is passed over by the skip data alone;
+//  2. the leader's own score for the posting, with the same: dropped without a look
+//     at anything else;
+//  3. the best score of the block each of the other terms has at the doc, one term
+//     after the other, with the global best of those not looked at yet: dropped as
+//     soon as it can't make the heap. This only reads skip data;
+//  4. what is left is looked up in the other terms and scored, as windowSegment does.
+//
+// Where the leader has far fewer postings than the others this does work in
+// proportion to the leader's postings, where windowSegment's is in proportion to the
+// blocks of all the terms. See candidateDriven.
+func (s *PerSegmentConjunctionSearcher) candidateSegment(ctx context.Context, sink search.PerSegmentSink,
+	seg int, byIdx []*termCursor) error {
+	h := sink.Heap(seg)
+	offset := byIdx[0].Offset()
+
+	// the rarest term leads, and the others are looked at rarest first
+	order := append([]*termCursor(nil), byIdx...)
+	for i := 1; i < len(order); i++ {
+		for j := i; j > 0 && order[j].cost < order[j-1].cost; j-- {
+			order[j], order[j-1] = order[j-1], order[j]
+		}
+	}
+	leader, secs := order[0], order[1:]
+
+	// the best score of each of the other terms anywhere, and of those after each
+	secMax := make([]float32, len(secs))
+	secMaxAfter := make([]float32, len(secs)) // of secs[i+1:]
+	var secMaxSum float32
+	for i := len(secs) - 1; i >= 0; i-- {
+		secMax[i] = secs[i].MaxScore()
+		secMaxAfter[i] = secMaxSum
+		secMaxSum += secMax[i]
+	}
+	globalMax := leader.MaxScore() + secMaxSum
+
+	var visited uint64
+	var maxScore float32
+	pruning := false
+	markPruning := func(thr float32) {
+		if !pruning && !math.IsInf(float64(thr), -1) {
+			sink.MarkPruned()
+			pruning = true
+		}
+	}
+
+	blockMax := make([]float32, len(secs)) // of the block each has at the candidate
+	scoreByIdx := make([]float32, len(byIdx))
+
+	thr := thresholdOf(sink)
+	markPruning(thr)
+	finished := globalMax <= thr // nothing in the segment can make the heap
+	doc := leader.Doc()
+	var blocks uint64
+
+	for !finished && doc != noMoreDocs {
+		blocks++
+		if blocks%checkDoneEvery == 0 {
+			select {
+			case <-ctx.Done():
+				search.RecordSearchCost(ctx, search.AbortM, 0)
+				return ctx.Err()
+			default:
+			}
+		}
+
+		// 1. the leader's block, by its skip entry
+		leader.ShallowSeek(doc)
+		blockEnd := leader.LastDocInBlock()
+		if blockEnd == noMoreDocs {
+			break
+		}
+		thr = thresholdOf(sink)
+		markPruning(thr)
+		if leader.BlockMaxScore()+secMaxSum <= thr {
+			doc = blockEnd + 1
+			continue
+		}
+
+		if leader.Seek(doc) == noMoreDocs {
+			break
+		}
+		scores := leader.blockScores()
+		docs := leader.blk.Docs[:leader.n]
+		scoreThreshold := thr - secMaxSum
+
+	candidates:
+		for i := leader.pos; i < len(docs); i++ {
+			// 2. the posting's own score
+			leaderScore := scores[i]
+			if leaderScore <= scoreThreshold {
+				continue
+			}
+			cand := docs[i]
+
+			// 3. the blocks the other terms have at the doc
+			var known float32
+			for si, c := range secs {
+				c.ShallowSeek(cand)
+				if c.LastDocInBlock() == noMoreDocs {
+					finished = true // a term has nothing from here on: no more matches
+					break candidates
+				}
+				blockMax[si] = c.BlockMaxScore()
+				known += blockMax[si]
+				if leaderScore+known+secMaxAfter[si] <= thr {
+					continue candidates
+				}
+			}
+
+			// 4. the postings of the other terms at the doc
+			partial := leaderScore
+			scoreByIdx[leader.idx] = leaderScore
+			remaining := known
+			for si, c := range secs {
+				if c.doc == noMoreDocs {
+					finished = true
+					break candidates
+				}
+				if c.doc > cand {
+					continue candidates // an earlier candidate took it past
+				}
+				if c.Seek(cand) != cand {
+					continue candidates
+				}
+				sc := c.Score()
+				scoreByIdx[c.idx] = sc
+				partial += sc
+				remaining -= blockMax[si]
+				if partial+remaining <= thr {
+					continue candidates
+				}
+			}
+
+			// a match. Scores are summed in the order of the query.
+			var total float32
+			for _, sc := range scoreByIdx {
+				total += sc
+			}
+			if total > maxScore {
+				maxScore = total
+			}
+			if total > thr {
+				h.Offer(search.PerSegmentHit{Score: total, Doc: offset + uint64(cand), Ord: uint32(visited), Seg: uint32(seg)})
+				thr = thresholdOf(sink)
+				markPruning(thr)
+				scoreThreshold = thr - secMaxSum
+				if globalMax <= thr {
+					finished = true
+					visited++
+					break candidates
+				}
+			}
+			visited++
+		}
+		doc = docs[len(docs)-1] + 1
 	}
 
 	sink.AddTotal(seg, visited)

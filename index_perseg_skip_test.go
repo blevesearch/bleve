@@ -361,75 +361,79 @@ func TestPerSegmentConjunctionRetrievesTheBestDocs(t *testing.T) {
 	for _, w := range []int{0, 1, 2, 3, 4, 5, 6, 8, 13, 21, 34, 55, 89, 144} {
 		vocab = append(vocab, "w"+strconv.Itoa(w))
 	}
-	for _, minCands := range []int{1, 16, 1 << 30} {
-		for _, model := range []string{index.DefaultScoringModel, index.BM25Scoring} {
-			for _, deletions := range []bool{false, true} {
-				t.Run(fmt.Sprintf("mincands=%d/%s/deletions=%v", minCands, model, deletions), func(t *testing.T) {
-					idx, cleanup := skipTestIndex(t, model, deletions)
-					defer cleanup()
-					restore := searcher.SetPerSegmentConjunctionBitmapMinCandidates(minCands)
-					defer restore()
+	for _, algo := range []string{"window", "candidate", "auto"} {
+		for _, minCands := range []int{1, 16, 1 << 30} {
+			for _, model := range []string{index.DefaultScoringModel, index.BM25Scoring} {
+				for _, deletions := range []bool{false, true} {
+					t.Run(fmt.Sprintf("%s/mincands=%d/%s/deletions=%v", algo, minCands, model, deletions), func(t *testing.T) {
+						idx, cleanup := skipTestIndex(t, model, deletions)
+						defer cleanup()
+						restore := searcher.SetPerSegmentConjunctionBitmapMinCandidates(minCands)
+						defer restore()
+						restoreAlgo := searcher.SetPerSegmentConjunctionAlgo(algo, 0)
+						defer restoreAlgo()
 
-					rnd := rand.New(rand.NewSource(5))
-					for qi := 0; qi < 30; qi++ {
-						terms := map[string]bool{}
-						for want := 2 + rnd.Intn(3); len(terms) < want; {
-							terms[vocab[rnd.Intn(len(vocab))]] = true
-						}
-						names := make([]string, 0, len(terms))
-						for name := range terms {
-							names = append(names, name)
-						}
-						mk := func(size int) *SearchRequest {
-							qs := make([]query.Query, len(names))
-							for i, name := range names {
-								qs[i] = termQueryOn("body", name)
+						rnd := rand.New(rand.NewSource(5))
+						for qi := 0; qi < 30; qi++ {
+							terms := map[string]bool{}
+							for want := 2 + rnd.Intn(3); len(terms) < want; {
+								terms[vocab[rnd.Intn(len(vocab))]] = true
 							}
-							return NewSearchRequestOptions(query.NewConjunctionQuery(qs), size, 0, false)
-						}
-						perSegmentSearchEnabled.Store(false)
-						truth, err := idx.Search(mk(12000))
-						perSegmentSearchEnabled.Store(true)
-						if err != nil {
-							t.Fatal(err)
-						}
-						truthScore := make(map[string]float64, len(truth.Hits))
-						for _, h := range truth.Hits {
-							truthScore[h.ID] = h.Score
-						}
-						for _, k := range []int{1, 5, 10, 50} {
-							what := fmt.Sprintf("mincands=%d %s deletions=%v %v k=%d", minCands, model, deletions, names, k)
-							got, err := idx.Search(mk(k))
+							names := make([]string, 0, len(terms))
+							for name := range terms {
+								names = append(names, name)
+							}
+							mk := func(size int) *SearchRequest {
+								qs := make([]query.Query, len(names))
+								for i, name := range names {
+									qs[i] = termQueryOn("body", name)
+								}
+								return NewSearchRequestOptions(query.NewConjunctionQuery(qs), size, 0, false)
+							}
+							perSegmentSearchEnabled.Store(false)
+							truth, err := idx.Search(mk(12000))
+							perSegmentSearchEnabled.Store(true)
 							if err != nil {
-								t.Fatalf("%s: %v", what, err)
+								t.Fatal(err)
 							}
-							if want := min(k, len(truth.Hits)); len(got.Hits) != want {
-								t.Fatalf("%s: %d hits, want %d", what, len(got.Hits), want)
+							truthScore := make(map[string]float64, len(truth.Hits))
+							for _, h := range truth.Hits {
+								truthScore[h.ID] = h.Score
 							}
-							seen := map[string]bool{}
-							for i, h := range got.Hits {
-								if seen[h.ID] {
-									t.Fatalf("%s: doc %s twice", what, h.ID)
+							for _, k := range []int{1, 5, 10, 50} {
+								what := fmt.Sprintf("%s mincands=%d %s deletions=%v %v k=%d", algo, minCands, model, deletions, names, k)
+								got, err := idx.Search(mk(k))
+								if err != nil {
+									t.Fatalf("%s: %v", what, err)
 								}
-								seen[h.ID] = true
-								if !sameScore(h.Score, truth.Hits[i].Score) {
-									t.Fatalf("%s: rank %d scores %v, the best doc at that rank scores %v",
-										what, i, h.Score, truth.Hits[i].Score)
+								if want := min(k, len(truth.Hits)); len(got.Hits) != want {
+									t.Fatalf("%s: %d hits, want %d", what, len(got.Hits), want)
 								}
-								if ts, ok := truthScore[h.ID]; !ok || !sameScore(h.Score, ts) {
-									t.Fatalf("%s: doc %s scores %v, it is %v (a match: %v) in the truth", what, h.ID, h.Score, ts, ok)
+								seen := map[string]bool{}
+								for i, h := range got.Hits {
+									if seen[h.ID] {
+										t.Fatalf("%s: doc %s twice", what, h.ID)
+									}
+									seen[h.ID] = true
+									if !sameScore(h.Score, truth.Hits[i].Score) {
+										t.Fatalf("%s: rank %d scores %v, the best doc at that rank scores %v",
+											what, i, h.Score, truth.Hits[i].Score)
+									}
+									if ts, ok := truthScore[h.ID]; !ok || !sameScore(h.Score, ts) {
+										t.Fatalf("%s: doc %s scores %v, it is %v (a match: %v) in the truth", what, h.ID, h.Score, ts, ok)
+									}
 								}
-							}
-							if got.TotalRelation == TotalRelationGte {
-								if got.Total > truth.Total {
-									t.Fatalf("%s: total %d above the real %d", what, got.Total, truth.Total)
+								if got.TotalRelation == TotalRelationGte {
+									if got.Total > truth.Total {
+										t.Fatalf("%s: total %d above the real %d", what, got.Total, truth.Total)
+									}
+								} else if got.Total != truth.Total {
+									t.Fatalf("%s: exact total %d, want %d", what, got.Total, truth.Total)
 								}
-							} else if got.Total != truth.Total {
-								t.Fatalf("%s: exact total %d, want %d", what, got.Total, truth.Total)
 							}
 						}
-					}
-				})
+					})
+				}
 			}
 		}
 	}

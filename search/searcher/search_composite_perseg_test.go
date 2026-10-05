@@ -313,6 +313,10 @@ func TestPerSegmentDisjunctionMatchesOracle(t *testing.T) {
 }
 
 func TestPerSegmentConjunctionMatchesOracle(t *testing.T) {
+	forEachConjunctionAlgo(t, testPerSegmentConjunctionMatchesOracle)
+}
+
+func testPerSegmentConjunctionMatchesOracle(t *testing.T) {
 	runCompositeChecks(t, conjunctionBuilder(), true, 0)
 }
 
@@ -486,6 +490,10 @@ func TestPerSegmentPruningStress(t *testing.T) {
 // few terms, over corpora of rare outliers, as often as it can: the oracle of a
 // term set is worked out once, and kept.
 func TestPerSegmentConjunctionWindowStress(t *testing.T) {
+	forEachConjunctionAlgo(t, testPerSegmentConjunctionWindowStress)
+}
+
+func testPerSegmentConjunctionWindowStress(t *testing.T) {
 	sets := [][]string{
 		{"alpha", "bravo"}, {"alpha", "charlie"}, {"bravo", "charlie"}, {"alpha", "delta"},
 		{"bravo", "delta"}, {"charlie", "delta"}, {"alpha", "bravo", "charlie"},
@@ -547,6 +555,10 @@ func repeatToken(tok string, n int) []string {
 // of the common term can't beat. A window that took its bounds from the first
 // block of a common term alone would skip the best doc.
 func TestPerSegmentConjunctionPlantedOutlier(t *testing.T) {
+	forEachConjunctionAlgo(t, testPerSegmentConjunctionPlantedOutlier)
+}
+
+func testPerSegmentConjunctionPlantedOutlier(t *testing.T) {
 	const plantedAt = 1500
 	tokens := func(seg, i int) []string {
 		toks := []string{"cc", "yy"} // in every doc
@@ -842,5 +854,17 @@ func TestPerSegmentUnwrapsSingleClauses(t *testing.T) {
 	c := collect(t, outer, fx, 5, 0)
 	if c.Total() == 0 {
 		t.Fatal("the bravo clause still matches")
+	}
+}
+
+// forEachConjunctionAlgo runs the test with each of the algorithms of an AND of
+// terms forced: by windows, by the leader's candidates, and by what fits best.
+func forEachConjunctionAlgo(t *testing.T, f func(t *testing.T)) {
+	for _, algo := range []string{"window", "candidate", "auto"} {
+		t.Run(algo, func(t *testing.T) {
+			restore := SetPerSegmentConjunctionAlgo(algo, 0)
+			defer restore()
+			f(t)
+		})
 	}
 }

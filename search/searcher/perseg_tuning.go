@@ -32,12 +32,48 @@ const (
 // disjunctionAlgo is the algorithm that finds the best hits of a plain OR of terms
 var disjunctionAlgo atomic.Int32
 
+const (
+	conjAlgoAuto int32 = iota
+	conjAlgoWindow
+	conjAlgoCandidate
+)
+
+// conjAlgo is the algorithm that finds the best hits of an AND of terms
+var conjAlgo atomic.Int32
+
+// conjCandidateRatio: an AND of terms is done by its leader's candidates, rather than
+// by windows, when the leader has this many times fewer postings than all the
+// terms together (see candidateDriven).
+var conjCandidateRatio atomic.Int32
+
 // conjBitmapMinCandidates is how many of the leader's postings in a window of an AND
 // have to be able to make the heap for the window to be done on bitmaps.
 var conjBitmapMinCandidates atomic.Int32
 
 func init() {
 	conjBitmapMinCandidates.Store(16)
+	conjCandidateRatio.Store(16)
+}
+
+// SetPerSegmentConjunctionAlgo makes the searchers of an AND of terms use the
+// algorithm named ("window", "candidate", or anything else for what fits best),
+// with, for what fits best, the ratio by which the leader has to have fewer
+// postings than all the terms together (if it is above 0), and returns a function
+// that puts back what was.
+func SetPerSegmentConjunctionAlgo(algo string, ratio int) (restore func()) {
+	next := conjAlgoAuto
+	switch algo {
+	case "window":
+		next = conjAlgoWindow
+	case "candidate":
+		next = conjAlgoCandidate
+	}
+	prevAlgo := conjAlgo.Swap(next)
+	prevRatio := conjCandidateRatio.Load()
+	if ratio > 0 {
+		conjCandidateRatio.Store(int32(min(ratio, 1<<30)))
+	}
+	return func() { conjAlgo.Store(prevAlgo); conjCandidateRatio.Store(prevRatio) }
 }
 
 // SetPerSegmentDisjunctionAlgo makes the searchers of a plain OR of terms use the
