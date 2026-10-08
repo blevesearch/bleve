@@ -516,9 +516,9 @@ func (i *indexImpl) FileWriterIDsInUse() (map[string]struct{}, error) {
 func (i *indexImpl) DropFileWriterIDs(ids map[string]struct{}) error {
 	i.mutex.Lock()
 	if _, ok := ids[i.meta.fileReader.Id()]; ok {
-		var err error
-		err = i.meta.UpdateWriter(i.path)
+		err := i.meta.UpdateWriter(i.path)
 		if err != nil {
+			i.mutex.Unlock()
 			return err
 		}
 	}

@@ -103,6 +103,12 @@ OUTER:
 				// lets get started
 				startTime := time.Now()
 				err := s.planMergeAtSnapshot(ctrlMsg, ourSnapshot)
+
+				done, hasDone := ctrlMsg.ctx.Value(mergeDoneKey).(chan error)
+				if hasDone {
+					done <- err
+				}
+
 				if err != nil {
 					atomic.StoreUint64(&s.iStats.mergeEpoch, 0)
 					if err == segment.ErrClosed {
@@ -128,6 +134,10 @@ OUTER:
 					))
 					_ = ourSnapshot.DecRef()
 					atomic.AddUint64(&s.stats.TotFileMergeLoopErr, 1)
+					// the error has been reported, so the request is not retried
+					if hasDone {
+						ctrlMsg = nil
+					}
 					continue OUTER
 				}
 
@@ -312,10 +322,8 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 			atomic.AddUint64(&s.stats.TotFileMergePlanErr, 1)
 			return fmt.Errorf("merge planning err: %v", err)
 		}
-	}
-
-	// default to making a merge plan if a custom one is not provided
-	if mergePlan == nil || len(mergePlan.Tasks) == 0 {
+	} else {
+		// default to making a merge plan if a custom one is not provided
 		// build list of persisted segments in this snapshot
 		var onlyPersistedSnapshots []mergeplan.Segment
 		for _, segmentSnapshot := range ourSnapshot.segment {
@@ -333,12 +341,12 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 			atomic.AddUint64(&s.stats.TotFileMergePlanErr, 1)
 			return fmt.Errorf("merge planning err: %v", err)
 		}
+	}
 
-		if mergePlan == nil || len(mergePlan.Tasks) == 0 {
-			// nothing to do
-			atomic.AddUint64(&s.stats.TotFileMergePlanNone, 1)
-			return nil
-		}
+	if mergePlan == nil || len(mergePlan.Tasks) == 0 {
+		// nothing to do
+		atomic.AddUint64(&s.stats.TotFileMergePlanNone, 1)
+		return nil
 	}
 
 	atomic.AddUint64(&s.stats.TotFileMergePlanOk, 1)
@@ -349,13 +357,6 @@ func (s *Scorch) planMergeAtSnapshot(ctrlMsg *mergerCtrl, ourSnapshot *IndexSnap
 	go cw.listen()
 
 	var err error
-	defer func() {
-		// send error to done channel if present
-		if done, ok := cw.ctx.Value(mergeDoneKey).(chan error); ok {
-			done <- err
-		}
-	}()
-
 	numBatches := len(mergePlan.Tasks)
 	mergeBatches := make([]*mergeBatch, numBatches)
 	defer func() {

@@ -1386,7 +1386,7 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	s.rootLock.Lock()
 	// create a done channel to ensure success of merge
 	ctx := context.Background()
-	doneCh := make(chan error)
+	doneCh := make(chan error, 1)
 	ctx = context.WithValue(ctx, mergeDoneKey, doneCh)
 
 	// PARTIAL ROLLBACK WILL NOT BE SUPPORTED DURING THIS OPERATION
@@ -1472,15 +1472,22 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	// any races
 	ctx = context.WithValue(ctx, mergePlanFuncKey, mergePlanner)
 
-	// trigger the merge with the force merge plan
-	s.forceMergeRequestCh <- &mergerCtrl{
-		ctx: ctx,
-	}
 	s.rootLock.Unlock()
 
+	// trigger the merge with the force merge plan. Sent without holding
+	// rootLock, as the merger may need it to finish a merge already queued
+	select {
+	case s.forceMergeRequestCh <- &mergerCtrl{ctx: ctx}:
+	case <-s.closeCh:
+		return segment.ErrClosed
+	}
+
 	// blockingly wait for merge to complete
-	err = <-doneCh
-	close(doneCh)
+	select {
+	case err = <-doneCh:
+	case <-s.closeCh:
+		return segment.ErrClosed
+	}
 	if err != nil {
 		return err
 	}
