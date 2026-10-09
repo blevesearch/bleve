@@ -656,6 +656,30 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				nil),
 		},
 		{
+			input:   `\/`,
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					NewMatchQuery("/"),
+				},
+				nil),
+		},
+		{
+			input:   `path:\/`,
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					func() Query {
+						q := NewMatchQuery("/")
+						q.SetField("path")
+						return q
+					}(),
+				},
+				nil),
+		},
+		{
 			input:   `mart*`,
 			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQueryForQueryString(
