@@ -1386,7 +1386,7 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	s.rootLock.Lock()
 	// create a done channel to ensure success of merge
 	ctx := context.Background()
-	doneCh := make(chan error)
+	doneCh := make(chan error, 1)
 	ctx = context.WithValue(ctx, mergeDoneKey, doneCh)
 
 	// PARTIAL ROLLBACK WILL NOT BE SUPPORTED DURING THIS OPERATION
@@ -1472,15 +1472,22 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 	// any races
 	ctx = context.WithValue(ctx, mergePlanFuncKey, mergePlanner)
 
-	// trigger the merge with the force merge plan
-	s.forceMergeRequestCh <- &mergerCtrl{
-		ctx: ctx,
-	}
 	s.rootLock.Unlock()
 
+	// trigger the merge with the force merge plan. Sent without holding
+	// rootLock, as the merger may need it to finish a merge already queued
+	select {
+	case s.forceMergeRequestCh <- &mergerCtrl{ctx: ctx}:
+	case <-s.closeCh:
+		return segment.ErrClosed
+	}
+
 	// blockingly wait for merge to complete
-	err = <-doneCh
-	close(doneCh)
+	select {
+	case err = <-doneCh:
+	case <-s.closeCh:
+		return segment.ErrClosed
+	}
 	if err != nil {
 		return err
 	}
@@ -1498,6 +1505,33 @@ func (s *Scorch) DropFileWriterIDs(ids map[string]struct{}) error {
 // returns an error after a timeout. It does so by checking the index directory every 5 seconds
 // for the presence of the given files, and returns once they are no longer present.
 func (s *Scorch) waitTillFileCleanup(filePaths []string) error {
+	pending := make(map[string]struct{}, len(filePaths))
+	for _, filePath := range filePaths {
+		pending[filePath] = struct{}{}
+	}
+
+	// reports whether any of the given files is still in the index directory
+	filesPresent := func() (bool, error) {
+		files, err := os.ReadDir(s.path)
+		if err != nil {
+			return false, err
+		}
+		for _, f := range files {
+			if _, ok := pending[f.Name()]; ok {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+
+	if len(pending) == 0 {
+		return nil
+	}
+	present, err := filesPresent()
+	if err != nil || !present {
+		return err
+	}
+
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -1506,23 +1540,14 @@ func (s *Scorch) waitTillFileCleanup(filePaths []string) error {
 	for {
 		select {
 		case <-ticker.C:
-			files, err := os.ReadDir(s.path)
-			if err != nil {
+			present, err := filesPresent()
+			if err != nil || !present {
 				return err
 			}
-			for _, f := range files {
-				fname := f.Name()
-				if filepath.Ext(fname) == ".zap" {
-					for _, filePath := range filePaths {
-						if fname == filePath {
-							continue
-						}
-					}
-				}
-			}
-			return nil
 		case <-timeout:
 			return fmt.Errorf("timeout waiting for file cleanup for files: %v", filePaths)
+		case <-s.closeCh:
+			return segment.ErrClosed
 		}
 	}
 }
