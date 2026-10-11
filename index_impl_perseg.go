@@ -1,0 +1,177 @@
+//  Copyright (c) 2026 Couchbase, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 		http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package bleve
+
+import (
+	"context"
+	"errors"
+	"sync/atomic"
+
+	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/collector"
+	"github.com/blevesearch/bleve/v2/search/query"
+	index "github.com/blevesearch/bleve_index_api"
+)
+
+// perSegmentSearchEnabled is the switch of the per segment search path. It is
+// on, and is turned off to compare the two paths.
+var perSegmentSearchEnabled atomic.Bool
+
+// perSegmentSearches counts the searches served by the per segment path.
+var perSegmentSearches atomic.Uint64
+
+// topNCollectorsBuilt counts the TopNCollectors built by searches: one for each
+// search that the per segment path doesn't serve.
+var topNCollectorsBuilt atomic.Uint64
+
+func init() {
+	perSegmentSearchEnabled.Store(true)
+}
+
+// perSegmentSearchEligible reports whether a search request may be served by
+// the per segment search path: a per segment searcher, built by the query itself
+// (see query.PerSegmentQuery), feeding the per segment collector (see
+// search/collector.PerSegmentTopNCollector).
+//
+// That path produces the same hits as the regular one, but only for a narrow
+// kind of request. It is limited to a term query, a match of terms, or a
+// conjunction or disjunction of those, in any sort order, that needs nothing more
+// than the score of each hit (or that there be none, with Score: "none"):
+// no locations or highlights, facets, KNN, search after / before, pre search data,
+// synonyms, nested documents or score fusion. (Explanations are fine: the
+// collector asks for those of the hits it returns once it has them. A search that
+// has no scores has none to explain, and its hits come without.)
+//
+// Whether the index reader is able to provide per segment postings isn't
+// decided here: if it can't, the query's per segment searcher is refused
+// (search.ErrPerSegmentUnsupported, see perSegmentSearcherFor), and the search is
+// run by the regular searcher and the regular collector.
+func perSegmentSearchEligible(ctx context.Context, req *SearchRequest,
+	fts search.FieldTermSynonymMap, fusion bool) bool {
+	if !perSegmentSearchEnabled.Load() {
+		return false
+	}
+	if !query.SupportsPerSegment(req.Query) {
+		return false
+	}
+	if req.IncludeLocations || req.Highlight != nil {
+		return false
+	}
+	if requestHasKNN(req) || len(req.PreSearchData) > 0 {
+		return false
+	}
+	if fts != nil || fusion {
+		return false
+	}
+	if nestedMode, ok := ctx.Value(search.NestedSearchKey).(bool); ok && nestedMode {
+		return false
+	}
+	// an application supplied document match handler expects DocumentMatches
+	if ctx.Value(search.MakeDocumentMatchHandlerKey) != nil {
+		return false
+	}
+	return true
+}
+
+// sortedByScoreDescending reports whether the hits are ordered by descending
+// score and nothing else, which is what the pruning algorithms are for. (No sort
+// at all is not that: hits are then in the order they were found, as the
+// regular collector has them.)
+func sortedByScoreDescending(so search.SortOrder) bool {
+	if len(so) != 1 {
+		return false
+	}
+	byScore, ok := so[0].(*search.SortScore)
+	return ok && byScore.Desc
+}
+
+// perSegmentCollector is what the search needs of the collector of the per
+// segment path, of either kind.
+type perSegmentCollector interface {
+	searchResults
+	Collect(ctx context.Context, searcher search.PerSegmentSearcher, reader index.IndexReader) error
+}
+
+// facetsCollector is a collector that counts facets, which are of every match, so
+// that it visits all of them: one that prunes can't.
+type facetsCollector interface {
+	SetFacetsBuilder(facetsBuilder *search.FacetsBuilder)
+	FacetResults() search.FacetResults
+}
+
+// searchResults is what a search needs of whichever collector ran it, TopNCollector
+// or PerSegmentTopNCollector.
+type searchResults interface {
+	Results() search.DocumentMatchCollection
+	Total() uint64
+	MaxScore() float64
+	EarlyStopped() bool
+	Size() int
+}
+
+// perSegmentSearcherFor returns the per segment searcher of the search if the
+// request is one that the per segment path serves and the index can serve it that
+// way; otherwise nil, and the search is run by the regular path. A searcher that
+// is returned is closed by the caller.
+func perSegmentSearcherFor(ctx context.Context, req *SearchRequest, reader index.IndexReader,
+	m mapping.IndexMapping, options search.SearcherOptions) (search.PerSegmentSearcher, error) {
+	pq, ok := req.Query.(query.PerSegmentQuery)
+	if !ok {
+		return nil, nil
+	}
+	rv, err := pq.PerSegmentSearcher(ctx, reader, m, options)
+	if errors.Is(err, search.ErrPerSegmentUnsupported) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	perSegmentSearches.Add(1)
+	return rv, nil
+}
+
+// newPerSegmentCollector is the collector of a search that is run by the per
+// segment path.
+// Hits ordered by descending score only are collected by the collector that
+// prunes, unless facets are asked for (every match counts in them) or a page
+// after some hit (see below); any other order, and those, by the one that sorts.
+// SearchBefore has been turned into a search after of the reverse order by then.
+func newPerSegmentCollector(req *SearchRequest) perSegmentCollector {
+	// scores that were asked not to be computed have no explanation to give
+	explain := req.Explain && req.Score != ScoreNone
+	if sortedByScoreDescending(req.Sort) && len(req.Facets) == 0 && req.SearchAfter == nil {
+		rv := collector.NewPerSegmentTopNCollector(req.Size, req.From)
+		rv.SetExplain(explain)
+		return rv
+	}
+	// the sorts hold the values of the doc they're asked about: the collector gets
+	// its own, not the request's
+	rv := collector.NewPerSegmentSortedCollector(req.Size, req.From, req.Sort.Copy())
+	rv.SetExplain(explain)
+	if req.SearchAfter != nil {
+		rv.SetSearchAfter(req.SearchAfter)
+	}
+	return rv
+}
+
+// perSegmentSearcherSize gives what a search needs of a searcher to estimate the
+// memory it needs, for a per segment searcher, which has no DocumentMatches.
+type perSegmentSearcherSize struct {
+	s search.PerSegmentSearcher
+}
+
+func (p perSegmentSearcherSize) Size() int                  { return p.s.Size() }
+func (p perSegmentSearcherSize) DocumentMatchPoolSize() int { return 0 }

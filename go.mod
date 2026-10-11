@@ -33,8 +33,11 @@ require (
 	google.golang.org/protobuf v1.36.6
 )
 
+require github.com/blevesearch/freeway v0.0.0-20260910051309-0770e11c32cd
+
 require (
 	github.com/blevesearch/mmap-go v1.2.0 // indirect
+	github.com/blevesearch/zapx/v18 v18.0.0
 	github.com/couchbase/ghistogram v0.1.0 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -44,3 +47,11 @@ require (
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 )
+
+replace github.com/blevesearch/zapx/v18 => /Users/gautham.k/projects/zapx-bitpack-simd
+
+replace github.com/blevesearch/scorch_segment_api/v2 => /Users/gautham.k/projects/scorch_segment_api-bitpack-simd
+
+replace github.com/blevesearch/vellum => /Users/gautham.k/projects/vellum
+
+replace github.com/blevesearch/freeway => /Users/gautham.k/projects/freeway

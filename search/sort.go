@@ -33,7 +33,20 @@ import (
 var (
 	HighTerm = strings.Repeat(string(utf8.MaxRune), 3)
 	LowTerm  = string([]byte{0x00})
+
+	highTermBytes = []byte(HighTerm)
+	lowTermBytes  = []byte(LowTerm)
 )
+
+// SortValueBytes is implemented by the sorts that can give the sort value of a
+// DocumentMatch without making a string of it: the bytes of Value, valid until
+// the sort is next used (UpdateVisitor, or ValueBytes again). Like Value, it
+// resets the state of the sort for the next document. A collector that looks at
+// a lot of docs that don't make the top hits uses it to compare values it will
+// throw away, without a copy of each.
+type SortValueBytes interface {
+	ValueBytes(a *DocumentMatch) []byte
+}
 
 type SearchSort interface {
 	UpdateVisitor(field string, term []byte)
@@ -407,8 +420,14 @@ func (s *SortField) UpdateVisitor(field string, term []byte) {
 // it also resets the state of this SortField for
 // processing the next document
 func (s *SortField) Value(i *DocumentMatch) string {
+	return string(s.ValueBytes(i))
+}
+
+// ValueBytes is Value, as the bytes of the term, which are valid until the sort
+// is next used.
+func (s *SortField) ValueBytes(i *DocumentMatch) []byte {
 	iTerms := s.filterTermsByType(s.values)
-	iTerm := s.filterTermsByMode(iTerms)
+	iTerm := s.filterTermsByModeBytes(iTerms)
 	s.values = s.values[:0]
 	return iTerm
 }
@@ -437,31 +456,31 @@ func (s *SortField) Descending() bool {
 	return s.Desc
 }
 
-func (s *SortField) filterTermsByMode(terms [][]byte) string {
+func (s *SortField) filterTermsByModeBytes(terms [][]byte) []byte {
 	if len(terms) == 1 || (len(terms) > 1 && s.Mode == SortFieldDefault) {
-		return string(terms[0])
+		return terms[0]
 	} else if len(terms) > 1 {
 		switch s.Mode {
 		case SortFieldMin:
 			sort.Sort(BytesSlice(terms))
-			return string(terms[0])
+			return terms[0]
 		case SortFieldMax:
 			sort.Sort(BytesSlice(terms))
-			return string(terms[len(terms)-1])
+			return terms[len(terms)-1]
 		}
 	}
 
 	// handle missing terms
 	if s.Missing == SortFieldMissingLast {
 		if s.Desc {
-			return LowTerm
+			return lowTermBytes
 		}
-		return HighTerm
+		return highTermBytes
 	}
 	if s.Desc {
-		return HighTerm
+		return highTermBytes
 	}
-	return LowTerm
+	return lowTermBytes
 }
 
 // filterTermsByType attempts to make one pass on the terms

@@ -91,6 +91,10 @@ type IndexSnapshot struct {
 	m3               sync.RWMutex // bm25 metrics specific - not to interfere with TFR creation
 	fieldCardinality map[string]int
 
+	// dictionaries of the segments, kept for the per segment term readers to
+	// use again (see snapshot_index_tfr_perseg.go)
+	perSegmentDicts perSegmentDictCache
+
 	// Stores information about zapx fields that have been
 	// fully deleted (indicated by UpdateFieldInfo.Deleted) or
 	// partially deleted index, store or docvalues (indicated by
