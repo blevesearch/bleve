@@ -59,6 +59,11 @@ type IndexMappingImpl struct {
 	DocValuesDynamic      bool                        `json:"docvalues_dynamic"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
 	cache                 *registry.Cache
+
+	// deprecatedAnalysis is the first custom analysis component that could not
+	// be defined because it is built out of a deprecated component; reported
+	// by Validate.
+	deprecatedAnalysis error
 }
 
 // AddCustomCharFilter defines a custom char filter for use in this mapping
@@ -177,10 +182,16 @@ func NewIndexMapping() *IndexMappingImpl {
 }
 
 // Validate will walk the entire structure ensuring the following
-// explicitly named and default analyzers can be built
+// explicitly named and default analyzers can be built.
+//
+// A reference to a deprecated analysis component does not stop the walk: the
+// error for it (wrapping registry.ErrDeprecatedComponent) is returned only if
+// the mapping is otherwise valid.  So a caller that finds errors.Is(err,
+// registry.ErrDeprecatedComponent) knows that nothing else is wrong.
 func (im *IndexMappingImpl) Validate() error {
+	deprecated := im.deprecatedAnalysis
 	_, err := im.cache.AnalyzerNamed(im.DefaultAnalyzer)
-	if err != nil {
+	if err = skipDeprecated(err, &deprecated); err != nil {
 		return err
 	}
 	_, err = im.cache.DateTimeParserNamed(im.DefaultDateTimeParser)
@@ -189,7 +200,7 @@ func (im *IndexMappingImpl) Validate() error {
 	}
 	if im.DefaultSynonymSource != "" {
 		_, err = im.cache.SynonymSourceNamed(im.DefaultSynonymSource)
-		if err != nil {
+		if err = skipDeprecated(err, &deprecated); err != nil {
 			return err
 		}
 	}
@@ -201,7 +212,7 @@ func (im *IndexMappingImpl) Validate() error {
 	if im.DefaultMapping.Nested {
 		return fmt.Errorf("default mapping cannot be nested")
 	}
-	err = im.DefaultMapping.Validate(im.cache, []string{}, fieldAliasCtx)
+	err = im.DefaultMapping.validate(im.cache, []string{}, fieldAliasCtx, &deprecated)
 	if err != nil {
 		return err
 	}
@@ -210,7 +221,7 @@ func (im *IndexMappingImpl) Validate() error {
 		if docMapping.Nested {
 			return fmt.Errorf("type mapping named: %s cannot be nested", name)
 		}
-		err = docMapping.Validate(im.cache, []string{}, fieldAliasCtx)
+		err = docMapping.validate(im.cache, []string{}, fieldAliasCtx, &deprecated)
 		if err != nil {
 			return err
 		}
@@ -220,7 +231,7 @@ func (im *IndexMappingImpl) Validate() error {
 		return fmt.Errorf("unsupported scoring model: %s", im.ScoringModel)
 	}
 
-	return nil
+	return deprecated
 }
 
 // AddDocumentMapping sets a custom document mapping for the specified type
@@ -248,6 +259,7 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 	// set defaults for fields which might have been omitted
 	im.cache = registry.NewCache()
 	im.CustomAnalysis = newCustomAnalysis()
+	im.deprecatedAnalysis = nil
 	im.TypeField = defaultTypeField
 	im.DefaultType = defaultType
 	im.DefaultAnalyzer = defaultAnalyzer

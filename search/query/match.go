@@ -136,7 +136,7 @@ func (q *MatchQuery) Searcher(ctx context.Context, i index.IndexReader, m mappin
 	analyzer := m.AnalyzerNamed(analyzerName)
 
 	if analyzer == nil {
-		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
+		return nil, analyzerNotFoundError(m, analyzerName)
 	}
 
 	tokens := analyzer.Analyze([]byte(q.Match))

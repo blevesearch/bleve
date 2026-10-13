@@ -15,6 +15,7 @@
 package mapping
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2/analysis"
@@ -58,6 +59,9 @@ func SynonymSourceConstructor(config map[string]interface{}, cache *registry.Cac
 		return nil, fmt.Errorf("must specify analyzer")
 	}
 	if _, err := cache.AnalyzerNamed(analyzer); err != nil {
+		if errors.Is(err, registry.ErrDeprecatedComponent) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("analyzer named '%s' not found", analyzer)
 	}
 	return NewSynonymSource(collection, analyzer), nil

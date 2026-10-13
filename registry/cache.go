@@ -26,12 +26,26 @@ type CacheBuild func(name string, config map[string]interface{}, cache *Cache) (
 type ConcurrentCache struct {
 	mutex sync.RWMutex
 	data  map[string]interface{}
+
+	// deprecated remembers the names that failed to build only because they
+	// are, or are built out of, a deprecated component (see
+	// ErrDeprecatedComponent).  Later lookups of such a name return the same
+	// error, so a custom component defined on top of a deprecated one is itself
+	// reported as deprecated rather than as not registered.
+	deprecated map[string]error
 }
 
 func NewConcurrentCache() *ConcurrentCache {
 	return &ConcurrentCache{
-		data: make(map[string]interface{}),
+		data:       make(map[string]interface{}),
+		deprecated: make(map[string]error),
 	}
+}
+
+func (c *ConcurrentCache) rememberDeprecated(name string, err error) {
+	c.mutex.Lock()
+	c.deprecated[name] = err
+	c.mutex.Unlock()
 }
 
 func (c *ConcurrentCache) ItemNamed(name string, cache *Cache, build CacheBuild) (interface{}, error) {
@@ -41,11 +55,18 @@ func (c *ConcurrentCache) ItemNamed(name string, cache *Cache, build CacheBuild)
 		c.mutex.RUnlock()
 		return item, nil
 	}
+	if err, deprecated := c.deprecated[name]; deprecated {
+		c.mutex.RUnlock()
+		return nil, err
+	}
 	// give up read lock
 	c.mutex.RUnlock()
 	// try to build it
 	newItem, err := build(name, nil, cache)
 	if err != nil {
+		if isDeprecatedError(err) {
+			c.rememberDeprecated(name, err)
+		}
 		return nil, err
 	}
 	// acquire write lock
@@ -72,6 +93,9 @@ func (c *ConcurrentCache) DefineItem(name string, typ string, config map[string]
 	// really not there, try to build it
 	newItem, err := build(typ, config, cache)
 	if err != nil {
+		if isDeprecatedError(err) {
+			c.rememberDeprecated(name, err)
+		}
 		return nil, err
 	}
 	// now we've built it, acquire lock

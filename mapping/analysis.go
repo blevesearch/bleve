@@ -24,6 +24,10 @@ type customAnalysis struct {
 	SynonymSources  map[string]map[string]interface{} `json:"synonym_sources,omitempty"`
 }
 
+// registerAll defines every custom analysis component in the mapping's cache.
+// A component that cannot be defined because it is built out of a deprecated
+// component is left undefined rather than failing the mapping, so that the
+// mapping of an existing index still unmarshals; Validate reports it.
 func (c *customAnalysis) registerAll(i *IndexMappingImpl) error {
 	for name, config := range c.CharFilters {
 		_, err := i.cache.DefineCharFilter(name, config)
@@ -47,9 +51,12 @@ func (c *customAnalysis) registerAll(i *IndexMappingImpl) error {
 			for name := range todo {
 				config := c.Tokenizers[name]
 				_, err := i.cache.DefineTokenizer(name, config)
-				if err != nil {
+				if err = skipDeprecated(err, &i.deprecatedAnalysis); err != nil {
 					errs = append(errs, err)
 				} else {
+					// a deprecated tokenizer counts as progress too, so
+					// that the tokenizers built on it are retried and
+					// reported as deprecated rather than as missing
 					delete(todo, name)
 					registered++
 				}
@@ -62,19 +69,19 @@ func (c *customAnalysis) registerAll(i *IndexMappingImpl) error {
 	}
 	for name, config := range c.TokenMaps {
 		_, err := i.cache.DefineTokenMap(name, config)
-		if err != nil {
+		if err = skipDeprecated(err, &i.deprecatedAnalysis); err != nil {
 			return err
 		}
 	}
 	for name, config := range c.TokenFilters {
 		_, err := i.cache.DefineTokenFilter(name, config)
-		if err != nil {
+		if err = skipDeprecated(err, &i.deprecatedAnalysis); err != nil {
 			return err
 		}
 	}
 	for name, config := range c.Analyzers {
 		_, err := i.cache.DefineAnalyzer(name, config)
-		if err != nil {
+		if err = skipDeprecated(err, &i.deprecatedAnalysis); err != nil {
 			return err
 		}
 	}
@@ -86,7 +93,7 @@ func (c *customAnalysis) registerAll(i *IndexMappingImpl) error {
 	}
 	for name, config := range c.SynonymSources {
 		_, err := i.cache.DefineSynonymSource(name, config)
-		if err != nil {
+		if err = skipDeprecated(err, &i.deprecatedAnalysis); err != nil {
 			return err
 		}
 	}

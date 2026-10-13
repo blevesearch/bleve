@@ -49,7 +49,7 @@ func SynonymSourceBuild(name string, config map[string]interface{}, cache *Cache
 	}
 	synonymSource, err := cons(config, cache)
 	if err != nil {
-		return nil, fmt.Errorf("error building synonym source: %v", err)
+		return nil, fmt.Errorf("error building synonym source: %w", err)
 	}
 	return synonymSource, nil
 }
