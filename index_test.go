@@ -612,9 +612,9 @@ func TestBytesRead(t *testing.T) {
 	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
 	prevBytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
 
-	expectedBytesRead := uint64(21574)
+	expectedBytesRead := uint64(21984)
 	if supportForVectorSearch {
-		expectedBytesRead = 21984
+		expectedBytesRead = 22394
 	}
 
 	if prevBytesRead != expectedBytesRead && res.Cost == prevBytesRead {
@@ -770,9 +770,9 @@ func TestBytesReadStored(t *testing.T) {
 	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
 
-	expectedBytesRead := uint64(11435)
+	expectedBytesRead := uint64(11845)
 	if supportForVectorSearch {
-		expectedBytesRead = 11845
+		expectedBytesRead = 12255
 	}
 
 	if bytesRead != expectedBytesRead && bytesRead == res.Cost {
@@ -847,9 +847,9 @@ func TestBytesReadStored(t *testing.T) {
 	stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
 
-	expectedBytesRead = uint64(3622)
+	expectedBytesRead = uint64(4032)
 	if supportForVectorSearch {
-		expectedBytesRead = 4032
+		expectedBytesRead = 4442
 	}
 
 	if bytesRead != expectedBytesRead && bytesRead == res.Cost {

@@ -104,7 +104,8 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache,
 
 func validateFieldType(field *FieldMapping) error {
 	switch field.Type {
-	case "text", "datetime", "number", "boolean", "geopoint", "geoshape", "geoshape_v2", "IP":
+	case "text", "datetime", "number", "number_v2", "boolean", "geopoint",
+		"geoshape", "geoshape_v2", "IP":
 		return nil
 	default:
 		return fmt.Errorf("field: '%s', unknown field type: '%s'",
