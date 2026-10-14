@@ -1125,3 +1125,173 @@ func TestPlanWithNoBestRoster(t *testing.T) {
 		t.Fatalf("final layout mismatch, got: %+v", spec.segments)
 	}
 }
+
+// A segment past the size-eligibility cut is never reconsidered however many
+// of its documents are deleted: one segment cannot push len(eligibles) over
+// the budget, so the roster loop never selects it, and ScoreSegments'
+// ReclaimDeletesWeight only ever sees segments that already passed eligibility.
+// DeletesPctAllowed is the escape.
+
+// hasSingletonTaskFor reports whether the plan rewrites seg on its own, which
+// is how a delete-heavy segment reaches the merger -- it can never push
+// len(eligibles) over the budget, so the roster loop would never select it.
+func hasSingletonTaskFor(p *MergePlan, seg Segment) bool {
+	if p == nil {
+		return false
+	}
+	for _, task := range p.Tasks {
+		if len(task.Segments) == 1 && task.Segments[0] == seg {
+			return true
+		}
+	}
+	return false
+}
+
+// A segment past the size cut is normally frozen for good. DeletesPctAllowed is
+// the escape, but only within a window: a segment stays ineligible while
+// liveSize >= MaxSegmentSize/2, so once enough is deleted it drops back under
+// the cut and rejoins the ordinary path. At MyFullSize == MaxSegmentSize that
+// window is roughly [threshold, 50%) deleted.
+func TestPlanDeletesPctAllowed(t *testing.T) {
+	base := DefaultMergePlanOptions
+	full := base.MaxSegmentSize // the largest a roster can produce
+	cut := base.MaxSegmentSize / 2
+
+	cases := []struct {
+		name       string
+		deletedPct float64
+		allowed    float64
+		want       bool
+	}{
+		{"pristine", 0.00, 0.33, false},
+		{"lightly deleted", 0.10, 0.33, false},
+		{"just under threshold", 0.32, 0.33, false},
+		{"exactly at threshold", 0.33, 0.33, true},
+		{"well over threshold", 0.45, 0.33, true},
+		{"deleted back under the size cut", 0.55, 0.33, false},
+		{"disabled by zero", 0.45, 0.00, false},
+		{"lower threshold catches less deleted", 0.10, 0.05, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			o := base
+			o.DeletesPctAllowed = tc.allowed
+
+			live := int64(float64(full) * (1 - tc.deletedPct))
+			fat := &segment{MyId: 1, MyFullSize: full, MyLiveSize: live,
+				MyFileSize: full * 120}
+
+			// enough ordinary segments that the planner has normal work to do
+			segs := []Segment{fat}
+			for i := 0; i < 12; i++ {
+				segs = append(segs, &segment{MyId: uint64(i + 2),
+					MyFullSize: 1000, MyLiveSize: 1000, MyFileSize: 100000})
+			}
+
+			p, err := plan(segs, &o)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got := hasSingletonTaskFor(p, Segment(fat))
+			if got != tc.want {
+				t.Fatalf("deleted %.0f%%, DeletesPctAllowed %.2f, live %d vs cut %d: "+
+					"single-segment task = %v, want %v",
+					tc.deletedPct*100, tc.allowed, live, cut, got, tc.want)
+			}
+
+			// whichever way it went, the segment must never appear twice --
+			// once via the delete pass and again inside a roster
+			seen := 0
+			if p != nil {
+				for _, task := range p.Tasks {
+					for _, s := range task.Segments {
+						if s == Segment(fat) {
+							seen++
+						}
+					}
+				}
+			}
+			if seen > 1 {
+				t.Fatalf("segment planned %d times in one plan", seen)
+			}
+		})
+	}
+}
+
+// The delete pass must not disturb ordinary planning: small segments over
+// budget should still be rostered in the same plan that rewrites a
+// delete-heavy one.
+func TestPlanDeletesPctAllowedLeavesNormalWorkIntact(t *testing.T) {
+	o := DefaultMergePlanOptions
+	o.DeletesPctAllowed = 0.33
+
+	full := o.MaxSegmentSize
+	fat := &segment{MyId: 1, MyFullSize: full,
+		MyLiveSize: int64(float64(full) * 0.6), MyFileSize: full * 120}
+
+	segs := []Segment{fat}
+	for i := 0; i < 40; i++ {
+		segs = append(segs, &segment{MyId: uint64(i + 2),
+			MyFullSize: 1000, MyLiveSize: 1000, MyFileSize: 100000})
+	}
+
+	p, err := plan(segs, &o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p == nil {
+		t.Fatal("expected a plan: 40 small segments is well over budget")
+	}
+	if !hasSingletonTaskFor(p, Segment(fat)) {
+		t.Error("delete-heavy segment was not rewritten")
+	}
+
+	var rosters int
+	for _, task := range p.Tasks {
+		if len(task.Segments) > 1 {
+			rosters++
+		}
+	}
+	if rosters == 0 {
+		t.Errorf("no ordinary merge task planned alongside; got %d task(s)",
+			len(p.Tasks))
+	}
+}
+
+// An ineligible segment must not be counted towards the budget, or its presence
+// would suppress merges of the small segments around it.
+func TestPlanIneligibleSegmentDoesNotConsumeBudget(t *testing.T) {
+	o := DefaultMergePlanOptions
+	o.DeletesPctAllowed = 0 // isolate the budget question from the delete pass
+
+	small := func(n int) []Segment {
+		var rv []Segment
+		for i := 0; i < n; i++ {
+			rv = append(rv, &segment{MyId: uint64(i + 2),
+				MyFullSize: 1000, MyLiveSize: 1000, MyFileSize: 100000})
+		}
+		return rv
+	}
+
+	without, err := plan(small(40), &o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fat := &segment{MyId: 1, MyFullSize: o.MaxSegmentSize,
+		MyLiveSize: o.MaxSegmentSize - 1, MyFileSize: o.MaxSegmentSize * 120}
+	with, err := plan(append([]Segment{fat}, small(40)...), &o)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if (without == nil) != (with == nil) {
+		t.Fatalf("plan presence changed by an ineligible segment: without=%v with=%v",
+			without != nil, with != nil)
+	}
+	if without != nil && len(without.Tasks) != len(with.Tasks) {
+		t.Errorf("ineligible segment changed task count: %d -> %d",
+			len(without.Tasks), len(with.Tasks))
+	}
+}
