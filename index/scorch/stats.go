@@ -29,8 +29,10 @@ type Stats struct {
 	TotUpdates uint64
 	TotDeletes uint64
 
-	TotBatches        uint64
-	TotBatchesEmpty   uint64
+	TotBatches                 uint64
+	TotBatchesEmpty            uint64
+	CurMergingUnpersistedBytes uint64
+
 	TotBatchIntroTime uint64
 	MaxBatchIntroTime uint64
 
