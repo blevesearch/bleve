@@ -115,6 +115,22 @@ type MergePlanOptions struct {
 	// impact merge selection.
 	ReclaimDeletesWeight float64
 
+	// DeletesPctAllowed makes a segment a merge candidate on its deleted
+	// fraction alone, whatever its size.
+	//
+	// Without it a large segment can hold tombstones indefinitely. Eligibility
+	// is liveSize < MaxSegmentSize/2, and liveSize already excludes deletes, so
+	// deleting does pull a segment back towards eligibility -- but only slowly.
+	// A merge roster is capped at MaxSegmentSize, so segments freeze somewhere
+	// between MaxSegmentSize/2 and MaxSegmentSize, and from there need half to
+	// three quarters of their documents deleted before they qualify again.
+	// Until that point ReclaimDeletesWeight cannot help either, because scoring
+	// only ever runs over the eligible set.
+	//
+	// Set it too low and the rewrite costs more than it reclaims; below roughly
+	// a quarter is rarely worth it. Zero disables the behaviour entirely.
+	DeletesPctAllowed float64
+
 	// Optional, defaults to mergeplan.CalcBudget().
 	CalcBudget func(totalSize int64, firstTierSize int64,
 		o *MergePlanOptions) (budgetNumSegments int)
@@ -165,6 +181,7 @@ var DefaultMergePlanOptions = MergePlanOptions{
 	SegmentsPerMergeTask: 10,
 	FloorSegmentSize:     2000,
 	ReclaimDeletesWeight: 2.0,
+	DeletesPctAllowed:    0.33,
 }
 
 // SingleSegmentMergePlanOptions helps in creating a
@@ -252,6 +269,7 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 	var minLiveFileSize int64 = math.MaxInt64
 
 	var eligibles []Segment
+	var deleteHeavy []Segment
 	var eligiblesLiveSize int64
 	var eligiblesLiveFileSize int64
 
@@ -274,6 +292,13 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		// vectors.
 		if segment.HasVector() {
 			isEligible = isEligible && liveFileSize < o.MaxSegmentFileSize/2
+		}
+		// A segment too large to merge on size is still worth rewriting once
+		// enough of it is deleted; collect those separately, since one such
+		// segment can never exceed the budget and so would never be planned.
+		if !isEligible && o.DeletesPctAllowed > 0 &&
+			deletedFraction(segment) >= o.DeletesPctAllowed {
+			deleteHeavy = append(deleteHeavy, segment)
 		}
 
 		// Only small-enough segments are eligible.
@@ -319,6 +344,12 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 	if len(empties) > 0 {
 		rv.Tasks = append(rv.Tasks, &MergeTask{Segments: empties})
 		eligibles = removeSegments(eligibles, empties)
+	}
+
+	// Segments too large to be eligible on size, but deleted enough to be worth
+	// rewriting on their own.
+	for _, dh := range deleteHeavy {
+		rv.Tasks = append(rv.Tasks, &MergeTask{Segments: []Segment{dh}})
 	}
 
 	numMergeTasks := 0
@@ -390,6 +421,19 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 	}
 
 	return rv, nil
+}
+
+// deletedFraction is the share of a segment's documents that are deleted.
+func deletedFraction(s Segment) float64 {
+	full := s.FullSize()
+	if full <= 0 {
+		return 0
+	}
+	live := s.LiveSize()
+	if live >= full {
+		return 0
+	}
+	return float64(full-live) / float64(full)
 }
 
 // Compute the number of segments that would be needed to cover the
