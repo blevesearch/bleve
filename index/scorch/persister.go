@@ -520,6 +520,18 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persiste
 		}
 	}
 
+	// Claim these bytes for the duration of the merge. They stay resident until
+	// the merge introduction lands, but they are being drained, so the ingest
+	// gate should stop counting them now rather than at the end of the cycle.
+	var claimed uint64
+	for _, f := range flushSet {
+		for _, ss := range f.sbsBatchSnapshots {
+			claimed += uint64(ss.Size())
+		}
+	}
+	atomic.AddUint64(&s.stats.CurMergingUnpersistedBytes, claimed)
+	defer atomic.AddUint64(&s.stats.CurMergingUnpersistedBytes, ^(claimed - 1))
+
 	// now merge each batch into a new segment, and persist all of them to disk,
 	// and construct a new snapshot with the merged segments
 	newSnapshot, newSegmentIDs, err := s.mergeAndPersistInMemorySegments(flushSet, po)
