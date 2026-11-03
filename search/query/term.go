@@ -27,6 +27,9 @@ type TermQuery struct {
 	Term     string `json:"term"`
 	FieldVal string `json:"field,omitempty"`
 	BoostVal *Boost `json:"boost,omitempty"`
+	// Notes is free-form JSON carried with the query and ignored when it
+	// runs; a more_like_this rewrite fills it with where the term came from.
+	Notes Notes `json:"notes,omitempty"`
 }
 
 // NewTermQuery creates a new Query for finding an

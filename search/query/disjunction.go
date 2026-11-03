@@ -27,9 +27,13 @@ import (
 )
 
 type DisjunctionQuery struct {
-	Disjuncts              []Query `json:"disjuncts"`
-	BoostVal               *Boost  `json:"boost,omitempty"`
-	Min                    float64 `json:"min"`
+	Disjuncts []Query `json:"disjuncts"`
+	BoostVal  *Boost  `json:"boost,omitempty"`
+	Min       float64 `json:"min"`
+	// Notes is free-form JSON carried with the query and ignored when it
+	// runs; a more_like_this rewrite fills it with how the terms were
+	// chosen.
+	Notes                  Notes `json:"notes,omitempty"`
 	retrieveScoreBreakdown bool
 	queryStringMode        bool
 }
@@ -115,6 +119,7 @@ func (q *DisjunctionQuery) UnmarshalJSON(data []byte) error {
 		Disjuncts []json.RawMessage `json:"disjuncts"`
 		Boost     *Boost            `json:"boost,omitempty"`
 		Min       float64           `json:"min"`
+		Notes     Notes             `json:"notes,omitempty"`
 	}{}
 	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {
@@ -130,5 +135,6 @@ func (q *DisjunctionQuery) UnmarshalJSON(data []byte) error {
 	}
 	q.BoostVal = tmp.Boost
 	q.Min = tmp.Min
+	q.Notes = tmp.Notes
 	return nil
 }
