@@ -220,6 +220,9 @@ const (
 	KnnPreSearchDataKey     = "_knn_pre_search_data_key"
 	SynonymPreSearchDataKey = "_synonym_pre_search_data_key"
 	BM25PreSearchDataKey    = "_bm25_pre_search_data_key"
+	// MLTPreSearchDataKey marks a request whose more_like_this nodes were
+	// already resolved and rewritten by an alias; it carries no data
+	MLTPreSearchDataKey = "_mlt_pre_search_data_key"
 )
 
 const GlobalScoring = "_global_scoring"
@@ -289,6 +292,80 @@ var (
 type BM25Stats struct {
 	DocCount         float64        `json:"doc_count"`
 	FieldCardinality map[string]int `json:"field_cardinality"`
+}
+
+// MLTTermStat is one candidate term of a more_like_this query: its frequency
+// in the input (TF), the number of documents containing it (DF) and the
+// document count (DocCount) of the index DF was read from, so that an idf
+// can be computed from figures that belong together.
+type MLTTermStat struct {
+	Field    string `json:"field"`
+	Term     string `json:"term"`
+	TF       uint64 `json:"tf"`
+	DF       uint64 `json:"df"`
+	DocCount uint64 `json:"doc_count"`
+	// Sources are the source documents the term was found in; filled by
+	// Candidates when the per-document statistics are flattened.
+	Sources []string `json:"sources,omitempty"`
+}
+
+// MLTSourceDoc is one source document of a more_like_this query held by an
+// index, with the terms it has in the compared fields.
+type MLTSourceDoc struct {
+	ID    string         `json:"id"`
+	Terms []*MLTTermStat `json:"terms,omitempty"`
+}
+
+// MLTStats is what one index contributes to a more_like_this query during
+// preSearch, and also the merged form an index alias builds from the
+// contributions of its members. With like_ids an index reports every source
+// document it holds (SourceDocs); with like_text it reports the analyzed
+// terms with their df and its document count (Terms). The merged form only
+// carries Terms, plus the IDs of the source documents it accounts for.
+type MLTStats struct {
+	SourceDocs []*MLTSourceDoc `json:"source_docs,omitempty"`
+	FoundIDs   []string        `json:"found_ids,omitempty"`
+	Terms      []*MLTTermStat  `json:"terms,omitempty"`
+}
+
+// Candidates flattens the statistics into one entry per (field, term):
+// the frequencies of a term across the source documents are added up,
+// while df and DocCount, which come from the same index for every source
+// document of one contribution, are kept as reported.
+func (s *MLTStats) Candidates() []*MLTTermStat {
+	if s == nil {
+		return nil
+	}
+	if len(s.SourceDocs) == 0 {
+		return s.Terms
+	}
+	byKey := make(map[string]*MLTTermStat)
+	var rv []*MLTTermStat
+	add := func(st *MLTTermStat, source string) {
+		key := st.Field + "\x00" + st.Term
+		cur, ok := byKey[key]
+		if !ok {
+			cp := *st
+			cp.Sources = nil
+			cur = &cp
+			byKey[key] = cur
+			rv = append(rv, cur)
+		} else {
+			cur.TF += st.TF
+		}
+		if source != "" {
+			cur.Sources = append(cur.Sources, source)
+		}
+	}
+	for _, doc := range s.SourceDocs {
+		for _, st := range doc.Terms {
+			add(st, doc.ID)
+		}
+	}
+	for _, st := range s.Terms {
+		add(st, "")
+	}
+	return rv
 }
 
 // FieldSet represents a set of queried fields.

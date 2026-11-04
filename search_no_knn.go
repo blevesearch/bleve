@@ -78,6 +78,14 @@ type SearchRequest struct {
 
 	PreSearchData map[string]interface{} `json:"pre_search_data,omitempty"`
 
+	// RewriteOnly stops after every more_like_this node has been
+	// substituted and returns the rewritten query instead of running it.
+	RewriteOnly bool `json:"rewrite_only,omitempty"`
+
+	// Notes is free-form JSON carried with the request and ignored by the
+	// search, for the caller's own annotations.
+	Notes OptionalRawMessage `json:"notes,omitempty"`
+
 	Params *RequestParams `json:"params,omitempty"`
 
 	sortFunc func(sort.Interface)
@@ -101,6 +109,8 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		SearchBefore     []string           `json:"search_before"`
 		PreSearchData    OptionalRawMessage `json:"pre_search_data"`
 		Params           OptionalRawMessage `json:"params"`
+		RewriteOnly      bool               `json:"rewrite_only"`
+		Notes            OptionalRawMessage `json:"notes"`
 	}
 
 	err := util.UnmarshalJSON(input, &temp)
@@ -130,6 +140,8 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.Score = temp.Score
 	r.SearchAfter = temp.SearchAfter
 	r.SearchBefore = temp.SearchBefore
+	r.RewriteOnly = temp.RewriteOnly
+	r.Notes = temp.Notes
 	r.Query, err = query.ParseQuery(temp.Q)
 	if err != nil {
 		return err
@@ -185,6 +197,8 @@ func copySearchRequest(req *SearchRequest, preSearchData map[string]interface{})
 		Score:            req.Score,
 		SearchAfter:      req.SearchAfter,
 		SearchBefore:     req.SearchBefore,
+		RewriteOnly:      req.RewriteOnly,
+		Notes:            req.Notes,
 		PreSearchData:    preSearchData,
 	}
 	return &rv
@@ -217,6 +231,10 @@ func validateAndDistributeKNNHits(knnHits []*search.DocumentMatch, indexes []Ind
 }
 
 func isKNNrequestSatisfiedByPreSearch(req *SearchRequest) bool {
+	return false
+}
+
+func knnFiltersContainMoreLikeThis(req *SearchRequest) bool {
 	return false
 }
 

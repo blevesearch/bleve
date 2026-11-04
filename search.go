@@ -564,6 +564,35 @@ type SearchResult struct {
 
 	// The following fields are applicable to BM25 preSearch
 	BM25Stats *search.BM25Stats `json:"bm25_stats,omitempty"`
+
+	// MLTStats carries, during preSearch, the term statistics gathered for
+	// each more_like_this node of the query, keyed by the node's position
+	// in the tree (see query.ExtractMoreLikeThisQueries).
+	MLTStats map[string]*search.MLTStats `json:"mlt_stats,omitempty"`
+
+	// RewrittenQuery is the query as it was (or would be) executed after
+	// every more_like_this node was substituted; returned with
+	// SearchRequest.RewriteOnly, or next to the hits with Explain.
+	RewrittenQuery *RewrittenQuery `json:"rewritten_query,omitempty"`
+}
+
+// RewrittenQuery carries a query in a SearchResult; it is parsed back with
+// query.ParseQuery when decoded.
+type RewrittenQuery struct {
+	Query query.Query
+}
+
+func (r RewrittenQuery) MarshalJSON() ([]byte, error) {
+	return util.MarshalJSON(r.Query)
+}
+
+func (r *RewrittenQuery) UnmarshalJSON(data []byte) error {
+	q, err := query.ParseQuery(data)
+	if err != nil {
+		return err
+	}
+	r.Query = q
+	return nil
 }
 
 func (sr *SearchResult) Size() int {
