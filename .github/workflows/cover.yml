@@ -4,16 +4,18 @@ on:
       - master
   pull_request:
 name: Coverage
+permissions:
+  contents: read
 jobs:
   coverage:
     runs-on: ubuntu-latest
     steps:
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.25.x'
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Clean environment
         run: |
           go clean -cache -testcache -modcache
@@ -25,6 +27,6 @@ jobs:
         run: |
           grep -E 'mode|\.go' profile.cov > profile_go.cov
       - name: Send coverage
-        uses: shogo82148/actions-goveralls@v1
+        uses: shogo82148/actions-goveralls@9606dbc5ac5cf888a0e9ef901515c3cd516a2790 # v1.11.0
         with:
           path-to-profile: profile_go.cov
