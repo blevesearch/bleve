@@ -934,6 +934,34 @@ func (s *Scorch) AddEligibleForRemoval(epoch uint64) {
 	s.rootLock.Unlock()
 }
 
+// UnpersistedMemoryUsed reports the bytes held by segments at root that have
+// not yet been written to disk.
+func (s *Scorch) UnpersistedMemoryUsed() (rv uint64) {
+	indexSnapshot := s.currentSnapshot()
+	if indexSnapshot == nil {
+		return 0
+	}
+	defer func() {
+		_ = indexSnapshot.Close()
+	}()
+
+	for _, ss := range indexSnapshot.segment {
+		if _, ok := ss.segment.(segment.PersistedSegment); !ok {
+			rv += uint64(ss.Size())
+		}
+	}
+
+	// Discount what a merge has already claimed, so ingest resumes when the
+	// drain starts rather than when the cycle's single introduction lands. The
+	// trade is a ceiling of roughly twice the threshold: in-flight inputs plus
+	// whatever accumulates during the merge.
+	claimed := atomic.LoadUint64(&s.stats.CurMergingUnpersistedBytes)
+	if claimed >= rv {
+		return 0
+	}
+	return rv - claimed
+}
+
 func (s *Scorch) MemoryUsed() (memUsed uint64) {
 	indexSnapshot := s.currentSnapshot()
 	if indexSnapshot == nil {
