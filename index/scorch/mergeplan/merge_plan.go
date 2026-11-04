@@ -178,7 +178,7 @@ var DefaultMergePlanOptions = MergePlanOptions{
 	MaxSegmentSize:       5000000,
 	MaxSegmentFileSize:   4 * 1024 * 1024 * 1024, // 4GiB
 	TierGrowth:           10.0,
-	SegmentsPerMergeTask: 10,
+	SegmentsPerMergeTask: 100,
 	FloorSegmentSize:     2000,
 	ReclaimDeletesWeight: 2.0,
 	DeletesPctAllowed:    0.33,
