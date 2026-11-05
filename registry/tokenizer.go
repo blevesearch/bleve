@@ -45,11 +45,14 @@ func NewTokenizerCache() *TokenizerCache {
 func TokenizerBuild(name string, config map[string]interface{}, cache *Cache) (interface{}, error) {
 	cons, registered := tokenizers[name]
 	if !registered {
+		if _, deprecated := deprecatedTokenizers[name]; deprecated {
+			return nil, deprecatedError("tokenizer", name)
+		}
 		return nil, fmt.Errorf("no tokenizer with name or type '%s' registered", name)
 	}
 	tokenizer, err := cons(config, cache)
 	if err != nil {
-		return nil, fmt.Errorf("error building tokenizer: %v", err)
+		return nil, fmt.Errorf("error building tokenizer: %w", err)
 	}
 	return tokenizer, nil
 }

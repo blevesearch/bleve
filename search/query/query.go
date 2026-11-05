@@ -17,6 +17,7 @@ package query
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
 	"github.com/blevesearch/bleve/v2/util"
@@ -565,7 +567,8 @@ func ExtractSynonyms(ctx context.Context, m mapping.SynonymMapping, r index.Thes
 		}
 		analyzer := m.AnalyzerNamed(analyzerName)
 		if analyzer == nil {
-			return nil, fmt.Errorf("no analyzer named '%s' registered", analyzerName)
+			// analyzer not registered
+			return nil, analyzerNotFoundError(m, analyzerName)
 		}
 		return analyzer, nil
 	}
@@ -815,4 +818,20 @@ func addSynonymsForTerm(ctx context.Context, src, field, term string,
 		rv[field][term] = synonyms
 	}
 	return rv, nil
+}
+
+// analyzerNotFoundError is the error for a query that needs analyzerName to
+// analyze its text when the mapping cannot resolve it.  An analyzer that has
+// been removed is reported as deprecated, wrapping
+// registry.ErrDeprecatedComponent.
+func analyzerNotFoundError(m mapping.IndexMapping, analyzerName string) error {
+	if am, ok := m.(interface {
+		AnalyzeText(string, []byte) (analysis.TokenStream, error)
+	}); ok {
+		_, err := am.AnalyzeText(analyzerName, nil)
+		if errors.Is(err, registry.ErrDeprecatedComponent) {
+			return err
+		}
+	}
+	return fmt.Errorf("no analyzer named '%s' registered", analyzerName)
 }

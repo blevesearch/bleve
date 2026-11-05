@@ -56,21 +56,34 @@ type DocumentMapping struct {
 func (dm *DocumentMapping) Validate(cache *registry.Cache,
 	path []string, fieldAliasCtx map[string]*FieldMapping,
 ) error {
+	var deprecated error
+	err := dm.validate(cache, path, fieldAliasCtx, &deprecated)
+	if err != nil {
+		return err
+	}
+	return deprecated
+}
+
+// validate is Validate, except that a reference to a deprecated analysis
+// component is recorded in *deprecated instead of ending the walk.
+func (dm *DocumentMapping) validate(cache *registry.Cache,
+	path []string, fieldAliasCtx map[string]*FieldMapping, deprecated *error,
+) error {
 	var err error
 	if dm.DefaultAnalyzer != "" {
 		_, err := cache.AnalyzerNamed(dm.DefaultAnalyzer)
-		if err != nil {
+		if err = skipDeprecated(err, deprecated); err != nil {
 			return err
 		}
 	}
 	if dm.DefaultSynonymSource != "" {
 		_, err := cache.SynonymSourceNamed(dm.DefaultSynonymSource)
-		if err != nil {
+		if err = skipDeprecated(err, deprecated); err != nil {
 			return err
 		}
 	}
 	for propertyName, property := range dm.Properties {
-		err = property.Validate(cache, append(path, propertyName), fieldAliasCtx)
+		err = property.validate(cache, append(path, propertyName), fieldAliasCtx, deprecated)
 		if err != nil {
 			return err
 		}
@@ -78,7 +91,7 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache,
 	for _, field := range dm.Fields {
 		if field.Analyzer != "" {
 			_, err = cache.AnalyzerNamed(field.Analyzer)
-			if err != nil {
+			if err = skipDeprecated(err, deprecated); err != nil {
 				return err
 			}
 		}
@@ -90,7 +103,7 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache,
 		}
 		if field.SynonymSource != "" {
 			_, err = cache.SynonymSourceNamed(field.SynonymSource)
-			if err != nil {
+			if err = skipDeprecated(err, deprecated); err != nil {
 				return err
 			}
 		}

@@ -60,7 +60,7 @@ func StopTokensFilterConstructor(config map[string]interface{}, cache *registry.
 	}
 	stopTokenMap, err := cache.TokenMapNamed(stopTokenMapName)
 	if err != nil {
-		return nil, fmt.Errorf("error building stop words filter: %v", err)
+		return nil, fmt.Errorf("error building stop words filter: %w", err)
 	}
 	return NewStopTokensFilter(stopTokenMap), nil
 }

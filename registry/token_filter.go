@@ -45,11 +45,14 @@ func NewTokenFilterCache() *TokenFilterCache {
 func TokenFilterBuild(name string, config map[string]interface{}, cache *Cache) (interface{}, error) {
 	cons, registered := tokenFilters[name]
 	if !registered {
+		if _, deprecated := deprecatedTokenFilters[name]; deprecated {
+			return nil, deprecatedError("token filter", name)
+		}
 		return nil, fmt.Errorf("no token filter with name or type '%s' registered", name)
 	}
 	tokenFilter, err := cons(config, cache)
 	if err != nil {
-		return nil, fmt.Errorf("error building token filter: %v", err)
+		return nil, fmt.Errorf("error building token filter: %w", err)
 	}
 	return tokenFilter, nil
 }

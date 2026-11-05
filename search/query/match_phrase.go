@@ -16,7 +16,6 @@ package query
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -87,7 +86,7 @@ func (q *MatchPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 	}
 	analyzer := m.AnalyzerNamed(analyzerName)
 	if analyzer == nil {
-		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
+		return nil, analyzerNotFoundError(m, analyzerName)
 	}
 
 	tokens := analyzer.Analyze([]byte(q.MatchPhrase))
