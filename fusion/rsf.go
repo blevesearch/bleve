@@ -94,32 +94,36 @@ func RelativeScoreFusion(hits search.DocumentMatchCollection, weights []float64,
 	}
 
 	// Code from here is for calculating knn scores
+	// Keep small result sets on the stack; larger sets reuse one allocation
+	// across all KNN sources.
+	var local [smallFusionBufferSize]scoredDocumentMatch
+	var scratch []scoredDocumentMatch
+	if numKNNQueries > 0 {
+		if nHits <= len(local) {
+			scratch = local[:nHits]
+		} else {
+			scratch = make([]scoredDocumentMatch, nHits)
+		}
+	}
 	for queryIdx := 0; queryIdx < numKNNQueries; queryIdx++ {
-		sortDocMatchesByBreakdown(hits, queryIdx)
+		knnHits := sortDocMatchesByBreakdown(hits, queryIdx, scratch)
 
 		// knnLimit holds the total number of knn hits retrieved for a specific knn query
-		knnLimit := 0
-		for _, hit := range hits {
-			if _, ok := scoreBreakdownForQuery(hit, queryIdx); !ok {
-				break
-			}
-			knnLimit++
-		}
-		knnLimit = min(knnLimit, windowSize)
+		knnLimit := min(len(knnHits), windowSize)
 
 		// if limit is 0, skip calculating
 		if knnLimit == 0 {
 			continue
 		}
 
-		max, _ := scoreBreakdownForQuery(hits[0], queryIdx)
-		min, _ := scoreBreakdownForQuery(hits[knnLimit-1], queryIdx)
+		max := knnHits[0].score
+		min := knnHits[knnLimit-1].score
 		denom := max - min
 		weight := weights[queryIdx+1]
 
 		for i := 0; i < knnLimit; i++ {
-			hit := hits[i]
-			score, _ := scoreBreakdownForQuery(hit, queryIdx)
+			hit := knnHits[i].hit
+			score := knnHits[i].score
 			norm := 1.0
 			if denom > 0 {
 				norm = (score - min) / denom

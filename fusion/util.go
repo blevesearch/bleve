@@ -16,6 +16,9 @@
 package fusion
 
 import (
+	"cmp"
+	"math"
+	"slices"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -50,10 +53,75 @@ func scoreBreakdownForQuery(hit *search.DocumentMatch, idx int) (float64, bool) 
 	return score, ok
 }
 
-// sortDocMatchesByBreakdown orders the hits in-place using the KNN score for
+const smallFusionBufferSize = 32
+
+type scoredDocumentMatch struct {
+	hit   *search.DocumentMatch
+	score float64
+}
+
+// sortDocMatchesByBreakdown caches the source scores and sorts present and
+// missing hits separately. Both groups retain the current order for equal keys,
+// including ties inherited from earlier sources. The entire input is reordered,
+// since even hits outside the scoring window can affect ties in the next source.
+// scratch must have room for every hit and can be reused for successive sources.
+// The returned prefix contains the hits with a score for this source.
+func sortDocMatchesByBreakdown(hits search.DocumentMatchCollection, queryIdx int, scratch []scoredDocumentMatch) []scoredDocumentMatch {
+	present, missing := 0, len(hits)
+	hasNaN := false
+	for _, hit := range hits {
+		score, ok := scoreBreakdownForQuery(hit, queryIdx)
+		if ok {
+			scratch[present] = scoredDocumentMatch{hit: hit, score: score}
+			present++
+			hasNaN = hasNaN || math.IsNaN(score)
+		} else {
+			missing--
+			scratch[missing] = scoredDocumentMatch{hit: hit}
+		}
+	}
+
+	if hasNaN {
+		// NaN does not define a total order. Keep the original comparison and
+		// sorting sequence rather than changing the behavior of such inputs.
+		sortDocMatchesByBreakdownFallback(hits, queryIdx)
+		present = 0
+		for _, hit := range hits {
+			score, ok := scoreBreakdownForQuery(hit, queryIdx)
+			if !ok {
+				break
+			}
+			scratch[present] = scoredDocumentMatch{hit: hit, score: score}
+			present++
+		}
+		return scratch[:present]
+	}
+
+	// Missing hits were filled from the end, so restore their input order
+	// before the stable sort. Equal HitNumbers must not be reversed.
+	slices.Reverse(scratch[present:len(hits)])
+	slices.SortStableFunc(scratch[:present], func(a, b scoredDocumentMatch) int {
+		if a.score == b.score {
+			return cmp.Compare(a.hit.HitNumber, b.hit.HitNumber)
+		}
+		if a.score > b.score {
+			return -1
+		}
+		return 1
+	})
+	slices.SortStableFunc(scratch[present:len(hits)], func(a, b scoredDocumentMatch) int {
+		return cmp.Compare(a.hit.HitNumber, b.hit.HitNumber)
+	})
+	for i := range hits {
+		hits[i] = scratch[i].hit
+	}
+	return scratch[:present]
+}
+
+// sortDocMatchesByBreakdownFallback orders the hits in-place using the KNN score for
 // the supplied query index (descending), breaking ties with `HitNumber` and
 // placing hits without a score at the end.
-func sortDocMatchesByBreakdown(hits search.DocumentMatchCollection, queryIdx int) {
+func sortDocMatchesByBreakdownFallback(hits search.DocumentMatchCollection, queryIdx int) {
 	if len(hits) < 2 {
 		return
 	}
