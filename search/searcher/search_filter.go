@@ -108,3 +108,146 @@ func (f *FilteringSearcher) Min() int {
 func (f *FilteringSearcher) DocumentMatchPoolSize() int {
 	return f.child.DocumentMatchPoolSize()
 }
+
+var reflectStaticSizeFilterSearcher int
+
+func init() {
+	var fs FilterSearcher
+	reflectStaticSizeFilterSearcher = int(reflect.TypeOf(fs).Size())
+}
+
+// FilterSearcher keeps only those documents of its child that are also matched
+// by filterSearcher. Both are expected to return documents in internal-ID
+// order, so filterSearcher is advanced in lockstep with the child and the
+// filter does not contribute to the result score.
+//
+// Unlike FilteringSearcher, which takes a caller-supplied predicate, this
+// searcher owns filterSearcher: it is closed together with the child, and any
+// error returned while iterating it aborts the search instead of being treated
+// as a non-match.
+type FilterSearcher struct {
+	child          search.Searcher
+	filterSearcher search.Searcher
+	initialized    bool
+	refDoc         *search.DocumentMatch
+}
+
+func NewFilterSearcher(ctx context.Context, child, filterSearcher search.Searcher) *FilterSearcher {
+	return &FilterSearcher{
+		child:          child,
+		filterSearcher: filterSearcher,
+	}
+}
+
+func (f *FilterSearcher) Size() int {
+	return reflectStaticSizeFilterSearcher + 2*size.SizeOfPtr +
+		f.child.Size() + f.filterSearcher.Size()
+}
+
+// matches reports whether d is also matched by filterSearcher, advancing
+// filterSearcher as needed. filterSearcher is only ever advanced forward, which
+// is valid because the child yields documents in internal-ID order.
+func (f *FilterSearcher) matches(ctx *search.SearchContext, d *search.DocumentMatch) (bool, error) {
+	if !f.initialized {
+		// Initialize the reference document to point
+		// to the first document in the filterSearcher
+		refDoc, err := f.filterSearcher.Next(ctx)
+		if err != nil {
+			return false, err
+		}
+		f.refDoc = refDoc
+		f.initialized = true
+	}
+	if f.refDoc == nil {
+		// filterSearcher is exhausted, d is not in filter
+		return false, nil
+	}
+	// Compare document IDs
+	cmp := f.refDoc.IndexInternalID.Compare(d.IndexInternalID)
+	if cmp < 0 {
+		// recycle refDoc now that we do not need it
+		ctx.DocumentMatchPool.Put(f.refDoc)
+		// filterSearcher is behind the current document, Advance() it
+		refDoc, err := f.filterSearcher.Advance(ctx, d.IndexInternalID)
+		if err != nil {
+			return false, err
+		}
+		f.refDoc = refDoc
+		if f.refDoc == nil {
+			return false, nil
+		}
+		// After advance, check if they're now equal
+		cmp = f.refDoc.IndexInternalID.Compare(d.IndexInternalID)
+	}
+	// cmp >= 0: either equal (match) or filterSearcher is ahead (no match)
+	return cmp == 0, nil
+}
+
+func (f *FilterSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+	next, err := f.child.Next(ctx)
+	for next != nil && err == nil {
+		keep, ferr := f.matches(ctx, next)
+		if ferr != nil {
+			return nil, ferr
+		}
+		if keep {
+			return next, nil
+		}
+		// recycle this document match now, since
+		// we do not need it anymore
+		ctx.DocumentMatchPool.Put(next)
+		next, err = f.child.Next(ctx)
+	}
+	return nil, err
+}
+
+func (f *FilterSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
+	adv, err := f.child.Advance(ctx, ID)
+	if err != nil {
+		return nil, err
+	}
+	if adv == nil {
+		return nil, nil
+	}
+	keep, err := f.matches(ctx, adv)
+	if err != nil {
+		return nil, err
+	}
+	if keep {
+		return adv, nil
+	}
+	// recycle this document match now, since
+	// we do not need it anymore
+	ctx.DocumentMatchPool.Put(adv)
+	return f.Next(ctx)
+}
+
+func (f *FilterSearcher) Close() error {
+	err0 := f.child.Close()
+	err1 := f.filterSearcher.Close()
+	if err0 != nil {
+		return err0
+	}
+	return err1
+}
+
+func (f *FilterSearcher) Weight() float64 {
+	return f.child.Weight()
+}
+
+func (f *FilterSearcher) SetQueryNorm(n float64) {
+	f.child.SetQueryNorm(n)
+}
+
+func (f *FilterSearcher) Count() uint64 {
+	return f.child.Count()
+}
+
+func (f *FilterSearcher) Min() int {
+	return f.child.Min()
+}
+
+func (f *FilterSearcher) DocumentMatchPoolSize() int {
+	return f.child.DocumentMatchPoolSize() +
+		f.filterSearcher.DocumentMatchPoolSize()
+}
