@@ -20,6 +20,7 @@ import (
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/geojson"
+	"github.com/blevesearch/geo/s2"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
 
@@ -93,6 +94,17 @@ func (iq *intersectsQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset
 
 	var reader *bytes.Reader
 
+	// Scratch buffers for decoding stored shapes, taken on the first decode that
+	// actually happens and returned at the end of the call. Evaluate runs on one
+	// goroutine per segment, so the pool is this call's alone while it holds it.
+	var bufPool *s2.GeoBufferPool
+	var releaseBufPool func()
+	defer func() {
+		if releaseBufPool != nil {
+			releaseBufPool()
+		}
+	}()
+
 	// filter out any maybeHits that do not have a bounding box that
 	// intersects the query bounding box
 	boxFilter := func(docNum int) {
@@ -121,7 +133,11 @@ func (iq *intersectsQuery) Evaluate(geoData segment.GeoShapeV2Data) *util.Bitset
 			return
 		}
 
-		docShape, err := geojson.ExtractShapesFromBytes(docShapeBytes, &reader, nil)
+		if bufPool == nil {
+			bufPool, releaseBufPool = shapeDecodeBuffers()
+		}
+
+		docShape, err := geojson.ExtractShapesFromBytes(docShapeBytes, &reader, bufPool)
 		if err != nil {
 			return
 		}
