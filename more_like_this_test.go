@@ -691,7 +691,9 @@ func TestMLTPreSearchResultProcessorMerge(t *testing.T) {
 	// like_text: every member answers for the same terms; tf stays, df
 	// and the document count add up to index-wide figures, whatever the
 	// order and even with members of the same name
-	t1 := contribution("0", &search.MLTStats{Terms: []*search.MLTTermStat{term("pool", 2, 4, 100)}})
+	// a member analyzing the text differently may report another tf; the
+	// largest one is kept so that the order of the answers does not matter
+	t1 := contribution("0", &search.MLTStats{Terms: []*search.MLTTermStat{term("pool", 1, 4, 100)}})
 	t2 := contribution("0", &search.MLTStats{Terms: []*search.MLTTermStat{term("pool", 2, 6, 300)}})
 	for name, order := range map[string][]*SearchResult{"t1 t2": {t1, t2}, "t2 t1": {t2, t1}} {
 		merged := merge(order...)
@@ -813,6 +815,85 @@ func TestMoreLikeThisValidateFields(t *testing.T) {
 	// no mapping to check against: nothing is refused
 	if err := query.NewMoreLikeThisQuery([]string{"summary"}, []string{"h"}).ValidateFields(nil); err != nil {
 		t.Errorf("expected no error without a mapping, got %v", err)
+	}
+	// a like_text only analyzes its input: no doc values needed
+	lt := query.NewMoreLikeThisQuery([]string{"summary"}, nil)
+	lt.LikeText = "some words"
+	if err := lt.ValidateFields(im); err != nil {
+		t.Errorf("expected like_text to be accepted on a field without doc values, got %v", err)
+	}
+	// a nested field's values live in child documents: refused for now
+	nested := NewIndexMapping()
+	reviews := mapping.NewNestedDocumentMapping()
+	reviews.AddFieldMappingsAt("body", mapping.NewTextFieldMapping())
+	nested.DefaultMapping.AddSubDocumentMapping("reviews", reviews)
+	nq := query.NewMoreLikeThisQuery([]string{"reviews.body"}, []string{"h"})
+	if err := nq.ValidateFields(nested); err == nil || !strings.Contains(err.Error(), "nested") {
+		t.Errorf("expected a nested field to be refused, got %v", err)
+	}
+	if err := query.NewMoreLikeThisQuery([]string{"description"}, []string{"h"}).ValidateFields(nested); err != nil {
+		t.Errorf("expected a field outside the nested mapping to be accepted, got %v", err)
+	}
+}
+
+func TestMoreLikeThisLikeTextWithoutDocValues(t *testing.T) {
+	// the terms of a like_text come from analyzing it, so the field does
+	// not need doc values
+	im := NewIndexMapping()
+	fm := mapping.NewTextFieldMapping()
+	fm.DocValues = false
+	im.DefaultMapping.AddFieldMappingsAt("description", fm)
+	idx, err := NewMemOnly(im)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mltIndexDocs(t, idx, "hotel_10025", "hotel_10063", "hotel_10142")
+	q := query.NewMoreLikeThisQuery([]string{"description"}, nil)
+	q.LikeText = "boutique harbourfront rooftop pool"
+	sr, err := idx.Search(NewSearchRequest(q))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertHitSet(t, sr, "hotel_10025", "hotel_10063")
+}
+
+func TestIndexAliasMappingThroughNestedAliases(t *testing.T) {
+	// the scoring model used to rank the terms is taken from the members,
+	// also when the members are aliases without a mapping of their own
+	im := NewIndexMapping()
+	im.ScoringModel = index.BM25Scoring
+	newIndex := func(ids ...string) Index {
+		idx, err := NewUsing(t.TempDir(), im, scorch.Name, scorch.Name, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return mltIndexDocs(t, idx, ids...)
+	}
+	inner1 := NewIndexAlias(newIndex("hotel_10025"), newIndex("hotel_10142"))
+	inner2 := NewIndexAlias(newIndex("hotel_10063"), newIndex("hotel_10098"))
+	root := NewIndexAlias(inner1, inner2)
+	if m := root.aliasMapping(); m == nil || !isBM25Enabled(m) {
+		t.Errorf("expected the members' bm25 mapping through the nested aliases, got %v", m)
+	}
+	// and the search works through that tree
+	sr, err := root.Search(NewSearchRequest(query.NewMoreLikeThisQuery([]string{"description"}, []string{"hotel_10025"})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertHitSet(t, sr, "hotel_10063", "hotel_10098")
+}
+
+func TestRewriteOnlyFlags(t *testing.T) {
+	// a rewrite_only request only needs the more_like_this lookup
+	if got := rewriteOnlyFlags(nil); got != nil {
+		t.Errorf("expected nil flags to stay nil, got %+v", got)
+	}
+	if got := rewriteOnlyFlags(&preSearchFlags{knn: true, synonyms: true, bm25: true}); got != nil {
+		t.Errorf("expected no preSearch without a more_like_this node, got %+v", got)
+	}
+	got := rewriteOnlyFlags(&preSearchFlags{knn: true, synonyms: true, bm25: true, mlt: true})
+	if got == nil || !got.mlt || got.knn || got.synonyms || got.bm25 {
+		t.Errorf("expected only the mlt flag kept, got %+v", got)
 	}
 }
 
@@ -980,6 +1061,11 @@ func TestMoreLikeThisRewriteOnlySingleIndex(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertHitIDs(t, again, "hotel_10063", "hotel_10098")
+
+		// reading the source document's terms counts towards the cost
+		if strings.Contains(t.Name(), "scorch") && sr.Cost == 0 {
+			t.Error("expected the doc value reads of the source document in the cost")
+		}
 
 		// a normal run returns neither the query nor notes
 		sr, err = idx.Search(NewSearchRequest(query.NewMoreLikeThisQuery([]string{"description"}, []string{"hotel_10025"})))

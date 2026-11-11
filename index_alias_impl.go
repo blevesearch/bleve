@@ -288,6 +288,11 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	if err != nil {
 		return nil, err
 	}
+	if req.RewriteOnly {
+		// the query is not going to run, so only the more_like_this
+		// lookup is worth a round-trip
+		flags = rewriteOnlyFlags(flags)
+	}
 	if flags != nil && flags.mlt && i.mapping == nil {
 		// the compared fields are checked against a member's mapping here
 		// rather than reported as a failed member after the fan-out
@@ -372,10 +377,11 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		if err != nil {
 			return nil, err
 		}
-		// an explained result also shows the query that was actually run
-		if req.Explain && searchReq != req {
-			sr.RewrittenQuery = &RewrittenQuery{Query: searchReq.Query}
-		}
+	}
+	// an explained result also shows the query that was actually run,
+	// whichever path produced the result
+	if req.Explain && searchReq != req && sr.RewrittenQuery == nil {
+		sr.RewrittenQuery = &RewrittenQuery{Query: searchReq.Query}
 	}
 	sr.Took += preSearchDuration
 	return sr, nil
@@ -684,6 +690,15 @@ func isBM25Enabled(m mapping.IndexMapping) bool {
 		rv = m.ScoringModel == index.BM25Scoring
 	}
 	return rv
+}
+
+// rewriteOnlyFlags reduces the preSearch flags of a rewrite_only request to
+// the more_like_this lookup, or to none when there is nothing to rewrite.
+func rewriteOnlyFlags(flags *preSearchFlags) *preSearchFlags {
+	if flags == nil || !flags.mlt {
+		return nil
+	}
+	return &preSearchFlags{mlt: true}
 }
 
 // preSearchRequired checks if preSearch is required and returns the presearch flags struct
@@ -1081,7 +1096,8 @@ type multiSearchParams struct {
 }
 
 // aliasMapping returns the mapping set on the alias, or the first mapping
-// one of its members can give; the caller holds the alias lock.
+// one of its members can give, looking through member aliases that have
+// none of their own; the caller holds the alias lock.
 func (i *indexAliasImpl) aliasMapping() mapping.IndexMapping {
 	if i.mapping != nil {
 		return i.mapping
@@ -1090,8 +1106,22 @@ func (i *indexAliasImpl) aliasMapping() mapping.IndexMapping {
 		if m := in.Mapping(); m != nil {
 			return m
 		}
+		if nested, ok := in.(*indexAliasImpl); ok {
+			if m := nested.lockedAliasMapping(); m != nil {
+				return m
+			}
+		}
 	}
 	return nil
+}
+
+func (i *indexAliasImpl) lockedAliasMapping() mapping.IndexMapping {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+	if !i.open {
+		return nil
+	}
+	return i.aliasMapping()
 }
 
 // MultiSearch executes a SearchRequest across multiple Index objects,

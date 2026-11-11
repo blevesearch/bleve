@@ -294,17 +294,30 @@ func (q *MoreLikeThisQuery) ValidateFields(m mapping.IndexMapping) error {
 	if !ok {
 		return nil
 	}
+	// doc values are what a source document's terms are read from; a
+	// like_text only analyzes its input and reads the term dictionary
+	needDocValues := len(q.LikeIDs) > 0
+	nm, _ := mapping.IndexMapping(im).(mapping.NestedMapping)
 	for _, field := range q.ComparedFields() {
+		if nm != nil {
+			// the values of a nested field live in child documents, which
+			// the source document's doc values do not cover
+			fs := search.NewFieldSet()
+			fs.AddField(field)
+			if _, depth := nm.NestedDepth(fs); depth > 0 {
+				return fmt.Errorf("more_like_this: field %q is nested, which is not supported", field)
+			}
+		}
 		fm := im.FieldMappingForPath(field)
 		switch {
 		case fm.Type == "":
 			// not explicitly mapped: indexed dynamically, if at all
-			if !im.DocValuesDynamic {
+			if needDocValues && !im.DocValuesDynamic {
 				return fmt.Errorf("more_like_this: field %q has no doc values", field)
 			}
 		case fm.Type != "text":
 			return fmt.Errorf("more_like_this: field %q is not a text field", field)
-		case !fm.DocValues:
+		case needDocValues && !fm.DocValues:
 			return fmt.Errorf("more_like_this: field %q has no doc values", field)
 		}
 	}
@@ -388,6 +401,9 @@ func (q *MoreLikeThisQuery) CollectStats(ctx context.Context, r index.IndexReade
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		reportBytesRead(ctx, dvReader.BytesRead())
+	}()
 	docIDReader, err := r.DocIDReaderOnly(q.LikeIDs)
 	if err != nil {
 		return nil, err
@@ -438,6 +454,18 @@ func (q *MoreLikeThisQuery) CollectStats(ctx context.Context, r index.IndexReade
 		rv.FoundIDs = append(rv.FoundIDs, id)
 	}
 	return rv, nil
+}
+
+// reportBytesRead accounts doc value reads towards the search cost, the way
+// the collector does for the doc values of the hits.
+func reportBytesRead(ctx context.Context, bytes uint64) {
+	if bytes == 0 {
+		return
+	}
+	if fn, ok := ctx.Value(search.SearchIOStatsCallbackKey).(search.SearchIOStatsCallbackFunc); ok {
+		fn(bytes)
+		search.RecordSearchCost(ctx, search.AddM, bytes)
+	}
 }
 
 // termStats reads, from the posting list of the term, its frequency in the

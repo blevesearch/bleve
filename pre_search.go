@@ -156,7 +156,9 @@ func mltTermKey(st *search.MLTTermStat) string {
 // addStat folds the df and document count of a term reported by one
 // contribution into the node; counted holds the terms this contribution
 // already accounted for, so that a term in two source documents of the same
-// member is counted once.
+// member is counted once. The tf kept is the largest reported, so that
+// members analyzing a like_text differently still merge the same way
+// whatever the order they answer in.
 func (n *mltMergedNode) addStat(st *search.MLTTermStat, counted map[string]struct{}) {
 	key := mltTermKey(st)
 	cur, ok := n.terms[key]
@@ -164,6 +166,8 @@ func (n *mltMergedNode) addStat(st *search.MLTTermStat, counted map[string]struc
 		cur = &search.MLTTermStat{Field: st.Field, Term: st.Term, TF: st.TF}
 		n.terms[key] = cur
 		n.termOrder = append(n.termOrder, key)
+	} else if st.TF > cur.TF {
+		cur.TF = st.TF
 	}
 	if _, done := counted[key]; done {
 		return
