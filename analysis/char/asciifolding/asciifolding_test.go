@@ -122,3 +122,40 @@ func TestAsciiFoldingFilter(t *testing.T) {
 		})
 	}
 }
+
+func TestAsciiFoldingFilterFractions(t *testing.T) {
+	tests := []struct {
+		input  string
+		output string
+	}{
+		{"¼", "1/4"},
+		{"½", "1/2"},
+		{"¾", "3/4"},
+		{"⅐", "1/7"},
+		{"⅑", "1/9"},
+		{"⅒", "1/10"},
+		{"⅓", "1/3"},
+		{"⅔", "2/3"},
+		{"⅕", "1/5"},
+		{"⅖", "2/5"},
+		{"⅗", "3/5"},
+		{"⅘", "4/5"},
+		{"⅙", "1/6"},
+		{"⅚", "5/6"},
+		{"⅛", "1/8"},
+		{"⅜", "3/8"},
+		{"⅝", "5/8"},
+		{"⅞", "7/8"},
+		{"↉", "0/3"},
+		{"Æ½ ⅒✅", "AE1/2 1/10✅"},
+	}
+
+	filter := New()
+	for _, test := range tests {
+		t.Run(test.input, func(t *testing.T) {
+			if output := string(filter.Filter([]byte(test.input))); output != test.output {
+				t.Errorf("expected %q, got %q", test.output, output)
+			}
+		})
+	}
+}
