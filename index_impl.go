@@ -646,7 +646,12 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 		}
 	}
 
-	return &SearchResult{
+	mltStats, err := collectMoreLikeThisStats(ctx, req, reader, i.m)
+	if err != nil {
+		return nil, err
+	}
+
+	rv := &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
 			Successful: 1,
@@ -657,7 +662,11 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 			DocCount:         float64(count),
 			FieldCardinality: fieldCardinality,
 		},
-	}, nil
+	}
+	if mltStats != nil {
+		rv.PreSearchResults = PreSearchResults{search.MLTPreSearchDataKey: mltStats}
+	}
+	return rv, nil
 }
 
 // SearchInContext executes a search request operation within the provided
@@ -776,6 +785,30 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		return sr, nil
 	}
 
+	// more_like_this nodes are resolved here, with this index's statistics;
+	// a request an alias already rewrote carries none
+	searchQuery := req.Query
+	rewritten := false
+	if nodes := query.ExtractMoreLikeThisQueries(req.Query); len(nodes) > 0 {
+		mltStats, err := collectMoreLikeThisStats(ctx, req, indexReader, i.m)
+		if err != nil {
+			return nil, err
+		}
+		searchQuery, err = rewriteMoreLikeThis(req.Query, mltStats, mltRewriteOptions(req, i.m))
+		if err != nil {
+			return nil, err
+		}
+		rewritten = true
+	}
+
+	// the caller only wants the query as it would run
+	if req.RewriteOnly {
+		atomic.AddUint64(&i.stats.searches, 1)
+		searchDuration := time.Since(searchStart)
+		atomic.AddUint64(&i.stats.searchTime, uint64(searchDuration))
+		return rewriteOnlyResult(req, searchQuery, &SearchStatus{Total: 1, Successful: 1}, 0, searchDuration), nil
+	}
+
 	var reverseQueryExecution bool
 	if req.SearchBefore != nil {
 		reverseQueryExecution = true
@@ -890,7 +923,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		ctx = context.WithValue(ctx, search.BM25StatsKey, bm25Stats)
 	}
 
-	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
+	searcher, err := searchQuery.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
 		IncludeTermVectors: req.IncludeLocations || req.Highlight != nil,
 		Score:              req.Score,
@@ -1078,6 +1111,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	if req.Explain {
 		rv.Request = req
+		if rewritten {
+			rv.RewrittenQuery = &RewrittenQuery{Query: searchQuery}
+		}
 	}
 
 	return rv, nil

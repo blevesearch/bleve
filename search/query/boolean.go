@@ -32,6 +32,7 @@ type BooleanQuery struct {
 	MustNot         Query  `json:"must_not,omitempty"`
 	Filter          Query  `json:"filter,omitempty"`
 	BoostVal        *Boost `json:"boost,omitempty"`
+	Notes           Notes  `json:"notes,omitempty"`
 	queryStringMode bool
 }
 
@@ -303,6 +304,7 @@ func (q *BooleanQuery) UnmarshalJSON(data []byte) error {
 		MustNot json.RawMessage `json:"must_not,omitempty"`
 		Filter  json.RawMessage `json:"filter,omitempty"`
 		Boost   *Boost          `json:"boost,omitempty"`
+		Notes   Notes           `json:"notes,omitempty"`
 	}{}
 	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {
@@ -350,6 +352,7 @@ func (q *BooleanQuery) UnmarshalJSON(data []byte) error {
 	}
 
 	q.BoostVal = tmp.Boost
+	q.Notes = tmp.Notes
 
 	return nil
 }

@@ -27,6 +27,7 @@ type TermQuery struct {
 	Term     string `json:"term"`
 	FieldVal string `json:"field,omitempty"`
 	BoostVal *Boost `json:"boost,omitempty"`
+	Notes    Notes  `json:"notes,omitempty"`
 }
 
 // NewTermQuery creates a new Query for finding an

@@ -117,7 +117,18 @@ func ParsePreSearchData(input []byte) (map[string]interface{}, error) {
 				rv = make(map[string]interface{})
 			}
 			rv[search.BM25PreSearchDataKey] = value
-
+		case search.MLTPreSearchDataKey:
+			var value bool
+			if v != nil {
+				err := util.UnmarshalJSON(v, &value)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if rv == nil {
+				rv = make(map[string]interface{})
+			}
+			rv[search.MLTPreSearchDataKey] = value
 		}
 	}
 	return rv, nil
@@ -321,6 +332,15 @@ func ParseQuery(input []byte) (Query, error) {
 			return nil, fmt.Errorf("custom score query parser is not registered")
 		}
 		return CustomScoreQueryParser(input)
+	}
+	_, hasMoreLikeThis := tmp["more_like_this"]
+	if hasMoreLikeThis {
+		var rv MoreLikeThisQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
 	}
 	_, hasDocIds := tmp["ids"]
 	if hasDocIds {
@@ -531,6 +551,15 @@ func ExtractFields(q Query, m mapping.IndexMapping, fs search.FieldSet) (search.
 			fs = search.NewFieldSet()
 		}
 		fs.AddField("_id")
+	case *MoreLikeThisQuery:
+		for _, f := range q.ComparedFields() {
+			if f != "" {
+				if fs == nil {
+					fs = search.NewFieldSet()
+				}
+				fs.AddField(f)
+			}
+		}
 	}
 	return fs, err
 }

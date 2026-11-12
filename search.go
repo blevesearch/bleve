@@ -564,6 +564,74 @@ type SearchResult struct {
 
 	// The following fields are applicable to BM25 preSearch
 	BM25Stats *search.BM25Stats `json:"bm25_stats,omitempty"`
+
+	// PreSearchResults carries what the other preSearch features gathered,
+	// keyed like SearchRequest.PreSearchData; see RegisterPreSearchResultParser.
+	// SynonymResult and BM25Stats predate it and keep their own fields for
+	// wire compatibility.
+	PreSearchResults PreSearchResults `json:"pre_search_results,omitempty"`
+
+	// RewrittenQuery is the query as it was (or would be) executed after
+	// every more_like_this node was substituted; returned with
+	// SearchRequest.RewriteOnly, or next to the hits with Explain.
+	RewrittenQuery *RewrittenQuery `json:"rewritten_query,omitempty"`
+}
+
+// PreSearchResults holds the per-feature payloads of a preSearch result,
+// keyed by the feature's PreSearchData key. A feature adds its payload here
+// by registering a parser for its key, without a new SearchResult field.
+type PreSearchResults map[string]interface{}
+
+// PreSearchResultParser decodes one feature's entry of PreSearchResults.
+type PreSearchResultParser func(data json.RawMessage) (interface{}, error)
+
+var preSearchResultParsers = map[string]PreSearchResultParser{}
+
+// RegisterPreSearchResultParser registers the decoder of the PreSearchResults
+// entry stored under key. It is meant to be called from an init function;
+// an entry without a registered parser is dropped when decoding.
+func RegisterPreSearchResultParser(key string, parser PreSearchResultParser) {
+	preSearchResultParsers[key] = parser
+}
+
+func (p *PreSearchResults) UnmarshalJSON(data []byte) error {
+	var tmp map[string]json.RawMessage
+	if err := util.UnmarshalJSON(data, &tmp); err != nil {
+		return err
+	}
+	rv := make(PreSearchResults, len(tmp))
+	for key, raw := range tmp {
+		parser, ok := preSearchResultParsers[key]
+		if !ok || len(raw) == 0 {
+			continue
+		}
+		value, err := parser(raw)
+		if err != nil {
+			return fmt.Errorf("preSearch result %q: %v", key, err)
+		}
+		rv[key] = value
+	}
+	*p = rv
+	return nil
+}
+
+// RewrittenQuery carries a query in a SearchResult; it is parsed back with
+// query.ParseQuery when decoded.
+type RewrittenQuery struct {
+	Query query.Query
+}
+
+func (r RewrittenQuery) MarshalJSON() ([]byte, error) {
+	return util.MarshalJSON(r.Query)
+}
+
+func (r *RewrittenQuery) UnmarshalJSON(data []byte) error {
+	q, err := query.ParseQuery(data)
+	if err != nil {
+		return err
+	}
+	r.Query = q
+	return nil
 }
 
 func (sr *SearchResult) Size() int {
