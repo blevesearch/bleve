@@ -598,7 +598,9 @@ func TestMLTPreSearchResultProcessorMerge(t *testing.T) {
 		return &search.MLTTermStat{Field: "f", Term: name, TF: tf, DF: df, DocCount: n}
 	}
 	contribution := func(key string, stats *search.MLTStats) *SearchResult {
-		return &SearchResult{MLTStats: map[string]*search.MLTStats{key: stats}}
+		return &SearchResult{PreSearchResults: PreSearchResults{
+			search.MLTPreSearchDataKey: map[string]*search.MLTStats{key: stats},
+		}}
 	}
 	// termFigures is the comparable part of a term stat
 	type termFigures struct {
@@ -624,7 +626,7 @@ func TestMLTPreSearchResultProcessorMerge(t *testing.T) {
 		}
 		sr := &SearchResult{}
 		p.finalize(sr)
-		return sr.MLTStats["0"]
+		return mltStatsOf(sr)["0"]
 	}
 
 	// like_ids: member 1 holds a, member 2 holds a copy of a and b
@@ -894,6 +896,55 @@ func TestRewriteOnlyFlags(t *testing.T) {
 	got := rewriteOnlyFlags(&preSearchFlags{knn: true, synonyms: true, bm25: true, mlt: true})
 	if got == nil || !got.mlt || got.knn || got.synonyms || got.bm25 {
 		t.Errorf("expected only the mlt flag kept, got %+v", got)
+	}
+}
+
+func TestPreSearchResultsJSONRoundTrip(t *testing.T) {
+	// a preSearch result travels between nodes as JSON; the more_like_this
+	// stats come back typed through the registered parser, an entry
+	// without a parser is dropped rather than failing the decode
+	stats := map[string]*search.MLTStats{"0": {
+		FoundIDs: []string{"a"},
+		SourceDocs: []*search.MLTSourceDoc{{ID: "a", Terms: []*search.MLTTermStat{
+			{Field: "f", Term: "pool", TF: 3, DF: 4, DocCount: 10},
+		}}},
+	}}
+	sr := &SearchResult{
+		Status:           &SearchStatus{Total: 1, Successful: 1},
+		PreSearchResults: PreSearchResults{search.MLTPreSearchDataKey: stats},
+	}
+	data, err := json.Marshal(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"pre_search_results":{"`+search.MLTPreSearchDataKey+`":{"0":`) {
+		t.Errorf("unexpected JSON %s", data)
+	}
+	var back SearchResult
+	if err := json.Unmarshal(data, &back); err != nil {
+		t.Fatal(err)
+	}
+	got := mltStatsOf(&back)
+	if got == nil || got["0"] == nil || len(got["0"].SourceDocs) != 1 || got["0"].SourceDocs[0].Terms[0].TF != 3 {
+		t.Errorf("expected the stats decoded through the registered parser, got %+v", back.PreSearchResults)
+	}
+
+	withUnknown := strings.Replace(string(data), `"pre_search_results":{`, `"pre_search_results":{"_future_feature_key":{"x":1},`, 1)
+	var tolerant SearchResult
+	if err := json.Unmarshal([]byte(withUnknown), &tolerant); err != nil {
+		t.Fatalf("expected an unknown entry to be ignored, got %v", err)
+	}
+	if _, present := tolerant.PreSearchResults["_future_feature_key"]; present || mltStatsOf(&tolerant) == nil {
+		t.Errorf("expected the unknown entry dropped and the known one kept, got %+v", tolerant.PreSearchResults)
+	}
+
+	// a result without preSearch payloads carries no key at all
+	plain, err := json.Marshal(&SearchResult{Status: &SearchStatus{}, Hits: search.DocumentMatchCollection{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(plain), "pre_search_results") {
+		t.Errorf("expected no pre_search_results key on a plain result, got %s", plain)
 	}
 }
 

@@ -320,7 +320,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// substituted by its rewritten query; the caller's request is left
 		// as it is, the children search a copy carrying the rewrite
 		if flags.mlt {
-			rewritten, err := rewriteMoreLikeThis(req.Query, preSearchResult, mltRewriteOptions(req, i.aliasMapping()))
+			rewritten, err := rewriteMoreLikeThis(req.Query, mltStatsOf(preSearchResult), mltRewriteOptions(req, i.aliasMapping()))
 			if err != nil {
 				return nil, err
 			}

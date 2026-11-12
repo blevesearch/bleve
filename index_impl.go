@@ -651,7 +651,7 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 		return nil, err
 	}
 
-	return &SearchResult{
+	rv := &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
 			Successful: 1,
@@ -662,8 +662,11 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 			DocCount:         float64(count),
 			FieldCardinality: fieldCardinality,
 		},
-		MLTStats: mltStats,
-	}, nil
+	}
+	if mltStats != nil {
+		rv.PreSearchResults = PreSearchResults{search.MLTPreSearchDataKey: mltStats}
+	}
+	return rv, nil
 }
 
 // SearchInContext executes a search request operation within the provided
@@ -791,7 +794,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if err != nil {
 			return nil, err
 		}
-		searchQuery, err = rewriteMoreLikeThis(req.Query, &SearchResult{MLTStats: mltStats}, mltRewriteOptions(req, i.m))
+		searchQuery, err = rewriteMoreLikeThis(req.Query, mltStats, mltRewriteOptions(req, i.m))
 		if err != nil {
 			return nil, err
 		}

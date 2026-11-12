@@ -16,6 +16,7 @@ package bleve
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"strconv"
 	"time"
@@ -23,6 +24,7 @@ import (
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/query"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -118,6 +120,26 @@ func (b *bm25PreSearchResultProcessor) finalize(sr *SearchResult) {
 	}
 }
 
+func init() {
+	RegisterPreSearchResultParser(search.MLTPreSearchDataKey, func(data json.RawMessage) (interface{}, error) {
+		var rv map[string]*search.MLTStats
+		if err := util.UnmarshalJSON(data, &rv); err != nil {
+			return nil, err
+		}
+		return rv, nil
+	})
+}
+
+// mltStatsOf returns the more_like_this statistics a preSearch result
+// carries, keyed by the node's position in the query tree.
+func mltStatsOf(sr *SearchResult) map[string]*search.MLTStats {
+	if sr == nil {
+		return nil
+	}
+	stats, _ := sr.PreSearchResults[search.MLTPreSearchDataKey].(map[string]*search.MLTStats)
+	return stats
+}
+
 // -----------------------------------------------------------------------------
 // more_like_this preSearchResultProcessor: merges, for every more_like_this
 // node of the query, the term stats that each member of the alias
@@ -178,7 +200,7 @@ func (n *mltMergedNode) addStat(st *search.MLTTermStat, counted map[string]struc
 }
 
 func (p *mltPreSearchResultProcessor) add(sr *SearchResult, _ string) {
-	for key, stats := range sr.MLTStats {
+	for key, stats := range mltStatsOf(sr) {
 		if stats == nil {
 			continue
 		}
@@ -215,7 +237,7 @@ func (p *mltPreSearchResultProcessor) finalize(sr *SearchResult) {
 	if len(p.merged) == 0 {
 		return
 	}
-	sr.MLTStats = make(map[string]*search.MLTStats, len(p.merged))
+	stats := make(map[string]*search.MLTStats, len(p.merged))
 	for key, node := range p.merged {
 		merged := &search.MLTStats{}
 		if len(node.docs) > 0 {
@@ -241,8 +263,12 @@ func (p *mltPreSearchResultProcessor) finalize(sr *SearchResult) {
 				merged.Terms = append(merged.Terms, &st)
 			}
 		}
-		sr.MLTStats[key] = merged
+		stats[key] = merged
 	}
+	if sr.PreSearchResults == nil {
+		sr.PreSearchResults = make(PreSearchResults)
+	}
+	sr.PreSearchResults[search.MLTPreSearchDataKey] = stats
 }
 
 // validateMoreLikeThis validates every more_like_this node of the query,
@@ -289,15 +315,11 @@ func collectMoreLikeThisStats(ctx context.Context, req *SearchRequest, reader in
 }
 
 // rewriteMoreLikeThis substitutes every more_like_this node of the query by
-// the standard query built from the stats gathered during preSearch. A node
-// no index could resolve becomes a match_none query.
-func rewriteMoreLikeThis(q query.Query, preSearchResult *SearchResult, opts query.RewriteOptions) (query.Query, error) {
+// the standard query built from its gathered stats, keyed by the node's
+// position. A node without stats becomes a match_none query.
+func rewriteMoreLikeThis(q query.Query, stats map[string]*search.MLTStats, opts query.RewriteOptions) (query.Query, error) {
 	return query.ReplaceMoreLikeThisQueries(q, func(idx int, mlt *query.MoreLikeThisQuery) (query.Query, error) {
-		var stats *search.MLTStats
-		if preSearchResult != nil {
-			stats = preSearchResult.MLTStats[strconv.Itoa(idx)]
-		}
-		return mlt.Rewrite(stats, opts), nil
+		return mlt.Rewrite(stats[strconv.Itoa(idx)], opts), nil
 	})
 }
 

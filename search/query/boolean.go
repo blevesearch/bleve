@@ -27,14 +27,12 @@ import (
 )
 
 type BooleanQuery struct {
-	Must     Query  `json:"must,omitempty"`
-	Should   Query  `json:"should,omitempty"`
-	MustNot  Query  `json:"must_not,omitempty"`
-	Filter   Query  `json:"filter,omitempty"`
-	BoostVal *Boost `json:"boost,omitempty"`
-	// Notes is free-form JSON carried with the query and ignored when it
-	// runs.
-	Notes           Notes `json:"notes,omitempty"`
+	Must            Query  `json:"must,omitempty"`
+	Should          Query  `json:"should,omitempty"`
+	MustNot         Query  `json:"must_not,omitempty"`
+	Filter          Query  `json:"filter,omitempty"`
+	BoostVal        *Boost `json:"boost,omitempty"`
+	Notes           Notes  `json:"notes,omitempty"`
 	queryStringMode bool
 }
 

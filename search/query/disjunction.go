@@ -27,13 +27,10 @@ import (
 )
 
 type DisjunctionQuery struct {
-	Disjuncts []Query `json:"disjuncts"`
-	BoostVal  *Boost  `json:"boost,omitempty"`
-	Min       float64 `json:"min"`
-	// Notes is free-form JSON carried with the query and ignored when it
-	// runs; a more_like_this rewrite fills it with how the terms were
-	// chosen.
-	Notes                  Notes `json:"notes,omitempty"`
+	Disjuncts              []Query `json:"disjuncts"`
+	BoostVal               *Boost  `json:"boost,omitempty"`
+	Min                    float64 `json:"min"`
+	Notes                  Notes   `json:"notes,omitempty"`
 	retrieveScoreBreakdown bool
 	queryStringMode        bool
 }
