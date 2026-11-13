@@ -1377,7 +1377,7 @@ func (s *Scorch) FileWriterIDsInUse() (map[string]struct{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		for k, _ := range trainerKeys {
+		for k := range trainerKeys {
 			keyMap[k] = struct{}{}
 		}
 	}
@@ -1387,7 +1387,7 @@ func (s *Scorch) FileWriterIDsInUse() (map[string]struct{}, error) {
 		return nil, err
 	}
 
-	for k, _ := range boltKeys {
+	for k := range boltKeys {
 		keyMap[k] = struct{}{}
 	}
 	s.rootLock.RUnlock()
