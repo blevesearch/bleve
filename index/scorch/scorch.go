@@ -934,9 +934,9 @@ func (s *Scorch) AddEligibleForRemoval(epoch uint64) {
 	s.rootLock.Unlock()
 }
 
-// UnpersistedMemoryUsed reports the bytes held by segments at root that have
-// not yet been written to disk.
-func (s *Scorch) UnpersistedMemoryUsed() (rv uint64) {
+// UnmergedMemorySegmentBytes reports the bytes held by segments at root that
+// have not yet been written to disk.
+func (s *Scorch) UnmergedMemorySegmentBytes() (rv uint64) {
 	indexSnapshot := s.currentSnapshot()
 	if indexSnapshot == nil {
 		return 0
