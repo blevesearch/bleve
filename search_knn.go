@@ -369,6 +369,10 @@ func addSortAndFieldsToKNNHits(req *SearchRequest, knnHits []*search.DocumentMat
 			req.Sort.UpdateVisitor(field, term)
 		}
 	}
+	var projection storedFieldProjection
+	if len(knnHits) > 0 {
+		projection = prepareStoredFieldProjection(req.Fields)
+	}
 	for _, hit := range knnHits {
 		if len(requiredSortFields) > 0 {
 			err = dvReader.VisitDocValues(hit.IndexInternalID, updateFieldVisitor)
@@ -377,7 +381,7 @@ func addSortAndFieldsToKNNHits(req *SearchRequest, knnHits []*search.DocumentMat
 			}
 		}
 		req.Sort.Value(hit)
-		err, _ = LoadAndHighlightAllFields(hit, req, "", reader, nil)
+		err, _ = loadAndHighlightAllFields(hit, req, reader, nil, projection)
 		if err != nil {
 			return err
 		}
