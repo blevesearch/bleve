@@ -6,7 +6,7 @@ require (
 	github.com/RoaringBitmap/roaring/v2 v2.14.5
 	github.com/bits-and-blooms/bitset v1.24.2
 	github.com/blevesearch/bleve_index_api v1.4.1
-	github.com/blevesearch/geo v0.2.7-0.20260831141219-9c3e3a4d84bc
+	github.com/blevesearch/geo v0.2.9-0.20261119104109-5e374b3c6aa9
 	github.com/blevesearch/go-faiss v1.1.5
 	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/blevesearch/go-porterstemmer v1.0.3
@@ -38,7 +38,6 @@ require (
 	github.com/couchbase/ghistogram v0.1.0 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/json-iterator/go v0.0.0-20171115153421-f7279a603ede // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	golang.org/x/net v0.55.0 // indirect
