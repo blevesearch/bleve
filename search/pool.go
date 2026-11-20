@@ -31,53 +31,63 @@ func init() {
 // a message, or panic, etc.
 type DocumentMatchPoolTooSmall func(p *DocumentMatchPool) *DocumentMatch
 
-// DocumentMatchPool manages use/reuse of DocumentMatch instances
-// it pre-allocates space from a single large block with the expected
-// number of instances.  It is not thread-safe as currently all
-// aspects of search take place in a single goroutine.
+// DocumentMatchPool reuses DocumentMatch instances and allocates reserved
+// matches in progressively larger blocks. Each pool belongs to one goroutine.
 type DocumentMatchPool struct {
-	avail    DocumentMatchCollection
-	TooSmall DocumentMatchPoolTooSmall
+	avail         DocumentMatchCollection
+	remaining     int
+	nextBlockSize int
+	sortSize      int
+	TooSmall      DocumentMatchPoolTooSmall
 }
 
 func defaultDocumentMatchPoolTooSmall(p *DocumentMatchPool) *DocumentMatch {
 	return &DocumentMatch{}
 }
 
-// NewDocumentMatchPool will build a DocumentMatchPool with memory
-// pre-allocated to accommodate the requested number of DocumentMatch
-// instances
-func NewDocumentMatchPool(size, sortsize int) *DocumentMatchPool {
-	avail := make(DocumentMatchCollection, size)
-	// pre-allocate the expected number of instances
-	startBlock := make([]DocumentMatch, size)
-	startSorts := make([]string, size*sortsize)
-	// make these initial instances available
-	i, j := 0, 0
-	for i < size {
-		avail[i] = &startBlock[i]
-		avail[i].Sort = startSorts[j:j]
-		i += 1
-		j += sortsize
-	}
+// NewDocumentMatchPool reserves size matches for use before invoking TooSmall.
+func NewDocumentMatchPool(size, sortSize int) *DocumentMatchPool {
 	return &DocumentMatchPool{
-		avail:    avail,
-		TooSmall: defaultDocumentMatchPoolTooSmall,
+		remaining:     size,
+		nextBlockSize: 32,
+		sortSize:      sortSize,
+		TooSmall:      defaultDocumentMatchPoolTooSmall,
 	}
 }
 
-// Get returns an available DocumentMatch from the pool
-// if the pool was not allocated with sufficient size, an allocation will
-// occur to satisfy this request.  As a side-effect this will grow the size
-// of the pool.
+// Get returns an available DocumentMatch from the pool.
 func (p *DocumentMatchPool) Get() *DocumentMatch {
-	var rv *DocumentMatch
-	if len(p.avail) > 0 {
-		rv, p.avail = p.avail[len(p.avail)-1], p.avail[:len(p.avail)-1]
-	} else {
-		rv = p.TooSmall(p)
+	if len(p.avail) == 0 {
+		if p.remaining == 0 {
+			return p.TooSmall(p)
+		}
+		p.allocateBlock()
 	}
-	return rv
+	last := len(p.avail) - 1
+	match := p.avail[last]
+	p.avail = p.avail[:last]
+	return match
+}
+
+func (p *DocumentMatchPool) allocateBlock() {
+	// Search windows can be much larger than the matches they find.
+	size := min(p.remaining, p.nextBlockSize)
+	p.remaining -= size
+	p.nextBlockSize = size * 2
+
+	if cap(p.avail) < size {
+		p.avail = make(DocumentMatchCollection, size)
+	} else {
+		p.avail = p.avail[:size]
+	}
+
+	matches := make([]DocumentMatch, size)
+	sorts := make([]string, size*p.sortSize)
+	for i := range matches {
+		start := i * p.sortSize
+		p.avail[i] = &matches[i]
+		p.avail[i].Sort = sorts[start:start]
+	}
 }
 
 // Put returns a DocumentMatch to the pool
