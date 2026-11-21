@@ -65,6 +65,14 @@ type Scorch struct {
 	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
 	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
 
+	// Filenames whose zap file removal failure has already been logged;
+	// their removal is still retried on every GC cycle, but the error is
+	// logged only once (per file) to avoid log spam while the file stays
+	// referenced by an in-flight reader/merger or an external process.
+	// An entry is dropped once the file is finally removed (or is found
+	// gone). Must be accessed within the rootLock.
+	removalErrLogged map[string]struct{}
+
 	// keeps track of segments scheduled for online copy/backup operation. Each segment's filename maps to
 	// the count of copy schedules. Segments with non-zero counts are protected from removal by the cleanup
 	// operation. Counts decrement upon successful copy, allowing removal of segments with zero or absent counts.
@@ -191,6 +199,7 @@ func NewScorch(storeName string,
 		nextSnapshotEpoch:    1,
 		closeCh:              make(chan struct{}),
 		ineligibleForRemoval: map[string]bool{},
+		removalErrLogged:     map[string]struct{}{},
 		forceMergeRequestCh:  make(chan *mergerCtrl, 1),
 		segPlugin:            defaultSegmentPlugin,
 		copyScheduled:        map[string]int{},
