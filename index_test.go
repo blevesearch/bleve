@@ -1047,6 +1047,40 @@ func TestClosedIndex(t *testing.T) {
 	}
 }
 
+// MB-75560: calling FileWriterIDsInUse on a closed index panicked with a nil
+// pointer dereference inside scorch. It must return ErrorIndexClosed instead.
+func TestFileWriterIDsInUseAfterClose(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = idx.Index("doc1", map[string]string{"f": "hello"}); err != nil {
+		t.Fatal(err)
+	}
+
+	cIdx, ok := idx.(IndexWithCallbacks)
+	if !ok {
+		t.Fatalf("index %T does not implement IndexWithCallbacks", idx)
+	}
+
+	if _, err = cIdx.FileWriterIDsInUse(); err != nil {
+		t.Fatalf("expected no error on open index, got: %v", err)
+	}
+
+	if err = idx.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	ids, err := cIdx.FileWriterIDsInUse()
+	if err != ErrorIndexClosed {
+		t.Fatalf("expected ErrorIndexClosed after close, got ids: %v, err: %v",
+			ids, err)
+	}
+}
+
 type slowQuery struct {
 	actual query.Query
 	delay  time.Duration

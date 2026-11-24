@@ -491,6 +491,15 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 
 // returns the set of file callback writer ids in use by the index
 func (i *indexImpl) FileWriterIDsInUse() (map[string]struct{}, error) {
+	// hold the read lock for the whole call so that Close, which takes the
+	// write lock, cannot close the underlying index while it is being read
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
 	ids := map[string]struct{}{i.meta.fileReader.Id(): {}}
 
 	if cidx, ok := i.i.(IndexWithCallbacks); ok {

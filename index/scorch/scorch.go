@@ -1337,6 +1337,14 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.UpdateFieldInfo, mapping
 // returns the set of file callback writer ids in use by all of the segments and boltdb
 func (s *Scorch) FileWriterIDsInUse() (map[string]struct{}, error) {
 	s.rootLock.RLock()
+	defer s.rootLock.RUnlock()
+
+	// Close() sets root and rootBolt to nil under rootLock, so a nil root
+	// means the index has been closed.
+	if s.root == nil || s.rootBolt == nil {
+		return nil, ErrClosed
+	}
+
 	keyMap := make(map[string]struct{})
 	for _, segmentSnapShot := range s.root.segment {
 		if seg, ok := segmentSnapShot.segment.(segment.SegmentWithCallbacks); ok {
@@ -1362,7 +1370,6 @@ func (s *Scorch) FileWriterIDsInUse() (map[string]struct{}, error) {
 	for k, _ := range boltKeys {
 		keyMap[k] = struct{}{}
 	}
-	s.rootLock.RUnlock()
 
 	return keyMap, nil
 }
