@@ -1483,19 +1483,64 @@ func (s *Scorch) removeOldZapFiles() error {
 
 	s.rootLock.RLock()
 
+	// the segments of the live root snapshot are still referenced (and
+	// mmap'ed) by the index itself; a flush that has just introduced such
+	// a segment into the root may not have committed its rootBolt entry
+	// yet, so the file isn't listed in liveFileNames - skip those files
+	// instead of attempting (and on platforms without POSIX unlink
+	// semantics, failing) their removal on every GC cycle
+	rootReferenced := make(map[string]struct{})
+	if s.root != nil {
+		for path := range s.root.diskSegmentsPaths() {
+			rootReferenced[filepath.Base(path)] = struct{}{}
+		}
+	}
+
+	// files whose removal failed or succeeded, so that the bookkeeping
+	// can be updated after releasing the read lock below
+	var removalErrs, removalDones []string
+
 	for _, f := range files {
 		fname := f.Name()
 		if filepath.Ext(fname) == ".zap" {
 			if _, exists := liveFileNames[fname]; !exists && !s.ineligibleForRemoval[fname] && (s.copyScheduled[fname] <= 0) {
+				if _, referenced := rootReferenced[fname]; referenced {
+					continue
+				}
 				err := os.Remove(s.path + string(os.PathSeparator) + fname)
 				if err != nil {
-					log.Printf("got err removing file: %s, err: %v", fname, err)
+					if os.IsNotExist(err) {
+						// the file is already gone, nothing to remove
+						removalDones = append(removalDones, fname)
+						continue
+					}
+					// the removal keeps being retried on the following
+					// cycles (a file held open by a reader, a merger or
+					// anything else outside of this process becomes
+					// removable once its last reference is gone), so log
+					// the failure only once per file to avoid spamming
+					// the log on every GC cycle
+					if _, logged := s.removalErrLogged[fname]; !logged {
+						log.Printf("got err removing file: %s, err: %v", fname, err)
+						removalErrs = append(removalErrs, fname)
+					}
+				} else {
+					removalDones = append(removalDones, fname)
 				}
 			}
 		}
 	}
 
 	s.rootLock.RUnlock()
+
+	s.rootLock.Lock()
+	for _, fname := range removalErrs {
+		s.removalErrLogged[fname] = struct{}{}
+	}
+	for _, fname := range removalDones {
+		delete(s.removalErrLogged, fname)
+	}
+	s.rootLock.Unlock()
 
 	return nil
 }
