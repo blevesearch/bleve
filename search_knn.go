@@ -68,6 +68,14 @@ type SearchRequest struct {
 
 	PreSearchData map[string]interface{} `json:"pre_search_data,omitempty"`
 
+	// RewriteOnly stops after every more_like_this node has been
+	// substituted and returns the rewritten query instead of running it.
+	RewriteOnly bool `json:"rewrite_only,omitempty"`
+
+	// Notes is free-form JSON carried with the request and ignored by the
+	// search, for the caller's own annotations.
+	Notes OptionalRawMessage `json:"notes,omitempty"`
+
 	Params *RequestParams `json:"params,omitempty"`
 
 	sortFunc func(sort.Interface)
@@ -152,6 +160,8 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		KNNOperator      knnOperator        `json:"knn_operator"`
 		PreSearchData    OptionalRawMessage `json:"pre_search_data"`
 		Params           OptionalRawMessage `json:"params"`
+		RewriteOnly      bool               `json:"rewrite_only"`
+		Notes            OptionalRawMessage `json:"notes"`
 	}
 
 	err := util.UnmarshalJSON(input, &temp)
@@ -181,6 +191,8 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.Score = temp.Score
 	r.SearchAfter = temp.SearchAfter
 	r.SearchBefore = temp.SearchBefore
+	r.RewriteOnly = temp.RewriteOnly
+	r.Notes = temp.Notes
 	r.Query, err = query.ParseQuery(temp.Q)
 	if err != nil {
 		return err
@@ -259,6 +271,8 @@ func copySearchRequest(req *SearchRequest, preSearchData map[string]interface{})
 		Score:            req.Score,
 		SearchAfter:      req.SearchAfter,
 		SearchBefore:     req.SearchBefore,
+		RewriteOnly:      req.RewriteOnly,
+		Notes:            req.Notes,
 		KNN:              req.KNN,
 		KNNOperator:      req.KNNOperator,
 		PreSearchData:    preSearchData,
@@ -338,6 +352,11 @@ func validateKNN(req *SearchRequest) error {
 		// the field must be specified.
 		if q.Field == "" {
 			return fmt.Errorf("knn query field must be non-empty")
+		}
+		// a more_like_this node is resolved by the index alias before the
+		// search, which does not cover knn filters
+		if len(query.ExtractMoreLikeThisQueries(q.FilterQuery)) > 0 {
+			return fmt.Errorf("knn filter query cannot contain a more_like_this query")
 		}
 		if vfq, ok := q.FilterQuery.(query.ValidatableQuery); ok {
 			err := vfq.Validate()
@@ -582,6 +601,17 @@ func validateAndDistributeKNNHits(knnHits []*search.DocumentMatch, indexes []Ind
 
 func requestHasKNN(req *SearchRequest) bool {
 	return len(req.KNN) > 0
+}
+
+// knnFiltersContainMoreLikeThis reports whether a knn filter query holds a
+// more_like_this node, which the alias preSearch does not resolve.
+func knnFiltersContainMoreLikeThis(req *SearchRequest) bool {
+	for _, q := range req.KNN {
+		if q != nil && len(query.ExtractMoreLikeThisQueries(q.FilterQuery)) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func numKNNQueries(req *SearchRequest) int {

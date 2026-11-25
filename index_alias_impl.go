@@ -195,6 +195,7 @@ func (i *indexAliasImpl) Search(req *SearchRequest) (*SearchResult, error) {
 }
 
 func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest) (*SearchResult, error) {
+	start := time.Now()
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -217,6 +218,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 			knn:      requestHasKNN(req),
 			synonyms: !isMatchNoneQuery(req.Query),
 			bm25:     bm25PreSearch,
+			mlt:      requestHasMoreLikeThis(req),
 		}
 		return preSearchDataSearch(ctx, req, flags, i.indexes...)
 	}
@@ -279,9 +281,24 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	// This variable is left nil if we have to send the knn hits to leaf
 	// indexes again, else contains the knn hits if not required.
 	var fusionKnnHits search.DocumentMatchCollection
+	// searchReq is what the second phase runs: the request itself, or a
+	// copy whose query was rewritten after preSearch
+	searchReq := req
 	flags, err := preSearchRequired(ctx, req, i.mapping)
 	if err != nil {
 		return nil, err
+	}
+	if req.RewriteOnly {
+		// the query is not going to run, so only the more_like_this
+		// lookup is worth a round-trip
+		flags = rewriteOnlyFlags(flags)
+	}
+	if flags != nil && flags.mlt && i.mapping == nil {
+		// the compared fields are checked against a member's mapping here
+		// rather than reported as a failed member after the fan-out
+		if err := validateMoreLikeThis(query.ExtractMoreLikeThisQueries(req.Query), i.aliasMapping()); err != nil {
+			return nil, err
+		}
 	}
 	if req.PreSearchData == nil && flags != nil {
 		searchStart := time.Now()
@@ -299,15 +316,35 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// finalize the preSearch result now
 		finalizePreSearchResult(req, flags, preSearchResult)
 
+		// with the term stats gathered, every more_like_this node is
+		// substituted by its rewritten query; the caller's request is left
+		// as it is, the children search a copy carrying the rewrite
+		if flags.mlt {
+			rewritten, err := rewriteMoreLikeThis(req.Query, mltStatsOf(preSearchResult), mltRewriteOptions(req, i.aliasMapping()))
+			if err != nil {
+				return nil, err
+			}
+			cp := *searchReq
+			cp.Query = rewritten
+			searchReq = &cp
+		}
+
+		// the caller only wants the rewritten query: stop before the
+		// actual search
+		if req.RewriteOnly {
+			return rewriteOnlyResult(req, searchReq.Query, preSearchResult.Status, preSearchResult.Cost,
+				time.Since(searchStart)), nil
+		}
+
 		// if there are no errors, then merge the data in the preSearch result
 		// and construct the preSearchData to be used in the actual search
 		// if the request is satisfied by the preSearch result, then we can
 		// directly return the preSearch result as the final result
-		if requestSatisfiedByPreSearch(req, flags) {
+		if requestSatisfiedByPreSearch(searchReq, flags) {
 			sr = finalizeSearchResult(ctx, req, preSearchResult, rescorer)
 			// no need to run the 2nd phase MultiSearch(..)
 		} else {
-			preSearchData, fusionKnnHits, err = constructPreSearchDataAndFusionKnnHits(req, flags, preSearchResult, rescorer, i.indexes)
+			preSearchData, fusionKnnHits, err = constructPreSearchDataAndFusionKnnHits(searchReq, flags, preSearchResult, rescorer, i.indexes)
 			if err != nil {
 				return nil, err
 			}
@@ -315,13 +352,36 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		preSearchDuration = time.Since(searchStart)
 	}
 
+	// nothing to rewrite, but the caller only wants the query it sent
+	// back as it would run; the members are reported as covered, since
+	// none had to be asked
+	if req.RewriteOnly && sr == nil {
+		return rewriteOnlyResult(req, req.Query, &SearchStatus{
+			Total:      len(i.indexes),
+			Successful: len(i.indexes),
+			Errors:     make(map[string]error),
+		}, 0, time.Since(start)), nil
+	}
+
 	// check if search result was generated as part of preSearch itself
 	if sr == nil {
-		multiSearchParams := &multiSearchParams{preSearchData, rescorer, fusionKnnHits}
+		multiSearchParams := &multiSearchParams{
+			preSearchData: preSearchData,
+			rescorer:      rescorer,
+			fusionKnnHits: fusionKnnHits,
+		}
+		if searchReq != req {
+			multiSearchParams.query = searchReq.Query
+		}
 		sr, err = MultiSearch(ctx, req, multiSearchParams, i.indexes...)
 		if err != nil {
 			return nil, err
 		}
+	}
+	// an explained result also shows the query that was actually run,
+	// whichever path produced the result
+	if req.Explain && searchReq != req && sr.RewrittenQuery == nil {
+		sr.RewrittenQuery = &RewrittenQuery{Query: searchReq.Query}
 	}
 	sr.Took += preSearchDuration
 	return sr, nil
@@ -621,6 +681,7 @@ type preSearchFlags struct {
 	knn      bool
 	synonyms bool
 	bm25     bool // needs presearch for this too
+	mlt      bool // more_like_this nodes need their term stats gathered first
 }
 
 func isBM25Enabled(m mapping.IndexMapping) bool {
@@ -629,6 +690,15 @@ func isBM25Enabled(m mapping.IndexMapping) bool {
 		rv = m.ScoringModel == index.BM25Scoring
 	}
 	return rv
+}
+
+// rewriteOnlyFlags reduces the preSearch flags of a rewrite_only request to
+// the more_like_this lookup, or to none when there is nothing to rewrite.
+func rewriteOnlyFlags(flags *preSearchFlags) *preSearchFlags {
+	if flags == nil || !flags.mlt {
+		return nil
+	}
+	return &preSearchFlags{mlt: true}
 }
 
 // preSearchRequired checks if preSearch is required and returns the presearch flags struct
@@ -665,11 +735,23 @@ func preSearchRequired(ctx context.Context, req *SearchRequest, m mapping.IndexM
 		}
 	}
 
-	if knn || synonyms || bm25 {
+	// more_like_this nodes can only be resolved by the index holding the
+	// source document, so their term stats are gathered in preSearch
+	mltNodes := query.ExtractMoreLikeThisQueries(req.Query)
+	if err := validateMoreLikeThis(mltNodes, m); err != nil {
+		return nil, err
+	}
+	if knnFiltersContainMoreLikeThis(req) {
+		return nil, fmt.Errorf("knn filter query cannot contain a more_like_this query")
+	}
+	mlt := len(mltNodes) > 0
+
+	if knn || synonyms || bm25 || mlt {
 		return &preSearchFlags{
 			knn:      knn,
 			synonyms: synonyms,
 			bm25:     bm25,
+			mlt:      mlt,
 		}, nil
 	}
 	return nil, nil
@@ -679,7 +761,7 @@ func preSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, i
 	// create a dummy request with a match none query
 	// since we only care about the preSearchData in PreSearch
 	dummyQuery := req.Query
-	if !flags.bm25 && !flags.synonyms {
+	if !flags.bm25 && !flags.synonyms && !flags.mlt {
 		// create a dummy request with a match none query
 		// since we only care about the preSearchData in PreSearch
 		dummyQuery = query.NewMatchNoneQuery()
@@ -808,6 +890,14 @@ func constructPreSearchData(req *SearchRequest, flags *preSearchFlags,
 	}
 	if flags.bm25 {
 		mergedOut = constructBM25PreSearchData(mergedOut, preSearchResult, indexes)
+	}
+	if flags.mlt {
+		// the terms were folded into the query already; the marker tells a
+		// child that the request has been preSearched, which an otherwise
+		// empty map would not survive serialization to say
+		for _, index := range indexes {
+			mergedOut[index.Name()][search.MLTPreSearchDataKey] = true
+		}
 	}
 	return mergedOut, nil
 }
@@ -953,6 +1043,11 @@ func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]
 			rv[index.Name()][search.BM25PreSearchDataKey] = bm25Data
 		}
 	}
+	if mltDone, ok := req.PreSearchData[search.MLTPreSearchDataKey].(bool); ok && mltDone {
+		for _, index := range indexes {
+			rv[index.Name()][search.MLTPreSearchDataKey] = true
+		}
+	}
 	return rv, nil
 }
 
@@ -995,6 +1090,38 @@ type multiSearchParams struct {
 	preSearchData map[string]map[string]interface{}
 	rescorer      *rescorer
 	fusionKnnHits search.DocumentMatchCollection
+	// query, when set, is what the children search in place of the
+	// request's query (a more_like_this node rewritten after preSearch)
+	query query.Query
+}
+
+// aliasMapping returns the mapping set on the alias, or the first mapping
+// one of its members can give, looking through member aliases that have
+// none of their own; the caller holds the alias lock.
+func (i *indexAliasImpl) aliasMapping() mapping.IndexMapping {
+	if i.mapping != nil {
+		return i.mapping
+	}
+	for _, in := range i.indexes {
+		if m := in.Mapping(); m != nil {
+			return m
+		}
+		if nested, ok := in.(*indexAliasImpl); ok {
+			if m := nested.lockedAliasMapping(); m != nil {
+				return m
+			}
+		}
+	}
+	return nil
+}
+
+func (i *indexAliasImpl) lockedAliasMapping() mapping.IndexMapping {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+	if !i.open {
+		return nil
+	}
+	return i.aliasMapping()
 }
 
 // MultiSearch executes a SearchRequest across multiple Index objects,
@@ -1006,10 +1133,12 @@ func MultiSearch(ctx context.Context, req *SearchRequest, params *multiSearchPar
 	var preSearchData map[string]map[string]interface{}
 	var rescorer *rescorer
 	var fusionKnnHits search.DocumentMatchCollection
+	var childQuery query.Query
 	if params != nil {
 		preSearchData = params.preSearchData
 		rescorer = params.rescorer
 		fusionKnnHits = params.fusionKnnHits
+		childQuery = params.query
 	}
 
 	var reverseQueryExecution bool
@@ -1030,13 +1159,22 @@ func MultiSearch(ctx context.Context, req *SearchRequest, params *multiSearchPar
 		waitGroup.Done()
 	}
 
+	// the children search the request's query unless a rewritten one
+	// was handed in; the request itself keeps the caller's query
+	childBase := req
+	if childQuery != nil {
+		cp := *req
+		cp.Query = childQuery
+		childBase = &cp
+	}
+
 	waitGroup.Add(len(indexes))
 	for _, in := range indexes {
 		var payload map[string]interface{}
 		if preSearchData != nil {
 			payload = preSearchData[in.Name()]
 		}
-		go searchChildIndex(in, createChildSearchRequest(req, payload))
+		go searchChildIndex(in, createChildSearchRequest(childBase, payload))
 	}
 
 	// on another go routine, close after finished
