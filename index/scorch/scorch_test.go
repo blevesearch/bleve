@@ -3961,3 +3961,45 @@ func checkUint64Stat(t *testing.T, m map[string]interface{}, key string, want ui
 		t.Errorf("stat %q: got %d, want %d", key, got, want)
 	}
 }
+
+// MB-75560: FileWriterIDsInUse called on a closed index dereferenced the nil
+// root snapshot and panicked. It must return ErrClosed instead.
+func TestFileWriterIDsInUseAfterClose(t *testing.T) {
+	cfg := CreateConfig("TestFileWriterIDsInUseAfterClose")
+	if err := InitTest(cfg); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := DestroyTest(cfg); err != nil {
+			t.Log(err)
+		}
+	}()
+
+	idx, err := NewScorch(Name, cfg, index.NewAnalysisQueue(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = idx.Open(); err != nil {
+		t.Fatalf("error opening index: %v", err)
+	}
+
+	doc := document.NewDocument("1")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
+	if err = idx.Update(doc); err != nil {
+		t.Fatalf("error updating index: %v", err)
+	}
+
+	s := idx.(*Scorch)
+	if _, err = s.FileWriterIDsInUse(); err != nil {
+		t.Fatalf("expected no error on open index, got: %v", err)
+	}
+
+	if err = s.Close(); err != nil {
+		t.Fatalf("error closing index: %v", err)
+	}
+
+	ids, err := s.FileWriterIDsInUse()
+	if err != ErrClosed {
+		t.Fatalf("expected ErrClosed after close, got ids: %v, err: %v", ids, err)
+	}
+}
