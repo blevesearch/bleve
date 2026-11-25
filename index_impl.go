@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -1018,6 +1019,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}
 
+	var projection storedFieldProjection
+	if len(hits) > 0 {
+		projection = prepareStoredFieldProjection(req.Fields)
+	}
 	var storedFieldsCost uint64
 	for _, hit := range hits {
 		// KNN documents will already have their Index value set as part of the knn collector output
@@ -1025,7 +1030,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if i.name != "" && hit.Index == "" {
 			hit.Index = i.name
 		}
-		err, storedFieldsBytes := LoadAndHighlightAllFields(hit, req, i.name, indexReader, highlighter)
+		err, storedFieldsBytes := loadAndHighlightAllFields(hit, req, indexReader, highlighter, projection)
 		if err != nil {
 			return nil, err
 		}
@@ -1096,84 +1101,21 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 	indexName string, r index.IndexReader,
 	highlighter highlight.Highlighter,
 ) (error, uint64) {
+	return loadAndHighlightFields(hit, req, r, highlighter, prepareStoredFieldProjection(req.Fields))
+}
+
+func loadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
+	r index.IndexReader, highlighter highlight.Highlighter, projection storedFieldProjection,
+) (error, uint64) {
 	var totalStoredFieldsBytes uint64
 	if len(req.Fields) > 0 || highlighter != nil {
 		doc, err := r.Document(hit.ID)
 		if err == nil && doc != nil {
 			if len(req.Fields) > 0 && hit.Fields == nil {
 				totalStoredFieldsBytes = doc.StoredFieldsBytes()
-				fieldsToLoad := deDuplicate(req.Fields)
-				for _, f := range fieldsToLoad {
-					doc.VisitFields(func(docF index.Field) {
-						if f == "*" || docF.Name() == f {
-							var value interface{}
-							switch docF := docF.(type) {
-							case index.TextField:
-								value = docF.Text()
-							case index.NumericField:
-								num, err := docF.Number()
-								if err == nil {
-									value = num
-								}
-							case index.DateTimeField:
-								datetime, layout, err := docF.DateTime()
-								if err == nil {
-									if layout == "" {
-										// missing layout means we fallback to
-										// the default layout which is RFC3339
-										value = datetime.Format(time.RFC3339)
-									} else {
-										// the layout here can now either be representative
-										// of an actual datetime layout or a timestamp
-										switch layout {
-										case seconds.Name:
-											value = strconv.FormatInt(datetime.Unix(), 10)
-										case milliseconds.Name:
-											value = strconv.FormatInt(datetime.UnixMilli(), 10)
-										case microseconds.Name:
-											value = strconv.FormatInt(datetime.UnixMicro(), 10)
-										case nanoseconds.Name:
-											value = strconv.FormatInt(datetime.UnixNano(), 10)
-										default:
-											// the layout for formatting the date to a string
-											// is provided by a datetime parser which is not
-											// handling the timestamp case, hence the layout
-											// can be directly used to format the date
-											value = datetime.Format(layout)
-										}
-									}
-								}
-							case index.BooleanField:
-								boolean, err := docF.Boolean()
-								if err == nil {
-									value = boolean
-								}
-							case index.GeoPointField:
-								lon, err := docF.Lon()
-								if err == nil {
-									lat, err := docF.Lat()
-									if err == nil {
-										value = []float64{lon, lat}
-									}
-								}
-							case index.GeoShapeField:
-								v, err := docF.GeoShape()
-								if err == nil {
-									value = v
-								}
-							case index.IPField:
-								ip, err := docF.IP()
-								if err == nil {
-									value = ip.String()
-								}
-							}
-
-							if value != nil {
-								hit.AddFieldValue(docF.Name(), value)
-							}
-						}
-					})
-				}
+				projection.visit(doc, func(field index.Field) {
+					addStoredFieldValue(hit, field)
+				})
 			}
 			if highlighter != nil {
 				highlightFields := req.Highlight.Fields
@@ -1198,6 +1140,119 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 	return nil, totalStoredFieldsBytes
 }
 
+type storedFieldProjection struct {
+	names   map[string]struct{}
+	ordered []string
+}
+
+func prepareStoredFieldProjection(fields []string) storedFieldProjection {
+	if len(fields) <= 1 {
+		return storedFieldProjection{ordered: fields}
+	}
+	// A wildcard and an explicit name each contribute their own values.
+	// Keep those passes in request order so multivalued fields stay in order.
+	if slices.Contains(fields, "*") {
+		return storedFieldProjection{ordered: deDuplicate(fields)}
+	}
+
+	names := make(map[string]struct{}, len(fields))
+	for _, name := range fields {
+		names[name] = struct{}{}
+	}
+	return storedFieldProjection{names: names}
+}
+
+func (p storedFieldProjection) visit(doc index.Document, visit index.FieldVisitor) {
+	if p.names != nil {
+		doc.VisitFields(func(field index.Field) {
+			if _, ok := p.names[field.Name()]; ok {
+				visit(field)
+			}
+		})
+		return
+	}
+
+	for _, name := range p.ordered {
+		if name == "*" {
+			doc.VisitFields(visit)
+			continue
+		}
+		doc.VisitFields(func(field index.Field) {
+			if field.Name() == name {
+				visit(field)
+			}
+		})
+	}
+}
+
+func addStoredFieldValue(hit *search.DocumentMatch, docF index.Field) {
+	var value interface{}
+	switch docF := docF.(type) {
+	case index.TextField:
+		value = docF.Text()
+	case index.NumericField:
+		num, err := docF.Number()
+		if err == nil {
+			value = num
+		}
+	case index.DateTimeField:
+		datetime, layout, err := docF.DateTime()
+		if err == nil {
+			if layout == "" {
+				// missing layout means we fallback to
+				// the default layout which is RFC3339
+				value = datetime.Format(time.RFC3339)
+			} else {
+				// the layout here can now either be representative
+				// of an actual datetime layout or a timestamp
+				switch layout {
+				case seconds.Name:
+					value = strconv.FormatInt(datetime.Unix(), 10)
+				case milliseconds.Name:
+					value = strconv.FormatInt(datetime.UnixMilli(), 10)
+				case microseconds.Name:
+					value = strconv.FormatInt(datetime.UnixMicro(), 10)
+				case nanoseconds.Name:
+					value = strconv.FormatInt(datetime.UnixNano(), 10)
+				default:
+					// the layout for formatting the date to a string
+					// is provided by a datetime parser which is not
+					// handling the timestamp case, hence the layout
+					// can be directly used to format the date
+					value = datetime.Format(layout)
+				}
+			}
+		}
+	case index.BooleanField:
+		boolean, err := docF.Boolean()
+		if err == nil {
+			value = boolean
+		}
+	case index.GeoPointField:
+		lon, err := docF.Lon()
+		if err == nil {
+			lat, err := docF.Lat()
+			if err == nil {
+				value = []float64{lon, lat}
+			}
+		}
+	case index.GeoShapeField:
+		v, err := docF.GeoShape()
+		if err == nil {
+			value = v
+		}
+	case index.IPField:
+		ip, err := docF.IP()
+		if err == nil {
+			value = ip.String()
+		}
+	}
+
+	if value != nil {
+		hit.AddFieldValue(docF.Name(), value)
+	}
+}
+
 const NestedDocumentKey = "_$nested"
 
 // LoadAndHighlightAllFields loads stored fields + highlights for root and its descendants.
@@ -1209,16 +1264,26 @@ func LoadAndHighlightAllFields(
 	r index.IndexReader,
 	highlighter highlight.Highlighter,
 ) (error, uint64) {
+	return loadAndHighlightAllFields(root, req, r, highlighter, prepareStoredFieldProjection(req.Fields))
+}
+
+func loadAndHighlightAllFields(
+	root *search.DocumentMatch,
+	req *SearchRequest,
+	r index.IndexReader,
+	highlighter highlight.Highlighter,
+	projection storedFieldProjection,
+) (error, uint64) {
 	var totalStoredFieldsBytes uint64
 	// load root fields/highlights
-	err, bytes := LoadAndHighlightFields(root, req, indexName, r, highlighter)
+	err, bytes := loadAndHighlightFields(root, req, r, highlighter, projection)
 	totalStoredFieldsBytes += bytes
 	if err != nil {
 		return err, totalStoredFieldsBytes
 	}
 	// collect all descendant documents
 	nestedDocs := make([]*search.NestedDocumentMatch, 0, len(root.Descendants))
-	// create a dummy desc DocumentMatch to reuse LoadAndHighlightFields
+	// create a dummy desc DocumentMatch to reuse the field loader
 	desc := &search.DocumentMatch{}
 	for _, descID := range root.Descendants {
 		extID, err := r.ExternalID(descID)
@@ -1229,7 +1294,7 @@ func LoadAndHighlightAllFields(
 		desc.ID = extID
 		desc.IndexInternalID = descID
 		desc.Locations = root.Locations
-		err, bytes := LoadAndHighlightFields(desc, req, indexName, r, highlighter)
+		err, bytes := loadAndHighlightFields(desc, req, r, highlighter, projection)
 		totalStoredFieldsBytes += bytes
 		if err != nil {
 			return err, totalStoredFieldsBytes

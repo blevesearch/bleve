@@ -1203,6 +1203,96 @@ func TestStoredFieldPreserved(t *testing.T) {
 	}
 }
 
+func TestStoredFieldProjection(t *testing.T) {
+	idx, err := New(filepath.Join(t.TempDir(), "index"), NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := idx.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	const title = "service dashboard"
+	for _, id := range []string{"a", "b"} {
+		err := idx.Index(id, map[string]interface{}{
+			"title": title,
+			"tags":  []string{"red", "blue"},
+			"count": float64(3),
+			"live":  true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tags := []interface{}{"red", "blue"}
+	for _, tc := range []struct {
+		name   string
+		fields []string
+		want   map[string]interface{}
+	}{
+		{name: "highlight only"},
+		{name: "single field", fields: []string{"title"}, want: map[string]interface{}{"title": title}},
+		{
+			name:   "named fields",
+			fields: []string{"live", "tags", "missing", "count", "tags"},
+			want:   map[string]interface{}{"tags": tags, "count": float64(3), "live": true},
+		},
+		{
+			name:   "wildcard",
+			fields: []string{"*"},
+			want:   map[string]interface{}{"title": title, "tags": tags, "count": float64(3), "live": true},
+		},
+		{
+			name:   "wildcard with repeated name",
+			fields: []string{"tags", "*", "tags", "*"},
+			want:   map[string]interface{}{"title": title, "tags": []interface{}{"red", "blue", "red", "blue"}, "count": float64(3), "live": true},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			query := NewMatchQuery("service")
+			query.SetField("title")
+			req := NewSearchRequest(query)
+			req.Fields = tc.fields
+			req.Highlight = NewHighlight()
+			req.Highlight.AddField("title")
+			res, err := idx.Search(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(res.Hits) != 2 {
+				t.Fatalf("expected 2 hits, got %d", len(res.Hits))
+			}
+			for _, hit := range res.Hits {
+				if !reflect.DeepEqual(hit.Fields, tc.want) {
+					t.Errorf("hit %q fields = %#v, want %#v", hit.ID, hit.Fields, tc.want)
+				}
+				if len(hit.Fragments["title"]) == 0 {
+					t.Errorf("hit %q has no title highlights", hit.ID)
+				}
+			}
+		})
+	}
+
+	t.Run("missing document", func(t *testing.T) {
+		advanced, err := idx.Advanced()
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader, err := advanced.Reader()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer reader.Close()
+		req := &SearchRequest{Fields: []string{"title", "tags"}}
+		err, cost := LoadAndHighlightFields(&search.DocumentMatch{ID: "missing"}, req, "", reader, nil)
+		if err != ErrorIndexReadInconsistency || cost != 0 {
+			t.Fatalf("missing document cost = %d, err = %v", cost, err)
+		}
+	})
+}
+
 func TestDict(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
