@@ -89,21 +89,25 @@ func ReciprocalRankFusion(hits search.DocumentMatchCollection, weights []float64
 	}
 
 	// Code from here is to calculate knn ranks and scores
+	// Keep small result sets on the stack; larger sets reuse one allocation
+	// across all KNN sources.
+	var local [smallFusionBufferSize]scoredDocumentMatch
+	var scratch []scoredDocumentMatch
+	if numKNNQueries > 0 {
+		if nHits <= len(local) {
+			scratch = local[:nHits]
+		} else {
+			scratch = make([]scoredDocumentMatch, nHits)
+		}
+	}
 	// iterate over each knn query and calculate knn rank+scores
 	for queryIdx := 0; queryIdx < numKNNQueries; queryIdx++ {
 		knnWeight := weights[queryIdx+1]
 		// Sorts hits in decreasing order of hit.ScoreBreakdown[i]
-		sortDocMatchesByBreakdown(hits, queryIdx)
+		knnHits := sortDocMatchesByBreakdown(hits, queryIdx, scratch)
 
-		for i := 0; i < nHits; i++ {
-			// break if score breakdown doesn't exist (sort function puts these hits at the end)
-			// or if we go past the windowSize
-			_, scoreBreakdownExists := scoreBreakdownForQuery(hits[i], queryIdx)
-			if i >= windowSize || !scoreBreakdownExists {
-				break
-			}
-
-			hit := hits[i]
+		for i := 0; i < min(len(knnHits), windowSize); i++ {
+			hit := knnHits[i].hit
 			contrib := knnWeight * rankReciprocals[i]
 			hit.Score += contrib
 
