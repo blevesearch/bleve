@@ -3288,6 +3288,179 @@ func foldToASCII(input []rune, inputPos int, output []rune, outputPos int, lengt
 				output[outputPos] = ')'
 				outputPos++
 
+			case '\u00BC': // ¼ [VULGAR FRACTION ONE QUARTER]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '1'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '4'
+				outputPos++
+
+			case '\u00BD': // ½ [VULGAR FRACTION ONE HALF]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '1'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '2'
+				outputPos++
+
+			case '\u00BE': // ¾ [VULGAR FRACTION THREE QUARTERS]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '3'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '4'
+				outputPos++
+
+			case '\u2150': // ⅐ [VULGAR FRACTION ONE SEVENTH]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '1'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '7'
+				outputPos++
+
+			case '\u2151': // ⅑ [VULGAR FRACTION ONE NINTH]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '1'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '9'
+				outputPos++
+
+			case '\u2152': // ⅒ [VULGAR FRACTION ONE TENTH]
+				output = output[:(len(output) + 3)]
+				output[outputPos] = '1'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '1'
+				outputPos++
+				output[outputPos] = '0'
+				outputPos++
+
+			case '\u2153': // ⅓ [VULGAR FRACTION ONE THIRD]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '1'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '3'
+				outputPos++
+
+			case '\u2154': // ⅔ [VULGAR FRACTION TWO THIRDS]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '2'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '3'
+				outputPos++
+
+			case '\u2155': // ⅕ [VULGAR FRACTION ONE FIFTH]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '1'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '5'
+				outputPos++
+
+			case '\u2156': // ⅖ [VULGAR FRACTION TWO FIFTHS]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '2'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '5'
+				outputPos++
+
+			case '\u2157': // ⅗ [VULGAR FRACTION THREE FIFTHS]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '3'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '5'
+				outputPos++
+
+			case '\u2158': // ⅘ [VULGAR FRACTION FOUR FIFTHS]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '4'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '5'
+				outputPos++
+
+			case '\u2159': // ⅙ [VULGAR FRACTION ONE SIXTH]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '1'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '6'
+				outputPos++
+
+			case '\u215A': // ⅚ [VULGAR FRACTION FIVE SIXTHS]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '5'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '6'
+				outputPos++
+
+			case '\u215B': // ⅛ [VULGAR FRACTION ONE EIGHTH]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '1'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '8'
+				outputPos++
+
+			case '\u215C': // ⅜ [VULGAR FRACTION THREE EIGHTHS]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '3'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '8'
+				outputPos++
+
+			case '\u215D': // ⅝ [VULGAR FRACTION FIVE EIGHTHS]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '5'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '8'
+				outputPos++
+
+			case '\u215E': // ⅞ [VULGAR FRACTION SEVEN EIGHTHS]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '7'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '8'
+				outputPos++
+
+			case '\u2189': // ↉ [VULGAR FRACTION ZERO THIRDS]
+				output = output[:(len(output) + 2)]
+				output[outputPos] = '0'
+				outputPos++
+				output[outputPos] = '/'
+				outputPos++
+				output[outputPos] = '3'
+				outputPos++
+
 			case '\u00AB': // « [LEFT-POINTING DOUBLE ANGLE QUOTATION MARK]
 				fallthrough
 			case '\u00BB': // » [RIGHT-POINTING DOUBLE ANGLE QUOTATION MARK]
