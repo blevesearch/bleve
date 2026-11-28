@@ -68,3 +68,35 @@ func TestDocumentMatchPool(t *testing.T) {
 		t.Fatalf("expected avail cap mpore than 10, got %d", cap(dmp.avail))
 	}
 }
+
+func TestDocumentMatchPoolAcrossBlocks(t *testing.T) {
+	const size = 129
+	pool := NewDocumentMatchPool(size, 2)
+	fallback := &DocumentMatch{}
+	calls := 0
+	pool.TooSmall = func(*DocumentMatchPool) *DocumentMatch {
+		calls++
+		return fallback
+	}
+
+	seen := make(map[*DocumentMatch]bool, size)
+	for i := 0; i < size; i++ {
+		match := pool.Get()
+		if calls != 0 || seen[match] || cap(match.Sort) < 2 {
+			t.Fatalf("unexpected allocation at match %d", i)
+		}
+		seen[match] = true
+	}
+	if pool.Get() != fallback || calls != 1 {
+		t.Fatal("overflow must invoke TooSmall")
+	}
+
+	for match := range seen {
+		match.ID = "recycled"
+		pool.Put(match)
+		reused := pool.Get()
+		if reused != match || reused.ID != "" || calls != 1 {
+			t.Fatal("returned matches must be reset and reused before calling TooSmall")
+		}
+	}
+}
